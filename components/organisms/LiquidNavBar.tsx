@@ -35,10 +35,10 @@ export const DEFAULT_TABS: NavTab[] = [
 /// re-exported from a uniform Figma canvas (e.g., 40x40 with consistent
 /// inner padding).
 const ICON_OPTICAL_HEIGHT: Record<NavTabKey, number> = {
-  discovery: 28,   // wide source, content fills well
-  chat:      28,   // wide source, content fills well
-  projects:  32,   // compact source, scales up to match
-  profile:   32,   // narrow source content, scales up to match
+  discovery: 24,   // wide source, content fills well
+  chat:      24,   // wide source, content fills well
+  projects:  28,   // compact source, scales up to match
+  profile:   28,   // narrow source content, scales up to match
 };
 
 interface Props {
@@ -59,7 +59,7 @@ export function LiquidNavBar({ tabs = DEFAULT_TABS, activeKey, onChange }: Props
   };
 
   return (
-    <View style={[styles.bar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+    <View style={[styles.bar, { paddingBottom: Math.max(insets.bottom, 8) }]}>
       {tabs.map((tab) => {
         const active = tab.key === activeKey;
         return (
@@ -100,9 +100,13 @@ const styles = StyleSheet.create({
   bar: {
     flexDirection: 'row',
     backgroundColor: Brand.navBarBg,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingTop: 16,
+    // 20pt top corner radius — slightly softer than 24, matches iOS HIG
+    // for sheet-anchored tab bars
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    // 10pt top padding (was 16) — brings total bar height closer to iOS
+    // HIG's 49pt tab bar + safe area, while preserving 44pt min touch target
+    paddingTop: 10,
     paddingHorizontal: 8,
     // Subtle top highlight via overlay border
     borderTopWidth: 0.5,
@@ -137,6 +141,6 @@ const styles = StyleSheet.create({
   label: {
     ...TypeScale.nav,
     color: Brand.inkOnBrand,
-    marginTop: 6,
+    marginTop: 4,
   },
 });
