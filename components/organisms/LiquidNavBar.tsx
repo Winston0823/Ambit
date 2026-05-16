@@ -37,8 +37,8 @@ export const DEFAULT_TABS: NavTab[] = [
 const ICON_OPTICAL_HEIGHT: Record<NavTabKey, number> = {
   discovery: 24,   // wide source, content fills well
   chat:      24,   // wide source, content fills well
-  projects:  28,   // compact source, scales up to match
-  profile:   28,   // narrow source content, scales up to match
+  projects:  24,   // wide aspect (1.30) → less height than Profile to match its visual footprint
+  profile:   28,   // square source — gets the most height for optical parity
 };
 
 interface Props {
