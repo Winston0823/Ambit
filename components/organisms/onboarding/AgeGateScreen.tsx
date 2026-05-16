@@ -138,14 +138,14 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   numActive: {
-    fontSize: 128,
+    fontSize: 96,
     color: Brand.inkPrimary,
-    lineHeight: 144,
+    lineHeight: 110,
   },
   numInactive: {
-    fontSize: 80,
+    fontSize: 56,
     color: Brand.inkPrimary,
     opacity: 0.25,
-    lineHeight: 90,
+    lineHeight: 70,
   },
 });

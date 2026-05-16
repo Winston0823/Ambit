@@ -27,21 +27,18 @@ export function RoleDeclarationScreen({ onBack, onContinue }: Props) {
           <OptionCard
             title="Project Owner"
             subtitle={`I have an idea and I'm building\na team around it`}
-            variant="neutral"
             selected={profile.role === 'owner'}
             onPress={() => pick('owner')}
           />
           <OptionCard
             title="Project Seeker"
             subtitle={`I want to find a project and\ncontribute my skills`}
-            variant="seeker"
             selected={profile.role === 'seeker'}
             onPress={() => pick('seeker')}
           />
           <OptionCard
             title="Both"
             subtitle={`I'm running a project and open\nto joining others too`}
-            variant="neutral"
             selected={profile.role === 'both'}
             onPress={() => pick('both')}
           />

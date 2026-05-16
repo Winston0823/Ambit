@@ -81,8 +81,8 @@ const styles = StyleSheet.create({
     fontSize: 17,
   },
   arrow: {
-    width: 32,
-    height: 10,
-    tintColor: undefined, // keep original colors (the swirl is white-on-tan in the asset)
+    width: 52,
+    height: 18,
+    marginLeft: 6,
   },
 });
