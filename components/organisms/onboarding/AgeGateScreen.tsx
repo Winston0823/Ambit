@@ -1,5 +1,5 @@
-import React, { useRef } from 'react';
-import { PanResponder, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { FlatList, NativeScrollEvent, NativeSyntheticEvent, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BackChevron } from '../../atoms';
 import { OnboardingContinue } from '../../molecules';
@@ -8,37 +8,75 @@ import { Brand, AmbitFont, Space } from '../../../constants/theme';
 
 interface Props { onBack: () => void; onContinue: () => void; }
 
-/// S-005 Age Gate — slot-machine 17 / 18 / 19. Swipe to change.
+const ITEM_WIDTH = 96;        // each age cell width
+const AGES = Array.from({ length: 50 - 13 + 1 }, (_, i) => 13 + i);  // 13..50
+
+/// S-005 Age Gate. Scrollable horizontal age wheel with center-snap.
+/// Whichever age is centered = selected. Side ages are dimmed.
 export function AgeGateScreen({ onBack, onContinue }: Props) {
   const { profile, update } = useOnboarding();
-  const isValid = profile.age >= 18;
+  const listRef = useRef<FlatList<number>>(null);
+  const [windowWidth, setWindowWidth] = useState(402);
 
-  const pan = useRef(
-    PanResponder.create({
-      onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > 20,
-      onPanResponderEnd: (_, g) => {
-        if (g.dx < -40) update('age', profile.age + 1);
-        else if (g.dx > 40) update('age', Math.max(13, profile.age - 1));
-      },
-    }),
-  ).current;
+  const sidePadding = (windowWidth - ITEM_WIDTH) / 2;
+
+  // Scroll to the current age on mount
+  useEffect(() => {
+    if (windowWidth === 402) return; // wait for layout
+    const idx = AGES.indexOf(profile.age);
+    if (idx >= 0) {
+      listRef.current?.scrollToOffset({ offset: idx * ITEM_WIDTH, animated: false });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [windowWidth]);
+
+  const onMomentumEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const x = e.nativeEvent.contentOffset.x;
+    const idx = Math.round(x / ITEM_WIDTH);
+    const newAge = AGES[Math.max(0, Math.min(AGES.length - 1, idx))];
+    if (newAge !== profile.age) update('age', newAge);
+  };
+
+  const isValid = profile.age >= 18;
 
   return (
     <SafeAreaView style={styles.root}>
       <BackChevron onPress={onBack} />
 
-      <View style={styles.spacer} />
+      <View
+        style={styles.content}
+        onLayout={(e) => setWindowWidth(e.nativeEvent.layout.width)}
+      >
+        <Text style={styles.headline}>What is your age?</Text>
+        <Text style={styles.subtitle}>We bring the brightest college students together</Text>
 
-      <Text style={styles.headline}>What is your age?</Text>
-      <Text style={styles.subtitle}>We bring the brightest college students together</Text>
-
-      <View style={styles.slotRow} {...pan.panHandlers}>
-        <Text style={[styles.numSm, { opacity: 0.3 }]}>{profile.age - 1}</Text>
-        <Text style={styles.numLg}>{profile.age}</Text>
-        <Text style={[styles.numSm, { opacity: 0.3 }]}>{profile.age + 1}</Text>
+        <View style={styles.wheelWrap}>
+          <FlatList
+            ref={listRef}
+            data={AGES}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            keyExtractor={(n) => String(n)}
+            getItemLayout={(_, i) => ({ length: ITEM_WIDTH, offset: ITEM_WIDTH * i, index: i })}
+            snapToInterval={ITEM_WIDTH}
+            decelerationRate="fast"
+            contentContainerStyle={{ paddingHorizontal: sidePadding }}
+            onMomentumScrollEnd={onMomentumEnd}
+            renderItem={({ item }) => (
+              <View style={styles.cell}>
+                <Text
+                  style={[
+                    styles.num,
+                    item === profile.age ? styles.numActive : styles.numInactive,
+                  ]}
+                >
+                  {item}
+                </Text>
+              </View>
+            )}
+          />
+        </View>
       </View>
-
-      <View style={{ flex: 1 }} />
 
       <OnboardingContinue onPress={onContinue} disabled={!isValid} />
     </SafeAreaView>
@@ -46,20 +84,37 @@ export function AgeGateScreen({ onBack, onContinue }: Props) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, paddingHorizontal: 16, backgroundColor: Brand.canvas },
-  spacer: { height: 220 },
-  headline: { fontFamily: AmbitFont.display, fontSize: 36, color: Brand.inkPrimary },
+  root: { flex: 1, backgroundColor: Brand.canvas },
+  content: {
+    flex: 1,
+    paddingHorizontal: Space.lg,
+    justifyContent: 'center',
+  },
+  headline: {
+    fontFamily: AmbitFont.display, fontSize: 36, color: Brand.inkPrimary,
+  },
   subtitle: {
     fontFamily: AmbitFont.body, fontSize: 16, color: Brand.inkMuted,
-    marginTop: 16, maxWidth: 250,
+    marginTop: 16, maxWidth: 260,
   },
-  slotRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    justifyContent: 'space-between',
-    marginTop: 80,
-    paddingHorizontal: 8,
+  wheelWrap: {
+    marginTop: 60,
+    marginHorizontal: -Space.lg,   // expand to full width
+    height: 160,
   },
-  numLg: { fontFamily: AmbitFont.display, fontSize: 128, color: Brand.inkPrimary },
-  numSm: { fontFamily: AmbitFont.display, fontSize: 96, color: Brand.inkPrimary },
+  cell: {
+    width: ITEM_WIDTH,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  num: { fontFamily: AmbitFont.display },
+  numActive: {
+    fontSize: 128,
+    color: Brand.inkPrimary,
+  },
+  numInactive: {
+    fontSize: 96,
+    color: Brand.inkPrimary,
+    opacity: 0.3,
+  },
 });

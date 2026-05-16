@@ -1,6 +1,5 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, ViewStyle, TextStyle } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Image, Pressable, StyleSheet, Text, ViewStyle, TextStyle } from 'react-native';
 import { Brand, Radii, AmbitFont } from '../../constants/theme';
 
 type Variant = 'primary' | 'secondary' | 'ghost';
@@ -14,8 +13,8 @@ interface Props {
   style?: ViewStyle;
 }
 
-/// Primary CTA: warm-tan fill, white label, 12pt radius, optional arrow.
-/// Spec § design tokens — Onboarding Continue button.
+/// Primary CTA. Warm-tan fill, white label, 12pt radius.
+/// `trailingArrow` renders the hand-drawn swirl arrow from Figma (assets/icons/ArrowSwirl).
 export function Button({
   title,
   onPress,
@@ -38,7 +37,11 @@ export function Button({
     >
       <Text style={[styles.label, tones.label]}>{title}</Text>
       {trailingArrow && (
-        <Feather name="arrow-right" size={14} color={tones.label.color as string} />
+        <Image
+          source={require('../../assets/icons/ArrowSwirl.png')}
+          style={styles.arrow}
+          resizeMode="contain"
+        />
       )}
     </Pressable>
   );
@@ -71,10 +74,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: 10,
   },
   label: {
     fontFamily: AmbitFont.body,
     fontSize: 17,
+  },
+  arrow: {
+    width: 32,
+    height: 10,
+    tintColor: undefined, // keep original colors (the swirl is white-on-tan in the asset)
   },
 });

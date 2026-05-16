@@ -9,6 +9,7 @@ import { Brand, AmbitFont, Space } from '../../../constants/theme';
 interface Props { onBack: () => void; onContinue: () => void; }
 
 /// S-009 Role Declaration. Three cards: Owner / Seeker (themed) / Both.
+/// Selected card uses warm-tan fill (matches Figma "yellow tint = selection").
 export function RoleDeclarationScreen({ onBack, onContinue }: Props) {
   const { profile, update } = useOnboarding();
 
@@ -17,36 +18,35 @@ export function RoleDeclarationScreen({ onBack, onContinue }: Props) {
   return (
     <SafeAreaView style={styles.root}>
       <BackChevron onPress={onBack} />
-      <View style={{ height: 16 }} />
 
-      <Text style={styles.headline}>What are you looking for?</Text>
-      <Text style={styles.subtitle}>This shapes your entire experience on Ambit</Text>
+      <View style={styles.content}>
+        <Text style={styles.headline}>What are you looking for?</Text>
+        <Text style={styles.subtitle}>This shapes your entire experience on Ambit</Text>
 
-      <View style={styles.cards}>
-        <OptionCard
-          title="Project Owner"
-          subtitle={`I have an idea and I'm building\na team around it`}
-          variant="neutral"
-          selected={profile.role === 'owner'}
-          onPress={() => pick('owner')}
-        />
-        <OptionCard
-          title="Project Seeker"
-          subtitle={`I want to find a project and\ncontribute my skills`}
-          variant="seeker"
-          selected={profile.role === 'seeker'}
-          onPress={() => pick('seeker')}
-        />
-        <OptionCard
-          title="Both"
-          subtitle={`I'm running a project and open\nto joining others too`}
-          variant="neutral"
-          selected={profile.role === 'both'}
-          onPress={() => pick('both')}
-        />
+        <View style={styles.cards}>
+          <OptionCard
+            title="Project Owner"
+            subtitle={`I have an idea and I'm building\na team around it`}
+            variant="neutral"
+            selected={profile.role === 'owner'}
+            onPress={() => pick('owner')}
+          />
+          <OptionCard
+            title="Project Seeker"
+            subtitle={`I want to find a project and\ncontribute my skills`}
+            variant="seeker"
+            selected={profile.role === 'seeker'}
+            onPress={() => pick('seeker')}
+          />
+          <OptionCard
+            title="Both"
+            subtitle={`I'm running a project and open\nto joining others too`}
+            variant="neutral"
+            selected={profile.role === 'both'}
+            onPress={() => pick('both')}
+          />
+        </View>
       </View>
-
-      <View style={{ flex: 1 }} />
 
       <OnboardingContinue onPress={onContinue} disabled={profile.role === null} />
     </SafeAreaView>
@@ -55,6 +55,7 @@ export function RoleDeclarationScreen({ onBack, onContinue }: Props) {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Brand.canvas },
+  content: { flex: 1, justifyContent: 'center', paddingBottom: 60 },
   headline: {
     fontFamily: AmbitFont.display, fontSize: 30, color: Brand.inkPrimary,
     paddingHorizontal: Space.lg,
@@ -64,8 +65,8 @@ const styles = StyleSheet.create({
     marginTop: 12, paddingHorizontal: Space.lg,
   },
   cards: {
-    marginTop: 18,
+    marginTop: 32,
     paddingHorizontal: 16,
-    gap: 22,
+    gap: 16,
   },
 });

@@ -12,8 +12,11 @@ interface Props {
   onPress?: () => void;
 }
 
-/// Option card used in role-declaration, campus, etc.
-/// Spec § design tokens — Role declaration card (354×104, radius 16, 20pt inner padding).
+/// Option card used in role-declaration etc.
+/// Default state:
+///   neutral → surface2 fill, ink-high title, ink-muted subtitle
+///   seeker  → seekerSurface fill, seekerInk title, accent subtitle
+/// Selected state: warm-tan fill, white ink (matches Figma yellow tint = selection).
 export function OptionCard({
   title,
   subtitle,
@@ -22,31 +25,24 @@ export function OptionCard({
   onPress,
 }: Props) {
   const seeker = variant === 'seeker';
+
+  let bg: string = seeker ? Brand.seekerSurface : Brand.surface2;
+  let titleColor: string = seeker ? Brand.seekerInk : Brand.inkHigh;
+  let subColor: string = seeker ? Brand.accent : Brand.inkMuted;
+
+  if (selected) {
+    bg = Brand.primary;
+    titleColor = Brand.inkOnBrand;
+    subColor = 'rgba(255,255,255,0.88)';
+  }
+
   return (
     <Pressable
       onPress={onPress}
-      style={[
-        styles.card,
-        seeker ? styles.seekerBg : styles.neutralBg,
-        selected && styles.selected,
-      ]}
+      style={[styles.card, { backgroundColor: bg }]}
     >
-      <Text
-        style={[
-          styles.title,
-          { color: seeker ? Brand.seekerInk : Brand.inkHigh },
-        ]}
-      >
-        {title}
-      </Text>
-      <Text
-        style={[
-          styles.subtitle,
-          { color: seeker ? Brand.accent : Brand.inkMuted },
-        ]}
-      >
-        {subtitle}
-      </Text>
+      <Text style={[styles.title, { color: titleColor }]}>{title}</Text>
+      <Text style={[styles.subtitle, { color: subColor }]}>{subtitle}</Text>
     </Pressable>
   );
 }
@@ -57,12 +53,7 @@ const styles = StyleSheet.create({
     borderRadius: Radii.lg,
     paddingHorizontal: 20,
     paddingVertical: 20,
-    borderWidth: 2,
-    borderColor: 'transparent',
   },
-  neutralBg: { backgroundColor: Brand.surface2 },
-  seekerBg:  { backgroundColor: Brand.seekerSurface },
-  selected:  { borderColor: Brand.accent },
   title: {
     fontFamily: AmbitFont.body,
     fontSize: 16,

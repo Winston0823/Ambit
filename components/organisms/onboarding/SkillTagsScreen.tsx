@@ -12,7 +12,7 @@ interface Props { onBack: () => void; onContinue: () => void; }
 const MIN_SELECTED = 2;
 const MAX_SELECTED = 8;
 
-/// S-008 Skill Tag Selector. ≥2 required, max 8.
+/// S-008 Skill Tag Selector.
 export function SkillTagsScreen({ onBack, onContinue }: Props) {
   const { profile, update } = useOnboarding();
   const selected = profile.skills;
@@ -30,7 +30,6 @@ export function SkillTagsScreen({ onBack, onContinue }: Props) {
   return (
     <SafeAreaView style={styles.root}>
       <BackChevron onPress={onBack} />
-      <View style={{ height: 16 }} />
 
       <View style={styles.titleRow}>
         <Text style={styles.headline}>What are you{'\n'}good at?</Text>
@@ -72,6 +71,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     justifyContent: 'space-between',
     paddingHorizontal: Space.lg,
+    marginTop: 16,
   },
   headline: {
     fontFamily: AmbitFont.display,
@@ -96,9 +96,7 @@ const styles = StyleSheet.create({
     paddingTop: Space.xl,
     paddingBottom: 24,
   },
-  category: {
-    marginBottom: Space.xxl,
-  },
+  category: { marginBottom: Space.xxl },
   categoryLabel: {
     fontFamily: AmbitFont.body,
     fontSize: 11,
@@ -106,9 +104,5 @@ const styles = StyleSheet.create({
     color: Brand.inkLabel,
     marginBottom: 16,
   },
-  chipRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
 });
