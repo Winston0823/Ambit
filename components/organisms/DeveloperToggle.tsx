@@ -1,10 +1,13 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import Animated, { useAnimatedStyle, withSpring } from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
-import { Colors, Spacing, Typography, SpringConfig } from '../../constants/theme';
+import { Colors, Spacing, Typography } from '../../constants/theme';
 import { useRole, Role } from '../../context/RoleContext';
 import { Icon } from '../atoms';
+
+// Reanimated removed — same worklet-plugin issue as in CandidateCard/StartupCard.
+// Indicator now jumps statically. Restore springy transition later with a
+// proper reanimated v4 + worklets setup.
 
 export function DeveloperToggle() {
   const { role, setRole } = useRole();
@@ -16,10 +19,6 @@ export function DeveloperToggle() {
     router.replace(newRole === 'founder' ? '/(founder)/feed' : '/(candidate)/feed');
   };
 
-  const indicatorStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: withSpring(role === 'founder' ? 0 : 130, SpringConfig.toggle) }],
-  }));
-
   return (
     <View style={styles.container}>
       <View style={styles.labelRow}>
@@ -27,7 +26,12 @@ export function DeveloperToggle() {
         <Text style={styles.label}>Switch view</Text>
       </View>
       <View style={styles.track}>
-        <Animated.View style={[styles.indicator, indicatorStyle]} />
+        <View
+          style={[
+            styles.indicator,
+            { transform: [{ translateX: role === 'founder' ? 0 : 130 }] },
+          ]}
+        />
         <TouchableOpacity
           style={styles.option}
           onPress={() => handleSwitch('founder')}
