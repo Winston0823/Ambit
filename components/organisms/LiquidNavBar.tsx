@@ -100,10 +100,9 @@ const styles = StyleSheet.create({
   bar: {
     flexDirection: 'row',
     backgroundColor: Brand.navBarBg,
-    // 20pt top corner radius — slightly softer than 24, matches iOS HIG
-    // for sheet-anchored tab bars
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    // 10pt top corner radius — tighter, more iOS-system tab-bar shape
+    borderTopLeftRadius: 10,
+    borderTopRightRadius: 10,
     // 10pt top padding (was 16) — brings total bar height closer to iOS
     // HIG's 49pt tab bar + safe area, while preserving 44pt min touch target
     paddingTop: 10,
