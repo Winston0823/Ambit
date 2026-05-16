@@ -28,6 +28,19 @@ export const DEFAULT_TABS: NavTab[] = [
   { key: 'profile',   label: 'Profile',   icon: require('../../assets/icons/nav/ProfileIcon.png') },
 ];
 
+/// Per-icon optical height. Compensates for different source PNG content
+/// densities so every icon FEELS the same size to the eye, even though the
+/// underlying images have different internal padding. Tuned by visual diff
+/// against the Figma reference. Replace these once all four PNGs are
+/// re-exported from a uniform Figma canvas (e.g., 40x40 with consistent
+/// inner padding).
+const ICON_OPTICAL_HEIGHT: Record<NavTabKey, number> = {
+  discovery: 28,   // wide source, content fills well
+  chat:      28,   // wide source, content fills well
+  projects:  32,   // compact source, scales up to match
+  profile:   32,   // narrow source content, scales up to match
+};
+
 interface Props {
   tabs?: NavTab[];
   activeKey: NavTabKey;
@@ -58,7 +71,12 @@ export function LiquidNavBar({ tabs = DEFAULT_TABS, activeKey, onChange }: Props
             accessibilityLabel={tab.label}
             accessibilityState={{ selected: active }}
           >
-            <View style={[styles.iconBox, { opacity: active ? 1 : 0.62 }]}>
+            <View
+              style={[
+                styles.iconBox,
+                { height: ICON_OPTICAL_HEIGHT[tab.key], opacity: active ? 1 : 0.62 },
+              ]}
+            >
               <Image
                 source={tab.icon}
                 style={styles.icon}
@@ -101,14 +119,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   iconBox: {
-    width: 32,
-    height: 32,
+    // Width is uniform (visual column); height varies per tab below for
+    // optical balance, because the source PNGs have different internal
+    // padding / content densities. iOS HIG calls this "optical sizing".
+    // Root fix is to standardize Figma export canvases — this compensates
+    // until then.
+    width: 36,
     alignItems: 'center',
     justifyContent: 'center',
   },
   icon: {
-    height: 32,
-    width: 32,
+    // Image fills its iconBox; resizeMode='contain' on the Image element
+    // keeps aspect ratio without cropping.
+    height: '100%',
+    width: '100%',
   },
   label: {
     ...TypeScale.nav,
