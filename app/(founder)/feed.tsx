@@ -1,51 +1,30 @@
-import React, { useCallback, useRef, useMemo } from 'react';
-import { Alert, View } from 'react-native';
-import { FeedTemplate } from '../../components/templates';
-import { CandidateCard } from '../../components/organisms';
-import { ProfileSidebar } from '../../components/organisms';
-import { candidates } from '../../data/candidates';
-import { Candidate } from '../../data/types';
-import BottomSheet from '@gorhom/bottom-sheet';
-import { Colors, Spacing } from '../../constants/theme';
-import { useState } from 'react';
+import React from 'react';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Brand, AmbitFont } from '../../constants/theme';
 
+/// Owner Feed (S-025). Placeholder until real feed is wired.
 export default function FounderFeed() {
-  const bottomSheetRef = useRef<BottomSheet>(null);
-  const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(null);
-  const snapPoints = useMemo(() => ['60%', '90%'], []);
-
-  const handlePress = useCallback((candidate: Candidate) => {
-    setSelectedCandidate(candidate);
-    bottomSheetRef.current?.snapToIndex(0);
-  }, []);
-
   return (
-    <View style={{ flex: 1 }}>
-      <FeedTemplate
-        title="Candidates near you"
-        data={candidates}
-        keyExtractor={(item) => item.id}
-        renderCard={(item: Candidate, index: number) => (
-          <CandidateCard
-            candidate={item}
-            index={index}
-            onChat={() => Alert.alert('Chat', `Start chat with ${item.name}`)}
-            onPass={() => Alert.alert('Passed', `Passed on ${item.name}`)}
-            onSave={() => Alert.alert('Saved', `Saved ${item.name}`)}
-            onPress={() => handlePress(item)}
-          />
-        )}
-      />
-      <BottomSheet
-        ref={bottomSheetRef}
-        index={-1}
-        snapPoints={snapPoints}
-        enablePanDownToClose
-        backgroundStyle={{ backgroundColor: Colors.warmWhite, borderRadius: 20 }}
-        handleIndicatorStyle={{ backgroundColor: Colors.textTertiary, width: 40 }}
-      >
-        {selectedCandidate && <ProfileSidebar candidate={selectedCandidate} />}
-      </BottomSheet>
-    </View>
+    <ScrollView style={styles.root} contentContainerStyle={styles.content}>
+      <Text style={styles.eyebrow}>CANDIDATES</Text>
+      <Text style={styles.title}>Who's looking</Text>
+
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>No candidates yet</Text>
+        <Text style={styles.cardBody}>
+          Once you publish a project, matching candidates appear here. Spec § 8.3.
+        </Text>
+      </View>
+    </ScrollView>
   );
 }
+
+const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: Brand.canvas },
+  content: { paddingHorizontal: 24, paddingTop: 24, gap: 24 },
+  eyebrow: { fontFamily: AmbitFont.body, fontSize: 11, letterSpacing: 1.2, color: Brand.inkLabel },
+  title: { fontFamily: AmbitFont.display, fontSize: 30, color: Brand.inkPrimary, marginTop: -16 },
+  card: { backgroundColor: Brand.surface1, borderRadius: 16, padding: 24 },
+  cardTitle: { fontFamily: AmbitFont.body, fontSize: 16, fontWeight: '600', color: Brand.inkHigh },
+  cardBody: { fontFamily: AmbitFont.body, fontSize: 13, color: Brand.inkMuted, marginTop: 6, lineHeight: 19 },
+});
