@@ -19,8 +19,9 @@ const AGES = Array.from({ length: 50 - 13 + 1 }, (_, i) => 13 + i);  // 13..50
 
 /// S-005 Age Gate. Wheel-style scrollable picker.
 /// Only -1 / current / +1 are visible at any time (3 items fit the viewport).
-/// Middle item is huge (128pt) and full opacity; sides are smaller and faded.
-/// Continue is a full-width tan pill anchored at the bottom.
+/// All three digits share the SAME baseline (cells flex to flex-end with
+/// lineHeight === fontSize) — the active one is just larger, rising upward
+/// from the common baseline. Inactive sides are smaller and faded.
 export function AgeGateScreen({ onBack, onContinue }: Props) {
   const { profile, update } = useOnboarding();
   const listRef = useRef<FlatList<number>>(null);
@@ -126,26 +127,26 @@ const styles = StyleSheet.create({
     maxWidth: 280,
   },
   wheelWrap: {
-    height: 180,
+    height: 130,
     marginTop: 48,
   },
   cell: {
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'flex-end',  // all digits hug the same baseline
   },
   num: {
     fontFamily: AmbitFont.display,
     textAlign: 'center',
+    color: Brand.inkPrimary,
+    includeFontPadding: false,   // strip Android extra leading
   },
   numActive: {
     fontSize: 96,
-    color: Brand.inkPrimary,
-    lineHeight: 110,
+    lineHeight: 96,              // line box = glyph → no extra leading shifts the baseline
   },
   numInactive: {
     fontSize: 56,
-    color: Brand.inkPrimary,
+    lineHeight: 56,
     opacity: 0.25,
-    lineHeight: 70,
   },
 });
