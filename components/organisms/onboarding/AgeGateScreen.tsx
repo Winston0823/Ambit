@@ -83,13 +83,13 @@ export function AgeGateScreen({ onBack, onContinue }: Props) {
               const active = item === profile.age;
               return (
                 <View style={[styles.cell, { width: itemWidth }]}>
-                  <Text
-                    style={[
-                      styles.num,
-                      active ? styles.numActive : styles.numInactive,
-                    ]}
-                  >
-                    {item}
+                  {/* baselineRuler: invisible 96pt outer Text — every cell
+                      has the same line box, so every digit shares the same
+                      baseline regardless of the inner fontSize. */}
+                  <Text style={styles.baselineRuler}>
+                    <Text style={active ? styles.numActive : styles.numInactive}>
+                      {item}
+                    </Text>
                   </Text>
                 </View>
               );
@@ -132,21 +132,30 @@ const styles = StyleSheet.create({
   },
   cell: {
     alignItems: 'center',
-    justifyContent: 'flex-end',  // all digits hug the same baseline
+    justifyContent: 'center',
   },
-  num: {
+  /// 96pt transparent ruler: every cell renders a 96pt line box. Inner
+  /// digit Texts baseline-align to this run, so all visible numbers share
+  /// the same baseline whether the inner is 96pt or 56pt.
+  baselineRuler: {
     fontFamily: AmbitFont.display,
+    fontSize: 96,
+    lineHeight: 96,
+    color: 'transparent',
+    includeFontPadding: false,
     textAlign: 'center',
-    color: Brand.inkPrimary,
-    includeFontPadding: false,   // strip Android extra leading
   },
   numActive: {
+    fontFamily: AmbitFont.display,
     fontSize: 96,
-    lineHeight: 96,              // line box = glyph → no extra leading shifts the baseline
+    lineHeight: 96,
+    color: Brand.inkPrimary,
   },
   numInactive: {
+    fontFamily: AmbitFont.display,
     fontSize: 56,
     lineHeight: 56,
+    color: Brand.inkPrimary,
     opacity: 0.25,
   },
 });
