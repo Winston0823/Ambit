@@ -1,249 +1,118 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import {
+  Image,
+  ImageSourcePropType,
   Platform,
   Pressable,
   StyleSheet,
   Text,
   View,
-  LayoutChangeEvent,
 } from 'react-native';
-import { BlurView } from 'expo-blur';
-import { Feather } from '@expo/vector-icons';
-import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-  withSequence,
-  withTiming,
-  interpolate,
-  Extrapolation,
-} from 'react-native-reanimated';
-import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Palette } from '../../constants/theme';
+import * as Haptics from 'expo-haptics';
+import { Brand, Palette, TypeScale } from '../../constants/theme';
 
 export type NavTabKey = 'discovery' | 'chat' | 'projects' | 'profile';
 
 export interface NavTab {
   key: NavTabKey;
   label: string;
-  icon: keyof typeof Feather.glyphMap;
+  icon: ImageSourcePropType;
 }
 
+/// PNG icon assets. Metro auto-picks @1x/@2x/@3x from the same require().
 export const DEFAULT_TABS: NavTab[] = [
-  { key: 'discovery', label: 'Discovery', icon: 'compass' },
-  { key: 'chat', label: 'Chat', icon: 'message-circle' },
-  { key: 'projects', label: 'Projects', icon: 'folder' },
-  { key: 'profile', label: 'Profile', icon: 'user' },
+  { key: 'discovery', label: 'Discovery', icon: require('../../assets/icons/nav/DiscoveryIcon.png') },
+  { key: 'chat',      label: 'Chat',      icon: require('../../assets/icons/nav/ChatIcon.png') },
+  { key: 'projects',  label: 'Projects',  icon: require('../../assets/icons/nav/ProjectsIcon.png') },
+  { key: 'profile',   label: 'Profile',   icon: require('../../assets/icons/nav/ProfileIcon.png') },
 ];
 
-interface LiquidNavBarProps {
+interface Props {
   tabs?: NavTab[];
   activeKey: NavTabKey;
   onChange: (key: NavTabKey) => void;
 }
 
-const BAR_HORIZONTAL_MARGIN = 16;
-const BAR_INNER_PADDING = 6;
-const BAR_HEIGHT = 64;
-const SPRING = { damping: 18, stiffness: 220, mass: 0.9 };
-
-export function LiquidNavBar({
-  tabs = DEFAULT_TABS,
-  activeKey,
-  onChange,
-}: LiquidNavBarProps) {
+/// Anchored bottom tab bar. Full width, rounded top corners only, solid dark fill,
+/// PNG icons, active state via opacity. Mirrors the SwiftUI LiquidNavBar 1:1.
+export function LiquidNavBar({ tabs = DEFAULT_TABS, activeKey, onChange }: Props) {
   const insets = useSafeAreaInsets();
-  const [barWidth, setBarWidth] = useState(0);
 
-  const activeIndex = Math.max(
-    0,
-    tabs.findIndex((t) => t.key === activeKey),
-  );
-
-  const tabWidth = barWidth
-    ? (barWidth - BAR_INNER_PADDING * 2) / tabs.length
-    : 0;
-
-  const translateX = useSharedValue(0);
-  const stretch = useSharedValue(1);
-
-  useEffect(() => {
-    if (!tabWidth) return;
-    const target = BAR_INNER_PADDING + activeIndex * tabWidth;
-    translateX.value = withSpring(target, SPRING);
-    stretch.value = withSequence(
-      withTiming(1.18, { duration: 140 }),
-      withSpring(1, SPRING),
-    );
-  }, [activeIndex, tabWidth, translateX, stretch]);
-
-  const pillStyle = useAnimatedStyle(() => {
-    const squashY = interpolate(
-      stretch.value,
-      [1, 1.18],
-      [1, 0.92],
-      Extrapolation.CLAMP,
-    );
-    return {
-      transform: [
-        { translateX: translateX.value },
-        { scaleX: stretch.value },
-        { scaleY: squashY },
-      ],
-    };
-  });
-
-  const handlePress = (key: NavTabKey) => {
+  const handleTap = (key: NavTabKey) => {
     if (key === activeKey) return;
-    if (Platform.OS !== 'web') {
-      Haptics.selectionAsync().catch(() => {});
-    }
+    if (Platform.OS !== 'web') Haptics.selectionAsync().catch(() => {});
     onChange(key);
   };
 
-  const onLayout = (e: LayoutChangeEvent) => {
-    setBarWidth(e.nativeEvent.layout.width);
-  };
-
   return (
-    <View
-      pointerEvents="box-none"
-      style={[
-        styles.wrapper,
-        { paddingBottom: Math.max(insets.bottom, 12) },
-      ]}
-    >
-      <View style={styles.shadowFrame} onLayout={onLayout}>
-        <BlurView
-          intensity={Platform.OS === 'ios' ? 70 : 40}
-          tint="light"
-          style={StyleSheet.absoluteFillObject}
-        />
-        <View style={styles.creamTint} pointerEvents="none" />
-        <View style={styles.hairline} pointerEvents="none" />
-
-        {tabWidth > 0 && (
-          <Animated.View
-            pointerEvents="none"
-            style={[
-              styles.pill,
-              {
-                width: tabWidth,
-                left: 0,
-                top: BAR_INNER_PADDING,
-                bottom: BAR_INNER_PADDING,
-              },
-              pillStyle,
-            ]}
+    <View style={[styles.bar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+      {tabs.map((tab) => {
+        const active = tab.key === activeKey;
+        return (
+          <Pressable
+            key={tab.key}
+            onPress={() => handleTap(tab.key)}
+            style={styles.tab}
+            accessibilityRole="tab"
+            accessibilityLabel={tab.label}
+            accessibilityState={{ selected: active }}
           >
-            <View style={styles.pillFill} />
-            <View style={styles.pillHighlight} pointerEvents="none" />
-          </Animated.View>
-        )}
-
-        <View style={styles.row}>
-          {tabs.map((tab) => {
-            const active = tab.key === activeKey;
-            return (
-              <Pressable
-                key={tab.key}
-                onPress={() => handlePress(tab.key)}
-                style={styles.tab}
-                hitSlop={6}
-                accessibilityRole="tab"
-                accessibilityLabel={tab.label}
-                accessibilityState={{ selected: active }}
-              >
-                <Feather
-                  name={tab.icon}
-                  size={22}
-                  color={active ? Palette.white : Palette.warmGray}
-                  style={{ marginBottom: 2 }}
-                />
-                <Text
-                  style={[
-                    styles.label,
-                    { color: active ? Palette.white : Palette.warmGray },
-                  ]}
-                  numberOfLines={1}
-                >
-                  {tab.label}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      </View>
+            <View style={[styles.iconBox, { opacity: active ? 1 : 0.62 }]}>
+              <Image
+                source={tab.icon}
+                style={styles.icon}
+                resizeMode="contain"
+              />
+            </View>
+            <Text
+              style={[styles.label, { opacity: active ? 1 : 0.62 }]}
+              numberOfLines={1}
+            >
+              {tab.label}
+            </Text>
+          </Pressable>
+        );
+      })}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrapper: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    paddingHorizontal: BAR_HORIZONTAL_MARGIN,
-    alignItems: 'stretch',
-  },
-  shadowFrame: {
-    height: BAR_HEIGHT,
-    borderRadius: BAR_HEIGHT / 2,
-    overflow: 'hidden',
-    backgroundColor: 'rgba(255,255,255,0.30)',
-    shadowColor: Palette.glassShadow,
-    shadowOpacity: 1,
-    shadowRadius: 24,
-    shadowOffset: { width: 0, height: 12 },
-    elevation: 14,
-    borderWidth: Platform.OS === 'android' ? 1 : 0,
-    borderColor: 'rgba(255,255,255,0.5)',
-  },
-  creamTint: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: Palette.glassCreamTint,
-  },
-  hairline: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: 0,
-    height: 1,
-    backgroundColor: Palette.glassHairline,
-  },
-  row: {
-    flex: 1,
+  bar: {
     flexDirection: 'row',
-    paddingHorizontal: BAR_INNER_PADDING,
+    backgroundColor: Palette.pillInk,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingTop: 16,
+    paddingHorizontal: 8,
+    // Subtle top highlight via overlay border
+    borderTopWidth: 0.5,
+    borderTopColor: 'rgba(255,255,255,0.06)',
+    shadowColor: '#000',
+    shadowOpacity: 0.22,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: -6 },
+    elevation: 18,
   },
   tab: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  iconBox: {
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  icon: {
+    height: 32,
+    width: 32,
+  },
   label: {
-    fontSize: 10,
-    fontWeight: '600',
-    letterSpacing: 0.2,
-  },
-  pill: {
-    position: 'absolute',
-    borderRadius: 999,
-    overflow: 'hidden',
-  },
-  pillFill: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: Palette.pillInk,
-  },
-  pillHighlight: {
-    position: 'absolute',
-    top: 1,
-    left: 10,
-    right: 10,
-    height: '38%',
-    borderRadius: 999,
-    backgroundColor: Palette.pillHighlight,
+    ...TypeScale.nav,
+    color: Brand.inkOnBrand,
+    marginTop: 6,
   },
 });

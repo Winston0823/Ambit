@@ -77,6 +77,26 @@ export const Radii = {
 
 const fontFamily = Platform.select({ ios: 'System', android: 'Roboto', default: 'System' });
 
+/// Ambit type families. Bundled OTFs loaded via expo-font in app/_layout.tsx.
+export const AmbitFont = {
+  display: 'Zodiak-Bold',           // Headlines: "What's your vibe?"
+  body: 'PlusJakartaSans-Regular',  // All body text, labels, CTAs
+} as const;
+
+/// Canonical type scale per Ambit Style Guide v1 / spec § design tokens.
+/// Use with: <Text style={[TypeScale.h1, { color: Brand.inkPrimary }]}>...</Text>
+export const TypeScale = {
+  h1:     { fontFamily: AmbitFont.display, fontSize: 30 },
+  title:  { fontFamily: AmbitFont.body, fontSize: 16, fontWeight: '600' as TextStyle['fontWeight'] },
+  lead:   { fontFamily: AmbitFont.body, fontSize: 17 },
+  body:   { fontFamily: AmbitFont.body, fontSize: 15 },
+  input:  { fontFamily: AmbitFont.body, fontSize: 14 },
+  helper: { fontFamily: AmbitFont.body, fontSize: 13 },
+  chip:   { fontFamily: AmbitFont.body, fontSize: 13 },
+  labelSm:{ fontFamily: AmbitFont.body, fontSize: 11, letterSpacing: 1.2 },
+  nav:    { fontFamily: AmbitFont.body, fontSize: 10, fontWeight: '600' as TextStyle['fontWeight'] },
+} as const;
+
 export const Typography = {
   heading: {
     fontFamily,
