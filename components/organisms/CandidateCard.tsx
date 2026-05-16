@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Image, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import Animated, { FadeInUp } from 'react-native-reanimated';
+// Reanimated entrance animation removed — was failing through worklet plugin chain.
+// Restore later via withSpring on a shared value once pipeline is verified.
 import { NeighborhoodDistance, SkillTagGroup, ActionBar } from '../molecules';
 import { Colors, Spacing, Radii, Shadows, Typography } from '../../constants/theme';
 import { Candidate } from '../../data/types';
@@ -16,9 +17,7 @@ interface CandidateCardProps {
 
 export function CandidateCard({ candidate, index, onChat, onPass, onSave, onPress }: CandidateCardProps) {
   return (
-    <Animated.View
-      entering={FadeInUp.springify().damping(15).stiffness(150).mass(0.8).delay(index * 80)}
-    >
+    <View>
       <TouchableOpacity style={styles.card} activeOpacity={0.95} onPress={onPress}>
         <Image source={{ uri: candidate.photo }} style={styles.photo} />
         <View style={styles.content}>
@@ -31,7 +30,7 @@ export function CandidateCard({ candidate, index, onChat, onPass, onSave, onPres
           <ActionBar onChat={onChat} onPass={onPass} onSave={onSave} />
         </View>
       </TouchableOpacity>
-    </Animated.View>
+    </View>
   );
 }
 

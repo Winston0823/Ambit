@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Image, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import Animated, { FadeInUp } from 'react-native-reanimated';
+// Reanimated entrance animation removed — see CandidateCard for context.
 import { Badge, Button, Icon } from '../atoms';
 import { NeighborhoodDistance } from '../molecules';
 import { Colors, Spacing, Radii, Shadows, Typography } from '../../constants/theme';
@@ -19,9 +19,7 @@ export function StartupCard({ startup, index, onInterest, onPress }: StartupCard
   const primaryRole = startup.roles[0];
 
   return (
-    <Animated.View
-      entering={FadeInUp.springify().damping(15).stiffness(150).mass(0.8).delay(index * 80)}
-    >
+    <View>
       <TouchableOpacity style={styles.card} activeOpacity={0.95} onPress={onPress}>
         <View style={styles.header}>
           <Image source={{ uri: startup.logo }} style={styles.logo} />
@@ -58,7 +56,7 @@ export function StartupCard({ startup, index, onInterest, onPress }: StartupCard
           style={styles.interestButton}
         />
       </TouchableOpacity>
-    </Animated.View>
+    </View>
   );
 }
 
