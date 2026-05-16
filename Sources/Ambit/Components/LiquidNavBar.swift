@@ -93,16 +93,15 @@ private struct TabButton: View {
     var body: some View {
         Button(action: action) {
             VStack(spacing: 6) {
-                // Uniform 32×32 box for every icon. Each PNG fits via aspectRatio,
-                // so icons with wider aspect (Chat, Discovery) show shorter inside the
-                // box, and Profile's square content fills it entirely. Labels stay
-                // horizontally aligned across all four tabs because every icon column
-                // is the same height.
+                // Uniform 32pt HEIGHT for every icon. Each PNG keeps its native
+                // aspect ratio; widths flow naturally. This matches how Figma renders
+                // the icons in their 32x32 groups — same vertical extent, varying widths.
+                // Code is identical for all four tabs — no per-icon overrides.
                 Image(tab.iconAsset)
                     .renderingMode(.original)
                     .resizable()
                     .aspectRatio(contentMode: .fit)
-                    .frame(width: 32, height: 32)
+                    .frame(height: 32)
                 Text(tab.label)
                     .font(TypeScale.nav)
                     .lineLimit(1)
