@@ -29,17 +29,6 @@ enum AppTab: String, CaseIterable, Hashable {
         }
     }
 
-    /// Per-icon visual height. Each source asset has a different aspect ratio
-    /// and content-to-padding ratio, so a uniform frame size would make them
-    /// look uneven. These values are hand-tuned for visual parity in the bar.
-    var iconHeight: CGFloat {
-        switch self {
-        case .discovery: return 24   // dashed route spreads horizontally — keep height moderate
-        case .chat:      return 26   // wide aspect (1.22), looks balanced at 26
-        case .projects:  return 26   // matches chat at similar visual weight
-        case .profile:   return 30   // square + tight crop, needs more height to read as same scale
-        }
-    }
 }
 
 /// Anchored bottom tab bar matching the Figma `Nav Bar (instance)` design.
@@ -104,11 +93,16 @@ private struct TabButton: View {
     var body: some View {
         Button(action: action) {
             VStack(spacing: 6) {
+                // Uniform 32×32 box for every icon. Each PNG fits via aspectRatio,
+                // so icons with wider aspect (Chat, Discovery) show shorter inside the
+                // box, and Profile's square content fills it entirely. Labels stay
+                // horizontally aligned across all four tabs because every icon column
+                // is the same height.
                 Image(tab.iconAsset)
                     .renderingMode(.original)
                     .resizable()
                     .aspectRatio(contentMode: .fit)
-                    .frame(height: tab.iconHeight)
+                    .frame(width: 32, height: 32)
                 Text(tab.label)
                     .font(TypeScale.nav)
                     .lineLimit(1)
