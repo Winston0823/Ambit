@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// Seeker Feed (S-020). Stub for first layer — real feed wiring will come next pass.
-struct DiscoverView: View {
+struct DiscoveryView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Space.lg) {
@@ -47,4 +47,4 @@ struct DiscoverView: View {
     }
 }
 
-#Preview { DiscoverView() }
+#Preview { DiscoveryView() }

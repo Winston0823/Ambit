@@ -1,61 +1,53 @@
 import SwiftUI
 
-/// Tabs in the seeker-side nav. Spec § 5.1.1 (Project Seeker row):
-/// Discover | Chats | Notifications | Profile.
-/// Owner-side variant lives in a future `OwnerNavBar` once that role is wired.
-enum SeekerTab: String, CaseIterable, Hashable {
-    case discover
-    case chats
-    case notifications
+/// Tabs in the nav bar, matching the Figma `Nav Bar (instance)` component.
+/// Spec § 5.1.1 names them differently (Discover/Chats/Notifications/Profile) —
+/// reconciling spec ↔ Figma is a deliberate follow-up.
+enum AppTab: String, CaseIterable, Hashable {
+    case discovery
+    case chat
+    case projects
     case profile
 
     var label: String {
         switch self {
-        case .discover:      return "Discover"
-        case .chats:         return "Chats"
-        case .notifications: return "Notifs"
-        case .profile:       return "Profile"
+        case .discovery: return "Discovery"
+        case .chat:      return "Chat"
+        case .projects:  return "Projects"
+        case .profile:   return "Profile"
         }
     }
 
-    /// SF Symbol for the inactive state. Active state uses the `.fill` variant.
-    var symbol: String {
+    /// Asset name in `Assets.xcassets`. Each is an SVG imageset with
+    /// preserves-vector-representation + template-rendering, so foregroundColor tints it.
+    var iconAsset: String {
         switch self {
-        case .discover:      return "safari"
-        case .chats:         return "bubble.left.and.bubble.right"
-        case .notifications: return "bell"
-        case .profile:       return "person"
-        }
-    }
-
-    var symbolFilled: String {
-        switch self {
-        case .discover:      return "safari.fill"
-        case .chats:         return "bubble.left.and.bubble.right.fill"
-        case .notifications: return "bell.fill"
-        case .profile:       return "person.fill"
+        case .discovery: return "IconDiscovery"
+        case .chat:      return "IconChat"
+        case .projects:  return "IconProjects"
+        case .profile:   return "IconProfile"
         }
     }
 }
 
-/// Floating liquid-glass tab bar. Uses iOS 26's `.glassEffect()` for the bar background
-/// and a warm-tan pill that morphs to the active tab via matched geometry.
+/// Floating liquid-glass tab bar. iOS 26 `.glassEffect()` background + a warm-tan
+/// animated pill that morphs to the active tab via matched geometry.
 struct LiquidNavBar: View {
-    @Binding var selected: SeekerTab
+    @Binding var selected: AppTab
     @Namespace private var pillSpace
 
     var body: some View {
         tabsRow
-            .padding(6)
+            .padding(8)
             .background(barBackground)
             .overlay(hairline)
-            .shadow(color: Color.black.opacity(0.18), radius: 24, x: 0, y: 12)
-            .padding(.horizontal, 16)
+            .shadow(color: Color.black.opacity(0.22), radius: 28, x: 0, y: 14)
+            .padding(.horizontal, 12)
     }
 
     private var tabsRow: some View {
         HStack(spacing: 0) {
-            ForEach(SeekerTab.allCases, id: \.self) { tab in
+            ForEach(AppTab.allCases, id: \.self) { tab in
                 TabButton(
                     tab: tab,
                     isActive: tab == selected,
@@ -69,17 +61,17 @@ struct LiquidNavBar: View {
     @ViewBuilder
     private var barBackground: some View {
         if #available(iOS 26.0, *) {
-            Capsule().fill(.clear).glassEffect(.regular, in: Capsule())
+            Capsule().fill(.clear).glassEffect(.regular.tint(.black.opacity(0.55)), in: Capsule())
         } else {
-            Capsule().fill(.ultraThinMaterial)
+            Capsule().fill(.ultraThinMaterial).background(Color.black.opacity(0.55))
         }
     }
 
     private var hairline: some View {
-        Capsule().strokeBorder(Color.white.opacity(0.45), lineWidth: 0.5)
+        Capsule().strokeBorder(Color.white.opacity(0.18), lineWidth: 0.5)
     }
 
-    private func handleTap(_ tab: SeekerTab) {
+    private func handleTap(_ tab: AppTab) {
         withAnimation(.spring(response: 0.42, dampingFraction: 0.78)) {
             selected = tab
         }
@@ -87,7 +79,7 @@ struct LiquidNavBar: View {
 }
 
 private struct TabButton: View {
-    let tab: SeekerTab
+    let tab: AppTab
     let isActive: Bool
     let namespace: Namespace.ID
     let action: () -> Void
@@ -95,7 +87,7 @@ private struct TabButton: View {
     var body: some View {
         Button(action: action) {
             content
-                .frame(maxWidth: .infinity, minHeight: 52)
+                .frame(maxWidth: .infinity, minHeight: 56)
                 .background(activeBackground)
                 .contentShape(Capsule())
         }
@@ -104,9 +96,12 @@ private struct TabButton: View {
     }
 
     private var content: some View {
-        VStack(spacing: 2) {
-            Image(systemName: isActive ? tab.symbolFilled : tab.symbol)
-                .font(.system(size: 20, weight: .regular))
+        VStack(spacing: 3) {
+            Image(tab.iconAsset)
+                .renderingMode(.template)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(width: 28, height: 24)
             Text(tab.label)
                 .font(TypeScale.nav)
                 .lineLimit(1)
@@ -120,25 +115,20 @@ private struct TabButton: View {
             Capsule()
                 .fill(Brand.warmTan)
                 .matchedGeometryEffect(id: "activePill", in: namespace)
-                .shadow(color: .black.opacity(0.18), radius: 6, x: 0, y: 2)
+                .shadow(color: .black.opacity(0.20), radius: 6, x: 0, y: 2)
         }
     }
 }
 
 #Preview {
-    StatefulPreviewWrapper(SeekerTab.discover) { binding in
+    StatefulPreviewWrapper(AppTab.discovery) { binding in
         ZStack {
-            Color.black.ignoresSafeArea()
-            VStack {
-                Spacer()
-                LiquidNavBar(selected: binding)
-                    .padding(.bottom, 24)
-            }
+            Color(white: 0.10).ignoresSafeArea()
+            VStack { Spacer(); LiquidNavBar(selected: binding).padding(.bottom, 24) }
         }
     }
 }
 
-/// SwiftUI Preview helper for @Binding-based components.
 struct StatefulPreviewWrapper<Value, Content: View>: View {
     @State private var value: Value
     let content: (Binding<Value>) -> Content

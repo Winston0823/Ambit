@@ -1,16 +1,16 @@
 import SwiftUI
 
-/// Conversation List (S-050). Stub — real thread inbox wires through Stream Chat later.
-struct ChatsView: View {
+/// Saved Projects / Bookmarks (S-024). Stub.
+struct ProjectsView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Space.lg) {
                 VStack(alignment: .leading, spacing: Space.sm) {
-                    Text("CONVERSATIONS")
+                    Text("SAVED")
                         .font(TypeScale.label)
                         .foregroundStyle(Brand.inkLabel)
                         .tracking(1.2)
-                    Text("Where the team comes together")
+                    Text("Your projects")
                         .font(TypeScale.h1)
                         .foregroundStyle(Brand.inkPrimary)
                 }
@@ -18,10 +18,10 @@ struct ChatsView: View {
                 .padding(.top, Space.lg)
 
                 VStack(alignment: .leading, spacing: Space.sm) {
-                    Text("Nothing here yet")
+                    Text("Nothing saved yet")
                         .font(TypeScale.title)
                         .foregroundStyle(Brand.inkHigh)
-                    Text("Express interest in a project from the Discover tab. When the owner opens chat, it lands here.")
+                    Text("Tap save on a project card from the Discovery tab and it lands here. Spec § 8.3 / S-024.")
                         .font(TypeScale.helper)
                         .foregroundStyle(Brand.inkMuted)
                 }
@@ -38,4 +38,4 @@ struct ChatsView: View {
     }
 }
 
-#Preview { ChatsView() }
+#Preview { ProjectsView() }

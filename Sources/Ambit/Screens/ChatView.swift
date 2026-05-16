@@ -1,16 +1,16 @@
 import SwiftUI
 
-/// Notification Center (S-060). Stub.
-struct NotificationsView: View {
+/// Conversation List (S-050). Stub — real thread inbox wires through Stream Chat later.
+struct ChatView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Space.lg) {
                 VStack(alignment: .leading, spacing: Space.sm) {
-                    Text("NOTIFICATIONS")
+                    Text("CONVERSATIONS")
                         .font(TypeScale.label)
                         .foregroundStyle(Brand.inkLabel)
                         .tracking(1.2)
-                    Text("Quiet for now")
+                    Text("Where the team comes together")
                         .font(TypeScale.h1)
                         .foregroundStyle(Brand.inkPrimary)
                 }
@@ -18,10 +18,10 @@ struct NotificationsView: View {
                 .padding(.top, Space.lg)
 
                 VStack(alignment: .leading, spacing: Space.sm) {
-                    Text("No new activity")
+                    Text("Nothing here yet")
                         .font(TypeScale.title)
                         .foregroundStyle(Brand.inkHigh)
-                    Text("Interest accepts, expirations, meet-up reminders and project updates will show up here. Spec § 8.7.")
+                    Text("Express interest in a project from the Discover tab. When the owner opens chat, it lands here.")
                         .font(TypeScale.helper)
                         .foregroundStyle(Brand.inkMuted)
                 }
@@ -38,4 +38,4 @@ struct NotificationsView: View {
     }
 }
 
-#Preview { NotificationsView() }
+#Preview { ChatView() }
