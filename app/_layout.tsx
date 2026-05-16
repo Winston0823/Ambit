@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { Slot, usePathname } from 'expo-router';
+import { Slot } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { useFonts } from 'expo-font';
 import { RoleProvider } from '../context/RoleContext';
 import { Brand } from '../constants/theme';
-import { DebugMenuButton, DebugMenuSheet } from '../components/molecules/DebugMenu';
-import { OnboardingFlow } from '../components/organisms/OnboardingFlow';
+import { DebugMenuButton, DebugMenuSheet } from '../components/molecules';
+import { OnboardingFlow } from '../components/organisms';
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
@@ -37,7 +37,7 @@ export default function RootLayout() {
             onClose={() => setDebugOpen(false)}
             onStartOnboarding={() => {
               setDebugOpen(false);
-              setTimeout(() => setOnboardingOpen(true), 150);
+              setTimeout(() => setOnboardingOpen(true), 200);
             }}
           />
 

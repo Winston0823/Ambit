@@ -1,17 +1,17 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
-import { LiquidNavBar, DEFAULT_TABS, NavTabKey } from '../../components/organisms/LiquidNavBar';
+import { LiquidNavBar, DEFAULT_TABS, NavTabKey } from '../../components/organisms';
 
 const TAB_TO_ROUTE: Record<NavTabKey, string> = {
   discovery: 'feed',
-  chat: 'chats',
+  chat: 'chat',
   projects: 'projects',
   profile: 'profile',
 };
 
 const ROUTE_TO_TAB: Record<string, NavTabKey> = {
   feed: 'discovery',
-  chats: 'chat',
+  chat: 'chat',
   projects: 'projects',
   profile: 'profile',
 };
@@ -33,10 +33,9 @@ export default function CandidateLayout() {
       }}
     >
       <Tabs.Screen name="feed" />
-      <Tabs.Screen name="chats" />
+      <Tabs.Screen name="chat" />
       <Tabs.Screen name="projects" />
       <Tabs.Screen name="profile" />
-      <Tabs.Screen name="interest" options={{ href: null }} />
     </Tabs>
   );
 }

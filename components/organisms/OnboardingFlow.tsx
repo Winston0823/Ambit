@@ -1,30 +1,62 @@
 import React, { useState } from 'react';
 import { Modal, StyleSheet, View } from 'react-native';
 import { Brand } from '../../constants/theme';
+import { OnboardingProvider, useOnboarding } from '../../context/OnboardingContext';
+import { SplashScreen } from './onboarding/SplashScreen';
+import { WelcomeScreen } from './onboarding/WelcomeScreen';
 import { EduEmailScreen } from './onboarding/EduEmailScreen';
 import { AgeGateScreen } from './onboarding/AgeGateScreen';
 import { VibeBlurbScreen } from './onboarding/VibeBlurbScreen';
+import { SkillTagsScreen } from './onboarding/SkillTagsScreen';
 import { RoleDeclarationScreen } from './onboarding/RoleDeclarationScreen';
+import { CampusScreen } from './onboarding/CampusScreen';
+import { PhotoScreen } from './onboarding/PhotoScreen';
+import { ProofLinksScreen } from './onboarding/ProofLinksScreen';
 import { CompleteScreen } from './onboarding/CompleteScreen';
-
-export type Role = 'owner' | 'seeker' | 'both';
 
 interface Props {
   visible: boolean;
   onDismiss: () => void;
 }
 
-const STEPS = ['eduEmail', 'ageGate', 'vibe', 'role', 'complete'] as const;
+const STEPS = [
+  'splash',
+  'welcome',
+  'eduEmail',
+  'age',
+  'vibe',
+  'skills',
+  'role',
+  'campus',
+  'photo',
+  'proof',
+  'complete',
+] as const;
 type Step = typeof STEPS[number];
 
-/// Full-screen modal walking the user through the v1.0 onboarding sequence.
-/// Per spec Journey 1, key 5 screens. UI only — no backend wired.
+/// Full-screen modal walking the 11-step onboarding sequence.
+/// (System sheets S-002a Apple Sign In and S-003b Google Picker are skipped —
+/// they're platform UI, not our screens. SheerID fallback S-006 deferred.)
 export function OnboardingFlow({ visible, onDismiss }: Props) {
-  const [step, setStep] = useState<Step>('eduEmail');
-  const [email, setEmail] = useState('');
-  const [age, setAge] = useState(18);
-  const [blurb, setBlurb] = useState('');
-  const [role, setRole] = useState<Role | null>('seeker');
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="fullScreen"
+      onRequestClose={onDismiss}
+    >
+      <OnboardingProvider>
+        <View style={styles.root}>
+          <Steps onDismiss={onDismiss} />
+        </View>
+      </OnboardingProvider>
+    </Modal>
+  );
+}
+
+function Steps({ onDismiss }: { onDismiss: () => void }) {
+  const [step, setStep] = useState<Step>('splash');
+  const { reset } = useOnboarding();
 
   const advance = () => {
     const i = STEPS.indexOf(step);
@@ -37,41 +69,27 @@ export function OnboardingFlow({ visible, onDismiss }: Props) {
   };
   const dismiss = () => {
     onDismiss();
-    setTimeout(() => setStep('eduEmail'), 300);
+    setTimeout(() => {
+      setStep('splash');
+      reset();
+    }, 300);
   };
 
-  const renderStep = () => {
-    switch (step) {
-      case 'eduEmail':
-        return <EduEmailScreen email={email} setEmail={setEmail} onBack={dismiss} onContinue={advance} />;
-      case 'ageGate':
-        return <AgeGateScreen age={age} setAge={setAge} onBack={back} onContinue={advance} />;
-      case 'vibe':
-        return <VibeBlurbScreen blurb={blurb} setBlurb={setBlurb} onBack={back} onContinue={advance} />;
-      case 'role':
-        return <RoleDeclarationScreen role={role} setRole={setRole} onBack={back} onContinue={advance} />;
-      case 'complete':
-        return <CompleteScreen onDone={dismiss} />;
-    }
-  };
-
-  return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      presentationStyle="fullScreen"
-      onRequestClose={dismiss}
-    >
-      <View style={styles.root}>
-        {renderStep()}
-      </View>
-    </Modal>
-  );
+  switch (step) {
+    case 'splash':   return <SplashScreen onContinue={advance} />;
+    case 'welcome':  return <WelcomeScreen onContinue={advance} />;
+    case 'eduEmail': return <EduEmailScreen onBack={back} onContinue={advance} />;
+    case 'age':      return <AgeGateScreen onBack={back} onContinue={advance} />;
+    case 'vibe':     return <VibeBlurbScreen onBack={back} onContinue={advance} />;
+    case 'skills':   return <SkillTagsScreen onBack={back} onContinue={advance} />;
+    case 'role':     return <RoleDeclarationScreen onBack={back} onContinue={advance} />;
+    case 'campus':   return <CampusScreen onBack={back} onContinue={advance} />;
+    case 'photo':    return <PhotoScreen onBack={back} onContinue={advance} />;
+    case 'proof':    return <ProofLinksScreen onBack={back} onContinue={advance} />;
+    case 'complete': return <CompleteScreen onDone={dismiss} />;
+  }
 }
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: Brand.canvas,
-  },
+  root: { flex: 1, backgroundColor: Brand.canvas },
 });

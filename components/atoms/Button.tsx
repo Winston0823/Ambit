@@ -1,73 +1,80 @@
 import React from 'react';
-import { TouchableOpacity, Text, StyleSheet, ViewStyle, TextStyle } from 'react-native';
-import { Colors, Spacing, Radii, Typography } from '../../constants/theme';
+import { Pressable, StyleSheet, Text, ViewStyle, TextStyle } from 'react-native';
+import { Feather } from '@expo/vector-icons';
+import { Brand, Radii, AmbitFont } from '../../constants/theme';
 
-type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'pill';
+type Variant = 'primary' | 'secondary' | 'ghost';
 
-interface ButtonProps {
+interface Props {
   title: string;
   onPress: () => void;
-  variant?: ButtonVariant;
+  variant?: Variant;
   disabled?: boolean;
+  trailingArrow?: boolean;
   style?: ViewStyle;
 }
 
-export function Button({ title, onPress, variant = 'primary', disabled = false, style }: ButtonProps) {
-  const buttonStyle = variantButtonStyles[variant];
-  const textStyle = variantTextStyles[variant];
-
+/// Primary CTA: warm-tan fill, white label, 12pt radius, optional arrow.
+/// Spec § design tokens — Onboarding Continue button.
+export function Button({
+  title,
+  onPress,
+  variant = 'primary',
+  disabled = false,
+  trailingArrow = false,
+  style,
+}: Props) {
+  const tones = TONES[variant];
   return (
-    <TouchableOpacity
+    <Pressable
       onPress={onPress}
       disabled={disabled}
-      activeOpacity={0.7}
-      style={[styles.base, buttonStyle, disabled && styles.disabled, style]}
+      style={({ pressed }) => [
+        styles.base,
+        tones.container,
+        { opacity: disabled ? 0.45 : pressed ? 0.88 : 1 },
+        style,
+      ]}
     >
-      <Text style={[styles.text, textStyle, disabled && styles.disabledText]}>{title}</Text>
-    </TouchableOpacity>
+      <Text style={[styles.label, tones.label]}>{title}</Text>
+      {trailingArrow && (
+        <Feather name="arrow-right" size={14} color={tones.label.color as string} />
+      )}
+    </Pressable>
   );
 }
 
-const variantButtonStyles: Record<ButtonVariant, ViewStyle> = {
+const TONES: Record<Variant, { container: ViewStyle; label: TextStyle }> = {
   primary: {
-    backgroundColor: Colors.brandGreen,
-    borderRadius: Radii.button,
+    container: { backgroundColor: Brand.primary },
+    label: { color: Brand.inkOnBrand },
   },
   secondary: {
-    backgroundColor: Colors.warmGray,
-    borderRadius: Radii.button,
+    container: {
+      backgroundColor: Brand.surface1,
+      borderWidth: 1.5,
+      borderColor: Brand.borderDefault,
+    },
+    label: { color: Brand.inkPrimary },
   },
   ghost: {
-    backgroundColor: 'transparent',
-    borderRadius: Radii.button,
+    container: { backgroundColor: 'transparent' },
+    label: { color: Brand.accent },
   },
-  pill: {
-    backgroundColor: Colors.brandGreen,
-    borderRadius: Radii.pill,
-  },
-};
-
-const variantTextStyles: Record<ButtonVariant, TextStyle> = {
-  primary: { color: Colors.white },
-  secondary: { color: Colors.textPrimary },
-  ghost: { color: Colors.brandGreen },
-  pill: { color: Colors.white },
 };
 
 const styles = StyleSheet.create({
   base: {
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.sm + 4,
+    minHeight: 52,
+    borderRadius: Radii.md,
+    paddingHorizontal: 24,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 8,
   },
-  text: {
-    ...Typography.button,
-  },
-  disabled: {
-    opacity: 0.4,
-  },
-  disabledText: {
-    opacity: 0.6,
+  label: {
+    fontFamily: AmbitFont.body,
+    fontSize: 17,
   },
 });

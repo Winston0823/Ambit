@@ -1,71 +1,30 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
-import { Brand } from '../../constants/theme';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Brand, AmbitFont, Space, Radii } from '../../constants/theme';
 
-export default function CandidateProjects() {
+/// Saved Projects (S-024). Placeholder.
+export default function ProjectsTab() {
   return (
-    <View style={styles.container}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.eyebrow}>SAVED</Text>
-        <Text style={styles.title}>Your projects</Text>
-        <Text style={styles.subtitle}>
-          Startups you've saved and conversations in motion will live here.
-        </Text>
+    <ScrollView style={styles.root} contentContainerStyle={styles.content}>
+      <Text style={styles.eyebrow}>SAVED</Text>
+      <Text style={styles.title}>Your projects</Text>
 
-        <View style={styles.placeholderCard}>
-          <Text style={styles.placeholderTitle}>Nothing saved yet</Text>
-          <Text style={styles.placeholderBody}>
-            When you tap save on a startup card, it lands here so you can come
-            back to it later.
-          </Text>
-        </View>
-      </ScrollView>
-    </View>
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Nothing saved yet</Text>
+        <Text style={styles.cardBody}>
+          Save a project from Discovery and it lands here for later. Spec § 8.3.
+        </Text>
+      </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Brand.canvas,
-  },
-  content: {
-    paddingHorizontal: 24,
-    paddingTop: 24,
-    paddingBottom: 140,
-  },
-  eyebrow: {
-    fontSize: 11,
-    color: Brand.inkLabel,
-    letterSpacing: 1.2,
-    marginBottom: 8,
-  },
-  title: {
-    fontSize: 30,
-    fontWeight: '700',
-    color: Brand.inkPrimary,
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 15,
-    color: Brand.inkMuted,
-    lineHeight: 22,
-    marginBottom: 32,
-  },
-  placeholderCard: {
-    backgroundColor: Brand.surface1,
-    borderRadius: 16,
-    padding: 24,
-  },
-  placeholderTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: Brand.inkHigh,
-    marginBottom: 6,
-  },
-  placeholderBody: {
-    fontSize: 13,
-    color: Brand.inkMuted,
-    lineHeight: 19,
-  },
+  root: { flex: 1, backgroundColor: Brand.canvas },
+  content: { paddingHorizontal: Space.lg, paddingTop: Space.lg, gap: Space.lg },
+  eyebrow: { fontFamily: AmbitFont.body, fontSize: 11, letterSpacing: 1.2, color: Brand.inkLabel },
+  title: { fontFamily: AmbitFont.display, fontSize: 30, color: Brand.inkPrimary, marginTop: -16 },
+  card: { backgroundColor: Brand.surface1, borderRadius: Radii.lg, padding: Space.lg },
+  cardTitle: { fontFamily: AmbitFont.body, fontSize: 16, fontWeight: '600', color: Brand.inkHigh },
+  cardBody: { fontFamily: AmbitFont.body, fontSize: 13, color: Brand.inkMuted, marginTop: 6, lineHeight: 19 },
 });

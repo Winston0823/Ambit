@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
-import { Brand, Palette, TypeScale } from '../../constants/theme';
+import { Brand, TypeScale } from '../../constants/theme';
 
 export type NavTabKey = 'discovery' | 'chat' | 'projects' | 'profile';
 
@@ -81,7 +81,7 @@ export function LiquidNavBar({ tabs = DEFAULT_TABS, activeKey, onChange }: Props
 const styles = StyleSheet.create({
   bar: {
     flexDirection: 'row',
-    backgroundColor: Palette.pillInk,
+    backgroundColor: Brand.navBarBg,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingTop: 16,
