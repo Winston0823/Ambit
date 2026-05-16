@@ -30,49 +30,55 @@ enum AppTab: String, CaseIterable, Hashable {
     }
 }
 
-/// Floating liquid-glass tab bar. iOS 26 `.glassEffect()` background + a warm-tan
-/// animated pill that morphs to the active tab via matched geometry.
+/// Anchored bottom tab bar matching the Figma `Nav Bar (instance)` design.
+/// Full-width, rounded top corners only, solid dark fill, white iconography.
+/// Active tab gets full white; inactive tabs are slightly dimmed for subtle feedback.
+/// Use with `.safeAreaInset(edge: .bottom)` so screen content reserves space above it.
 struct LiquidNavBar: View {
     @Binding var selected: AppTab
-    @Namespace private var pillSpace
 
     var body: some View {
-        tabsRow
-            .padding(8)
-            .background(barBackground)
-            .overlay(hairline)
-            .shadow(color: Color.black.opacity(0.22), radius: 28, x: 0, y: 14)
-            .padding(.horizontal, 12)
-    }
-
-    private var tabsRow: some View {
         HStack(spacing: 0) {
             ForEach(AppTab.allCases, id: \.self) { tab in
                 TabButton(
                     tab: tab,
                     isActive: tab == selected,
-                    namespace: pillSpace,
                     action: { handleTap(tab) }
                 )
             }
         }
+        .padding(.top, 16)
+        .padding(.bottom, 12)
+        .padding(.horizontal, 8)
+        .background(barBackground)
     }
 
     @ViewBuilder
     private var barBackground: some View {
-        if #available(iOS 26.0, *) {
-            Capsule().fill(.clear).glassEffect(.regular.tint(.black.opacity(0.55)), in: Capsule())
-        } else {
-            Capsule().fill(.ultraThinMaterial).background(Color.black.opacity(0.55))
-        }
-    }
-
-    private var hairline: some View {
-        Capsule().strokeBorder(Color.white.opacity(0.18), lineWidth: 0.5)
+        UnevenRoundedRectangle(
+            topLeadingRadius: 24,
+            bottomLeadingRadius: 0,
+            bottomTrailingRadius: 0,
+            topTrailingRadius: 24,
+            style: .continuous
+        )
+        .fill(Color(white: 0.16))
+        .overlay(
+            UnevenRoundedRectangle(
+                topLeadingRadius: 24,
+                bottomLeadingRadius: 0,
+                bottomTrailingRadius: 0,
+                topTrailingRadius: 24,
+                style: .continuous
+            )
+            .strokeBorder(Color.white.opacity(0.06), lineWidth: 0.5)
+        )
+        .shadow(color: .black.opacity(0.22), radius: 18, x: 0, y: -6)
+        .ignoresSafeArea(edges: .bottom)
     }
 
     private func handleTap(_ tab: AppTab) {
-        withAnimation(.spring(response: 0.42, dampingFraction: 0.78)) {
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
             selected = tab
         }
     }
@@ -81,50 +87,41 @@ struct LiquidNavBar: View {
 private struct TabButton: View {
     let tab: AppTab
     let isActive: Bool
-    let namespace: Namespace.ID
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            content
-                .frame(maxWidth: .infinity, minHeight: 56)
-                .background(activeBackground)
-                .contentShape(Capsule())
+            VStack(spacing: 6) {
+                Image(tab.iconAsset)
+                    .renderingMode(.template)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 32, height: 28)
+                Text(tab.label)
+                    .font(TypeScale.nav)
+                    .lineLimit(1)
+            }
+            .foregroundStyle(Color.white)
+            .opacity(isActive ? 1.0 : 0.62)
+            .frame(maxWidth: .infinity)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .sensoryFeedback(.selection, trigger: isActive) { _, new in new }
-    }
-
-    private var content: some View {
-        VStack(spacing: 3) {
-            Image(tab.iconAsset)
-                .renderingMode(.template)
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .frame(width: 28, height: 24)
-            Text(tab.label)
-                .font(TypeScale.nav)
-                .lineLimit(1)
-        }
-        .foregroundStyle(isActive ? Brand.inkDeep : Color.white)
-    }
-
-    @ViewBuilder
-    private var activeBackground: some View {
-        if isActive {
-            Capsule()
-                .fill(Brand.warmTan)
-                .matchedGeometryEffect(id: "activePill", in: namespace)
-                .shadow(color: .black.opacity(0.20), radius: 6, x: 0, y: 2)
-        }
     }
 }
 
 #Preview {
     StatefulPreviewWrapper(AppTab.discovery) { binding in
-        ZStack {
-            Color(white: 0.10).ignoresSafeArea()
-            VStack { Spacer(); LiquidNavBar(selected: binding).padding(.bottom, 24) }
+        VStack {
+            Spacer()
+            Text("Content above").foregroundStyle(.secondary)
+            Spacer()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color.white)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            LiquidNavBar(selected: binding)
         }
     }
 }

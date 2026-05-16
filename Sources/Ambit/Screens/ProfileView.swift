@@ -34,7 +34,7 @@ struct ProfileView: View {
                 .clipShape(RoundedRectangle(cornerRadius: Radii.lg))
                 .padding(.horizontal, Space.screenH)
 
-                Spacer(minLength: 160)
+                Spacer(minLength: 24)
             }
         }
         .background(Brand.canvas)

@@ -21,7 +21,7 @@ struct DiscoveryView: View {
                 placeholderCard
                 placeholderCard
 
-                Spacer(minLength: 160) // clearance for the floating nav bar
+                Spacer(minLength: 24)
             }
         }
         .background(Brand.canvas)
