@@ -1,6 +1,5 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { Image } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BackChevron, KeyboardDismiss } from '../../atoms';
 import { useOnboarding } from '../../../context/OnboardingContext';
@@ -8,8 +7,9 @@ import { Brand, AmbitFont, Radii, Space } from '../../../constants/theme';
 
 interface Props { onBack: () => void; onContinue: () => void; }
 
-/// S-004 .edu Verification. Per Figma node 18:308. Title-to-input gap ~80pt
-/// to match the Figma spacing; vertical content centered.
+/// S-004 .edu Verification. Per Figma node 18:308.
+/// Layout: illustration upper-right → headline left-aligned → label → input →
+/// submit (warm-tan with swirl arrow) on its own row, right-aligned.
 export function EduEmailScreen({ onBack, onContinue }: Props) {
   const { profile, update } = useOnboarding();
   const isValid = profile.eduEmail.toLowerCase().endsWith('.edu') && profile.eduEmail.includes('@');
@@ -19,38 +19,42 @@ export function EduEmailScreen({ onBack, onContinue }: Props) {
       <SafeAreaView style={styles.root}>
         <BackChevron onPress={onBack} />
 
-        <View style={styles.content}>
+        {/* Illustration top-right */}
+        <View style={styles.illustrationRow}>
           <View style={styles.illustration} />
+        </View>
 
-          <Text style={styles.headline}>Please provide{'\n'}your .edu email</Text>
+        {/* Headline + form */}
+        <View style={styles.form}>
+          <Text style={styles.headline}>Please provide your .edu email</Text>
 
-          <View style={styles.field}>
-            <Text style={styles.fieldLabel}>Education email</Text>
-            <View style={styles.inputRow}>
-              <TextInput
-                value={profile.eduEmail}
-                onChangeText={(v) => update('eduEmail', v)}
-                placeholder="example@college.edu"
-                placeholderTextColor={Brand.inkPlaceholder}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                autoCorrect={false}
-                style={styles.input}
-                returnKeyType="done"
-                onSubmitEditing={() => { if (isValid) onContinue(); }}
+          <Text style={styles.fieldLabel}>Education email</Text>
+
+          <TextInput
+            value={profile.eduEmail}
+            onChangeText={(v) => update('eduEmail', v)}
+            placeholder="example@college.edu"
+            placeholderTextColor={Brand.inkPlaceholder}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoCorrect={false}
+            style={styles.input}
+            returnKeyType="done"
+            onSubmitEditing={() => { if (isValid) onContinue(); }}
+          />
+
+          <View style={styles.submitRow}>
+            <Pressable
+              onPress={onContinue}
+              disabled={!isValid}
+              style={[styles.submit, { opacity: isValid ? 1 : 0.45 }]}
+            >
+              <Image
+                source={require('../../../assets/icons/ArrowSwirl.png')}
+                style={styles.submitArrow}
+                resizeMode="contain"
               />
-              <Pressable
-                onPress={onContinue}
-                disabled={!isValid}
-                style={[styles.submit, { opacity: isValid ? 1 : 0.45 }]}
-              >
-                <Image
-                  source={require('../../../assets/icons/ArrowSwirl.png')}
-                  style={styles.submitArrow}
-                  resizeMode="contain"
-                />
-              </Pressable>
-            </View>
+            </Pressable>
           </View>
         </View>
       </SafeAreaView>
@@ -59,37 +63,61 @@ export function EduEmailScreen({ onBack, onContinue }: Props) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, paddingHorizontal: 16, backgroundColor: Brand.canvas },
-  content: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingBottom: 80 },
+  root: {
+    flex: 1,
+    backgroundColor: Brand.canvas,
+    paddingHorizontal: Space.lg,
+  },
+  illustrationRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginTop: 30,
+  },
   illustration: {
-    width: 188, height: 180, borderRadius: 6,
+    width: 240,
+    height: 240,
+    borderRadius: Radii.sm,
     backgroundColor: Brand.surface2,
   },
+  form: {
+    marginTop: 40,
+  },
   headline: {
-    fontFamily: AmbitFont.display, fontSize: 32, color: Brand.inkPrimary,
-    textAlign: 'center', marginTop: 48, paddingHorizontal: 16,
+    fontFamily: AmbitFont.display,
+    fontSize: 36,
+    color: Brand.inkPrimary,
+    lineHeight: 44,
+    marginBottom: 28,
   },
-  field: { marginTop: 80, paddingHorizontal: 8, alignSelf: 'stretch' },
   fieldLabel: {
-    fontFamily: AmbitFont.body, fontSize: 16, color: Brand.inkPrimary,
-    marginBottom: 8,
-  },
-  inputRow: {
-    flexDirection: 'row', alignItems: 'center',
-    height: 46, borderRadius: Radii.md,
-    backgroundColor: Brand.surface1,
-    borderWidth: 1.5, borderColor: Brand.borderDefault,
-    paddingLeft: 9, paddingRight: 5,
+    fontFamily: AmbitFont.body,
+    fontSize: 16,
+    color: Brand.inkPrimary,
+    marginBottom: 10,
   },
   input: {
-    flex: 1,
-    fontFamily: AmbitFont.body, fontSize: 16, color: Brand.inkBody,
+    height: 48,
+    borderRadius: Radii.md,
+    paddingHorizontal: 16,
+    backgroundColor: Brand.surface1,
+    borderWidth: 0,
+    fontFamily: AmbitFont.body,
+    fontSize: 16,
+    color: Brand.inkBody,
     fontWeight: '600',
   },
-  submit: {
-    width: 63, height: 36, borderRadius: 6,
-    backgroundColor: Brand.primary,
-    alignItems: 'center', justifyContent: 'center',
+  submitRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginTop: 20,
   },
-  submitArrow: { width: 28, height: 9 },
+  submit: {
+    width: 72,
+    height: 48,
+    borderRadius: Radii.sm,
+    backgroundColor: Brand.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  submitArrow: { width: 32, height: 10 },
 });
