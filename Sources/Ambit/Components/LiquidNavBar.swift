@@ -93,7 +93,7 @@ private struct TabButton: View {
         Button(action: action) {
             VStack(spacing: 6) {
                 Image(tab.iconAsset)
-                    .renderingMode(.template)
+                    .renderingMode(.original)
                     .resizable()
                     .aspectRatio(contentMode: .fit)
                     .frame(width: 32, height: 28)
@@ -101,7 +101,7 @@ private struct TabButton: View {
                     .font(TypeScale.nav)
                     .lineLimit(1)
             }
-            .foregroundStyle(Color.white)
+            .foregroundStyle(Color.white)   // applies to the Text only; Image uses original colors
             .opacity(isActive ? 1.0 : 0.62)
             .frame(maxWidth: .infinity)
             .contentShape(Rectangle())
