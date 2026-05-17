@@ -19,9 +19,13 @@ const AGES = Array.from({ length: 50 - 13 + 1 }, (_, i) => 13 + i);  // 13..50
 
 /// S-005 Age Gate. Wheel-style scrollable picker.
 /// Only -1 / current / +1 are visible at any time (3 items fit the viewport).
-/// All three digits share the SAME baseline (cells flex to flex-end with
-/// lineHeight === fontSize) — the active one is just larger, rising upward
-/// from the common baseline. Inactive sides are smaller and faded.
+///
+/// Vertical alignment trick: every cell renders its digit at the SAME 96pt
+/// font size and the SAME 96pt line box. Inactive cells get a transform
+/// scale of 56/96 — scale preserves the visual center, so all three digits
+/// feel like they share a common vertical midline. (Baseline alignment was
+/// tried first and looked wrong: the bigger active digit kept rising above
+/// the smaller sides because cap-height is asymmetric around the baseline.)
 export function AgeGateScreen({ onBack, onContinue }: Props) {
   const { profile, update } = useOnboarding();
   const listRef = useRef<FlatList<number>>(null);
@@ -83,13 +87,10 @@ export function AgeGateScreen({ onBack, onContinue }: Props) {
               const active = item === profile.age;
               return (
                 <View style={[styles.cell, { width: itemWidth }]}>
-                  {/* baselineRuler: invisible 96pt outer Text — every cell
-                      has the same line box, so every digit shares the same
-                      baseline regardless of the inner fontSize. */}
-                  <Text style={styles.baselineRuler}>
-                    <Text style={active ? styles.numActive : styles.numInactive}>
-                      {item}
-                    </Text>
+                  <Text
+                    style={[styles.num, active ? styles.numActive : styles.numInactive]}
+                  >
+                    {item}
                   </Text>
                 </View>
               );
@@ -134,28 +135,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  /// 96pt transparent ruler: every cell renders a 96pt line box. Inner
-  /// digit Texts baseline-align to this run, so all visible numbers share
-  /// the same baseline whether the inner is 96pt or 56pt.
-  baselineRuler: {
+  /// Shared text style — every digit is rendered at 96pt with a 96pt line
+  /// box, so layout is identical across cells. Scale on inactive shrinks
+  /// the *rendered* glyph around its own visual center.
+  num: {
     fontFamily: AmbitFont.display,
     fontSize: 96,
     lineHeight: 96,
-    color: 'transparent',
-    includeFontPadding: false,
+    color: Brand.inkPrimary,
     textAlign: 'center',
+    includeFontPadding: false,
   },
   numActive: {
-    fontFamily: AmbitFont.display,
-    fontSize: 96,
-    lineHeight: 96,
-    color: Brand.inkPrimary,
+    // intentionally empty — uses the base num style at full size.
   },
   numInactive: {
-    fontFamily: AmbitFont.display,
-    fontSize: 56,
-    lineHeight: 56,
-    color: Brand.inkPrimary,
     opacity: 0.25,
+    transform: [{ scale: 56 / 96 }],
   },
 });

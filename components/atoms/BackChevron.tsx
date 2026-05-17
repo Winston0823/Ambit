@@ -1,16 +1,26 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Brand, AmbitFont } from '../../constants/theme';
 
 interface Props { onPress: () => void; }
 
-/// Self-positioning top-left back chevron. Absolute-positions itself inside
-/// its parent SafeAreaView so screens never need to worry about its placement
-/// — chevron glyph always sits ~24pt from the left edge and ~16pt from the
-/// top of the safe area, with a 44×44 HIG-compliant touch target.
+/// Self-positioning top-left back chevron.
+///
+/// Why useSafeAreaInsets and not just SafeAreaView padding: this Pressable
+/// is absolutely positioned so callers cannot accidentally displace it via
+/// their own root padding. But absolute children ignore their parent's
+/// padding — including SafeAreaView's top-inset padding — so we'd render
+/// inside the status bar / Dynamic Island. Reading insets.top directly and
+/// offsetting from it keeps the chevron clear of system UI on every device.
 export function BackChevron({ onPress }: Props) {
+  const insets = useSafeAreaInsets();
   return (
-    <Pressable onPress={onPress} hitSlop={8} style={styles.btn}>
+    <Pressable
+      onPress={onPress}
+      hitSlop={8}
+      style={[styles.btn, { top: insets.top + 8 }]}
+    >
       <Text style={styles.glyph}>‹</Text>
     </Pressable>
   );
@@ -19,11 +29,10 @@ export function BackChevron({ onPress }: Props) {
 const styles = StyleSheet.create({
   btn: {
     position: 'absolute',
-    top: 8,
-    left: 8,
+    left: 12,
     width: 44,
     height: 44,
-    paddingLeft: 12,
+    paddingLeft: 8,
     justifyContent: 'center',
     zIndex: 10,
   },
