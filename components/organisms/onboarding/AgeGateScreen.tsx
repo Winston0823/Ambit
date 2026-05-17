@@ -31,11 +31,17 @@ const INACTIVE_SCALE   = 56 / ACTIVE_FONT;   // neighbor digits render at 56pt v
 const EDGE_SCALE       = 0.32;                // pre-/post-neighbor — almost faded out
 const WHEEL_HEIGHT     = 140;
 
-/// Cap-height compensation. At 96pt, Zodiak Bold's cap sits ~8pt above the
-/// line-box center, so an unadjusted Text floats above where the eye expects
-/// "centered". Pushing every Text down 8pt before scaling recenters the
-/// glyph in its line box; scale then preserves that visual center.
-const CAP_OFFSET = 8;
+/// Cap-height compensation. Zodiak Bold's glyph sits above its line-box
+/// center by some amount of pt — the exact value depends on the font's
+/// ascender/cap-height metrics, which we don't have to hand. Instead of
+/// guessing a constant, we make translateY *proportional* to scale via
+/// Animated.multiply: every item gets pushed down by (CAP_RATIO * scale).
+/// That way, even if the absolute value is slightly off, the relative
+/// offset between active and inactive scales together — the active digit
+/// can't drift away from the neighbors. CAP_RATIO is the fraction of
+/// fontSize the glyph sits above center (~0.12 for display serifs at this
+/// size; tunable if the eye still reads anything as elevated).
+const CAP_RATIO = 0.12;
 
 /// S-005 Age Gate. Continuous wheel-style picker.
 ///
@@ -128,6 +134,14 @@ export function AgeGateScreen({ onBack, onContinue }: Props) {
                 outputRange: [0, 0.25, 1, 0.25, 0],
                 extrapolate: 'clamp',
               });
+              // translateY scales with the visual size. RN composes
+              // right-to-left, so [{ translateY }, { scale }] applies scale
+              // first (glyph moves to -K_actual * s), then translateY
+              // (CAP_RATIO * ACTIVE_FONT * s = ~K_actual * s, cancelling
+              // the offset). Whatever the actual cap-height ratio is, the
+              // active and inactive glyphs end up at the same fraction-of-
+              // line-box position, so they line up with each other.
+              const translateY = Animated.multiply(scale, CAP_RATIO * ACTIVE_FONT);
               return (
                 <View style={[styles.cell, { width: itemWidth }]}>
                   <Animated.Text
@@ -135,13 +149,7 @@ export function AgeGateScreen({ onBack, onContinue }: Props) {
                       styles.num,
                       {
                         opacity,
-                        // Order matters. RN composes transforms right-to-
-                        // left, so the rightmost entry is applied FIRST.
-                        // translateY re-centers the glyph inside its line
-                        // box first; scale then shrinks it around that
-                        // recentered point. (Swap the order and the
-                        // translation gets scaled too, undoing the fix.)
-                        transform: [{ scale }, { translateY: CAP_OFFSET }],
+                        transform: [{ translateY }, { scale }],
                       },
                     ]}
                   >
