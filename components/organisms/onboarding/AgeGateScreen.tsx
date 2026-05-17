@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
+  Animated,
   FlatList,
   NativeScrollEvent,
   NativeSyntheticEvent,
@@ -17,39 +18,57 @@ interface Props { onBack: () => void; onContinue: () => void; }
 
 const AGES = Array.from({ length: 50 - 13 + 1 }, (_, i) => 13 + i);  // 13..50
 
-/// S-005 Age Gate. Wheel-style scrollable picker.
-/// Only -1 / current / +1 are visible at any time (3 items fit the viewport).
+const AnimatedFlatList = Animated.createAnimatedComponent(FlatList<number>);
+
+/// Wheel-picker tuning constants.
 ///
-/// Vertical alignment trick: every cell renders its digit at the SAME 96pt
-/// font size and the SAME 96pt line box. Inactive cells get a transform
-/// scale of 56/96 — scale preserves the visual center, so all three digits
-/// feel like they share a common vertical midline. (Baseline alignment was
-/// tried first and looked wrong: the bigger active digit kept rising above
-/// the smaller sides because cap-height is asymmetric around the baseline.)
+/// All digits render at ACTIVE_FONT (96pt) with the same line box. The
+/// rendered glyph and visual scale are controlled per-item by interpolating
+/// the live scroll position — that's what gives the wheel its drum-roll
+/// feel instead of popping discretely at momentum-end.
+const ACTIVE_FONT      = 96;
+const INACTIVE_SCALE   = 56 / ACTIVE_FONT;   // neighbor digits render at 56pt visual
+const EDGE_SCALE       = 0.32;                // pre-/post-neighbor — almost faded out
+const WHEEL_HEIGHT     = 140;
+
+/// Cap-height compensation. At 96pt, Zodiak Bold's cap sits ~8pt above the
+/// line-box center, so an unadjusted Text floats above where the eye expects
+/// "centered". Pushing every Text down 8pt before scaling recenters the
+/// glyph in its line box; scale then preserves that visual center.
+const CAP_OFFSET = 8;
+
+/// S-005 Age Gate. Continuous wheel-style picker.
+///
+/// Only -1 / current / +1 fit the viewport at a time. As the user scrolls,
+/// every visible digit's scale and opacity interpolate smoothly off the live
+/// scroll offset (native-driver, 60fps). Each cell renders an identically-
+/// sized 96pt line box; scale shrinks the neighbors around their own visual
+/// center, so all three digits share a common vertical midline.
 export function AgeGateScreen({ onBack, onContinue }: Props) {
   const { profile, update } = useOnboarding();
   const listRef = useRef<FlatList<number>>(null);
+  const scrollX = useRef(new Animated.Value(0)).current;
   const [containerWidth, setContainerWidth] = useState(0);
   const itemWidth = containerWidth > 0 ? containerWidth / 3 : 0;
-  const sidePadding = itemWidth;  // pad so first item can center
+  const sidePadding = itemWidth;
 
-  // Scroll to current age once we know the width
   useEffect(() => {
     if (itemWidth === 0) return;
     const idx = AGES.indexOf(profile.age);
     if (idx >= 0) {
-      listRef.current?.scrollToOffset({ offset: idx * itemWidth, animated: false });
+      const offset = idx * itemWidth;
+      listRef.current?.scrollToOffset({ offset, animated: false });
+      scrollX.setValue(offset);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [itemWidth]);
 
   const onMomentumEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     if (itemWidth === 0) return;
-    const x = e.nativeEvent.contentOffset.x;
-    const idx = Math.round(x / itemWidth);
+    const idx = Math.round(e.nativeEvent.contentOffset.x / itemWidth);
     const clamped = Math.max(0, Math.min(AGES.length - 1, idx));
-    const newAge = AGES[clamped];
-    if (newAge !== profile.age) update('age', newAge);
+    const next = AGES[clamped];
+    if (next !== profile.age) update('age', next);
   };
 
   const isValid = profile.age >= 18;
@@ -58,7 +77,6 @@ export function AgeGateScreen({ onBack, onContinue }: Props) {
     <SafeAreaView style={styles.root}>
       <BackChevron onPress={onBack} />
 
-      {/* Headline area — top-aligned, generous breathing room */}
       <View style={styles.headerWrap}>
         <Text style={styles.headline}>What is your age?</Text>
         <Text style={styles.subtitle}>
@@ -66,32 +84,69 @@ export function AgeGateScreen({ onBack, onContinue }: Props) {
         </Text>
       </View>
 
-      {/* Wheel — three items visible at all times */}
       <View
         style={styles.wheelWrap}
         onLayout={(e) => setContainerWidth(e.nativeEvent.layout.width)}
       >
         {itemWidth > 0 && (
-          <FlatList
-            ref={listRef}
+          <AnimatedFlatList
+            ref={listRef as React.Ref<FlatList<number>>}
             data={AGES}
             horizontal
             showsHorizontalScrollIndicator={false}
             keyExtractor={(n) => String(n)}
-            getItemLayout={(_, i) => ({ length: itemWidth, offset: itemWidth * i, index: i })}
+            getItemLayout={(_, i) => ({
+              length: itemWidth,
+              offset: itemWidth * i,
+              index: i,
+            })}
             snapToInterval={itemWidth}
             decelerationRate="fast"
             contentContainerStyle={{ paddingHorizontal: sidePadding }}
+            scrollEventThrottle={16}
+            onScroll={Animated.event(
+              [{ nativeEvent: { contentOffset: { x: scrollX } } }],
+              { useNativeDriver: true }
+            )}
             onMomentumScrollEnd={onMomentumEnd}
-            renderItem={({ item }) => {
-              const active = item === profile.age;
+            renderItem={({ item, index }) => {
+              const itemCenter = index * itemWidth;
+              const inputRange = [
+                itemCenter - 2 * itemWidth,
+                itemCenter - itemWidth,
+                itemCenter,
+                itemCenter + itemWidth,
+                itemCenter + 2 * itemWidth,
+              ];
+              const scale = scrollX.interpolate({
+                inputRange,
+                outputRange: [EDGE_SCALE, INACTIVE_SCALE, 1, INACTIVE_SCALE, EDGE_SCALE],
+                extrapolate: 'clamp',
+              });
+              const opacity = scrollX.interpolate({
+                inputRange,
+                outputRange: [0, 0.25, 1, 0.25, 0],
+                extrapolate: 'clamp',
+              });
               return (
                 <View style={[styles.cell, { width: itemWidth }]}>
-                  <Text
-                    style={[styles.num, active ? styles.numActive : styles.numInactive]}
+                  <Animated.Text
+                    style={[
+                      styles.num,
+                      {
+                        opacity,
+                        // Order matters. RN composes transforms right-to-
+                        // left, so the rightmost entry is applied FIRST.
+                        // translateY re-centers the glyph inside its line
+                        // box first; scale then shrinks it around that
+                        // recentered point. (Swap the order and the
+                        // translation gets scaled too, undoing the fix.)
+                        transform: [{ scale }, { translateY: CAP_OFFSET }],
+                      },
+                    ]}
                   >
                     {item}
-                  </Text>
+                  </Animated.Text>
                 </View>
               );
             }}
@@ -101,7 +156,6 @@ export function AgeGateScreen({ onBack, onContinue }: Props) {
 
       <View style={{ flex: 1 }} />
 
-      {/* Full-width pill button at the bottom */}
       <OnboardingContinue title="Continue" onPress={onContinue} disabled={!isValid} />
     </SafeAreaView>
   );
@@ -111,7 +165,7 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Brand.canvas },
   headerWrap: {
     paddingHorizontal: Space.lg,
-    marginTop: 200,  // Figma puts the headline ~halfway down
+    marginTop: 200,
   },
   headline: {
     fontFamily: AmbitFont.display,
@@ -128,29 +182,20 @@ const styles = StyleSheet.create({
     maxWidth: 280,
   },
   wheelWrap: {
-    height: 130,
+    height: WHEEL_HEIGHT,
     marginTop: 48,
   },
   cell: {
+    height: WHEEL_HEIGHT,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  /// Shared text style — every digit is rendered at 96pt with a 96pt line
-  /// box, so layout is identical across cells. Scale on inactive shrinks
-  /// the *rendered* glyph around its own visual center.
   num: {
     fontFamily: AmbitFont.display,
-    fontSize: 96,
-    lineHeight: 96,
+    fontSize: ACTIVE_FONT,
+    lineHeight: ACTIVE_FONT,
     color: Brand.inkPrimary,
     textAlign: 'center',
     includeFontPadding: false,
-  },
-  numActive: {
-    // intentionally empty — uses the base num style at full size.
-  },
-  numInactive: {
-    opacity: 0.25,
-    transform: [{ scale: 56 / 96 }],
   },
 });
