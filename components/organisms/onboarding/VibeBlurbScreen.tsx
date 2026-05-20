@@ -32,7 +32,6 @@ export function VibeBlurbScreen({ onBack, onContinue }: Props) {
             placeholder="I'm a pretty easygoing guy, but I'm honest about my feelings towards a product/feature. I'm passionate about the projects I join :D"
             placeholderTextColor={Brand.inkPlaceholder}
             multiline
-            textAlignVertical="top"
             style={styles.textArea}
           />
 
@@ -60,10 +59,18 @@ const styles = StyleSheet.create({
     fontFamily: AmbitFont.body, fontSize: 14, color: Brand.inkMuted, marginTop: 8,
   },
   textArea: {
-    height: 114, borderRadius: Radii.lg, padding: 14, marginTop: 24,
+    height: 114, borderRadius: Radii.lg, marginTop: 24,
+    paddingTop: 12,
+    paddingHorizontal: 14,
+    paddingBottom: 14,
     backgroundColor: Brand.surface1,
     borderWidth: 1.5, borderColor: Brand.borderDefault,
     fontFamily: AmbitFont.body, fontSize: 15, color: Brand.inkBody,
+    // Anchor text/placeholder/cursor to top-left. textAlignVertical must
+    // live in the style sheet (Android honors it as a style, not a prop);
+    // explicit textAlign keeps iOS from drifting center on empty state.
+    textAlign: 'left',
+    textAlignVertical: 'top',
   },
   helperRow: { flexDirection: 'row', marginTop: 12, gap: 12 },
   helper: { flex: 1, fontFamily: AmbitFont.body, fontSize: 13, color: Brand.accent },

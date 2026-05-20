@@ -1,7 +1,7 @@
 import React from 'react';
-import { Image, StyleSheet, Text, TextInput, View } from 'react-native';
+import { StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { EnvelopeOpen } from 'phosphor-react-native';
+import { Mailbox } from 'phosphor-react-native';
 import { BackChevron, KeyboardDismiss } from '../../atoms';
 import { OnboardingContinue } from '../../molecules';
 import { useOnboarding } from '../../../context/OnboardingContext';
@@ -11,11 +11,11 @@ interface Props { onBack: () => void; onContinue: () => void; }
 
 /// S-004 .edu Verification.
 ///
-/// Layout: illustration sits compactly upper-right (160×160 — small enough
-/// not to dominate the chevron column), headline left-aligned beneath it,
-/// then the input. The CTA is the standard anchored OnboardingContinue at
-/// the bottom — matches every other onboarding screen so the page feels
-/// like it belongs to the flow.
+/// Layout: a large Mailbox watermark sits behind the page in the upper-right,
+/// bleeding slightly off the right edge — converts the old illustration card
+/// into ambient atmosphere instead of a fixed UI object. The headline is the
+/// first solid element, then the input. The CTA is the standard anchored
+/// OnboardingContinue at the bottom.
 export function EduEmailScreen({ onBack, onContinue }: Props) {
   const { profile, update } = useOnboarding();
   const isValid =
@@ -25,26 +25,20 @@ export function EduEmailScreen({ onBack, onContinue }: Props) {
   return (
     <KeyboardDismiss>
       <SafeAreaView style={styles.root}>
+        {/* Ambient watermark — Mailbox bleeds off the right edge at low
+            opacity, giving the page a quiet motif without competing with
+            the form. pointerEvents=none so it never intercepts taps. */}
+        <View style={styles.watermark} pointerEvents="none">
+          <Mailbox
+            size={360}
+            color={Brand.accent}
+            weight="duotone"
+          />
+        </View>
+
         <BackChevron onPress={onBack} />
 
         <View style={styles.body}>
-          {/* Illustration — compact, top-right. EnvelopeOpen + swirl arrow
-              echoes the brand's hand-drawn signature mark. */}
-          <View style={styles.illustrationRow}>
-            <View style={styles.illustration}>
-              <EnvelopeOpen
-                size={84}
-                color={Brand.accent}
-                weight="duotone"
-              />
-              <Image
-                source={require('../../../assets/icons/ArrowSwirl.png')}
-                style={styles.illustrationSwirl}
-                resizeMode="contain"
-              />
-            </View>
-          </View>
-
           <View style={styles.form}>
             <Text style={styles.headline}>What's your{'\n'}school email?</Text>
 
@@ -80,30 +74,14 @@ const styles = StyleSheet.create({
   body: {
     flex: 1,
   },
-  illustrationRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    marginTop: 40,
-  },
-  illustration: {
-    width: 160,
-    height: 160,
-    borderRadius: Radii.lg,
-    backgroundColor: Brand.seekerSurface,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  illustrationSwirl: {
+  watermark: {
     position: 'absolute',
-    bottom: 18,
-    right: 16,
-    width: 44,
-    height: 15,
-    transform: [{ rotate: '-10deg' }],
+    top: 120,
+    right: -90,
+    opacity: 0.09,
   },
   form: {
-    marginTop: 36,
+    marginTop: 40,
   },
   headline: {
     fontFamily: AmbitFont.display,

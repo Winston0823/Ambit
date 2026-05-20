@@ -40,13 +40,9 @@ export function SkillTagsScreen({ onBack, onContinue }: Props) {
       </View>
 
       <ScrollView
+        style={{ marginBottom: insets.bottom + 130 }}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={[
-          styles.scroll,
-          // Reserve room for the anchored Continue + progress bar overlay
-          // so the last chip row isn't hidden behind them.
-          { paddingBottom: insets.bottom + 130 },
-        ]}
+        contentContainerStyle={styles.scroll}
       >
         {SKILL_CATEGORIES.map((cat) => (
           <View key={cat.label} style={styles.category}>
@@ -77,7 +73,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     justifyContent: 'space-between',
     paddingHorizontal: Space.lg,
-    marginTop: 16,
+    marginTop: 40,
   },
   headline: {
     fontFamily: AmbitFont.display,
@@ -90,7 +86,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 8,
-    marginTop: 8,
+    // Sits with the first line of the headline (30px display font, default
+    // line-height ≈ 36 — center the pill optically against that line).
+    marginTop: 10,
   },
   counterText: {
     fontFamily: AmbitFont.body,
@@ -100,8 +98,8 @@ const styles = StyleSheet.create({
   scroll: {
     paddingHorizontal: Space.lg,
     paddingTop: Space.xl,
-    // paddingBottom is injected dynamically with insets.bottom + 130 in the
-    // component to reserve room for the anchored CTA + progress overlay.
+    // The ScrollView itself has marginBottom = insets.bottom + 130 so the
+    // last category clears the anchored CTA + progress overlay.
   },
   category: { marginBottom: Space.xxl },
   categoryLabel: {

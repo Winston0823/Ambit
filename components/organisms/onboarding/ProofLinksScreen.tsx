@@ -31,10 +31,8 @@ export function ProofLinksScreen({ onBack, onContinue }: Props) {
         </View>
 
         <ScrollView
-          contentContainerStyle={[
-            styles.scroll,
-            { paddingBottom: insets.bottom + 130 },
-          ]}
+          style={{ marginBottom: insets.bottom + 130 }}
+          contentContainerStyle={styles.scroll}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
@@ -80,11 +78,12 @@ export function ProofLinksScreen({ onBack, onContinue }: Props) {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Brand.canvas, paddingHorizontal: Space.lg },
-  headerWrap: { marginTop: 56 },
+  headerWrap: { marginTop: 40 },
   headline: { fontFamily: AmbitFont.display, fontSize: 30, color: Brand.inkPrimary },
   subtitle: {
     fontFamily: AmbitFont.body, fontSize: 13, color: Brand.inkMuted, marginTop: 12,
   },
-  // paddingBottom dynamic via insets.bottom + 130 — clears the anchored CTA.
+  // ScrollView itself has marginBottom = insets.bottom + 130 to clear the
+  // anchored CTA — content padding only needs top + gap here.
   scroll: { paddingTop: Space.lg, gap: 18 },
 });
