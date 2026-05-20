@@ -1,5 +1,5 @@
 import React from 'react';
-import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import {
@@ -11,7 +11,7 @@ import {
   UserCircleDashed,
   IconProps,
 } from 'phosphor-react-native';
-import { Brand, TypeScale } from '../../constants/theme';
+import { Brand } from '../../constants/theme';
 
 export type NavTabKey = 'discovery' | 'chat' | 'projects' | 'profile';
 
@@ -47,13 +47,10 @@ interface Props {
 
 const ACTIVE_COLOR   = Brand.inkOnBrand;                  // white icon on dark nav
 const INACTIVE_COLOR = 'rgba(255, 255, 255, 0.55)';
-const ACCENT         = Brand.primary;                     // warm tan for label + dot
 
-/// Anchored bottom tab bar. Active tab gets two coordinated cues:
-///   1. Icon swaps from outline → fill weight (or fill variant).
-///   2. The label appears in warm tan; inactive tabs are icon-only.
-/// Phosphor renders all four icons with consistent metrics, so no per-tab
-/// optical sizing is required.
+/// Anchored bottom tab bar. Active tab is marked by an icon swap from
+/// outline → fill weight (or a distinct fill variant). Icon-only — no
+/// labels, so the bar stays quiet and the cue is purely visual.
 export function LiquidNavBar({ activeKey, onChange }: Props) {
   const insets = useSafeAreaInsets();
 
@@ -83,13 +80,6 @@ export function LiquidNavBar({ activeKey, onChange }: Props) {
               color={active ? ACTIVE_COLOR : INACTIVE_COLOR}
               weight={active ? 'fill' : 'regular'}
             />
-
-            <Text
-              style={[styles.label, { opacity: active ? 1 : 0 }]}
-              numberOfLines={1}
-            >
-              {tab.label}
-            </Text>
           </Pressable>
         );
       })}
@@ -116,12 +106,6 @@ const styles = StyleSheet.create({
   tab: {
     flex: 1,
     alignItems: 'center',
-    justifyContent: 'flex-start',
-  },
-  label: {
-    ...TypeScale.nav,
-    color: ACCENT,
-    marginTop: 4,
-    letterSpacing: 0.2,
+    justifyContent: 'center',
   },
 });
