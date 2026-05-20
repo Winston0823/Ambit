@@ -6,13 +6,8 @@ import {
   Text,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import {
-  MapPin,
-  SlidersHorizontal,
-  MagnifyingGlass,
-} from 'phosphor-react-native';
+import { MapPin } from 'phosphor-react-native';
 import { Button, Chip } from '../../components/atoms';
 import { Brand, AmbitFont, Space, Radii, TypeScale } from '../../constants/theme';
 
@@ -76,27 +71,18 @@ const MOCK_PROJECTS: MockProject[] = [
 ];
 
 export default function DiscoveryFeed() {
+  // No SafeAreaView wrapper — the root _layout.tsx already applies the top
+  // inset. Wrapping again double-pads the wordmark below the Dynamic Island.
   return (
-    <SafeAreaView style={styles.root} edges={['top']}>
-      {/* Top bar — Instagram-style: wordmark centered, utility actions
-          pinned right. Logo is absolutely positioned so it stays dead-
-          center regardless of how wide the action cluster grows. */}
+    <View style={styles.root}>
+      {/* Top bar — Instagram-style wordmark, centered. No right-hand actions
+          yet (filter + search return when those features ship). */}
       <View style={styles.topBar}>
         <Text style={styles.wordmark}>ambit</Text>
-
-        <View style={styles.topActions}>
-          <Pressable style={styles.iconBtn} accessibilityLabel="Filters">
-            <SlidersHorizontal size={22} color={Brand.inkPrimary} weight="regular" />
-          </Pressable>
-          <Pressable style={styles.iconBtn} accessibilityLabel="Search">
-            <MagnifyingGlass size={22} color={Brand.inkPrimary} weight="regular" />
-          </Pressable>
-        </View>
       </View>
 
-      {/* Campus + context strip — sits one tier below the wordmark so the
-          'why am I seeing this' signal stays prominent without competing
-          with the brand mark. */}
+      {/* Campus context — sits one tier below the wordmark so the
+          'why am I seeing this' proximity signal stays prominent. */}
       <View style={styles.subBar}>
         <Pressable style={styles.campusChip} accessibilityRole="button">
           <MapPin size={16} color={Brand.inkPrimary} weight="fill" />
@@ -118,7 +104,7 @@ export default function DiscoveryFeed() {
         ))}
         <View style={{ height: Space.lg }} />
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -183,23 +169,14 @@ const styles = StyleSheet.create({
 
   // Top bar -----------------------------------------------------
   topBar: {
-    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'flex-end',
-    paddingHorizontal: Space.lg,
-    paddingTop: Space.sm,
+    justifyContent: 'center',
+    paddingTop: Space.xs,
     paddingBottom: Space.sm,
-    height: 56,
   },
   /// Wordmark — rendered in the display font so the brand voice IS the
-  /// type. Absolute-positioned so the centered position never shifts as
-  /// the right-hand action cluster changes. Swap for an Image source when
-  /// the Figma logo export lands.
+  /// type. Swap for an Image source when the Figma logo export lands.
   wordmark: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    textAlign: 'center',
     fontFamily: AmbitFont.display,
     fontSize: 26,
     color: Brand.inkPrimary,
@@ -229,15 +206,6 @@ const styles = StyleSheet.create({
     ...TypeScale.helper,
     color: Brand.inkMuted,
   },
-  topActions: { flexDirection: 'row', gap: Space.sm },
-  iconBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: Radii.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
   // Context strip -----------------------------------------------
   context: {
     ...TypeScale.input,
