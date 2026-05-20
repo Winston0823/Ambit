@@ -5,31 +5,48 @@ import React, { createContext, ReactNode, useContext, useState } from 'react';
 
 export type Role = 'owner' | 'seeker' | 'both';
 
+/// Who is on the platform. Students are the primary v1 audience; professors
+/// join to recruit students into research projects, so they live alongside.
+export type Demographic = 'student' | 'professor';
+
 export interface OnboardingProfile {
+  // Eligibility
   eduEmail: string;
-  age: number;
+  demographic: Demographic | null;
+
+  // Identity
+  name: string;
+  photoUri: string | null;
+
+  // Personality + capability
   vibeBlurb: string;
   skills: string[];
-  role: Role | null;
+
+  // Proximity
   campusId: string | null;
-  photoUri: string | null;
+
+  // Validation
   proofLinks: {
     github: string;
     linkedin: string;
     portfolio: string;
     resume: string;
   };
+
+  // Intent — toggleable later in profile menu
+  role: Role | null;
 }
 
 const INITIAL: OnboardingProfile = {
   eduEmail: '',
-  age: 18,
+  demographic: null,
+  name: '',
+  photoUri: null,
   vibeBlurb: '',
   skills: [],
-  role: 'seeker',
   campusId: null,
-  photoUri: null,
   proofLinks: { github: '', linkedin: '', portfolio: '', resume: '' },
+  role: 'seeker',
 };
 
 interface Ctx {

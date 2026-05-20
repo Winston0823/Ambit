@@ -6,14 +6,16 @@ export interface Campus {
   city: string;
 }
 
+/// LA-area campuses. USC + UCLA are the v1 anchor campuses; the rest are
+/// nearby schools where students might commute or collaborate.
 export const CAMPUSES: Campus[] = [
-  { id: 'stanford',   name: 'Stanford University',          city: 'Stanford' },
-  { id: 'berkeley',   name: 'UC Berkeley',                  city: 'Berkeley' },
-  { id: 'sjsu',       name: 'San Jose State University',    city: 'San Jose' },
-  { id: 'scu',        name: 'Santa Clara University',       city: 'Santa Clara' },
-  { id: 'sfsu',       name: 'San Francisco State University', city: 'San Francisco' },
-  { id: 'usf',        name: 'University of San Francisco',  city: 'San Francisco' },
-  { id: 'ucsc',       name: 'UC Santa Cruz',                city: 'Santa Cruz' },
+  { id: 'usc',        name: 'University of Southern California', city: 'Los Angeles' },
+  { id: 'ucla',       name: 'UCLA',                              city: 'Los Angeles' },
+  { id: 'caltech',    name: 'Caltech',                           city: 'Pasadena' },
+  { id: 'lmu',        name: 'Loyola Marymount University',       city: 'Los Angeles' },
+  { id: 'pepperdine', name: 'Pepperdine University',             city: 'Malibu' },
+  { id: 'csula',      name: 'Cal State LA',                      city: 'Los Angeles' },
+  { id: 'oxy',        name: 'Occidental College',                city: 'Los Angeles' },
 ];
 
 /// Skill tag categories. Spec § 8.1 has the full taxonomy; this is a v0 subset.

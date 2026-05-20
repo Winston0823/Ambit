@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Alert, Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -17,7 +17,6 @@ interface Props { onBack: () => void; onContinue: () => void; }
 /// Tapping the avatar opens an action sheet (Camera / Photo Library / Cancel).
 export function PhotoScreen({ onBack, onContinue }: Props) {
   const { profile, update } = useOnboarding();
-  const [name, setName] = useState('');
 
   const pickFromLibrary = async () => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -64,7 +63,7 @@ export function PhotoScreen({ onBack, onContinue }: Props) {
     );
   };
 
-  const isValid = name.trim().length > 1;
+  const isValid = profile.name.trim().length > 1;
 
   return (
     <KeyboardDismiss>
@@ -86,8 +85,8 @@ export function PhotoScreen({ onBack, onContinue }: Props) {
           </Pressable>
 
           <TextInput
-            value={name}
-            onChangeText={setName}
+            value={profile.name}
+            onChangeText={(v) => update('name', v)}
             placeholder="First + Last Name"
             placeholderTextColor={Brand.inkPlaceholder}
             autoCapitalize="words"

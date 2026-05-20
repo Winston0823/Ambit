@@ -1,14 +1,20 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '../../atoms';
 import { Brand, AmbitFont, Space } from '../../../constants/theme';
 
-interface Props { onContinue: () => void; }
+interface Props {
+  /// User chose "Create account" — proceed forward through onboarding.
+  onCreateAccount: () => void;
+  /// User chose "Sign in" — branch to the auth screen instead of the
+  /// linear onboarding sequence.
+  onSignIn: () => void;
+}
 
-/// S-003 Welcome / Sign Up. Two OAuth buttons + .edu fallback.
-/// Content vertically centered per user request.
-export function WelcomeScreen({ onContinue }: Props) {
+/// S-003 Welcome. Dual-path entry: create a new account (onboarding) OR
+/// sign in (returning user). Returning users skip onboarding entirely.
+export function WelcomeScreen({ onCreateAccount, onSignIn }: Props) {
   return (
     <SafeAreaView style={styles.root}>
       <View style={styles.content}>
@@ -16,24 +22,30 @@ export function WelcomeScreen({ onContinue }: Props) {
           <Text style={styles.logoText}>ambit</Text>
         </View>
 
-        <Text style={styles.headline}>How do you want to continue?</Text>
-        <Text style={styles.helper}>Google and Apple are equivalent.</Text>
+        <Text style={styles.headline}>Welcome to ambit</Text>
+        <Text style={styles.helper}>
+          The place where student builders find each other.
+        </Text>
 
         <View style={styles.cta}>
           <Button
-            title="Continue with Apple"
-            onPress={onContinue}
+            title="Create account"
+            onPress={onCreateAccount}
             variant="primary"
-            style={styles.appleBtn}
+            trailingArrow
           />
           <Button
-            title="Continue with Google"
-            onPress={onContinue}
+            title="Sign in"
+            onPress={onSignIn}
             variant="secondary"
           />
         </View>
 
-        <Text style={styles.fallback}>Use .edu email instead  →</Text>
+        <Pressable onPress={onCreateAccount}>
+          <Text style={styles.fineprint}>
+            New here? Set up takes about two minutes.
+          </Text>
+        </Pressable>
       </View>
     </SafeAreaView>
   );
@@ -76,17 +88,18 @@ const styles = StyleSheet.create({
     color: Brand.inkMuted,
     textAlign: 'center',
     marginTop: 12,
+    paddingHorizontal: Space.lg,
+    lineHeight: 20,
   },
   cta: {
     gap: 12,
     marginTop: 48,
   },
-  appleBtn: { backgroundColor: Brand.inkPrimary },
-  fallback: {
+  fineprint: {
     fontFamily: AmbitFont.body,
     fontSize: 13,
-    color: Brand.accent,
+    color: Brand.inkMuted,
     textAlign: 'center',
-    marginTop: 24,
+    marginTop: 20,
   },
 });

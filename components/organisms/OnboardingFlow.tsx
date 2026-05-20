@@ -4,14 +4,15 @@ import { Brand } from '../../constants/theme';
 import { OnboardingProvider, useOnboarding } from '../../context/OnboardingContext';
 import { SplashScreen } from './onboarding/SplashScreen';
 import { WelcomeScreen } from './onboarding/WelcomeScreen';
+import { SignInScreen } from './onboarding/SignInScreen';
 import { EduEmailScreen } from './onboarding/EduEmailScreen';
-import { AgeGateScreen } from './onboarding/AgeGateScreen';
+import { DemographicScreen } from './onboarding/DemographicScreen';
 import { VibeBlurbScreen } from './onboarding/VibeBlurbScreen';
-import { SkillTagsScreen } from './onboarding/SkillTagsScreen';
-import { RoleDeclarationScreen } from './onboarding/RoleDeclarationScreen';
-import { CampusScreen } from './onboarding/CampusScreen';
 import { PhotoScreen } from './onboarding/PhotoScreen';
+import { CampusScreen } from './onboarding/CampusScreen';
+import { SkillTagsScreen } from './onboarding/SkillTagsScreen';
 import { ProofLinksScreen } from './onboarding/ProofLinksScreen';
+import { RoleDeclarationScreen } from './onboarding/RoleDeclarationScreen';
 import { CompleteScreen } from './onboarding/CompleteScreen';
 
 interface Props {
@@ -19,24 +20,36 @@ interface Props {
   onDismiss: () => void;
 }
 
+/// Linear sign-up sequence. Sign-in is a branch off 'welcome' that lives
+/// outside this array — it bypasses everything and goes straight to home.
+///
+/// Order rationale:
+///   1. splash / welcome      — brand + dual-path entry (create OR sign in)
+///   2. eduEmail              — eligibility (returning users don't see this)
+///   3. demographic           — student vs professor; gates downstream copy
+///   4. vibe                  — personality before identity (sets tone)
+///   5. photo                 — name + avatar
+///   6. campus                — proximity anchor
+///   7. skills                — capability
+///   8. proof                 — validation links
+///   9. role                  — owner / seeker / both (toggleable later)
+///   10. complete             — celebration + dismiss
 const STEPS = [
   'splash',
   'welcome',
   'eduEmail',
-  'age',
+  'demographic',
   'vibe',
-  'skills',
-  'role',
-  'campus',
   'photo',
+  'campus',
+  'skills',
   'proof',
+  'role',
   'complete',
 ] as const;
-type Step = typeof STEPS[number];
+type LinearStep = typeof STEPS[number];
+type Step = LinearStep | 'signIn';
 
-/// Full-screen modal walking the 11-step onboarding sequence.
-/// (System sheets S-002a Apple Sign In and S-003b Google Picker are skipped —
-/// they're platform UI, not our screens. SheerID fallback S-006 deferred.)
 export function OnboardingFlow({ visible, onDismiss }: Props) {
   return (
     <Modal
@@ -58,15 +71,6 @@ function Steps({ onDismiss }: { onDismiss: () => void }) {
   const [step, setStep] = useState<Step>('splash');
   const { reset } = useOnboarding();
 
-  const advance = () => {
-    const i = STEPS.indexOf(step);
-    if (i < STEPS.length - 1) setStep(STEPS[i + 1]);
-  };
-  const back = () => {
-    const i = STEPS.indexOf(step);
-    if (i > 0) setStep(STEPS[i - 1]);
-    else dismiss();
-  };
   const dismiss = () => {
     onDismiss();
     setTimeout(() => {
@@ -75,18 +79,54 @@ function Steps({ onDismiss }: { onDismiss: () => void }) {
     }, 300);
   };
 
+  /// Linear advance — only valid when on a LinearStep. The 'signIn' branch
+  /// dismisses on success rather than advancing.
+  const advance = () => {
+    if (step === 'signIn') return;
+    const i = STEPS.indexOf(step);
+    if (i < STEPS.length - 1) setStep(STEPS[i + 1]);
+  };
+
+  const back = () => {
+    if (step === 'signIn') {
+      setStep('welcome');
+      return;
+    }
+    const i = STEPS.indexOf(step);
+    if (i > 0) setStep(STEPS[i - 1]);
+    else dismiss();
+  };
+
   switch (step) {
-    case 'splash':   return <SplashScreen onContinue={advance} />;
-    case 'welcome':  return <WelcomeScreen onContinue={advance} />;
-    case 'eduEmail': return <EduEmailScreen onBack={back} onContinue={advance} />;
-    case 'age':      return <AgeGateScreen onBack={back} onContinue={advance} />;
-    case 'vibe':     return <VibeBlurbScreen onBack={back} onContinue={advance} />;
-    case 'skills':   return <SkillTagsScreen onBack={back} onContinue={advance} />;
-    case 'role':     return <RoleDeclarationScreen onBack={back} onContinue={advance} />;
-    case 'campus':   return <CampusScreen onBack={back} onContinue={advance} />;
-    case 'photo':    return <PhotoScreen onBack={back} onContinue={advance} />;
-    case 'proof':    return <ProofLinksScreen onBack={back} onContinue={advance} />;
-    case 'complete': return <CompleteScreen onDone={dismiss} />;
+    case 'splash':
+      return <SplashScreen onContinue={advance} />;
+    case 'welcome':
+      return (
+        <WelcomeScreen
+          onCreateAccount={advance}
+          onSignIn={() => setStep('signIn')}
+        />
+      );
+    case 'signIn':
+      return <SignInScreen onBack={back} onSignedIn={dismiss} />;
+    case 'eduEmail':
+      return <EduEmailScreen onBack={back} onContinue={advance} />;
+    case 'demographic':
+      return <DemographicScreen onBack={back} onContinue={advance} />;
+    case 'vibe':
+      return <VibeBlurbScreen onBack={back} onContinue={advance} />;
+    case 'photo':
+      return <PhotoScreen onBack={back} onContinue={advance} />;
+    case 'campus':
+      return <CampusScreen onBack={back} onContinue={advance} />;
+    case 'skills':
+      return <SkillTagsScreen onBack={back} onContinue={advance} />;
+    case 'proof':
+      return <ProofLinksScreen onBack={back} onContinue={advance} />;
+    case 'role':
+      return <RoleDeclarationScreen onBack={back} onContinue={advance} />;
+    case 'complete':
+      return <CompleteScreen onDone={dismiss} />;
   }
 }
 
