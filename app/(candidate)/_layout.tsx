@@ -1,6 +1,6 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
-import { LiquidNavBar, DEFAULT_TABS, NavTabKey } from '../../components/organisms';
+import { LiquidNavBar, NavTabKey } from '../../components/organisms';
 
 const TAB_TO_ROUTE: Record<NavTabKey, string> = {
   discovery: 'feed',
@@ -25,7 +25,6 @@ export default function CandidateLayout() {
         const activeKey = ROUTE_TO_TAB[currentRoute] ?? 'discovery';
         return (
           <LiquidNavBar
-            tabs={DEFAULT_TABS}
             activeKey={activeKey}
             onChange={(key) => navigation.navigate(TAB_TO_ROUTE[key] as never)}
           />

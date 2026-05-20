@@ -76,7 +76,7 @@ export function ProofLinksScreen({ onBack, onContinue }: Props) {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Brand.canvas, paddingHorizontal: Space.lg },
-  headerWrap: { marginTop: 16 },
+  headerWrap: { marginTop: 56 },
   headline: { fontFamily: AmbitFont.display, fontSize: 30, color: Brand.inkPrimary },
   subtitle: {
     fontFamily: AmbitFont.body, fontSize: 13, color: Brand.inkMuted, marginTop: 12,

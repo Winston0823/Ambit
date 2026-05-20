@@ -1,55 +1,60 @@
 import React from 'react';
-import {
-  Image,
-  ImageSourcePropType,
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
+import {
+  Sailboat,
+  ChatCircle,
+  ChatCircleDots,
+  Stack,
+  User,
+  UserCircle,
+  IconProps,
+} from 'phosphor-react-native';
 import { Brand, TypeScale } from '../../constants/theme';
 
 export type NavTabKey = 'discovery' | 'chat' | 'projects' | 'profile';
 
-export interface NavTab {
+type PhosphorIcon = React.ComponentType<IconProps>;
+
+interface NavTab {
   key: NavTabKey;
   label: string;
-  icon: ImageSourcePropType;
+  /// Outline icon shown when the tab is inactive.
+  inactiveIcon: PhosphorIcon;
+  /// Filled icon shown when the tab is active. Many Phosphor icons have a
+  /// distinct "active" variant (e.g. ChatCircleDots) that adds a state cue —
+  /// use those where they exist.
+  activeIcon: PhosphorIcon;
 }
 
-/// PNG icon assets. Metro auto-picks @1x/@2x/@3x from the same require().
-export const DEFAULT_TABS: NavTab[] = [
-  { key: 'discovery', label: 'Discovery', icon: require('../../assets/icons/nav/DiscoveryIcon.png') },
-  { key: 'chat',      label: 'Chat',      icon: require('../../assets/icons/nav/ChatIcon.png') },
-  { key: 'projects',  label: 'Projects',  icon: require('../../assets/icons/nav/ProjectsIcon.png') },
-  { key: 'profile',   label: 'Profile',   icon: require('../../assets/icons/nav/ProfileIcon.png') },
+/// Phosphor icon picks per tab. Sailboat carries the proximity/explore
+/// metaphor better than Compass for Ambit's "discover students near you"
+/// thesis. ChatCircleDots has an unread-state hint baked in. UserCircle
+/// reads as a self-portrait frame on active.
+const TABS: NavTab[] = [
+  { key: 'discovery', label: 'Discovery', inactiveIcon: Sailboat,   activeIcon: Sailboat },
+  { key: 'chat',      label: 'Chat',      inactiveIcon: ChatCircle, activeIcon: ChatCircleDots },
+  { key: 'projects',  label: 'Projects',  inactiveIcon: Stack,      activeIcon: Stack },
+  { key: 'profile',   label: 'Profile',   inactiveIcon: User,       activeIcon: UserCircle },
 ];
 
-/// Per-icon optical height. Compensates for different source PNG content
-/// densities so every icon FEELS the same size to the eye, even though the
-/// underlying images have different internal padding. Tuned by visual diff
-/// against the Figma reference. Replace these once all four PNGs are
-/// re-exported from a uniform Figma canvas (e.g., 40x40 with consistent
-/// inner padding).
-const ICON_OPTICAL_HEIGHT: Record<NavTabKey, number> = {
-  discovery: 24,   // wide source, content fills well
-  chat:      24,   // wide source, content fills well
-  projects:  24,   // wide aspect (1.30) → less height than Profile to match its visual footprint
-  profile:   28,   // square source — gets the most height for optical parity
-};
-
 interface Props {
-  tabs?: NavTab[];
   activeKey: NavTabKey;
   onChange: (key: NavTabKey) => void;
 }
 
-/// Anchored bottom tab bar. Full width, rounded top corners only, solid dark fill,
-/// PNG icons, active state via opacity. Mirrors the SwiftUI LiquidNavBar 1:1.
-export function LiquidNavBar({ tabs = DEFAULT_TABS, activeKey, onChange }: Props) {
+const ACTIVE_COLOR   = Brand.inkOnBrand;                  // white icon on dark nav
+const INACTIVE_COLOR = 'rgba(255, 255, 255, 0.55)';
+const ACCENT         = Brand.primary;                     // warm tan for label + dot
+
+/// Anchored bottom tab bar. Active tab gets three coordinated cues:
+///   1. A warm-tan dot above the icon (color-independent affordance).
+///   2. Icon swaps from outline → fill weight (or fill variant).
+///   3. The label appears in warm tan; inactive tabs are icon-only.
+/// Phosphor renders all four icons with consistent metrics, so no per-tab
+/// optical sizing is required.
+export function LiquidNavBar({ activeKey, onChange }: Props) {
   const insets = useSafeAreaInsets();
 
   const handleTap = (key: NavTabKey) => {
@@ -60,8 +65,10 @@ export function LiquidNavBar({ tabs = DEFAULT_TABS, activeKey, onChange }: Props
 
   return (
     <View style={[styles.bar, { paddingBottom: Math.max(insets.bottom, 8) }]}>
-      {tabs.map((tab) => {
+      {TABS.map((tab) => {
         const active = tab.key === activeKey;
+        const Icon = active ? tab.activeIcon : tab.inactiveIcon;
+
         return (
           <Pressable
             key={tab.key}
@@ -71,20 +78,18 @@ export function LiquidNavBar({ tabs = DEFAULT_TABS, activeKey, onChange }: Props
             accessibilityLabel={tab.label}
             accessibilityState={{ selected: active }}
           >
-            <View
-              style={[
-                styles.iconBox,
-                { height: ICON_OPTICAL_HEIGHT[tab.key], opacity: active ? 1 : 0.62 },
-              ]}
-            >
-              <Image
-                source={tab.icon}
-                style={styles.icon}
-                resizeMode="contain"
-              />
+            <View style={styles.dotSlot}>
+              {active && <View style={styles.dot} />}
             </View>
+
+            <Icon
+              size={26}
+              color={active ? ACTIVE_COLOR : INACTIVE_COLOR}
+              weight={active ? 'fill' : 'regular'}
+            />
+
             <Text
-              style={[styles.label, { opacity: active ? 1 : 0.62 }]}
+              style={[styles.label, { opacity: active ? 1 : 0 }]}
               numberOfLines={1}
             >
               {tab.label}
@@ -100,16 +105,12 @@ const styles = StyleSheet.create({
   bar: {
     flexDirection: 'row',
     backgroundColor: Brand.navBarBg,
-    // 10pt top corner radius — tighter, more iOS-system tab-bar shape
     borderTopLeftRadius: 10,
     borderTopRightRadius: 10,
-    // 10pt top padding (was 16) — brings total bar height closer to iOS
-    // HIG's 49pt tab bar + safe area, while preserving 44pt min touch target
-    paddingTop: 10,
+    paddingTop: 8,
     paddingHorizontal: 8,
-    // Subtle top highlight via overlay border
     borderTopWidth: 0.5,
-    borderTopColor: 'rgba(255,255,255,0.06)',
+    borderTopColor: Brand.navBarHairline,
     shadowColor: '#000',
     shadowOpacity: 0.22,
     shadowRadius: 18,
@@ -119,27 +120,27 @@ const styles = StyleSheet.create({
   tab: {
     flex: 1,
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
   },
-  iconBox: {
-    // Width is uniform (visual column); height varies per tab below for
-    // optical balance, because the source PNGs have different internal
-    // padding / content densities. iOS HIG calls this "optical sizing".
-    // Root fix is to standardize Figma export canvases — this compensates
-    // until then.
-    width: 36,
+  /// Reserve vertical space for the dot whether or not it's rendered, so the
+  /// icon row doesn't shift up/down between active and inactive states.
+  dotSlot: {
+    height: 8,
+    width: 8,
     alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: 4,
   },
-  icon: {
-    // Image fills its iconBox; resizeMode='contain' on the Image element
-    // keeps aspect ratio without cropping.
-    height: '100%',
-    width: '100%',
+  dot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: ACCENT,
   },
   label: {
     ...TypeScale.nav,
-    color: Brand.inkOnBrand,
+    color: ACCENT,
     marginTop: 4,
+    letterSpacing: 0.2,
   },
 });

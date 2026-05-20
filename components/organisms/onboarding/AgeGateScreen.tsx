@@ -142,19 +142,25 @@ export function AgeGateScreen({ onBack, onContinue }: Props) {
               // active and inactive glyphs end up at the same fraction-of-
               // line-box position, so they line up with each other.
               const translateY = Animated.multiply(scale, CAP_RATIO * ACTIVE_FONT);
+              // Render each digit as its own Text so iOS's bounding-box
+              // computation can't leak round-glyph overshoot (e.g. "0") into
+              // the vertical positioning of the whole string. Each glyph
+              // sits in its own line-box and centers independently.
+              const digits = String(item).split('');
               return (
                 <View style={[styles.cell, { width: itemWidth }]}>
-                  <Animated.Text
-                    style={[
-                      styles.num,
-                      {
-                        opacity,
-                        transform: [{ translateY }, { scale }],
-                      },
-                    ]}
+                  <Animated.View
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      opacity,
+                      transform: [{ translateY }, { scale }],
+                    }}
                   >
-                    {item}
-                  </Animated.Text>
+                    {digits.map((d, i) => (
+                      <Text key={i} style={styles.num}>{d}</Text>
+                    ))}
+                  </Animated.View>
                 </View>
               );
             }}
