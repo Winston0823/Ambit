@@ -7,8 +7,8 @@ import {
   ChatCircle,
   ChatCircleDots,
   Stack,
-  User,
   UserCircle,
+  UserCircleDashed,
   IconProps,
 } from 'phosphor-react-native';
 import { Brand, TypeScale } from '../../constants/theme';
@@ -30,13 +30,14 @@ interface NavTab {
 
 /// Phosphor icon picks per tab. Sailboat carries the proximity/explore
 /// metaphor better than Compass for Ambit's "discover students near you"
-/// thesis. ChatCircleDots has an unread-state hint baked in. UserCircle
-/// reads as a self-portrait frame on active.
+/// thesis. ChatCircleDots has an unread-state hint baked in. Profile uses
+/// a dashed circle when inactive (reads as "not yet entered") and resolves
+/// to the solid UserCircle once selected.
 const TABS: NavTab[] = [
-  { key: 'discovery', label: 'Discovery', inactiveIcon: Sailboat,   activeIcon: Sailboat },
-  { key: 'chat',      label: 'Chat',      inactiveIcon: ChatCircle, activeIcon: ChatCircleDots },
-  { key: 'projects',  label: 'Projects',  inactiveIcon: Stack,      activeIcon: Stack },
-  { key: 'profile',   label: 'Profile',   inactiveIcon: User,       activeIcon: UserCircle },
+  { key: 'discovery', label: 'Discovery', inactiveIcon: Sailboat,         activeIcon: Sailboat    },
+  { key: 'chat',      label: 'Chat',      inactiveIcon: ChatCircle,       activeIcon: ChatCircleDots },
+  { key: 'projects',  label: 'Projects',  inactiveIcon: Stack,            activeIcon: Stack       },
+  { key: 'profile',   label: 'Profile',   inactiveIcon: UserCircleDashed, activeIcon: UserCircle  },
 ];
 
 interface Props {
