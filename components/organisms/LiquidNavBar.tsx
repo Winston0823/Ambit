@@ -49,10 +49,9 @@ const ACTIVE_COLOR   = Brand.inkOnBrand;                  // white icon on dark 
 const INACTIVE_COLOR = 'rgba(255, 255, 255, 0.55)';
 const ACCENT         = Brand.primary;                     // warm tan for label + dot
 
-/// Anchored bottom tab bar. Active tab gets three coordinated cues:
-///   1. A warm-tan dot above the icon (color-independent affordance).
-///   2. Icon swaps from outline → fill weight (or fill variant).
-///   3. The label appears in warm tan; inactive tabs are icon-only.
+/// Anchored bottom tab bar. Active tab gets two coordinated cues:
+///   1. Icon swaps from outline → fill weight (or fill variant).
+///   2. The label appears in warm tan; inactive tabs are icon-only.
 /// Phosphor renders all four icons with consistent metrics, so no per-tab
 /// optical sizing is required.
 export function LiquidNavBar({ activeKey, onChange }: Props) {
@@ -79,10 +78,6 @@ export function LiquidNavBar({ activeKey, onChange }: Props) {
             accessibilityLabel={tab.label}
             accessibilityState={{ selected: active }}
           >
-            <View style={styles.dotSlot}>
-              {active && <View style={styles.dot} />}
-            </View>
-
             <Icon
               size={26}
               color={active ? ACTIVE_COLOR : INACTIVE_COLOR}
@@ -122,21 +117,6 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'flex-start',
-  },
-  /// Reserve vertical space for the dot whether or not it's rendered, so the
-  /// icon row doesn't shift up/down between active and inactive states.
-  dotSlot: {
-    height: 8,
-    width: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 4,
-  },
-  dot: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: ACCENT,
   },
   label: {
     ...TypeScale.nav,
