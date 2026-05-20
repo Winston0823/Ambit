@@ -3,6 +3,7 @@ import { StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BackChevron, Button, KeyboardDismiss } from '../../atoms';
 import { ANCHORED_CTA_BOTTOM } from '../../molecules/OnboardingContinue';
+import { useAuth } from '../../../context/AuthContext';
 import { Brand, AmbitFont, Radii, Space } from '../../../constants/theme';
 
 interface Props {
@@ -20,11 +21,28 @@ interface Props {
 /// Wire to Supabase Auth (or Clerk) when auth lands.
 export function SignInScreen({ onBack, onSignedIn }: Props) {
   const insets = useSafeAreaInsets();
+  const { signInWithEmail } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const isValid =
     email.includes('@') && email.includes('.') && password.length >= 6;
+
+  const handleSignIn = async () => {
+    if (!isValid || loading) return;
+    setLoading(true);
+    setError('');
+    try {
+      await signInWithEmail(email, password);
+      onSignedIn();
+    } catch (e: any) {
+      setError(e?.message ?? 'Invalid email or password.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <KeyboardDismiss>
@@ -68,11 +86,13 @@ export function SignInScreen({ onBack, onSignedIn }: Props) {
           <Text style={styles.forgot}>Forgot password?</Text>
         </View>
 
+        {error !== '' && <Text style={styles.errorNote}>{error}</Text>}
+
         <View style={[styles.cta, { bottom: insets.bottom + ANCHORED_CTA_BOTTOM }]}>
           <Button
             title="Sign in"
-            onPress={onSignedIn}
-            disabled={!isValid}
+            onPress={handleSignIn}
+            disabled={!isValid || loading}
             trailingArrow
           />
         </View>
@@ -126,6 +146,13 @@ const styles = StyleSheet.create({
     color: Brand.accent,
     textAlign: 'right',
     marginTop: -4,
+  },
+  errorNote: {
+    fontFamily: AmbitFont.body,
+    fontSize: 13,
+    color: '#C0392B',
+    paddingHorizontal: Space.lg,
+    marginTop: 8,
   },
   cta: {
     position: 'absolute',
