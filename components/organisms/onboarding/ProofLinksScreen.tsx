@@ -1,6 +1,6 @@
 import React from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BackChevron, KeyboardDismiss, TextField } from '../../atoms';
 import { OnboardingContinue } from '../../molecules';
 import { useOnboarding } from '../../../context/OnboardingContext';
@@ -11,6 +11,7 @@ interface Props { onBack: () => void; onContinue: () => void; }
 /// S-012 Proof Links — at least one required.
 export function ProofLinksScreen({ onBack, onContinue }: Props) {
   const { profile, update } = useOnboarding();
+  const insets = useSafeAreaInsets();
   const { proofLinks } = profile;
   const hasAtLeastOne = Object.values(proofLinks).some((v) => v.trim().length > 0);
 
@@ -30,7 +31,10 @@ export function ProofLinksScreen({ onBack, onContinue }: Props) {
         </View>
 
         <ScrollView
-          contentContainerStyle={styles.scroll}
+          contentContainerStyle={[
+            styles.scroll,
+            { paddingBottom: insets.bottom + 130 },
+          ]}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
@@ -81,5 +85,6 @@ const styles = StyleSheet.create({
   subtitle: {
     fontFamily: AmbitFont.body, fontSize: 13, color: Brand.inkMuted, marginTop: 12,
   },
-  scroll: { paddingTop: Space.lg, paddingBottom: 24, gap: 18 },
+  // paddingBottom dynamic via insets.bottom + 130 — clears the anchored CTA.
+  scroll: { paddingTop: Space.lg, gap: 18 },
 });

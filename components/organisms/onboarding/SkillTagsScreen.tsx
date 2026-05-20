@@ -1,6 +1,6 @@
 import React from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BackChevron, Chip } from '../../atoms';
 import { OnboardingContinue } from '../../molecules';
 import { useOnboarding } from '../../../context/OnboardingContext';
@@ -15,6 +15,7 @@ const MAX_SELECTED = 8;
 /// S-008 Skill Tag Selector.
 export function SkillTagsScreen({ onBack, onContinue }: Props) {
   const { profile, update } = useOnboarding();
+  const insets = useSafeAreaInsets();
   const selected = profile.skills;
 
   const toggle = (tag: string) => {
@@ -40,7 +41,12 @@ export function SkillTagsScreen({ onBack, onContinue }: Props) {
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scroll}
+        contentContainerStyle={[
+          styles.scroll,
+          // Reserve room for the anchored Continue + progress bar overlay
+          // so the last chip row isn't hidden behind them.
+          { paddingBottom: insets.bottom + 130 },
+        ]}
       >
         {SKILL_CATEGORIES.map((cat) => (
           <View key={cat.label} style={styles.category}>
@@ -94,7 +100,8 @@ const styles = StyleSheet.create({
   scroll: {
     paddingHorizontal: Space.lg,
     paddingTop: Space.xl,
-    paddingBottom: 24,
+    // paddingBottom is injected dynamically with insets.bottom + 130 in the
+    // component to reserve room for the anchored CTA + progress overlay.
   },
   category: { marginBottom: Space.xxl },
   categoryLabel: {

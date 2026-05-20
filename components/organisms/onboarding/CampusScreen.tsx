@@ -1,6 +1,6 @@
 import React from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CheckCircle, MapPin } from 'phosphor-react-native';
 import { BackChevron } from '../../atoms';
 import { OnboardingContinue } from '../../molecules';
@@ -18,6 +18,7 @@ interface Props { onBack: () => void; onContinue: () => void; }
 /// design language.
 export function CampusScreen({ onBack, onContinue }: Props) {
   const { profile, update } = useOnboarding();
+  const insets = useSafeAreaInsets();
   const isValid = profile.campusId !== null;
 
   return (
@@ -32,7 +33,10 @@ export function CampusScreen({ onBack, onContinue }: Props) {
       </View>
 
       <ScrollView
-        contentContainerStyle={styles.list}
+        contentContainerStyle={[
+          styles.list,
+          { paddingBottom: insets.bottom + 130 },
+        ]}
         showsVerticalScrollIndicator={false}
       >
         {CAMPUSES.map((c) => {
@@ -96,8 +100,9 @@ const styles = StyleSheet.create({
   },
   list: {
     paddingHorizontal: Space.lg,
-    paddingBottom: 24,
     gap: 10,
+    // paddingBottom injected via insets.bottom + 130 in the component to
+    // clear the anchored CTA + progress overlay.
   },
   row: {
     flexDirection: 'row',

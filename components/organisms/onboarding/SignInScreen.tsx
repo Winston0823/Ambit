@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BackChevron, Button, KeyboardDismiss } from '../../atoms';
+import { ANCHORED_CTA_BOTTOM } from '../../molecules/OnboardingContinue';
 import { Brand, AmbitFont, Radii, Space } from '../../../constants/theme';
 
 interface Props {
@@ -18,6 +19,7 @@ interface Props {
 /// "Sign in" treats any valid-looking email + password ≥ 6 chars as success.
 /// Wire to Supabase Auth (or Clerk) when auth lands.
 export function SignInScreen({ onBack, onSignedIn }: Props) {
+  const insets = useSafeAreaInsets();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
@@ -66,7 +68,7 @@ export function SignInScreen({ onBack, onSignedIn }: Props) {
           <Text style={styles.forgot}>Forgot password?</Text>
         </View>
 
-        <View style={styles.cta}>
+        <View style={[styles.cta, { bottom: insets.bottom + ANCHORED_CTA_BOTTOM }]}>
           <Button
             title="Sign in"
             onPress={onSignedIn}
@@ -129,6 +131,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: Space.lg,
     right: Space.lg,
-    bottom: Space.ctaBottom,
+    // bottom set dynamically to match the linear flow's anchored CTA.
   },
 });

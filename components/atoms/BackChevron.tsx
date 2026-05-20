@@ -26,7 +26,7 @@ export function BackChevron({ onPress }: Props) {
     <Pressable
       onPress={press}
       hitSlop={8}
-      style={[styles.btn, { top: insets.top + 18 }]}
+      style={[styles.btn, { top: insets.top + 8 }]}
     >
       <Text style={styles.glyph}>‹</Text>
     </Pressable>

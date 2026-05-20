@@ -11,6 +11,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Brand } from '../../constants/theme';
 import { OnboardingProvider, useOnboarding } from '../../context/OnboardingContext';
 import { OnboardingProgress } from '../atoms';
+import {
+  ANCHORED_CTA_BOTTOM,
+  ANCHORED_CTA_HEIGHT,
+} from '../molecules/OnboardingContinue';
 import { SplashScreen } from './onboarding/SplashScreen';
 import { WelcomeScreen } from './onboarding/WelcomeScreen';
 import { SignInScreen } from './onboarding/SignInScreen';
@@ -177,12 +181,18 @@ function Steps({ onDismiss }: { onDismiss: () => void }) {
         {renderStep()}
       </Animated.View>
 
-      {/* Progress bar overlays the top of every in-flow screen. Absolute-
-          positioned with the safe-area inset so it sits above the back
-          chevron (which is offset further down to clear it). */}
+      {/* Progress bar sits just above the anchored Continue button, so
+          both elements always live at the same y-coordinate regardless of
+          which screen is mounted. 16pt gap above the CTA's top edge. */}
       {showProgress && (
         <View
-          style={[styles.progressOverlay, { top: insets.top + 6 }]}
+          style={[
+            styles.progressOverlay,
+            {
+              bottom:
+                insets.bottom + ANCHORED_CTA_BOTTOM + ANCHORED_CTA_HEIGHT + 16,
+            },
+          ]}
           pointerEvents="none"
         >
           <OnboardingProgress
