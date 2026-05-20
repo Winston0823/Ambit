@@ -11,11 +11,35 @@ interface Props { onBack: () => void; onContinue: () => void; }
 const MAX_LEN = 280;
 const MIN_LEN = 50;
 
-/// S-007 Vibe Blurb Composer.
+/// Copy variants — students pitch personality, professors pitch their lab.
+/// Same screen, same validation; only the surface language changes so the
+/// component stays single-purpose without forking.
+const COPY = {
+  student: {
+    headline: "What's your vibe?",
+    subtitle: 'This will be shown on your profile.',
+    placeholder:
+      "I'm a pretty easygoing guy, but I'm honest about my feelings towards a product/feature. I'm passionate about the projects I join :D",
+    helper:
+      'Be honest. The best teams know and like each other for who they actually are.',
+  },
+  professor: {
+    headline: "What's your lab about?",
+    subtitle: 'Help students understand your research at a glance.',
+    placeholder:
+      "We're a computational neuroscience lab decoding neural signals with machine learning. Always looking for students who like hard problems and messy data.",
+    helper:
+      "Specifics help. Students care about what you actually work on, not just the field.",
+  },
+} as const;
+
+/// S-007 Vibe Blurb Composer. Copy adapts to demographic; structure stays
+/// constant so students and professors both land on the same form.
 export function VibeBlurbScreen({ onBack, onContinue }: Props) {
   const { profile, update } = useOnboarding();
   const blurb = profile.vibeBlurb;
   const isValid = blurb.length >= MIN_LEN && blurb.length <= MAX_LEN;
+  const copy = profile.demographic === 'professor' ? COPY.professor : COPY.student;
 
   return (
     <SafeAreaView style={styles.root}>
@@ -23,22 +47,20 @@ export function VibeBlurbScreen({ onBack, onContinue }: Props) {
 
       <KeyboardDismiss>
         <View style={styles.content}>
-          <Text style={styles.headline}>What's your vibe?</Text>
-          <Text style={styles.subtitle}>This will be shown on your profile.</Text>
+          <Text style={styles.headline}>{copy.headline}</Text>
+          <Text style={styles.subtitle}>{copy.subtitle}</Text>
 
           <TextInput
             value={blurb}
             onChangeText={(v) => update('vibeBlurb', v.slice(0, MAX_LEN))}
-            placeholder="I'm a pretty easygoing guy, but I'm honest about my feelings towards a product/feature. I'm passionate about the projects I join :D"
+            placeholder={copy.placeholder}
             placeholderTextColor={Brand.inkPlaceholder}
             multiline
             style={styles.textArea}
           />
 
           <View style={styles.helperRow}>
-            <Text style={styles.helper}>
-              Be honest. The best teams know and like each other for who they actually are.
-            </Text>
+            <Text style={styles.helper}>{copy.helper}</Text>
             <Text style={[styles.count, { color: blurb.length === 0 ? Brand.inkDisabled : Brand.inkMuted }]}>
               {blurb.length} / {MAX_LEN}
             </Text>

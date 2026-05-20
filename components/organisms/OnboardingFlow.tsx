@@ -9,7 +9,11 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Brand } from '../../constants/theme';
-import { OnboardingProvider, useOnboarding } from '../../context/OnboardingContext';
+import {
+  OnboardingProvider,
+  OnboardingProfile,
+  useOnboarding,
+} from '../../context/OnboardingContext';
 import { OnboardingProgress } from '../atoms';
 import {
   ANCHORED_CTA_BOTTOM,
@@ -33,6 +37,10 @@ interface Props {
   onDismiss: () => void;
 }
 
+/// Canonical step order. The user's branch (student vs. professor + the
+/// student's role pick) determines which of these actually render — see
+/// shouldShow + activeSteps below. Order here is the narrative spine; the
+/// branching is purely subtractive.
 const STEPS = [
   'splash',
   'welcome',
@@ -41,27 +49,50 @@ const STEPS = [
   'vibe',
   'photo',
   'campus',
+  'role',
   'skills',
   'proof',
-  'role',
   'complete',
 ] as const;
 type LinearStep = typeof STEPS[number];
 type Step = LinearStep | 'signIn';
 
-/// Steps for which the progress bar is visible. Splash + welcome + signIn
-/// are entry moments; complete is the celebration — none of them benefit
-/// from orientation.
-const PROGRESS_STEPS: LinearStep[] = [
+/// Steps that appear in the progress bar. Splash + welcome + signIn are
+/// entry moments; complete is the celebration — none of them benefit from
+/// orientation. The actual progress denominator is filtered through
+/// shouldShow() so professors don't see "5 / 8" when only 6 screens exist
+/// in their branch.
+const PROGRESS_STEPS_ALL: LinearStep[] = [
   'eduEmail',
   'demographic',
   'vibe',
   'photo',
   'campus',
+  'role',
   'skills',
   'proof',
-  'role',
 ];
+
+/// Whether a step should render for a given profile.
+///   - Professors skip `role` (implicitly Owners — they recruit) and
+///     `skills` (their value prop is the research, not a personal chip list).
+///   - Student Owners (not Seeker, not Both) skip `skills` for the same
+///     reason — they pitch the project, not themselves.
+function shouldShow(step: LinearStep, profile: OnboardingProfile): boolean {
+  if (profile.demographic === 'professor') {
+    return step !== 'role' && step !== 'skills';
+  }
+  if (step === 'skills' && profile.role === 'owner') return false;
+  return true;
+}
+
+function activeSteps(profile: OnboardingProfile): readonly LinearStep[] {
+  return STEPS.filter((s) => shouldShow(s, profile));
+}
+
+function activeProgressSteps(profile: OnboardingProfile): LinearStep[] {
+  return PROGRESS_STEPS_ALL.filter((s) => shouldShow(s, profile));
+}
 
 const SCREEN_W = Dimensions.get('window').width;
 
@@ -86,7 +117,7 @@ function Steps({ onDismiss }: { onDismiss: () => void }) {
   const [step, setStep] = useState<Step>('splash');
   const prevStepRef = useRef<Step>(step);
   const translateX = useRef(new Animated.Value(0)).current;
-  const { reset } = useOnboarding();
+  const { profile, reset } = useOnboarding();
 
   const dismiss = () => {
     onDismiss();
@@ -96,10 +127,14 @@ function Steps({ onDismiss }: { onDismiss: () => void }) {
     }, 300);
   };
 
+  /// advance / back walk the *active* sub-flow (after applying shouldShow),
+  /// so e.g. a professor advancing from `campus` lands on `proof`, skipping
+  /// the role + skills screens that don't apply to them.
   const advance = () => {
     if (step === 'signIn') return;
-    const i = STEPS.indexOf(step);
-    if (i < STEPS.length - 1) setStep(STEPS[i + 1]);
+    const steps = activeSteps(profile);
+    const i = steps.indexOf(step as LinearStep);
+    if (i >= 0 && i < steps.length - 1) setStep(steps[i + 1]);
   };
 
   const back = () => {
@@ -107,8 +142,9 @@ function Steps({ onDismiss }: { onDismiss: () => void }) {
       setStep('welcome');
       return;
     }
-    const i = STEPS.indexOf(step);
-    if (i > 0) setStep(STEPS[i - 1]);
+    const steps = activeSteps(profile);
+    const i = steps.indexOf(step as LinearStep);
+    if (i > 0) setStep(steps[i - 1]);
     else dismiss();
   };
 
@@ -169,7 +205,8 @@ function Steps({ onDismiss }: { onDismiss: () => void }) {
     }
   };
 
-  const progressIndex = PROGRESS_STEPS.indexOf(step as LinearStep);
+  const progressSteps = activeProgressSteps(profile);
+  const progressIndex = progressSteps.indexOf(step as LinearStep);
   const showProgress = progressIndex >= 0;
   const insets = useSafeAreaInsets();
 
@@ -197,7 +234,7 @@ function Steps({ onDismiss }: { onDismiss: () => void }) {
         >
           <OnboardingProgress
             current={progressIndex + 1}
-            total={PROGRESS_STEPS.length}
+            total={progressSteps.length}
           />
         </View>
       )}
