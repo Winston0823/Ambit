@@ -19,30 +19,30 @@ export function RoleDeclarationScreen({ onBack, onContinue }: Props) {
     <SafeAreaView style={styles.root}>
       <BackChevron onPress={onBack} />
 
-      <View style={styles.content}>
+      <View style={styles.header}>
         <Text style={styles.headline}>How do you want{'\n'}to show up?</Text>
         <Text style={styles.subtitle}>You can flip this anytime in your profile.</Text>
+      </View>
 
-        <View style={styles.cards}>
-          <OptionCard
-            title="Project Owner"
-            subtitle={`I have an idea and I'm building\na team around it`}
-            selected={profile.role === 'owner'}
-            onPress={() => pick('owner')}
-          />
-          <OptionCard
-            title="Project Seeker"
-            subtitle={`I want to find a project and\ncontribute my skills`}
-            selected={profile.role === 'seeker'}
-            onPress={() => pick('seeker')}
-          />
-          <OptionCard
-            title="Both"
-            subtitle={`I'm running a project and open\nto joining others too`}
-            selected={profile.role === 'both'}
-            onPress={() => pick('both')}
-          />
-        </View>
+      <View style={styles.cards}>
+        <OptionCard
+          title="Project Owner"
+          subtitle={`I have an idea and I'm building\na team around it`}
+          selected={profile.role === 'owner'}
+          onPress={() => pick('owner')}
+        />
+        <OptionCard
+          title="Project Seeker"
+          subtitle={`I want to find a project and\ncontribute my skills`}
+          selected={profile.role === 'seeker'}
+          onPress={() => pick('seeker')}
+        />
+        <OptionCard
+          title="Both"
+          subtitle={`I'm running a project and open\nto joining others too`}
+          selected={profile.role === 'both'}
+          onPress={() => pick('both')}
+        />
       </View>
 
       <OnboardingContinue onPress={onContinue} disabled={profile.role === null} />
@@ -52,17 +52,24 @@ export function RoleDeclarationScreen({ onBack, onContinue }: Props) {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Brand.canvas },
-  content: { flex: 1, justifyContent: 'center', paddingBottom: 60 },
-  headline: {
-    fontFamily: AmbitFont.display, fontSize: 30, color: Brand.inkPrimary,
+  header: {
     paddingHorizontal: Space.lg,
+    marginTop: 40,
+    marginBottom: Space.lg,
+  },
+  headline: {
+    fontFamily: AmbitFont.display,
+    fontSize: 30,
+    color: Brand.inkPrimary,
+    lineHeight: 36,
   },
   subtitle: {
-    fontFamily: AmbitFont.body, fontSize: 13, color: Brand.inkMuted,
-    marginTop: 12, paddingHorizontal: Space.lg,
+    fontFamily: AmbitFont.body,
+    fontSize: 13,
+    color: Brand.inkMuted,
+    marginTop: 12,
   },
   cards: {
-    marginTop: 32,
     paddingHorizontal: 16,
     gap: 16,
   },
