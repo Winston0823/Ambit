@@ -81,9 +81,7 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Brand.canvas },
   header: {
     paddingHorizontal: Space.lg,
-    // BackChevron sits at insets.top + 8 with height 44 (bottom edge at
-    // insets.top + 52). marginTop 60 clears it with breathing room.
-    marginTop: 60,
+    marginTop: 40,
     marginBottom: Space.lg,
   },
   headline: {

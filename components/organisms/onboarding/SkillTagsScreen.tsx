@@ -1,11 +1,20 @@
 import React from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { BackChevron, Chip } from '../../atoms';
 import { OnboardingContinue } from '../../molecules';
 import { useOnboarding } from '../../../context/OnboardingContext';
 import { SKILL_CATEGORIES } from '../../../data/mock';
 import { Brand, AmbitFont, Space } from '../../../constants/theme';
+
+/// Canvas-to-transparent endpoints for the fade-out gradients. Using
+/// explicit rgba(255,255,255,0) instead of 'transparent' avoids iOS's
+/// transparent-to-color interpolation defaulting through black (which
+/// would tint the fade gray).
+const CANVAS_OPAQUE = Brand.canvas;
+const CANVAS_CLEAR  = 'rgba(255, 255, 255, 0)';
+const FADE_HEIGHT   = 32;
 
 interface Props { onBack: () => void; onContinue: () => void; }
 
@@ -39,27 +48,43 @@ export function SkillTagsScreen({ onBack, onContinue }: Props) {
         </View>
       </View>
 
-      <ScrollView
-        style={{ marginBottom: insets.bottom + 130 }}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scroll}
-      >
-        {SKILL_CATEGORIES.map((cat) => (
-          <View key={cat.label} style={styles.category}>
-            <Text style={styles.categoryLabel}>{cat.label}</Text>
-            <View style={styles.chipRow}>
-              {cat.tags.map((tag) => (
-                <Chip
-                  key={tag}
-                  label={tag}
-                  selected={selected.includes(tag)}
-                  onPress={() => toggle(tag)}
-                />
-              ))}
+      {/* Scroll area + fade overlays. Wrap so the gradients can absolute-
+          position over the ScrollView's visible edges. marginBottom lives
+          on the wrap so the fade-bottom sits exactly at the scroll area's
+          bottom edge, not below it. */}
+      <View style={[styles.scrollWrap, { marginBottom: insets.bottom + 130 }]}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scroll}
+        >
+          {SKILL_CATEGORIES.map((cat) => (
+            <View key={cat.label} style={styles.category}>
+              <Text style={styles.categoryLabel}>{cat.label}</Text>
+              <View style={styles.chipRow}>
+                {cat.tags.map((tag) => (
+                  <Chip
+                    key={tag}
+                    label={tag}
+                    selected={selected.includes(tag)}
+                    onPress={() => toggle(tag)}
+                  />
+                ))}
+              </View>
             </View>
-          </View>
-        ))}
-      </ScrollView>
+          ))}
+        </ScrollView>
+
+        <LinearGradient
+          colors={[CANVAS_OPAQUE, CANVAS_CLEAR]}
+          style={styles.fadeTop}
+          pointerEvents="none"
+        />
+        <LinearGradient
+          colors={[CANVAS_CLEAR, CANVAS_OPAQUE]}
+          style={styles.fadeBottom}
+          pointerEvents="none"
+        />
+      </View>
 
       <OnboardingContinue onPress={onContinue} disabled={!isValid} />
     </SafeAreaView>
@@ -95,11 +120,26 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: Brand.inkOnBrand,
   },
+  scrollWrap: {
+    flex: 1,
+  },
   scroll: {
     paddingHorizontal: Space.lg,
     paddingTop: Space.xl,
-    // The ScrollView itself has marginBottom = insets.bottom + 130 so the
-    // last category clears the anchored CTA + progress overlay.
+  },
+  fadeTop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: FADE_HEIGHT,
+  },
+  fadeBottom: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: FADE_HEIGHT,
   },
   category: { marginBottom: Space.xxl },
   categoryLabel: {

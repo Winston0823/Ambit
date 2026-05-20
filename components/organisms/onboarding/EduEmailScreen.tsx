@@ -38,25 +38,25 @@ export function EduEmailScreen({ onBack, onContinue }: Props) {
 
         <BackChevron onPress={onBack} />
 
-        <View style={styles.body}>
-          <View style={styles.form}>
-            <Text style={styles.headline}>What's your{'\n'}school email?</Text>
+        <View style={styles.header}>
+          <Text style={styles.headline}>What's your{'\n'}school email?</Text>
+        </View>
 
-            <Text style={styles.fieldLabel}>Education email</Text>
+        <View style={styles.formFields}>
+          <Text style={styles.fieldLabel}>Education email</Text>
 
-            <TextInput
-              value={profile.eduEmail}
-              onChangeText={(v) => update('eduEmail', v)}
-              placeholder="example@college.edu"
-              placeholderTextColor={Brand.inkPlaceholder}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoCorrect={false}
-              style={styles.input}
-              returnKeyType="done"
-              onSubmitEditing={() => { if (isValid) onContinue(); }}
-            />
-          </View>
+          <TextInput
+            value={profile.eduEmail}
+            onChangeText={(v) => update('eduEmail', v)}
+            placeholder="example@college.edu"
+            placeholderTextColor={Brand.inkPlaceholder}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoCorrect={false}
+            style={styles.input}
+            returnKeyType="done"
+            onSubmitEditing={() => { if (isValid) onContinue(); }}
+          />
         </View>
 
         <OnboardingContinue onPress={onContinue} disabled={!isValid} />
@@ -66,29 +66,26 @@ export function EduEmailScreen({ onBack, onContinue }: Props) {
 }
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: Brand.canvas,
-    paddingHorizontal: Space.lg,
-  },
-  body: {
-    flex: 1,
-  },
+  root: { flex: 1, backgroundColor: Brand.canvas },
   watermark: {
     position: 'absolute',
     top: 120,
     right: -90,
     opacity: 0.09,
   },
-  form: {
+  header: {
+    paddingHorizontal: Space.lg,
     marginTop: 40,
+    marginBottom: Space.lg,
   },
   headline: {
     fontFamily: AmbitFont.display,
-    fontSize: 34,
+    fontSize: 30,
     color: Brand.inkPrimary,
-    lineHeight: 42,
-    marginBottom: 32,
+    lineHeight: 36,
+  },
+  formFields: {
+    paddingHorizontal: Space.lg,
   },
   fieldLabel: {
     fontFamily: AmbitFont.body,
