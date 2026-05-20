@@ -78,13 +78,11 @@ const MOCK_PROJECTS: MockProject[] = [
 export default function DiscoveryFeed() {
   return (
     <SafeAreaView style={styles.root} edges={['top']}>
-      {/* Top bar — campus context on the left, utility actions on the right */}
+      {/* Top bar — Instagram-style: wordmark centered, utility actions
+          pinned right. Logo is absolutely positioned so it stays dead-
+          center regardless of how wide the action cluster grows. */}
       <View style={styles.topBar}>
-        <Pressable style={styles.campusChip} accessibilityRole="button">
-          <MapPin size={16} color={Brand.inkPrimary} weight="fill" />
-          <Text style={styles.campusLabel}>Stanford</Text>
-          <Text style={styles.campusRadius}>· 5mi</Text>
-        </Pressable>
+        <Text style={styles.wordmark}>ambit</Text>
 
         <View style={styles.topActions}>
           <Pressable style={styles.iconBtn} accessibilityLabel="Filters">
@@ -96,7 +94,17 @@ export default function DiscoveryFeed() {
         </View>
       </View>
 
-      {/* Context strip — gives the feed a heartbeat */}
+      {/* Campus + context strip — sits one tier below the wordmark so the
+          'why am I seeing this' signal stays prominent without competing
+          with the brand mark. */}
+      <View style={styles.subBar}>
+        <Pressable style={styles.campusChip} accessibilityRole="button">
+          <MapPin size={16} color={Brand.inkPrimary} weight="fill" />
+          <Text style={styles.campusLabel}>Stanford</Text>
+          <Text style={styles.campusRadius}>· 5mi</Text>
+        </Pressable>
+      </View>
+
       <Text style={styles.context}>
         3 new projects looking for designers near you
       </Text>
@@ -177,9 +185,30 @@ const styles = StyleSheet.create({
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end',
     paddingHorizontal: Space.lg,
     paddingTop: Space.sm,
+    paddingBottom: Space.sm,
+    height: 56,
+  },
+  /// Wordmark — rendered in the display font so the brand voice IS the
+  /// type. Absolute-positioned so the centered position never shifts as
+  /// the right-hand action cluster changes. Swap for an Image source when
+  /// the Figma logo export lands.
+  wordmark: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    textAlign: 'center',
+    fontFamily: AmbitFont.display,
+    fontSize: 26,
+    color: Brand.inkPrimary,
+    letterSpacing: 0.5,
+  },
+  subBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Space.lg,
     paddingBottom: Space.md,
   },
   campusChip: {
