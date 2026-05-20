@@ -1,12 +1,19 @@
 import React from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { CheckCircle, MapPin } from 'phosphor-react-native';
 import { BackChevron } from '../../atoms';
 import { OnboardingContinue } from '../../molecules';
 import { useOnboarding } from '../../../context/OnboardingContext';
 import { CAMPUSES } from '../../../data/mock';
 import { Brand, AmbitFont, Radii, Space } from '../../../constants/theme';
+
+/// Canvas-to-transparent endpoints — explicit rgba(255,255,255,0) so iOS
+/// doesn't interpolate 'transparent' through black and tint the fade gray.
+const CANVAS_OPAQUE = Brand.canvas;
+const CANVAS_CLEAR  = 'rgba(255, 255, 255, 0)';
+const FADE_HEIGHT   = 32;
 
 interface Props { onBack: () => void; onContinue: () => void; }
 
@@ -32,45 +39,60 @@ export function CampusScreen({ onBack, onContinue }: Props) {
         </Text>
       </View>
 
-      <ScrollView
-        style={{ marginBottom: insets.bottom + 130 }}
-        contentContainerStyle={styles.list}
-        showsVerticalScrollIndicator={false}
-      >
-        {CAMPUSES.map((c) => {
-          const selected = profile.campusId === c.id;
-          return (
-            <Pressable
-              key={c.id}
-              onPress={() => update('campusId', c.id)}
-              style={[styles.row, selected && styles.rowSelected]}
-              accessibilityRole="button"
-              accessibilityState={{ selected }}
-            >
-              <View style={styles.rowIcon}>
-                <MapPin
-                  size={20}
-                  color={selected ? Brand.seekerInk : Brand.inkMuted}
-                  weight={selected ? 'fill' : 'regular'}
-                />
-              </View>
+      {/* Scroll area + fade overlays. marginBottom lives on the wrap so
+          the bottom fade sits at the scroll area's true bottom edge, not
+          below the entire CTA reserve zone. */}
+      <View style={[styles.scrollWrap, { marginBottom: insets.bottom + 130 }]}>
+        <ScrollView
+          contentContainerStyle={styles.list}
+          showsVerticalScrollIndicator={false}
+        >
+          {CAMPUSES.map((c) => {
+            const selected = profile.campusId === c.id;
+            return (
+              <Pressable
+                key={c.id}
+                onPress={() => update('campusId', c.id)}
+                style={[styles.row, selected && styles.rowSelected]}
+                accessibilityRole="button"
+                accessibilityState={{ selected }}
+              >
+                <View style={styles.rowIcon}>
+                  <MapPin
+                    size={20}
+                    color={selected ? Brand.seekerInk : Brand.inkMuted}
+                    weight={selected ? 'fill' : 'regular'}
+                  />
+                </View>
 
-              <View style={styles.rowText}>
-                <Text style={[styles.rowName, selected && styles.rowNameSelected]}>
-                  {c.name}
-                </Text>
-                <Text style={[styles.rowCity, selected && styles.rowCitySelected]}>
-                  {c.city}
-                </Text>
-              </View>
+                <View style={styles.rowText}>
+                  <Text style={[styles.rowName, selected && styles.rowNameSelected]}>
+                    {c.name}
+                  </Text>
+                  <Text style={[styles.rowCity, selected && styles.rowCitySelected]}>
+                    {c.city}
+                  </Text>
+                </View>
 
-              {selected && (
-                <CheckCircle size={22} color={Brand.seekerInk} weight="fill" />
-              )}
-            </Pressable>
-          );
-        })}
-      </ScrollView>
+                {selected && (
+                  <CheckCircle size={22} color={Brand.seekerInk} weight="fill" />
+                )}
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+
+        <LinearGradient
+          colors={[CANVAS_OPAQUE, CANVAS_CLEAR]}
+          style={styles.fadeTop}
+          pointerEvents="none"
+        />
+        <LinearGradient
+          colors={[CANVAS_CLEAR, CANVAS_OPAQUE]}
+          style={styles.fadeBottom}
+          pointerEvents="none"
+        />
+      </View>
 
       <OnboardingContinue onPress={onContinue} disabled={!isValid} />
     </SafeAreaView>
@@ -96,11 +118,26 @@ const styles = StyleSheet.create({
     color: Brand.inkMuted,
     marginTop: 12,
   },
+  scrollWrap: {
+    flex: 1,
+  },
   list: {
     paddingHorizontal: Space.lg,
     gap: 10,
-    // paddingBottom injected via insets.bottom + 130 in the component to
-    // clear the anchored CTA + progress overlay.
+  },
+  fadeTop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: FADE_HEIGHT,
+  },
+  fadeBottom: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: FADE_HEIGHT,
   },
   row: {
     flexDirection: 'row',
