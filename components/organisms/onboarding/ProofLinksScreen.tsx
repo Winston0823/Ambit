@@ -19,10 +19,10 @@ export function ProofLinksScreen({ onBack, onContinue }: Props) {
     update('proofLinks', { ...proofLinks, [key]: v });
 
   return (
-    <KeyboardDismiss>
-      <SafeAreaView style={styles.root}>
-        <BackChevron onPress={onBack} />
+    <SafeAreaView style={styles.root}>
+      <BackChevron onPress={onBack} />
 
+      <KeyboardDismiss>
         <View style={styles.headerWrap}>
           <Text style={styles.headline}>Show your work</Text>
           <Text style={styles.subtitle}>
@@ -69,10 +69,10 @@ export function ProofLinksScreen({ onBack, onContinue }: Props) {
             autoCorrect={false}
           />
         </ScrollView>
+      </KeyboardDismiss>
 
-        <OnboardingContinue onPress={onContinue} disabled={!hasAtLeastOne} />
-      </SafeAreaView>
-    </KeyboardDismiss>
+      <OnboardingContinue onPress={onContinue} disabled={!hasAtLeastOne} />
+    </SafeAreaView>
   );
 }
 

@@ -23,21 +23,21 @@ export function EduEmailScreen({ onBack, onContinue }: Props) {
     profile.eduEmail.includes('@');
 
   return (
-    <KeyboardDismiss>
-      <SafeAreaView style={styles.root}>
-        {/* Ambient watermark — Mailbox bleeds off the right edge at low
-            opacity, giving the page a quiet motif without competing with
-            the form. pointerEvents=none so it never intercepts taps. */}
-        <View style={styles.watermark} pointerEvents="none">
-          <Mailbox
-            size={360}
-            color={Brand.accent}
-            weight="duotone"
-          />
-        </View>
+    <SafeAreaView style={styles.root}>
+      {/* Ambient watermark — Mailbox bleeds off the right edge at low
+          opacity, giving the page a quiet motif without competing with
+          the form. pointerEvents=none so it never intercepts taps. */}
+      <View style={styles.watermark} pointerEvents="none">
+        <Mailbox
+          size={360}
+          color={Brand.accent}
+          weight="duotone"
+        />
+      </View>
 
-        <BackChevron onPress={onBack} />
+      <BackChevron onPress={onBack} />
 
+      <KeyboardDismiss>
         <View style={styles.header}>
           <Text style={styles.headline}>What's your{'\n'}school email?</Text>
         </View>
@@ -58,10 +58,10 @@ export function EduEmailScreen({ onBack, onContinue }: Props) {
             onSubmitEditing={() => { if (isValid) onContinue(); }}
           />
         </View>
+      </KeyboardDismiss>
 
-        <OnboardingContinue onPress={onContinue} disabled={!isValid} />
-      </SafeAreaView>
-    </KeyboardDismiss>
+      <OnboardingContinue onPress={onContinue} disabled={!isValid} />
+    </SafeAreaView>
   );
 }
 

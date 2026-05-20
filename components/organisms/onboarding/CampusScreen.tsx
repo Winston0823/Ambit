@@ -1,5 +1,12 @@
-import React from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useMemo, useRef, useState } from 'react';
+import {
+  Animated,
+  NativeSyntheticEvent,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { CheckCircle, MapPin } from 'phosphor-react-native';
@@ -28,6 +35,31 @@ export function CampusScreen({ onBack, onContinue }: Props) {
   const insets = useSafeAreaInsets();
   const isValid = profile.campusId !== null;
 
+  // Scroll-conditional fade — same Animated.Value + interpolate pattern as
+  // SkillTagsScreen. Top fade only when scrolled away from the start,
+  // bottom fade only when there's more content below the viewport.
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const [contentH, setContentH] = useState(0);
+  const [layoutH, setLayoutH] = useState(0);
+
+  const topOpacity = useMemo(
+    () => scrollY.interpolate({
+      inputRange: [0, FADE_HEIGHT],
+      outputRange: [0, 1],
+      extrapolate: 'clamp',
+    }),
+    [scrollY],
+  );
+
+  const bottomOpacity = useMemo(() => {
+    const maxScroll = Math.max(0, contentH - layoutH);
+    return scrollY.interpolate({
+      inputRange: [maxScroll - FADE_HEIGHT, maxScroll + 0.001],
+      outputRange: [1, 0],
+      extrapolate: 'clamp',
+    });
+  }, [scrollY, contentH, layoutH]);
+
   return (
     <SafeAreaView style={styles.root}>
       <BackChevron onPress={onBack} />
@@ -43,9 +75,18 @@ export function CampusScreen({ onBack, onContinue }: Props) {
           the bottom fade sits at the scroll area's true bottom edge, not
           below the entire CTA reserve zone. */}
       <View style={[styles.scrollWrap, { marginBottom: insets.bottom + 130 }]}>
-        <ScrollView
+        <Animated.ScrollView
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
+          scrollEventThrottle={16}
+          onScroll={Animated.event(
+            [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+            { useNativeDriver: true },
+          )}
+          onContentSizeChange={(_w: number, h: number) => setContentH(h)}
+          onLayout={(e: NativeSyntheticEvent<{ layout: { height: number } }>) =>
+            setLayoutH(e.nativeEvent.layout.height)
+          }
         >
           {CAMPUSES.map((c) => {
             const selected = profile.campusId === c.id;
@@ -80,18 +121,26 @@ export function CampusScreen({ onBack, onContinue }: Props) {
               </Pressable>
             );
           })}
-        </ScrollView>
+        </Animated.ScrollView>
 
-        <LinearGradient
-          colors={[CANVAS_OPAQUE, CANVAS_CLEAR]}
-          style={styles.fadeTop}
+        <Animated.View
+          style={[styles.fadeTop, { opacity: topOpacity }]}
           pointerEvents="none"
-        />
-        <LinearGradient
-          colors={[CANVAS_CLEAR, CANVAS_OPAQUE]}
-          style={styles.fadeBottom}
+        >
+          <LinearGradient
+            colors={[CANVAS_OPAQUE, CANVAS_CLEAR]}
+            style={StyleSheet.absoluteFill}
+          />
+        </Animated.View>
+        <Animated.View
+          style={[styles.fadeBottom, { opacity: bottomOpacity }]}
           pointerEvents="none"
-        />
+        >
+          <LinearGradient
+            colors={[CANVAS_CLEAR, CANVAS_OPAQUE]}
+            style={StyleSheet.absoluteFill}
+          />
+        </Animated.View>
       </View>
 
       <OnboardingContinue onPress={onContinue} disabled={!isValid} />

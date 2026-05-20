@@ -18,10 +18,10 @@ export function VibeBlurbScreen({ onBack, onContinue }: Props) {
   const isValid = blurb.length >= MIN_LEN && blurb.length <= MAX_LEN;
 
   return (
-    <KeyboardDismiss>
-      <SafeAreaView style={styles.root}>
-        <BackChevron onPress={onBack} />
+    <SafeAreaView style={styles.root}>
+      <BackChevron onPress={onBack} />
 
+      <KeyboardDismiss>
         <View style={styles.content}>
           <Text style={styles.headline}>What's your vibe?</Text>
           <Text style={styles.subtitle}>This will be shown on your profile.</Text>
@@ -44,10 +44,10 @@ export function VibeBlurbScreen({ onBack, onContinue }: Props) {
             </Text>
           </View>
         </View>
+      </KeyboardDismiss>
 
-        <OnboardingContinue onPress={onContinue} disabled={!isValid} />
-      </SafeAreaView>
-    </KeyboardDismiss>
+      <OnboardingContinue onPress={onContinue} disabled={!isValid} />
+    </SafeAreaView>
   );
 }
 

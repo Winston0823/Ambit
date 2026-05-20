@@ -1,5 +1,11 @@
-import React from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useMemo, useRef, useState } from 'react';
+import {
+  Animated,
+  NativeSyntheticEvent,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BackChevron, Chip } from '../../atoms';
@@ -37,6 +43,35 @@ export function SkillTagsScreen({ onBack, onContinue }: Props) {
 
   const isValid = selected.length >= MIN_SELECTED;
 
+  // Scroll-conditional fades. Top fade ramps in over the first FADE_HEIGHT
+  // pt of scroll; bottom fade ramps out over the last FADE_HEIGHT pt
+  // before the content end. When content fits the viewport (no scroll
+  // possible), both opacities are 0 — exactly the Apple Music / Hinge
+  // behavior of "only show the fade when there's something to fade off".
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const [contentH, setContentH] = useState(0);
+  const [layoutH, setLayoutH] = useState(0);
+
+  const topOpacity = useMemo(
+    () => scrollY.interpolate({
+      inputRange: [0, FADE_HEIGHT],
+      outputRange: [0, 1],
+      extrapolate: 'clamp',
+    }),
+    [scrollY],
+  );
+
+  const bottomOpacity = useMemo(() => {
+    const maxScroll = Math.max(0, contentH - layoutH);
+    // inputRange must be strictly ascending — the +0.001 keeps it valid
+    // even when maxScroll === 0 (content fits viewport).
+    return scrollY.interpolate({
+      inputRange: [maxScroll - FADE_HEIGHT, maxScroll + 0.001],
+      outputRange: [1, 0],
+      extrapolate: 'clamp',
+    });
+  }, [scrollY, contentH, layoutH]);
+
   return (
     <SafeAreaView style={styles.root}>
       <BackChevron onPress={onBack} />
@@ -53,9 +88,18 @@ export function SkillTagsScreen({ onBack, onContinue }: Props) {
           on the wrap so the fade-bottom sits exactly at the scroll area's
           bottom edge, not below it. */}
       <View style={[styles.scrollWrap, { marginBottom: insets.bottom + 130 }]}>
-        <ScrollView
+        <Animated.ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scroll}
+          scrollEventThrottle={16}
+          onScroll={Animated.event(
+            [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+            { useNativeDriver: true },
+          )}
+          onContentSizeChange={(_w: number, h: number) => setContentH(h)}
+          onLayout={(e: NativeSyntheticEvent<{ layout: { height: number } }>) =>
+            setLayoutH(e.nativeEvent.layout.height)
+          }
         >
           {SKILL_CATEGORIES.map((cat) => (
             <View key={cat.label} style={styles.category}>
@@ -72,18 +116,26 @@ export function SkillTagsScreen({ onBack, onContinue }: Props) {
               </View>
             </View>
           ))}
-        </ScrollView>
+        </Animated.ScrollView>
 
-        <LinearGradient
-          colors={[CANVAS_OPAQUE, CANVAS_CLEAR]}
-          style={styles.fadeTop}
+        <Animated.View
+          style={[styles.fadeTop, { opacity: topOpacity }]}
           pointerEvents="none"
-        />
-        <LinearGradient
-          colors={[CANVAS_CLEAR, CANVAS_OPAQUE]}
-          style={styles.fadeBottom}
+        >
+          <LinearGradient
+            colors={[CANVAS_OPAQUE, CANVAS_CLEAR]}
+            style={StyleSheet.absoluteFill}
+          />
+        </Animated.View>
+        <Animated.View
+          style={[styles.fadeBottom, { opacity: bottomOpacity }]}
           pointerEvents="none"
-        />
+        >
+          <LinearGradient
+            colors={[CANVAS_CLEAR, CANVAS_OPAQUE]}
+            style={StyleSheet.absoluteFill}
+          />
+        </Animated.View>
       </View>
 
       <OnboardingContinue onPress={onContinue} disabled={!isValid} />
