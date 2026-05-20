@@ -6,6 +6,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { useFonts } from 'expo-font';
 import { RoleProvider } from '../context/RoleContext';
+import { AuthProvider } from '../context/AuthContext';
 import { Brand } from '../constants/theme';
 import { DebugMenuButton, DebugMenuSheet } from '../components/molecules';
 import { OnboardingFlow } from '../components/organisms';
@@ -24,28 +25,30 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={styles.root}>
       <SafeAreaProvider>
-        <RoleProvider>
-          <StatusBar style="dark" />
-          <SafeAreaView style={styles.safe} edges={['top']}>
-            <Slot />
-          </SafeAreaView>
+        <AuthProvider>
+          <RoleProvider>
+            <StatusBar style="dark" />
+            <SafeAreaView style={styles.safe} edges={['top']}>
+              <Slot />
+            </SafeAreaView>
 
-          <DebugMenuButton onPress={() => setDebugOpen(true)} />
+            <DebugMenuButton onPress={() => setDebugOpen(true)} />
 
-          <DebugMenuSheet
-            visible={debugOpen}
-            onClose={() => setDebugOpen(false)}
-            onStartOnboarding={() => {
-              setDebugOpen(false);
-              setTimeout(() => setOnboardingOpen(true), 200);
-            }}
-          />
+            <DebugMenuSheet
+              visible={debugOpen}
+              onClose={() => setDebugOpen(false)}
+              onStartOnboarding={() => {
+                setDebugOpen(false);
+                setTimeout(() => setOnboardingOpen(true), 200);
+              }}
+            />
 
-          <OnboardingFlow
-            visible={onboardingOpen}
-            onDismiss={() => setOnboardingOpen(false)}
-          />
-        </RoleProvider>
+            <OnboardingFlow
+              visible={onboardingOpen}
+              onDismiss={() => setOnboardingOpen(false)}
+            />
+          </RoleProvider>
+        </AuthProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

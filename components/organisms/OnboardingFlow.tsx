@@ -14,6 +14,7 @@ import {
   OnboardingProfile,
   useOnboarding,
 } from '../../context/OnboardingContext';
+import { useAuth } from '../../context/AuthContext';
 import { OnboardingProgress } from '../atoms';
 import {
   ANCHORED_CTA_BOTTOM,
@@ -117,7 +118,8 @@ function Steps({ onDismiss }: { onDismiss: () => void }) {
   const [step, setStep] = useState<Step>('splash');
   const prevStepRef = useRef<Step>(step);
   const translateX = useRef(new Animated.Value(0)).current;
-  const { profile, reset } = useOnboarding();
+  const { profile, reset, submit } = useOnboarding();
+  const { user } = useAuth();
 
   const dismiss = () => {
     onDismiss();
@@ -171,6 +173,13 @@ function Steps({ onDismiss }: { onDismiss: () => void }) {
     prevStepRef.current = step;
   }, [step, translateX]);
 
+  const handleDone = async () => {
+    if (user) {
+      try { await submit(user.id, user.email); } catch { /* non-blocking */ }
+    }
+    dismiss();
+  };
+
   const renderStep = () => {
     switch (step) {
       case 'splash':
@@ -201,7 +210,7 @@ function Steps({ onDismiss }: { onDismiss: () => void }) {
       case 'role':
         return <RoleDeclarationScreen onBack={back} onContinue={advance} />;
       case 'complete':
-        return <CompleteScreen onDone={dismiss} />;
+        return <CompleteScreen onDone={handleDone} />;
     }
   };
 
@@ -218,9 +227,6 @@ function Steps({ onDismiss }: { onDismiss: () => void }) {
         {renderStep()}
       </Animated.View>
 
-      {/* Progress bar sits just above the anchored Continue button, so
-          both elements always live at the same y-coordinate regardless of
-          which screen is mounted. 16pt gap above the CTA's top edge. */}
       {showProgress && (
         <View
           style={[

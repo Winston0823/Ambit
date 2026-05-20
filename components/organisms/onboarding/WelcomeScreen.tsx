@@ -5,10 +5,7 @@ import { Button } from '../../atoms';
 import { Brand, AmbitFont, Space } from '../../../constants/theme';
 
 interface Props {
-  /// User chose "Create account" — proceed forward through onboarding.
   onCreateAccount: () => void;
-  /// User chose "Sign in" — branch to the auth screen instead of the
-  /// linear onboarding sequence.
   onSignIn: () => void;
 }
 
