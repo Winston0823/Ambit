@@ -1,5 +1,6 @@
-import React from 'react';
-import { Pressable, StyleSheet, Text } from 'react-native';
+import React, { useRef } from 'react';
+import { Animated, Platform, Pressable, StyleSheet, Text } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { Brand, Radii, AmbitFont } from '../../constants/theme';
 
 interface Props {
@@ -11,16 +12,37 @@ interface Props {
 /// Skill chip / pill. Spec § design tokens — Pill chip.
 /// Default: surface1 fill + 1.5px border + ink-body text
 /// Selected: warm-tan fill + no border + white text
+/// Tap: selection haptic + brief scale pulse.
 export function Chip({ label, selected = false, onPress }: Props) {
+  const scale = useRef(new Animated.Value(1)).current;
+
+  const press = () => {
+    if (Platform.OS !== 'web') {
+      Haptics.selectionAsync().catch(() => {});
+    }
+    Animated.sequence([
+      Animated.timing(scale, { toValue: 0.94, duration: 70, useNativeDriver: true }),
+      Animated.spring(scale, {
+        toValue: 1,
+        friction: 4,
+        tension: 220,
+        useNativeDriver: true,
+      }),
+    ]).start();
+    onPress?.();
+  };
+
   return (
-    <Pressable
-      onPress={onPress}
-      style={[styles.base, selected ? styles.selected : styles.unselected]}
-    >
-      <Text style={[styles.label, selected ? styles.labelOn : styles.labelOff]}>
-        {label}
-      </Text>
-    </Pressable>
+    <Animated.View style={{ transform: [{ scale }] }}>
+      <Pressable
+        onPress={press}
+        style={[styles.base, selected ? styles.selected : styles.unselected]}
+      >
+        <Text style={[styles.label, selected ? styles.labelOn : styles.labelOff]}>
+          {label}
+        </Text>
+      </Pressable>
+    </Animated.View>
   );
 }
 

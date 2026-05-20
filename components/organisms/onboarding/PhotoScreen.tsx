@@ -71,7 +71,7 @@ export function PhotoScreen({ onBack, onContinue }: Props) {
         <BackChevron onPress={onBack} />
 
         <View style={styles.content}>
-          <Text style={styles.headline}>Set up your profile</Text>
+          <Text style={styles.headline}>Show your face</Text>
 
           <Pressable onPress={openPicker} style={styles.avatarBtn}>
             {profile.photoUri ? (

@@ -1,6 +1,7 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Haptics from 'expo-haptics';
 import { Brand, AmbitFont } from '../../constants/theme';
 
 interface Props { onPress: () => void; }
@@ -15,11 +16,17 @@ interface Props { onPress: () => void; }
 /// offsetting from it keeps the chevron clear of system UI on every device.
 export function BackChevron({ onPress }: Props) {
   const insets = useSafeAreaInsets();
+  const press = () => {
+    if (Platform.OS !== 'web') {
+      Haptics.selectionAsync().catch(() => {});
+    }
+    onPress();
+  };
   return (
     <Pressable
-      onPress={onPress}
+      onPress={press}
       hitSlop={8}
-      style={[styles.btn, { top: insets.top + 8 }]}
+      style={[styles.btn, { top: insets.top + 18 }]}
     >
       <Text style={styles.glyph}>‹</Text>
     </Pressable>

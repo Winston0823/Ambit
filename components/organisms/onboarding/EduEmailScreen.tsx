@@ -1,6 +1,7 @@
 import React from 'react';
 import { Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { EnvelopeOpen } from 'phosphor-react-native';
 import { BackChevron, KeyboardDismiss } from '../../atoms';
 import { useOnboarding } from '../../../context/OnboardingContext';
 import { Brand, AmbitFont, Radii, Space } from '../../../constants/theme';
@@ -19,14 +20,26 @@ export function EduEmailScreen({ onBack, onContinue }: Props) {
       <SafeAreaView style={styles.root}>
         <BackChevron onPress={onBack} />
 
-        {/* Illustration top-right */}
+        {/* Illustration top-right — warm-tan card with EnvelopeOpen on top,
+            swirl arrow overlay echoing the brand's signature mark. */}
         <View style={styles.illustrationRow}>
-          <View style={styles.illustration} />
+          <View style={styles.illustration}>
+            <EnvelopeOpen
+              size={120}
+              color={Brand.accent}
+              weight="duotone"
+            />
+            <Image
+              source={require('../../../assets/icons/ArrowSwirl.png')}
+              style={styles.illustrationSwirl}
+              resizeMode="contain"
+            />
+          </View>
         </View>
 
         {/* Headline + form */}
         <View style={styles.form}>
-          <Text style={styles.headline}>Please provide your .edu email</Text>
+          <Text style={styles.headline}>What's your school email?</Text>
 
           <Text style={styles.fieldLabel}>Education email</Text>
 
@@ -74,10 +87,21 @@ const styles = StyleSheet.create({
     marginTop: 30,
   },
   illustration: {
-    width: 240,
-    height: 240,
-    borderRadius: Radii.sm,
-    backgroundColor: Brand.surface2,
+    width: 220,
+    height: 220,
+    borderRadius: Radii.lg,
+    backgroundColor: Brand.seekerSurface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  illustrationSwirl: {
+    position: 'absolute',
+    bottom: 24,
+    right: 20,
+    width: 64,
+    height: 22,
+    transform: [{ rotate: '-10deg' }],
   },
   form: {
     marginTop: 40,

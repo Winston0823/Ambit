@@ -26,9 +26,9 @@ export function DemographicScreen({ onBack, onContinue }: Props) {
       <BackChevron onPress={onBack} />
 
       <View style={styles.content}>
-        <Text style={styles.headline}>Who are you on campus?</Text>
+        <Text style={styles.headline}>Are you the student{'\n'}or the professor?</Text>
         <Text style={styles.subtitle}>
-          This shapes who you see — and who sees you.
+          Students build, professors recruit. Both are welcome.
         </Text>
 
         <View style={styles.cards}>

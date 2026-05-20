@@ -1,5 +1,15 @@
-import React from 'react';
-import { Image, Pressable, StyleSheet, Text, ViewStyle, TextStyle } from 'react-native';
+import React, { useRef } from 'react';
+import {
+  Animated,
+  Image,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextStyle,
+  ViewStyle,
+} from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { Brand, Radii, AmbitFont } from '../../constants/theme';
 
 type Variant = 'primary' | 'secondary' | 'ghost';
@@ -14,7 +24,12 @@ interface Props {
 }
 
 /// Primary CTA. Warm-tan fill, white label, 12pt radius.
-/// `trailingArrow` renders the hand-drawn swirl arrow from Figma (assets/icons/ArrowSwirl).
+/// `trailingArrow` renders the hand-drawn swirl arrow from Figma.
+///
+/// Adds two interaction signals over a plain Pressable:
+///   - press-in compression (scale 0.96) via native-driver spring
+///   - light haptic on confirmed press
+/// Both fire only when the button is enabled.
 export function Button({
   title,
   onPress,
@@ -24,26 +39,58 @@ export function Button({
   style,
 }: Props) {
   const tones = TONES[variant];
+  const scale = useRef(new Animated.Value(1)).current;
+
+  const press = () => {
+    if (disabled) return;
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    }
+    onPress();
+  };
+
+  const pressIn = () => {
+    Animated.spring(scale, {
+      toValue: 0.96,
+      friction: 8,
+      tension: 240,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const pressOut = () => {
+    Animated.spring(scale, {
+      toValue: 1,
+      friction: 5,
+      tension: 200,
+      useNativeDriver: true,
+    }).start();
+  };
+
   return (
-    <Pressable
-      onPress={onPress}
-      disabled={disabled}
-      style={({ pressed }) => [
-        styles.base,
-        tones.container,
-        { opacity: disabled ? 0.45 : pressed ? 0.88 : 1 },
-        style,
-      ]}
-    >
-      <Text style={[styles.label, tones.label]}>{title}</Text>
-      {trailingArrow && (
-        <Image
-          source={require('../../assets/icons/ArrowSwirl.png')}
-          style={styles.arrow}
-          resizeMode="contain"
-        />
-      )}
-    </Pressable>
+    <Animated.View style={{ transform: [{ scale }] }}>
+      <Pressable
+        onPress={press}
+        onPressIn={pressIn}
+        onPressOut={pressOut}
+        disabled={disabled}
+        style={({ pressed }) => [
+          styles.base,
+          tones.container,
+          { opacity: disabled ? 0.45 : pressed ? 0.92 : 1 },
+          style,
+        ]}
+      >
+        <Text style={[styles.label, tones.label]}>{title}</Text>
+        {trailingArrow && (
+          <Image
+            source={require('../../assets/icons/ArrowSwirl.png')}
+            style={styles.arrow}
+            resizeMode="contain"
+          />
+        )}
+      </Pressable>
+    </Animated.View>
   );
 }
 

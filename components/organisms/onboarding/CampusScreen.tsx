@@ -25,7 +25,7 @@ export function CampusScreen({ onBack, onContinue }: Props) {
       <BackChevron onPress={onBack} />
 
       <View style={styles.header}>
-        <Text style={styles.headline}>Which campus are{'\n'}you part of?</Text>
+        <Text style={styles.headline}>Where do you go?</Text>
         <Text style={styles.subtitle}>
           Your campus shapes who you see first.
         </Text>

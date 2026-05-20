@@ -20,8 +20,8 @@ export function RoleDeclarationScreen({ onBack, onContinue }: Props) {
       <BackChevron onPress={onBack} />
 
       <View style={styles.content}>
-        <Text style={styles.headline}>What are you looking for?</Text>
-        <Text style={styles.subtitle}>This shapes your entire experience on Ambit</Text>
+        <Text style={styles.headline}>How do you want{'\n'}to show up?</Text>
+        <Text style={styles.subtitle}>You can flip this anytime in your profile.</Text>
 
         <View style={styles.cards}>
           <OptionCard
