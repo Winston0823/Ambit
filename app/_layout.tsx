@@ -7,6 +7,7 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { useFonts } from 'expo-font';
 import { RoleProvider } from '../context/RoleContext';
 import { AuthProvider, useAuth } from '../context/AuthContext';
+import { SavedDeckProvider } from '../context/SavedDeckContext';
 import { Brand } from '../constants/theme';
 import { DebugMenuButton, DebugMenuSheet } from '../components/molecules';
 import { OnboardingFlow, OnboardingInline } from '../components/organisms';
@@ -24,8 +25,10 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <AuthProvider>
           <RoleProvider>
-            <StatusBar style="dark" />
-            <Gate />
+            <SavedDeckProvider>
+              <StatusBar style="dark" />
+              <Gate />
+            </SavedDeckProvider>
           </RoleProvider>
         </AuthProvider>
       </SafeAreaProvider>

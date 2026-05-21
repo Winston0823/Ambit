@@ -1,289 +1,207 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import {
+  Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { MapPin } from 'phosphor-react-native';
-import { Button, Chip } from '../../components/atoms';
-import { Brand, AmbitFont, Space, Radii, TypeScale } from '../../constants/theme';
+import { router } from 'expo-router';
+import { BookmarkSimple } from 'phosphor-react-native';
+import * as Haptics from 'expo-haptics';
+import { DiscoveryOverview, SwipeDeck } from '../../components/organisms';
+import { useProfileRole } from '../../hooks/useProfileRole';
+import { useSavedDeck } from '../../context/SavedDeckContext';
+import {
+  AmbitFont,
+  Brand,
+  Radii,
+  Space,
+} from '../../constants/theme';
+import {
+  DiscoveryCardData,
+  MOCK_PROJECTS,
+  MOCK_SEEKERS,
+} from '../../data/mock';
 
-/// Discovery feed (S-020) — placeholder until the Discover API is wired.
+const SKIP_OVERVIEW_THRESHOLD = 5;
+
+/// Discovery feed (S-020) — the matching surface.
 ///
-/// Layout (designed for clarity in §8.3):
-///   ┌ campus chip  ·  radius        filter  ·  search ┐
-///   │  context strip — "why this feed, right now"    │
-///   │  ┌ project card                              ┐ │
-///   │  │ gradient hero + project initials         │ │
-///   │  │ display-font title                       │ │
-///   │  │ owner row (avatar · name · campus · mi)  │ │
-///   │  │ need chips                               │ │
-///   │  │ Express interest CTA                     │ │
-///   │  └──────────────────────────────────────────┘ │
-///   └─────────────────────────────────────────────────┘
+/// Layout:
+///   ┌ wordmark + bookmark icon ─────────────────────┐
+///   │                                                │
+///   │            <SwipeDeck>                         │
+///   │   (or)     <DiscoveryOverview>                 │
+///   │   (or)     skeleton while role loads           │
+///   │                                                │
+///   └────────────────────────────────────────────────┘
 ///
-/// All tokens — color, type, spacing, radii — pull from constants/theme.
-
-interface MockProject {
-  id: string;
-  title: string;
-  ownerName: string;
-  ownerCampus: string;
-  distanceMi: number;
-  needs: string[];
-  /// Two-stop gradient drawn from the warm-tan palette family. Different
-  /// stops per card give each project a unique fingerprint until real
-  /// banner uploads land.
-  gradient: [string, string];
-}
-
-const MOCK_PROJECTS: MockProject[] = [
-  {
-    id: '1',
-    title: 'AI Study Tool',
-    ownerName: 'Alex Chen',
-    ownerCampus: 'Stanford',
-    distanceMi: 2.1,
-    needs: ['Designer', 'Ops'],
-    gradient: [Brand.primary, Brand.accent],
-  },
-  {
-    id: '2',
-    title: 'Hardware for student labs',
-    ownerName: 'Daria Park',
-    ownerCampus: 'SJSU',
-    distanceMi: 14.6,
-    needs: ['Mechanical', 'Firmware'],
-    gradient: ['#C9A57A', Brand.seekerInk],
-  },
-  {
-    id: '3',
-    title: 'Campus mental-health app',
-    ownerName: 'Maya Patel',
-    ownerCampus: 'UC Berkeley',
-    distanceMi: 31.2,
-    needs: ['Design', 'iOS', 'Research'],
-    gradient: [Brand.seekerSurface, Brand.accent],
-  },
-];
-
+/// State machine:
+///   - role loading → render skeleton (blank card-shaped surface, no spinner)
+///   - role known → pick deck (owner→seekers, seeker/both→projects)
+///   - pass → increment consecutiveSkips, push to lastFiveSeen
+///   - save / message-send → reset counters
+///   - consecutiveSkips reaches 5 → overlay DiscoveryOverview
 export default function DiscoveryFeed() {
-  // No SafeAreaView wrapper — the root _layout.tsx already applies the top
-  // inset. Wrapping again double-pads the wordmark below the Dynamic Island.
+  const { role, loading } = useProfileRole();
+  const { save } = useSavedDeck();
+
+  // Owners see Seeker cards (recruit). Seekers + 'both' see Project cards
+  // (join). 'both' defaults to seeker view in v1 — owner toggle ships with
+  // the Profile menu later.
+  const deck = useMemo<DiscoveryCardData[]>(
+    () => (role === 'owner' ? MOCK_SEEKERS : MOCK_PROJECTS),
+    [role],
+  );
+
+  // Skip counter + recent-five buffer drive the overview interstitial.
+  const [consecutiveSkips, setConsecutiveSkips] = useState(0);
+  const [lastFiveSeen, setLastFiveSeen] = useState<DiscoveryCardData[]>([]);
+  /// Re-mount key for SwipeDeck. Bumping this resets the deck's internal
+  /// index to 0 — used when the overview reinserts a card at the head.
+  const [deckResetKey, setDeckResetKey] = useState(0);
+  /// When the overview reinserts a card, we prepend it to this list. Combined
+  /// with the role-mapped deck via memo below.
+  const [reinserted, setReinserted] = useState<DiscoveryCardData[]>([]);
+
+  const activeDeck = useMemo(
+    () => [...reinserted, ...deck.filter((c) => !reinserted.some((r) => r.id === c.id))],
+    [reinserted, deck],
+  );
+
+  const overviewVisible = consecutiveSkips >= SKIP_OVERVIEW_THRESHOLD;
+
+  const handlePass = (card: DiscoveryCardData) => {
+    setConsecutiveSkips((n) => n + 1);
+    setLastFiveSeen((prev) => {
+      const next = [...prev, card];
+      return next.length > SKIP_OVERVIEW_THRESHOLD
+        ? next.slice(next.length - SKIP_OVERVIEW_THRESHOLD)
+        : next;
+    });
+  };
+
+  const handleSave = (card: DiscoveryCardData) => {
+    save(card);
+    setConsecutiveSkips(0);
+    setLastFiveSeen([]);
+  };
+
+  const handleMessage = (_card: DiscoveryCardData, _text: string) => {
+    // Messaging integration lands later. For now the card commits up
+    // off-screen via SwipeDeck and we just reset the counters.
+    setConsecutiveSkips(0);
+    setLastFiveSeen([]);
+  };
+
+  const handleOverviewPick = (card: DiscoveryCardData) => {
+    setReinserted((prev) => [card, ...prev.filter((c) => c.id !== card.id)]);
+    setConsecutiveSkips(0);
+    setLastFiveSeen([]);
+    setDeckResetKey((k) => k + 1);
+  };
+
+  const handleOverviewContinue = () => {
+    setConsecutiveSkips(0);
+    setLastFiveSeen([]);
+  };
+
+  const goToSaved = () => {
+    if (Platform.OS !== 'web') Haptics.selectionAsync().catch(() => {});
+    router.push('/saved');
+  };
+
   return (
     <View style={styles.root}>
-      {/* Top bar — Instagram-style wordmark, centered. No right-hand actions
-          yet (filter + search return when those features ship). */}
       <View style={styles.topBar}>
         <Text style={styles.wordmark}>ambit</Text>
-      </View>
-
-      {/* Campus context — sits one tier below the wordmark so the
-          'why am I seeing this' proximity signal stays prominent. */}
-      <View style={styles.subBar}>
-        <Pressable style={styles.campusChip} accessibilityRole="button">
-          <MapPin size={16} color={Brand.inkPrimary} weight="fill" />
-          <Text style={styles.campusLabel}>Stanford</Text>
-          <Text style={styles.campusRadius}>· 5mi</Text>
+        <Pressable
+          onPress={goToSaved}
+          hitSlop={12}
+          style={styles.bookmarkBtn}
+          accessibilityRole="button"
+          accessibilityLabel="Open saved list"
+        >
+          <BookmarkSimple size={22} color={Brand.inkPrimary} weight="regular" />
         </Pressable>
       </View>
 
-      <Text style={styles.context}>
-        3 new projects looking for designers near you
-      </Text>
-
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scroll}
-      >
-        {MOCK_PROJECTS.map((p) => (
-          <ProjectCard key={p.id} project={p} />
-        ))}
-        <View style={{ height: Space.lg }} />
-      </ScrollView>
-    </View>
-  );
-}
-
-function ProjectCard({ project }: { project: MockProject }) {
-  const initials = project.title
-    .split(' ')
-    .slice(0, 2)
-    .map((w) => w[0]?.toUpperCase() ?? '')
-    .join('');
-
-  return (
-    <View style={styles.card}>
-      {/* Hero — gradient with project initials in the display font */}
-      <LinearGradient
-        colors={project.gradient}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.hero}
-      >
-        <Text style={styles.heroInitials}>{initials}</Text>
-      </LinearGradient>
-
-      <View style={styles.cardBody}>
-        <Text style={styles.cardTitle}>{project.title}</Text>
-
-        <View style={styles.ownerRow}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{project.ownerName[0]}</Text>
-          </View>
-          <Text style={styles.ownerMeta}>
-            {project.ownerName}
-            <Text style={styles.ownerDot}> · </Text>
-            {project.ownerCampus}
-            <Text style={styles.ownerDot}> · </Text>
-            {project.distanceMi}mi
-          </Text>
-        </View>
-
-        {/* Need chips — reuse the Chip atom in its unselected (neutral) form
-            so the card's primary CTA stays the only warm-tan element. */}
-        <View style={styles.chipRow}>
-          {project.needs.map((need) => (
-            <Chip key={need} label={need} selected={false} />
-          ))}
-        </View>
-
-        {/* CTA — reuse Button with the project-wide swirl arrow so this
-            matches every other primary action in the app. */}
-        <Button
-          title="Express interest"
-          onPress={() => {}}
-          trailingArrow
-          style={styles.cta}
+      {/* Content layer — three states. */}
+      {loading ? (
+        <Skeleton />
+      ) : overviewVisible ? (
+        <DiscoveryOverview
+          seen={lastFiveSeen}
+          onPick={handleOverviewPick}
+          onContinue={handleOverviewContinue}
         />
-      </View>
+      ) : (
+        <SwipeDeck
+          key={deckResetKey}
+          deck={activeDeck}
+          onPass={handlePass}
+          onSave={handleSave}
+          onMessageSend={handleMessage}
+        />
+      )}
     </View>
   );
 }
+
+// ─── Skeleton ──────────────────────────────────────────────────────────────
+
+function Skeleton() {
+  return (
+    <View style={styles.skeletonWrap}>
+      <View style={styles.skeletonCard} />
+    </View>
+  );
+}
+
+// ─── Styles ────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: Brand.canvas },
+  root: {
+    flex: 1,
+    backgroundColor: Brand.canvas,
+  },
 
-  // Top bar -----------------------------------------------------
+  // Top bar — wordmark centered, bookmark right-aligned via absolute
+  // positioning so the wordmark stays visually centered regardless of
+  // icon width.
   topBar: {
+    height: 44,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingTop: Space.xs,
-    paddingBottom: Space.sm,
   },
-  /// Wordmark — rendered in the display font so the brand voice IS the
-  /// type. Swap for an Image source when the Figma logo export lands.
   wordmark: {
     fontFamily: AmbitFont.display,
     fontSize: 26,
     color: Brand.inkPrimary,
     letterSpacing: 0.5,
   },
-  subBar: {
-    flexDirection: 'row',
+  bookmarkBtn: {
+    position: 'absolute',
+    right: Space.lg,
+    top: 0,
+    bottom: 0,
+    width: 44,
     alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // Skeleton — blank card-shaped surface; calmer than a spinner and keeps
+  // layout stable while role resolves.
+  skeletonWrap: {
+    flex: 1,
     paddingHorizontal: Space.lg,
+    paddingTop: Space.md,
     paddingBottom: Space.md,
   },
-  campusChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: Brand.surface1,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: Radii.pill,
-  },
-  campusLabel: {
-    ...TypeScale.title,
-    fontSize: 14,
-    color: Brand.inkPrimary,
-  },
-  campusRadius: {
-    ...TypeScale.helper,
-    color: Brand.inkMuted,
-  },
-  // Context strip -----------------------------------------------
-  context: {
-    ...TypeScale.input,
-    color: Brand.inkMuted,
-    paddingHorizontal: Space.lg,
-    marginBottom: Space.md,
-  },
-
-  // Scroll content ---------------------------------------------
-  scroll: {
-    paddingHorizontal: Space.lg,
-    gap: Space.lg,
-  },
-
-  // Card --------------------------------------------------------
-  card: {
-    backgroundColor: Brand.canvas,
-    borderRadius: Radii.lg,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: Brand.surface2,
-  },
-  hero: {
-    height: 140,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  heroInitials: {
-    fontFamily: AmbitFont.display,
-    // One-off display size — the hero needs a single dominant glyph and
-    // none of the TypeScale tokens fit. Treated as a card-level moment.
-    fontSize: 56,
-    color: 'rgba(255, 255, 255, 0.85)',
-    letterSpacing: 2,
-  },
-  cardBody: {
-    padding: 20,
-    gap: 12,
-  },
-  cardTitle: {
-    // Display headline at card scale — between TypeScale.title (16) and
-    // TypeScale.h1 (30). One-off but consistent within the card family.
-    fontFamily: AmbitFont.display,
-    fontSize: 24,
-    color: Brand.inkPrimary,
-    lineHeight: 30,
-  },
-
-  // Owner row ---------------------------------------------------
-  ownerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  avatar: {
-    width: 24,
-    height: 24,
-    borderRadius: Radii.full,
-    backgroundColor: Brand.seekerSurface,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: {
-    fontFamily: AmbitFont.body,
-    fontSize: 12,
-    fontWeight: '700',
-    color: Brand.seekerInk,
-  },
-  ownerMeta: {
-    ...TypeScale.helper,
-    color: Brand.inkBody,
+  skeletonCard: {
     flex: 1,
+    backgroundColor: Brand.surface1,
+    borderRadius: Radii.lg,
   },
-  ownerDot: { color: Brand.inkMuted },
-
-  // Chips -------------------------------------------------------
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Space.sm },
-
-  // CTA ---------------------------------------------------------
-  cta: { marginTop: Space.xs },
 });
