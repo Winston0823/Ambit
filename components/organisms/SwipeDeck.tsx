@@ -139,12 +139,25 @@ export function SwipeDeck({ deck, onPass, onSave, onMessageSend, emptyState }: P
   };
 
   const dismissComposer = () => {
+    if (Platform.OS !== 'web') Haptics.selectionAsync().catch(() => {});
     setComposerOpen(false);
     setComposerText('');
     Animated.spring(position, {
       toValue: { x: 0, y: 0 },
       friction: 6,
       tension: 90,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  /// Snap the card back to its composer-resting position without closing
+  /// the composer. Used when a downward pan starts but doesn't pass the
+  /// dismiss threshold — the card should bounce back up, not stay halfway.
+  const snapToComposerRest = () => {
+    Animated.spring(position, {
+      toValue: { x: 0, y: COMPOSER_RESTING_Y },
+      friction: 7,
+      tension: 80,
       useNativeDriver: true,
     }).start();
   };
@@ -185,13 +198,24 @@ export function SwipeDeck({ deck, onPass, onSave, onMessageSend, emptyState }: P
         // child taps (chips, buttons later) working until we know the user
         // really meant to swipe.
         onStartShouldSetPanResponder: () => false,
-        onMoveShouldSetPanResponder: (_e, g) =>
-          Math.abs(g.dx) > 6 || Math.abs(g.dy) > 6,
+        onMoveShouldSetPanResponder: (_e, g) => {
+          // While composing: only claim downward intent so the user can
+          // still scroll/select inside the composer without the card
+          // chasing every micro-movement.
+          if (composerOpen) return g.dy > 6 && g.dy > Math.abs(g.dx);
+          return Math.abs(g.dx) > 6 || Math.abs(g.dy) > 6;
+        },
 
         onPanResponderMove: (_e, g) => {
-          // While the composer is open, ignore further pan input — the
-          // user is typing, not swiping.
-          if (composerOpen) return;
+          if (composerOpen) {
+            // Card is parked at COMPOSER_RESTING_Y. Downward drag closes
+            // the gap toward 0; upward drag is ignored (already at the
+            // top of its lifted travel). Clamp so the card can't go below
+            // its base position mid-drag.
+            const liftedDy = Math.max(0, g.dy);
+            position.setValue({ x: 0, y: COMPOSER_RESTING_Y + liftedDy });
+            return;
+          }
           // Allow horizontal movement freely; clamp downward movement so the
           // card doesn't slide off the bottom on errant downward drags.
           position.setValue({
@@ -201,7 +225,13 @@ export function SwipeDeck({ deck, onPass, onSave, onMessageSend, emptyState }: P
         },
 
         onPanResponderRelease: (_e, g) => {
-          if (composerOpen) return;
+          if (composerOpen) {
+            // 60pt pull-down OR downward velocity dismisses. Otherwise
+            // the card springs back up to its lifted resting position.
+            if (g.dy > 60 || g.vy > 0.5) dismissComposer();
+            else snapToComposerRest();
+            return;
+          }
           const passed =
             g.dx <= -SWIPE_X_DISTANCE || g.vx <= -SWIPE_X_VELOCITY;
           const saved =
@@ -214,7 +244,10 @@ export function SwipeDeck({ deck, onPass, onSave, onMessageSend, emptyState }: P
           else if (upRevealed) revealComposer();
           else cancelToCenter();
         },
-        onPanResponderTerminate: () => cancelToCenter(),
+        onPanResponderTerminate: () => {
+          if (composerOpen) snapToComposerRest();
+          else cancelToCenter();
+        },
       }),
     // PanResponder closes over composerOpen + current, so rebuild when those change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
