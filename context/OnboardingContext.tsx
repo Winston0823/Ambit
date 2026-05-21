@@ -52,6 +52,11 @@ interface Ctx {
   update: <K extends keyof OnboardingProfile>(key: K, value: OnboardingProfile[K]) => void;
   reset: () => void;
   submit: (userId: string, userEmail?: string) => Promise<void>;
+  /// Hydrate the in-memory profile from a partial Supabase row. Returns the
+  /// resolved profile so callers (e.g. OnboardingFlow's "resume at first
+  /// incomplete step" logic) can read the hydrated values immediately
+  /// without waiting for a React re-render.
+  hydrate: (userId: string) => Promise<OnboardingProfile>;
 }
 
 const OnboardingContext = createContext<Ctx | undefined>(undefined);
@@ -63,6 +68,34 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
     setProfile((p) => ({ ...p, [key]: value }));
 
   const reset = () => setProfile(INITIAL);
+
+  const hydrate = async (userId: string): Promise<OnboardingProfile> => {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('edu_email, demographic, name, vibe_blurb, skills, role, campus_id, photo_url, github_url, linkedin_url, portfolio_url, resume_url')
+      .eq('id', userId)
+      .maybeSingle();
+    if (error || !data) return profile;
+    const merged: OnboardingProfile = {
+      ...profile,
+      eduEmail: data.edu_email ?? profile.eduEmail,
+      demographic: (data.demographic as Demographic | null) ?? profile.demographic,
+      name: data.name ?? profile.name,
+      photoUri: data.photo_url ?? profile.photoUri,
+      vibeBlurb: data.vibe_blurb ?? profile.vibeBlurb,
+      skills: data.skills ?? profile.skills,
+      campusId: data.campus_id ?? profile.campusId,
+      role: (data.role as Role | null) ?? profile.role,
+      proofLinks: {
+        github: data.github_url ?? profile.proofLinks.github,
+        linkedin: data.linkedin_url ?? profile.proofLinks.linkedin,
+        portfolio: data.portfolio_url ?? profile.proofLinks.portfolio,
+        resume: data.resume_url ?? profile.proofLinks.resume,
+      },
+    };
+    setProfile(merged);
+    return merged;
+  };
 
   const submit = async (userId: string, userEmail?: string) => {
     let photoUrl: string | null = profile.photoUri;
@@ -101,7 +134,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <OnboardingContext.Provider value={{ profile, update, reset, submit }}>
+    <OnboardingContext.Provider value={{ profile, update, reset, submit, hydrate }}>
       {children}
     </OnboardingContext.Provider>
   );

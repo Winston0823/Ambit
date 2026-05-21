@@ -38,6 +38,13 @@ interface Props {
   onDismiss: () => void;
 }
 
+interface InlineProps {
+  /// Called when onboarding completes — handleDone has already submitted
+  /// the profile to Supabase by this point, so the parent should re-route
+  /// to the main app (typically by re-checking hasProfile in AuthContext).
+  onComplete: () => void;
+}
+
 /// Canonical step order. The user's branch (student vs. professor + the
 /// student's role pick) determines which of these actually render — see
 /// shouldShow + activeSteps below. Order here is the narrative spine; the
@@ -95,6 +102,34 @@ function activeProgressSteps(profile: OnboardingProfile): LinearStep[] {
   return PROGRESS_STEPS_ALL.filter((s) => shouldShow(s, profile));
 }
 
+/// Per-step "is this field filled?" predicate. Mirrors the validation
+/// inside each screen — keep these in sync if a screen's required-field
+/// logic changes. Used to pick the first incomplete step when a resuming
+/// user re-enters the flow.
+function isComplete(step: LinearStep, profile: OnboardingProfile): boolean {
+  switch (step) {
+    case 'eduEmail':    return profile.eduEmail.toLowerCase().endsWith('.edu') && profile.eduEmail.includes('@');
+    case 'demographic': return profile.demographic !== null;
+    case 'vibe':        return profile.vibeBlurb.length >= 50;
+    case 'photo':       return !!profile.photoUri;
+    case 'campus':      return profile.campusId !== null;
+    case 'role':        return profile.role !== null;
+    case 'skills':      return profile.skills.length >= 2;
+    case 'proof':       return Object.values(profile.proofLinks).some((v) => v.trim().length > 0);
+    // splash/welcome/complete have no "field" — they're transitions.
+    case 'splash':
+    case 'welcome':
+    case 'complete':    return true;
+  }
+}
+
+function firstIncompleteStep(profile: OnboardingProfile): LinearStep {
+  for (const step of activeSteps(profile)) {
+    if (!isComplete(step, profile)) return step;
+  }
+  return 'complete';
+}
+
 const SCREEN_W = Dimensions.get('window').width;
 
 export function OnboardingFlow({ visible, onDismiss }: Props) {
@@ -114,12 +149,40 @@ export function OnboardingFlow({ visible, onDismiss }: Props) {
   );
 }
 
+/// Inline variant — same flow, no Modal wrapper. Used by app/_layout when
+/// onboarding is the user's actual entry point (first launch / incomplete
+/// profile). No slide-from-bottom animation; the splash IS the entry.
+export function OnboardingInline({ onComplete }: InlineProps) {
+  return (
+    <OnboardingProvider>
+      <View style={styles.root}>
+        <Steps onDismiss={onComplete} />
+      </View>
+    </OnboardingProvider>
+  );
+}
+
 function Steps({ onDismiss }: { onDismiss: () => void }) {
   const [step, setStep] = useState<Step>('splash');
   const prevStepRef = useRef<Step>(step);
   const translateX = useRef(new Animated.Value(0)).current;
-  const { profile, reset, submit } = useOnboarding();
-  const { user } = useAuth();
+  const { profile, reset, submit, hydrate } = useOnboarding();
+  const { user, refreshProfile } = useAuth();
+
+  /// First mount with a signed-in user: pull their partial profile (if any)
+  /// from Supabase and jump straight to the first step they haven't filled.
+  /// Brand-new users (no session yet) start at splash as normal.
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    (async () => {
+      const merged = await hydrate(user.id);
+      if (cancelled) return;
+      setStep(firstIncompleteStep(merged));
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
 
   const dismiss = () => {
     onDismiss();
@@ -150,32 +213,53 @@ function Steps({ onDismiss }: { onDismiss: () => void }) {
     else dismiss();
   };
 
-  // Slide the next screen in from the appropriate side every time `step`
-  // changes. Direction is derived from index order; the signIn branch is
-  // treated as forward off welcome and back into it. ~280ms easeOutCubic
-  // matches iOS-native feel without dragging.
+  // Per-step transition. Default: ~280ms easeOutCubic horizontal slide
+  // (iOS-native feel). Special case: any transition OUT of splash uses a
+  // luxurious opacity crossfade (~1100ms easeInOutCubic) so the very first
+  // hand-off into the app reads as deliberate rather than mechanical —
+  // applies both to brand-new users (splash → welcome) and resuming users
+  // (splash → wherever they left off).
+  const opacity = useRef(new Animated.Value(1)).current;
   useEffect(() => {
     const prev = prevStepRef.current;
     if (prev === step) return;
 
-    const prevIdx = prev === 'signIn' ? 1.5 : STEPS.indexOf(prev as LinearStep);
-    const newIdx = step === 'signIn' ? 1.5 : STEPS.indexOf(step as LinearStep);
-    const forward = newIdx >= prevIdx;
+    const isLeavingSplash = prev === 'splash';
 
-    translateX.setValue(forward ? SCREEN_W : -SCREEN_W);
-    Animated.timing(translateX, {
-      toValue: 0,
-      duration: 280,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: true,
-    }).start();
+    if (isLeavingSplash) {
+      translateX.setValue(0);
+      opacity.setValue(0);
+      Animated.timing(opacity, {
+        toValue: 1,
+        duration: 1100,
+        easing: Easing.inOut(Easing.cubic),
+        useNativeDriver: true,
+      }).start();
+    } else {
+      const prevIdx = prev === 'signIn' ? 1.5 : STEPS.indexOf(prev as LinearStep);
+      const newIdx = step === 'signIn' ? 1.5 : STEPS.indexOf(step as LinearStep);
+      const forward = newIdx >= prevIdx;
+      opacity.setValue(1);
+      translateX.setValue(forward ? SCREEN_W : -SCREEN_W);
+      Animated.timing(translateX, {
+        toValue: 0,
+        duration: 280,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }).start();
+    }
 
     prevStepRef.current = step;
-  }, [step, translateX]);
+  }, [step, translateX, opacity]);
 
   const handleDone = async () => {
     if (user) {
-      try { await submit(user.id, user.email); } catch { /* non-blocking */ }
+      try {
+        await submit(user.id, user.email);
+        // Flip hasProfile in AuthContext so the root layout re-routes from
+        // OnboardingInline to the main app. Non-blocking on failure.
+        await refreshProfile();
+      } catch { /* non-blocking */ }
     }
     dismiss();
   };
@@ -222,7 +306,7 @@ function Steps({ onDismiss }: { onDismiss: () => void }) {
   return (
     <View style={styles.root}>
       <Animated.View
-        style={[styles.slider, { transform: [{ translateX }] }]}
+        style={[styles.slider, { transform: [{ translateX }], opacity }]}
       >
         {renderStep()}
       </Animated.View>

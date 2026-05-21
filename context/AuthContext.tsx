@@ -8,6 +8,12 @@ interface AuthContextValue {
   session: Session | null;
   user: User | null;
   loading: boolean;
+  /// True once we've verified the signed-in user has a row in the profiles
+  /// table (onboarding complete). null while the check is in-flight. Drives
+  /// the root-level routing decision in app/_layout.tsx.
+  hasProfile: boolean | null;
+  /// Re-check profile existence (e.g. after the user finishes onboarding).
+  refreshProfile: () => Promise<void>;
   signInWithGoogle: () => Promise<void>;
   signInWithApple: () => Promise<void>;
   signInWithEduOtp: (email: string) => Promise<void>;
@@ -21,6 +27,7 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [hasProfile, setHasProfile] = useState<boolean | null>(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -34,6 +41,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  /// Whenever the signed-in user changes, re-check whether they have a
+  /// completed profile row. Single source of truth for the "needs onboarding"
+  /// decision. We only select `id` so this stays cheap even on slow networks.
+  const checkProfile = async (userId: string | undefined) => {
+    if (!userId) { setHasProfile(false); return; }
+    setHasProfile(null);
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('id', userId)
+      .maybeSingle();
+    if (error) {
+      // Treat lookup failure as "no profile" so we don't lock the user out of
+      // onboarding; they can complete it and we'll upsert.
+      setHasProfile(false);
+      return;
+    }
+    setHasProfile(!!data);
+  };
+
+  useEffect(() => {
+    checkProfile(session?.user?.id);
+  }, [session?.user?.id]);
+
+  const refreshProfile = async () => {
+    await checkProfile(session?.user?.id);
+  };
 
   // Handle deep links for OAuth redirects and magic links
   useEffect(() => {
@@ -105,6 +140,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       session,
       user: session?.user ?? null,
       loading,
+      hasProfile,
+      refreshProfile,
       signInWithGoogle,
       signInWithApple,
       signInWithEduOtp,
