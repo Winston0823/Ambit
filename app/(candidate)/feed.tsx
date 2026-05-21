@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Platform,
   Pressable,
@@ -19,12 +19,136 @@ import {
   Space,
 } from '../../constants/theme';
 import {
-  DiscoveryCardData,
+  type DiscoveryCardData,
+  type ProjectCardData,
+  type SeekerCardData,
   MOCK_PROJECTS,
   MOCK_SEEKERS,
 } from '../../data/mock';
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../context/AuthContext';
 
 const SKIP_OVERVIEW_THRESHOLD = 5;
+
+const CARD_GRADIENTS: [string, string][] = [
+  [Brand.primary, Brand.accent],
+  ['#C9A57A', Brand.seekerInk],
+  [Brand.seekerSurface, Brand.accent],
+  ['#E8C9A0', Brand.primary],
+  [Brand.accent, '#7A5A38'],
+  ['#D4B490', '#4D361D'],
+  [Brand.seekerSurface, '#B48045'],
+];
+
+/// Fetches ranked projects for a seeker and maps them to ProjectCardData.
+/// Falls back to MOCK_PROJECTS if the RPC fails or returns nothing.
+async function fetchProjectDeck(userId: string): Promise<ProjectCardData[]> {
+  const { data: ranked, error } = await supabase.rpc(
+    'compat_projects_for_seeker',
+    { p_seeker_id: userId, p_limit: 30 }
+  );
+
+  if (error || !ranked || ranked.length === 0) return MOCK_PROJECTS;
+
+  const rows = ranked as {
+    project_id: string;
+    title: string;
+    vibe_blurb: string;
+    required_skills: string[];
+    campus_id: string | null;
+    owner_id: string;
+    score: number;
+    skill_match_pct: number;
+  }[];
+
+  const ownerIds = [...new Set(rows.map((r) => r.owner_id))];
+  const { data: owners } = await supabase
+    .from('profiles')
+    .select('id, name, photo_url')
+    .in('id', ownerIds);
+
+  const ownerMap = Object.fromEntries(
+    (owners ?? []).map((o: { id: string; name: string; photo_url: string | null }) => [
+      o.id,
+      { name: o.name, photoUri: o.photo_url },
+    ])
+  );
+
+  return rows.map((r, i): ProjectCardData => {
+    const matchedCount = Math.round((r.skill_match_pct / 100) * r.required_skills.length);
+    const whyMatched =
+      matchedCount > 0
+        ? `${matchedCount} matching skill${matchedCount !== 1 ? 's' : ''}`
+        : 'New project near you';
+
+    return {
+      kind: 'project',
+      id: r.project_id,
+      title: r.title,
+      pitch: r.vibe_blurb || r.title,
+      ownerName: ownerMap[r.owner_id]?.name ?? 'Unknown',
+      ownerPhotoUri: ownerMap[r.owner_id]?.photoUri ?? null,
+      ownerCampusId: r.campus_id ?? '',
+      whyMatched,
+      skillsSought: r.required_skills.slice(0, 5),
+      gradient: CARD_GRADIENTS[i % CARD_GRADIENTS.length],
+    };
+  });
+}
+
+/// Fetches compatible seekers for an owner's first active project.
+/// Falls back to MOCK_SEEKERS if none found.
+async function fetchSeekerDeck(userId: string): Promise<SeekerCardData[]> {
+  const { data: projects } = await supabase
+    .from('projects')
+    .select('id')
+    .eq('owner_id', userId)
+    .eq('active', true)
+    .order('created_at', { ascending: false })
+    .limit(1);
+
+  if (!projects || projects.length === 0) return MOCK_SEEKERS;
+
+  const projectId = (projects[0] as { id: string }).id;
+  const { data: ranked, error } = await supabase.rpc('compat_for_project', {
+    p_project_id: projectId,
+    p_limit: 30,
+  });
+
+  if (error || !ranked || ranked.length === 0) return MOCK_SEEKERS;
+
+  const rows = ranked as { seeker_id: string; score: number }[];
+  const seekerIds = rows.map((r) => r.seeker_id);
+
+  const { data: seekers } = await supabase
+    .from('profiles')
+    .select('id, name, photo_url, campus_id, skills, vibe_blurb')
+    .in('id', seekerIds);
+
+  if (!seekers || seekers.length === 0) return MOCK_SEEKERS;
+
+  const scoreMap = Object.fromEntries(rows.map((r) => [r.seeker_id, r.score]));
+
+  return (seekers as {
+    id: string;
+    name: string;
+    photo_url: string | null;
+    campus_id: string | null;
+    skills: string[];
+    vibe_blurb: string;
+  }[])
+    .sort((a, b) => (scoreMap[b.id] ?? 0) - (scoreMap[a.id] ?? 0))
+    .map((s): SeekerCardData => ({
+      kind: 'seeker',
+      id: s.id,
+      name: s.name ?? 'Unknown',
+      photoUri: s.photo_url,
+      campusId: s.campus_id ?? '',
+      skills: s.skills ?? [],
+      vibeBlurb: s.vibe_blurb ?? '',
+      portfolioHighlight: '',
+    }));
+}
 
 /// Discovery feed (S-020) — the matching surface.
 ///
@@ -39,30 +163,44 @@ const SKIP_OVERVIEW_THRESHOLD = 5;
 ///
 /// State machine:
 ///   - role loading → render skeleton (blank card-shaped surface, no spinner)
-///   - role known → pick deck (owner→seekers, seeker/both→projects)
+///   - role known → fetch live deck; fall back to mock if empty
 ///   - pass → increment consecutiveSkips, push to lastFiveSeen
 ///   - save / message-send → reset counters
 ///   - consecutiveSkips reaches 5 → overlay DiscoveryOverview
 export default function DiscoveryFeed() {
-  const { role, loading } = useProfileRole();
+  const { role, loading: roleLoading } = useProfileRole();
   const { save } = useSavedDeck();
+  const { user } = useAuth();
 
-  // Owners see Seeker cards (recruit). Seekers + 'both' see Project cards
-  // (join). 'both' defaults to seeker view in v1 — owner toggle ships with
-  // the Profile menu later.
+  const [liveDeck, setLiveDeck] = useState<DiscoveryCardData[] | null>(null);
+  const [deckLoading, setDeckLoading] = useState(false);
+
+  const fetchDeck = useCallback(async () => {
+    if (!user || roleLoading) return;
+    setDeckLoading(true);
+    try {
+      const data =
+        role === 'owner'
+          ? await fetchSeekerDeck(user.id)
+          : await fetchProjectDeck(user.id);
+      setLiveDeck(data);
+    } finally {
+      setDeckLoading(false);
+    }
+  }, [user, role, roleLoading]);
+
+  useEffect(() => {
+    fetchDeck();
+  }, [fetchDeck]);
+
   const deck = useMemo<DiscoveryCardData[]>(
-    () => (role === 'owner' ? MOCK_SEEKERS : MOCK_PROJECTS),
-    [role],
+    () => liveDeck ?? (role === 'owner' ? MOCK_SEEKERS : MOCK_PROJECTS),
+    [liveDeck, role]
   );
 
-  // Skip counter + recent-five buffer drive the overview interstitial.
   const [consecutiveSkips, setConsecutiveSkips] = useState(0);
   const [lastFiveSeen, setLastFiveSeen] = useState<DiscoveryCardData[]>([]);
-  /// Re-mount key for SwipeDeck. Bumping this resets the deck's internal
-  /// index to 0 — used when the overview reinserts a card at the head.
   const [deckResetKey, setDeckResetKey] = useState(0);
-  /// When the overview reinserts a card, we prepend it to this list. Combined
-  /// with the role-mapped deck via memo below.
   const [reinserted, setReinserted] = useState<DiscoveryCardData[]>([]);
 
   const activeDeck = useMemo(
@@ -80,19 +218,36 @@ export default function DiscoveryFeed() {
         ? next.slice(next.length - SKIP_OVERVIEW_THRESHOLD)
         : next;
     });
+    // Record skip in matches table for project cards
+    if (card.kind === 'project' && user) {
+      supabase.from('matches').upsert(
+        { seeker_id: user.id, project_id: card.id, outcome: 'skipped' },
+        { onConflict: 'seeker_id,project_id' }
+      ).then(() => {});
+    }
   };
 
   const handleSave = (card: DiscoveryCardData) => {
     save(card);
     setConsecutiveSkips(0);
     setLastFiveSeen([]);
+    if (card.kind === 'project' && user) {
+      supabase.from('matches').upsert(
+        { seeker_id: user.id, project_id: card.id, outcome: 'saved' },
+        { onConflict: 'seeker_id,project_id' }
+      ).then(() => {});
+    }
   };
 
   const handleMessage = (_card: DiscoveryCardData, _text: string) => {
-    // Messaging integration lands later. For now the card commits up
-    // off-screen via SwipeDeck and we just reset the counters.
     setConsecutiveSkips(0);
     setLastFiveSeen([]);
+    if (_card.kind === 'project' && user) {
+      supabase.from('matches').upsert(
+        { seeker_id: user.id, project_id: _card.id, outcome: 'applied' },
+        { onConflict: 'seeker_id,project_id' }
+      ).then(() => {});
+    }
   };
 
   const handleOverviewPick = (card: DiscoveryCardData) => {
@@ -112,6 +267,8 @@ export default function DiscoveryFeed() {
     router.push('/saved');
   };
 
+  const loading = roleLoading || deckLoading;
+
   return (
     <View style={styles.root}>
       <View style={styles.topBar}>
@@ -127,7 +284,6 @@ export default function DiscoveryFeed() {
         </Pressable>
       </View>
 
-      {/* Content layer — three states. */}
       {loading ? (
         <Skeleton />
       ) : overviewVisible ? (
@@ -149,8 +305,6 @@ export default function DiscoveryFeed() {
   );
 }
 
-// ─── Skeleton ──────────────────────────────────────────────────────────────
-
 function Skeleton() {
   return (
     <View style={styles.skeletonWrap}>
@@ -159,17 +313,11 @@ function Skeleton() {
   );
 }
 
-// ─── Styles ────────────────────────────────────────────────────────────────
-
 const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: Brand.canvas,
   },
-
-  // Top bar — wordmark centered, bookmark right-aligned via absolute
-  // positioning so the wordmark stays visually centered regardless of
-  // icon width.
   topBar: {
     height: 44,
     alignItems: 'center',
@@ -190,9 +338,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-
-  // Skeleton — blank card-shaped surface; calmer than a spinner and keeps
-  // layout stable while role resolves.
   skeletonWrap: {
     flex: 1,
     paddingHorizontal: Space.lg,

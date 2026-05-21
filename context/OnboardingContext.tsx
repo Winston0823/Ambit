@@ -129,8 +129,20 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
       portfolio_url: profile.proofLinks.portfolio,
       resume_url: profile.proofLinks.resume,
       updated_at: new Date().toISOString(),
+      last_meaningful_action_at: new Date().toISOString(),
     });
     if (upsertError) throw upsertError;
+
+    // Fire-and-forget: generate vibe embedding via Edge Function.
+    // Failures are non-fatal — the profile is already saved.
+    if (profile.vibeBlurb.trim().length > 0) {
+      const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+      fetch(`${supabaseUrl}/functions/v1/embed-vibe`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ table: 'profiles', id: userId, text: profile.vibeBlurb }),
+      }).catch(() => {/* non-blocking */});
+    }
   };
 
   return (
