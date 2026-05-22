@@ -38,6 +38,10 @@ export default function CandidateLayout() {
       {/* Saved exists as a route but never appears in the nav bar — it's
           pushed via router.push('/saved') from the feed's bookmark icon. */}
       <Tabs.Screen name="saved" options={{ href: null }} />
+      {/* Project create / edit screens — reached from the projects tab.
+          Hidden from the nav bar via href:null. */}
+      <Tabs.Screen name="project-new" options={{ href: null }} />
+      <Tabs.Screen name="project-edit" options={{ href: null }} />
     </Tabs>
   );
 }
