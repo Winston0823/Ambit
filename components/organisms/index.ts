@@ -5,3 +5,4 @@ export { SwipeDeck } from './SwipeDeck';
 export { DiscoveryOverview } from './DiscoveryOverview';
 export { ProjectForm } from './ProjectForm';
 export type { ProjectFormValues } from './ProjectForm';
+export { ChatComposer } from './ChatComposer';

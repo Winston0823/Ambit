@@ -42,6 +42,9 @@ export default function CandidateLayout() {
           Hidden from the nav bar via href:null. */}
       <Tabs.Screen name="project-new" options={{ href: null }} />
       <Tabs.Screen name="project-edit" options={{ href: null }} />
+      {/* Messaging — thread + search reached from the chat tab. */}
+      <Tabs.Screen name="thread" options={{ href: null }} />
+      <Tabs.Screen name="search" options={{ href: null }} />
     </Tabs>
   );
 }

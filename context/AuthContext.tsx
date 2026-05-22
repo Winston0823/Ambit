@@ -3,6 +3,7 @@ import { Session, User } from '@supabase/supabase-js';
 import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
 import { supabase } from '../lib/supabase';
+import { registerForPushNotifications } from '../lib/pushNotifications';
 
 interface AuthContextValue {
   session: Session | null;
@@ -64,6 +65,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     checkProfile(session?.user?.id);
+  }, [session?.user?.id]);
+
+  // Register for push notifications once we have a signed-in user.
+  // No-ops cleanly in Expo Go (which can't receive remote push).
+  useEffect(() => {
+    const uid = session?.user?.id;
+    if (!uid) return;
+    registerForPushNotifications(uid).catch((e) =>
+      console.warn('push registration failed:', e?.message ?? e),
+    );
   }, [session?.user?.id]);
 
   const refreshProfile = async () => {

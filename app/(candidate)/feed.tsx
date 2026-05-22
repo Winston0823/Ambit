@@ -26,6 +26,7 @@ import {
   MOCK_SEEKERS,
 } from '../../data/mock';
 import { supabase } from '../../lib/supabase';
+import { startConversationWithMessage } from '../../lib/messaging';
 import { useAuth } from '../../context/AuthContext';
 
 const SKIP_OVERVIEW_THRESHOLD = 5;
@@ -239,14 +240,59 @@ export default function DiscoveryFeed() {
     }
   };
 
-  const handleMessage = (_card: DiscoveryCardData, _text: string) => {
+  /// Composer-send. Creates (or finds) a conversation, posts the first
+  /// message, and navigates into the thread. Also records the match
+  /// outcome as 'applied' so the discovery feed doesn't show the same
+  /// project again. Seeker-side: project_id = card.id, seeker = me.
+  /// Owner-side: project_id = my first active project, seeker = card.id.
+  const handleMessage = async (card: DiscoveryCardData, text: string) => {
     setConsecutiveSkips(0);
     setLastFiveSeen([]);
-    if (_card.kind === 'project' && user) {
-      supabase.from('matches').upsert(
-        { seeker_id: user.id, project_id: _card.id, outcome: 'applied' },
-        { onConflict: 'seeker_id,project_id' }
-      ).then(() => {});
+    if (!user) return;
+
+    try {
+      let projectId: string;
+      let seekerId:  string;
+
+      if (card.kind === 'project') {
+        projectId = card.id;
+        seekerId  = user.id;
+        // Mirror the existing match-outcome write so the project gets
+        // filtered out of future decks.
+        supabase
+          .from('matches')
+          .upsert(
+            { seeker_id: user.id, project_id: card.id, outcome: 'applied' },
+            { onConflict: 'seeker_id,project_id' },
+          )
+          .then(() => {});
+      } else {
+        // Owner messaging a seeker card. Look up the owner's first active
+        // project as the conversation context.
+        const { data: proj } = await supabase
+          .from('projects')
+          .select('id')
+          .eq('owner_id', user.id)
+          .eq('active', true)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (!proj) {
+          console.warn('Owner has no active project to anchor a conversation.');
+          return;
+        }
+        projectId = (proj as { id: string }).id;
+        seekerId  = card.id;
+      }
+
+      const conversationId = await startConversationWithMessage({
+        projectId,
+        seekerId,
+        body: text,
+      });
+      router.push({ pathname: '/thread', params: { id: conversationId } });
+    } catch (e: any) {
+      console.warn('start_conversation_with_message failed:', e?.message ?? e);
     }
   };
 
