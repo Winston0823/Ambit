@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as Clipboard from 'expo-clipboard';
+import { randomUUID } from 'expo-crypto';
 import {
   ActivityIndicator,
   Alert,
@@ -18,6 +19,7 @@ import type { RealtimeChannel } from '@supabase/supabase-js';
 import { BackChevron } from '../../components/atoms';
 import {
   MessageBubble,
+  type MessageStatus,
   TypingIndicator,
 } from '../../components/molecules';
 import { ChatComposer } from '../../components/organisms';
@@ -70,6 +72,19 @@ export default function ThreadScreen() {
   const [replyTo, setReplyTo] = useState<MessageRow | null>(null);
   const [editing, setEditing] = useState<MessageRow | null>(null);
   const [selectedMessage, setSelectedMessage] = useState<MessageRow | null>(null);
+
+  /// Optimistic send tracking. A message id lives in `pendingIds` while
+  /// its insert is in flight, moves to `failedIds` if the request errors
+  /// (the user can tap the bubble to retry), and disappears from both
+  /// when the server-confirmed row replaces the optimistic one.
+  const [pendingIds, setPendingIds] = useState<Set<string>>(() => new Set());
+  const [failedIds, setFailedIds] = useState<Set<string>>(() => new Set());
+  /// Re-send payload keyed by client id — kept in a ref because retry
+  /// doesn't need to trigger renders.
+  const failedPayloadsRef = useRef<
+    Map<string, { type: 'text'; body: string; parentId: string | null }
+            | { type: 'image'; localUri: string; parentId: string | null }>
+  >(new Map());
 
   const [partnerTyping, setPartnerTyping] = useState(false);
   const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -275,29 +290,154 @@ export default function ThreadScreen() {
   }, [reactions]);
 
   // ── Handlers ─────────────────────────────────────────────────
-  const handleSendText = async (body: string) => {
-    if (!user) return;
-    await sendTextMessage({
-      conversationId: conversationId!,
-      senderId:       user.id,
-      body,
-      parentId:       replyTo?.id ?? null,
+
+  /// Move an id between the pending / failed sets atomically. Using
+  /// functional setState ensures the two updates can't tear if React
+  /// schedules them across separate ticks.
+  const markPending = (id: string) => {
+    setPendingIds((prev) => new Set(prev).add(id));
+    setFailedIds((prev) => {
+      if (!prev.has(id)) return prev;
+      const next = new Set(prev); next.delete(id); return next;
     });
+  };
+  const markSent = (id: string) => {
+    setPendingIds((prev) => {
+      if (!prev.has(id)) return prev;
+      const next = new Set(prev); next.delete(id); return next;
+    });
+    setFailedIds((prev) => {
+      if (!prev.has(id)) return prev;
+      const next = new Set(prev); next.delete(id); return next;
+    });
+    failedPayloadsRef.current.delete(id);
+  };
+  const markFailed = (id: string) => {
+    setPendingIds((prev) => {
+      if (!prev.has(id)) return prev;
+      const next = new Set(prev); next.delete(id); return next;
+    });
+    setFailedIds((prev) => new Set(prev).add(id));
+  };
+
+  /// Scroll the list to the bottom after a send. We schedule with a small
+  /// timeout so the optimistic-insert setState has flushed and the FlatList
+  /// has measured the new row's height — scrolling synchronously after
+  /// setState frequently lands on the row above the one we just added.
+  const scrollToEnd = () => {
+    setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 50);
+  };
+
+  const handleSendText = async (body: string) => {
+    if (!user || !conversationId) return;
+    const clientId = randomUUID();
+    const parentId = replyTo?.id ?? null;
+
+    // Optimistic insert — the bubble renders immediately with a spinner.
+    const optimistic: MessageRow = {
+      id:              clientId,
+      conversation_id: conversationId,
+      sender_id:       user.id,
+      body,
+      attachment_url:  null,
+      parent_id:       parentId,
+      edited_at:       null,
+      deleted_at:      null,
+      created_at:      new Date().toISOString(),
+    };
+    setMessages((prev) => [...prev, optimistic]);
+    markPending(clientId);
     setReplyTo(null);
+    scrollToEnd();
+
+    try {
+      const real = await sendTextMessage({
+        conversationId,
+        senderId: user.id,
+        body,
+        parentId,
+        clientId,
+      });
+      // Replace optimistic with the server-confirmed row. The realtime
+      // INSERT broadcast that follows is deduped by id (same uuid both
+      // sides) and becomes a no-op.
+      setMessages((prev) => prev.map((m) => (m.id === clientId ? real : m)));
+      markSent(clientId);
+    } catch {
+      failedPayloadsRef.current.set(clientId, { type: 'text', body, parentId });
+      markFailed(clientId);
+    }
   };
 
   const handleSendImage = async (localUri: string) => {
-    if (!user) return;
+    if (!user || !conversationId) return;
+    const clientId = randomUUID();
+    const parentId = replyTo?.id ?? null;
+
+    // Optimistic insert with the LOCAL file:// URI in attachment_url.
+    // MessageBubble's useAttachmentUrl detects file:// and passes it
+    // through, so the picked image renders instantly. The server-confirmed
+    // row will carry the real storage path and replace this row.
+    const optimistic: MessageRow = {
+      id:              clientId,
+      conversation_id: conversationId,
+      sender_id:       user.id,
+      body:            null,
+      attachment_url:  localUri,
+      parent_id:       parentId,
+      edited_at:       null,
+      deleted_at:      null,
+      created_at:      new Date().toISOString(),
+    };
+    setMessages((prev) => [...prev, optimistic]);
+    markPending(clientId);
+    setReplyTo(null);
+    scrollToEnd();
+
     try {
-      await sendImageMessage({
-        conversationId: conversationId!,
-        senderId:       user.id,
+      const real = await sendImageMessage({
+        conversationId,
+        senderId: user.id,
         localUri,
-        parentId:       replyTo?.id ?? null,
+        parentId,
+        clientId,
       });
-      setReplyTo(null);
+      setMessages((prev) => prev.map((m) => (m.id === clientId ? real : m)));
+      markSent(clientId);
     } catch (e: any) {
-      Alert.alert('Upload failed', e?.message ?? 'Try again.');
+      failedPayloadsRef.current.set(clientId, { type: 'image', localUri, parentId });
+      markFailed(clientId);
+      Alert.alert('Upload failed', e?.message ?? 'Tap the bubble to retry.');
+    }
+  };
+
+  const handleRetry = async (messageId: string) => {
+    const payload = failedPayloadsRef.current.get(messageId);
+    if (!payload || !user || !conversationId) return;
+    markPending(messageId);
+    try {
+      if (payload.type === 'text') {
+        const real = await sendTextMessage({
+          conversationId,
+          senderId: user.id,
+          body: payload.body,
+          parentId: payload.parentId,
+          clientId: messageId,
+        });
+        setMessages((prev) => prev.map((m) => (m.id === messageId ? real : m)));
+      } else {
+        const real = await sendImageMessage({
+          conversationId,
+          senderId: user.id,
+          localUri: payload.localUri,
+          parentId: payload.parentId,
+          clientId: messageId,
+        });
+        setMessages((prev) => prev.map((m) => (m.id === messageId ? real : m)));
+      }
+      markSent(messageId);
+    } catch {
+      markFailed(messageId);
     }
   };
 
@@ -395,6 +535,10 @@ export default function ThreadScreen() {
             const parent = item.parent_id
               ? messages.find((m) => m.id === item.parent_id) ?? null
               : null;
+            const status: MessageStatus =
+              pendingIds.has(item.id) ? 'sending'
+              : failedIds.has(item.id) ? 'failed'
+              : 'sent';
             return (
               <MessageBubble
                 message={item}
@@ -404,8 +548,10 @@ export default function ThreadScreen() {
                 parent={parent}
                 partnerLastReadAt={partnerLastReadAt}
                 meId={user.id}
+                status={status}
                 onToggleReaction={(emoji) => handleToggleReaction(item, emoji)}
                 onLongPress={() => handleLongPress(item)}
+                onRetry={() => handleRetry(item.id)}
               />
             );
           }}

@@ -1,8 +1,8 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   Dimensions,
-  KeyboardAvoidingView,
+  Keyboard,
   PanResponder,
   PanResponderGestureState,
   Platform,
@@ -58,6 +58,23 @@ export function SwipeDeck({ deck, onPass, onSave, onMessageSend, emptyState }: P
   const [index, setIndex] = useState(0);
   const [composerOpen, setComposerOpen] = useState(false);
   const [composerText, setComposerText] = useState('');
+
+  /// Bind the composer's bottom offset to the live keyboard height so it
+  /// always sits flush above the keyboard's top edge. We listen directly
+  /// instead of using KeyboardAvoidingView because the composer wrap is
+  /// `position: 'absolute', bottom: 0` — KeyboardAvoidingView's "padding"
+  /// behavior only works in flex layouts (it adds padding *inside* an
+  /// absolute container, which doesn't move the container itself).
+  const [keyboardOffset, setKeyboardOffset] = useState(0);
+  useEffect(() => {
+    const showEvt = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvt = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showSub = Keyboard.addListener(showEvt, (e) => {
+      setKeyboardOffset(e.endCoordinates?.height ?? 0);
+    });
+    const hideSub = Keyboard.addListener(hideEvt, () => setKeyboardOffset(0));
+    return () => { showSub.remove(); hideSub.remove(); };
+  }, []);
   const position = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
 
   const current = deck[index];
@@ -307,11 +324,12 @@ export function SwipeDeck({ deck, onPass, onSave, onMessageSend, emptyState }: P
       </Animated.View>
 
       {/* Composer — only renders when the card has been swiped up. Lives
-          below the card; the card's translateY makes room for it. */}
+          below the card; the card's translateY makes room for it. The
+          `bottom` style is bound to live keyboard height so the input is
+          never covered. */}
       {composerOpen && (
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          style={styles.composerWrap}
+        <View
+          style={[styles.composerWrap, { bottom: keyboardOffset }]}
           pointerEvents="box-none"
         >
           <View style={styles.composer}>
@@ -355,7 +373,7 @@ export function SwipeDeck({ deck, onPass, onSave, onMessageSend, emptyState }: P
               </Pressable>
             </View>
           </View>
-        </KeyboardAvoidingView>
+        </View>
       )}
     </View>
   );

@@ -1,3 +1,4 @@
+import { randomUUID } from 'expo-crypto';
 import { supabase } from './supabase';
 
 // ─── Types ──────────────────────────────────────────────────────────
@@ -100,10 +101,17 @@ export async function sendTextMessage(args: {
   senderId:       string;
   body:           string;
   parentId?:      string | null;
+  /// Optional client-supplied UUID. When provided, the server uses this
+  /// as the message id instead of generating one — lets the caller
+  /// optimistically insert a row locally with the same id, so the
+  /// realtime INSERT broadcast dedupes against the existing row instead
+  /// of duplicating it.
+  clientId?:      string;
 }): Promise<MessageRow> {
   const { data, error } = await supabase
     .from('messages')
     .insert({
+      ...(args.clientId ? { id: args.clientId } : {}),
       conversation_id: args.conversationId,
       sender_id:       args.senderId,
       body:            args.body.trim(),
@@ -120,13 +128,15 @@ export async function sendImageMessage(args: {
   senderId:       string;
   localUri:       string;
   parentId?:      string | null;
+  /// Same dedupe contract as sendTextMessage — see that doc.
+  clientId?:      string;
 }): Promise<MessageRow> {
   // Read the local file as bytes. expo-file-system would also work; using
   // fetch() keeps us dep-free here (it works for file:// URIs in RN).
   const res = await fetch(args.localUri);
   const blob = await res.blob();
   const ext = (args.localUri.match(/\.([a-zA-Z0-9]+)$/)?.[1] ?? 'jpg').toLowerCase();
-  const path = `${args.conversationId}/${crypto.randomUUID()}.${ext}`;
+  const path = `${args.conversationId}/${randomUUID()}.${ext}`;
 
   const { error: upErr } = await supabase.storage
     .from('chat-attachments')
@@ -139,6 +149,7 @@ export async function sendImageMessage(args: {
   const { data, error } = await supabase
     .from('messages')
     .insert({
+      ...(args.clientId ? { id: args.clientId } : {}),
       conversation_id: args.conversationId,
       sender_id:       args.senderId,
       attachment_url:  path,
@@ -151,13 +162,45 @@ export async function sendImageMessage(args: {
 }
 
 /// Returns a short-lived signed URL for rendering an attachment in an
-/// <Image>. Signed URLs are cheap to mint; we don't bother caching them.
+/// <Image>. Prefer `getCachedAttachmentUrl` from app code — that one
+/// memoizes the result and avoids re-minting on every scroll.
 export async function signAttachmentUrl(path: string, ttlSeconds = 3600): Promise<string | null> {
   const { data, error } = await supabase.storage
     .from('chat-attachments')
     .createSignedUrl(path, ttlSeconds);
   if (error) return null;
   return data?.signedUrl ?? null;
+}
+
+/// Process-lifetime cache for signed attachment URLs. Avoids minting a
+/// fresh URL on every render/scroll — a thread with 50 image messages
+/// would otherwise hit Supabase Storage 50× per remount. The cache
+/// refreshes when an entry is within 60s of expiry so we never serve
+/// a URL that's about to die mid-render.
+///
+/// Local URIs (file:// or content://) are passed through untouched —
+/// used by the optimistic image path so the picked image renders
+/// instantly while the real upload is in flight.
+const signedUrlCache = new Map<string, { url: string; expiresAt: number }>();
+const REFRESH_BUFFER_MS = 60_000;
+
+export async function getCachedAttachmentUrl(
+  path: string,
+  ttlSeconds = 3600,
+): Promise<string | null> {
+  if (path.startsWith('file://') || path.startsWith('content://')) {
+    return path;
+  }
+  const now = Date.now();
+  const cached = signedUrlCache.get(path);
+  if (cached && cached.expiresAt > now + REFRESH_BUFFER_MS) {
+    return cached.url;
+  }
+  const url = await signAttachmentUrl(path, ttlSeconds);
+  if (url) {
+    signedUrlCache.set(path, { url, expiresAt: now + ttlSeconds * 1000 });
+  }
+  return url;
 }
 
 export async function editMessage(messageId: string, body: string): Promise<void> {

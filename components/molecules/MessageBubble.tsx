@@ -1,15 +1,21 @@
 import React, { useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   Image,
   Pressable,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
-import { Check, Checks, PencilSimple } from 'phosphor-react-native';
+import { Check, Checks, PencilSimple, Warning } from 'phosphor-react-native';
 import type { MessageRow, ReactionRow } from '../../lib/messaging';
-import { signAttachmentUrl } from '../../lib/messaging';
+import { getCachedAttachmentUrl } from '../../lib/messaging';
 import { AmbitFont, Brand, Radii, Space } from '../../constants/theme';
+
+/// Send lifecycle for a locally-originated message — used to render the
+/// in-flight spinner / failure marker on my-own bubbles. Partner bubbles
+/// always render as 'sent'.
+export type MessageStatus = 'sending' | 'sent' | 'failed';
 
 interface Props {
   message:       MessageRow;
@@ -27,23 +33,37 @@ interface Props {
   partnerLastReadAt: string | null;
   /// User id of the signed-in viewer.
   meId:          string;
+  /// Optimistic-send state for my own messages. Defaults to 'sent' if the
+  /// message has been confirmed by the server.
+  status?:       MessageStatus;
   /// Tap reaction chip → toggle off / on (caller routes to toggleReaction).
   onToggleReaction: (emoji: string) => void;
   /// Long press → action sheet (react / reply / copy / edit / delete).
   onLongPress:   () => void;
+  /// Tap → retry a failed send. Only invoked when status === 'failed'.
+  onRetry?:      () => void;
 }
 
-/// Hooks for the resolved (signed) attachment URL. Resigning is cheap;
-/// we keep it scoped per-bubble so it expires with the component.
+/// Resolve a path into a renderable URL. Local URIs (file://) pass through
+/// untouched — used by the optimistic image path so the picked image
+/// renders instantly while the upload is in flight. Storage paths route
+/// through `getCachedAttachmentUrl` which memoizes signed URLs.
 function useAttachmentUrl(path: string | null): string | null {
-  const [url, setUrl] = useState<string | null>(null);
+  const [url, setUrl] = useState<string | null>(
+    // Synchronously return local URIs so the image is visible on first render.
+    path && (path.startsWith('file://') || path.startsWith('content://')) ? path : null,
+  );
   useEffect(() => {
     if (!path) {
       setUrl(null);
       return;
     }
+    if (path.startsWith('file://') || path.startsWith('content://')) {
+      setUrl(path);
+      return;
+    }
     let cancelled = false;
-    signAttachmentUrl(path).then((u) => {
+    getCachedAttachmentUrl(path).then((u) => {
       if (!cancelled) setUrl(u);
     });
     return () => {
@@ -61,8 +81,10 @@ export function MessageBubble({
   parent,
   partnerLastReadAt,
   meId,
+  status = 'sent',
   onToggleReaction,
   onLongPress,
+  onRetry,
 }: Props) {
   const attachmentUrl = useAttachmentUrl(message.attachment_url);
   const isDeleted = !!message.deleted_at;
@@ -83,11 +105,14 @@ export function MessageBubble({
     <View style={[styles.row, isMine ? styles.rowMine : styles.rowTheirs]}>
       <Pressable
         onLongPress={isDeleted ? undefined : onLongPress}
+        onPress={isMine && status === 'failed' ? onRetry : undefined}
         delayLongPress={250}
         style={[
           styles.bubble,
           isMine ? styles.bubbleMine : styles.bubbleTheirs,
           isDeleted && styles.bubbleDeleted,
+          isMine && status === 'sending' && styles.bubblePending,
+          isMine && status === 'failed' && styles.bubbleFailed,
         ]}
       >
         {/* Reply preview — small bar above the body that quotes the parent. */}
@@ -142,7 +167,11 @@ export function MessageBubble({
             {formatTime(message.created_at)}
           </Text>
           {isMine && !isDeleted && (
-            readByPartner ? (
+            status === 'sending' ? (
+              <ActivityIndicator size="small" color={Brand.inkOnBrand} />
+            ) : status === 'failed' ? (
+              <Warning size={13} color={Brand.inkOnBrand} weight="fill" />
+            ) : readByPartner ? (
               <Checks size={13} color={Brand.inkOnBrand} weight="bold" />
             ) : (
               <Check size={13} color={Brand.inkOnBrand} weight="bold" />
@@ -208,6 +237,11 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 6,
   },
   bubbleDeleted: { opacity: 0.65 },
+  // Optimistic-send tints: while in flight the bubble is slightly
+  // translucent; on failure it shifts to a muted red so the user sees the
+  // tap-to-retry affordance without breaking the brand palette completely.
+  bubblePending: { opacity: 0.7 },
+  bubbleFailed:  { backgroundColor: '#C0392B' },
 
   body: {
     fontFamily: AmbitFont.body,

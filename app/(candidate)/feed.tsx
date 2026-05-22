@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  Alert,
   Platform,
   Pressable,
   StyleSheet,
@@ -30,6 +31,15 @@ import { startConversationWithMessage } from '../../lib/messaging';
 import { useAuth } from '../../context/AuthContext';
 
 const SKIP_OVERVIEW_THRESHOLD = 5;
+
+/// Mock discovery cards use non-UUID ids like 'seeker-2' / 'project-1' for
+/// readability. start_conversation_with_message expects real UUIDs and
+/// throws otherwise. Until the deck is fed from real Supabase rows, we
+/// detect the placeholder shape and bail gracefully instead of letting the
+/// RPC error bubble up.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const isRealUuid = (s: string | null | undefined): s is string =>
+  !!s && UUID_RE.test(s);
 
 const CARD_GRADIENTS: [string, string][] = [
   [Brand.primary, Brand.accent],
@@ -240,11 +250,14 @@ export default function DiscoveryFeed() {
     }
   };
 
-  /// Composer-send. Creates (or finds) a conversation, posts the first
-  /// message, and navigates into the thread. Also records the match
-  /// outcome as 'applied' so the discovery feed doesn't show the same
-  /// project again. Seeker-side: project_id = card.id, seeker = me.
-  /// Owner-side: project_id = my first active project, seeker = card.id.
+  /// Composer-send (swipe-up "Say hi" on a discovery card). Creates or
+  /// finds the conversation and posts the first message. Does NOT navigate
+  /// into the thread — the user stays in the discovery deck and the new
+  /// conversation surfaces in the Chat tab via the inbox's realtime
+  /// subscription. Also records the match outcome as 'applied' so the
+  /// project doesn't reappear in future decks. Seeker-side: project_id =
+  /// card.id, seeker = me. Owner-side: project_id = my first active
+  /// project, seeker = card.id.
   const handleMessage = async (card: DiscoveryCardData, text: string) => {
     setConsecutiveSkips(0);
     setLastFiveSeen([]);
@@ -255,6 +268,15 @@ export default function DiscoveryFeed() {
       let seekerId:  string;
 
       if (card.kind === 'project') {
+        // Placeholder mock cards have ids like 'project-1'. Skip messaging
+        // until the deck is wired to real Supabase project rows.
+        if (!isRealUuid(card.id)) {
+          Alert.alert(
+            'Demo card',
+            "This is a placeholder card — messaging isn't wired for it yet.",
+          );
+          return;
+        }
         projectId = card.id;
         seekerId  = user.id;
         // Mirror the existing match-outcome write so the project gets
@@ -267,6 +289,14 @@ export default function DiscoveryFeed() {
           )
           .then(() => {});
       } else {
+        // Placeholder seeker cards (id like 'seeker-2') aren't real users.
+        if (!isRealUuid(card.id)) {
+          Alert.alert(
+            'Demo card',
+            "This is a placeholder card — messaging isn't wired for it yet.",
+          );
+          return;
+        }
         // Owner messaging a seeker card. Look up the owner's first active
         // project as the conversation context.
         const { data: proj } = await supabase
@@ -278,19 +308,24 @@ export default function DiscoveryFeed() {
           .limit(1)
           .maybeSingle();
         if (!proj) {
-          console.warn('Owner has no active project to anchor a conversation.');
+          Alert.alert(
+            'No active project',
+            'Create a project before reaching out to seekers.',
+          );
           return;
         }
         projectId = (proj as { id: string }).id;
         seekerId  = card.id;
       }
 
-      const conversationId = await startConversationWithMessage({
+      await startConversationWithMessage({
         projectId,
         seekerId,
         body: text,
       });
-      router.push({ pathname: '/thread', params: { id: conversationId } });
+      // Intentionally no router.push here — the composer dismisses on its
+      // own and the new conversation appears in the Chat tab via the
+      // inbox realtime subscription.
     } catch (e: any) {
       console.warn('start_conversation_with_message failed:', e?.message ?? e);
     }
