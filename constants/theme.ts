@@ -14,9 +14,11 @@ export const Brand = {
 
   // Surfaces
   canvas:         '#FFFFFF',
+  cardCream:      '#FAF6F0',  // warm off-white for primary card surfaces (Hinge-style)
   surface1:       '#F6F6F6',  // input fill, default chip fill
   surface2:       '#EFEFEF',  // unselected option card fill
   borderDefault:  '#E0E0E0',  // 1.5px hairlines on inputs/chips
+  borderSoft:     'rgba(0, 0, 0, 0.06)',  // softer hairline for card on cream
 
   // Ink
   inkPrimary:     '#000000',  // display headlines

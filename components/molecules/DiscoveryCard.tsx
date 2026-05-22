@@ -86,69 +86,82 @@ function SeekerVariant({
       contentContainerStyle={styles.cardContent}
       showsVerticalScrollIndicator={false}
     >
-      {/* Top row: avatar (left) + name + campus stack */}
-      <View style={styles.topRow}>
-        <View style={styles.avatar}>
-          {card.photoUri ? (
-            <Image source={{ uri: card.photoUri }} style={styles.avatarImg} />
-          ) : (
-            <Text style={styles.avatarInitial}>{initial}</Text>
-          )}
-        </View>
-        <View style={styles.nameCol}>
-          <Text style={styles.name} numberOfLines={1}>
-            {card.name}
-          </Text>
+      {/* Photo hero — full-width band. Hinge-style: the person leads, the
+          name + campus float on a dark gradient scrim at the bottom-left.
+          When photoUri is missing, fall back to a warm gradient with the
+          name initial as the placeholder visual. */}
+      <View style={styles.heroBand}>
+        {card.photoUri ? (
+          <Image source={{ uri: card.photoUri }} style={styles.heroImg} />
+        ) : (
+          <LinearGradient
+            colors={[Brand.primary, Brand.accent]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.heroImg}
+          >
+            <Text style={styles.heroInitial}>{initial}</Text>
+          </LinearGradient>
+        )}
+        {/* Dark scrim makes the overlaid name readable over any photo */}
+        <LinearGradient
+          colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.55)']}
+          style={styles.heroScrim}
+          pointerEvents="none"
+        />
+        <View style={styles.heroTextBlock}>
+          <Text style={styles.heroName} numberOfLines={1}>{card.name}</Text>
           {campus && (
-            <View style={styles.campusRow}>
-              <MapPin size={12} color={Brand.inkMuted} weight="fill" />
-              <Text style={styles.campusText} numberOfLines={1}>
-                {campus.name}
-              </Text>
+            <View style={styles.heroCampusRow}>
+              <MapPin size={13} color="rgba(255,255,255,0.92)" weight="fill" />
+              <Text style={styles.heroCampus} numberOfLines={1}>{campus.name}</Text>
             </View>
           )}
         </View>
       </View>
 
-      {/* Vibe blurb — speech bubble with tail pointing up toward the avatar */}
-      {card.vibeBlurb !== '' && (
-        <SpeechBubble color={Brand.seekerSurface} tailAnchor="top-left" tailOffset={20}>
-          <Text style={styles.vibe}>{card.vibeBlurb}</Text>
-        </SpeechBubble>
-      )}
-
-      {/* Skills — chips highlighted when they match the project's needs */}
-      {card.skills.length > 0 && (
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>SKILLS</Text>
-          <View style={styles.chipRow}>
-            {card.skills.map((s) => (
-              <Chip key={s} label={s} selected={isMatched(s)} />
-            ))}
+      {/* Body — padded; sections breathe at 28pt apart */}
+      <View style={styles.body}>
+        {card.vibeBlurb !== '' && (
+          <View>
+            <Text style={styles.promptLabel}>IN THEIR WORDS</Text>
+            <SpeechBubble color={Brand.seekerSurface} tailAnchor="top-left" tailOffset={20}>
+              <Text style={styles.vibePrompt}>{card.vibeBlurb}</Text>
+            </SpeechBubble>
           </View>
-        </View>
-      )}
+        )}
 
-      {/* Portfolio — horizontal row of bubble + title-below. Hidden when empty. */}
-      {card.portfolio.length > 0 && (
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>PORTFOLIO</Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.portfolioRow}
-          >
-            {card.portfolio.map((item) => (
-              <PortfolioBubble
-                key={item.id}
-                item={item}
-                onPress={() => onPortfolioPress?.(item)}
-                active={activePortfolioId === item.id}
-              />
-            ))}
-          </ScrollView>
-        </View>
-      )}
+        {card.skills.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionLabel}>SKILLS</Text>
+            <View style={styles.chipRow}>
+              {card.skills.map((s) => (
+                <Chip key={s} label={s} selected={isMatched(s)} />
+              ))}
+            </View>
+          </View>
+        )}
+
+        {card.portfolio.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionLabel}>PORTFOLIO</Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.portfolioRow}
+            >
+              {card.portfolio.map((item) => (
+                <PortfolioBubble
+                  key={item.id}
+                  item={item}
+                  onPress={() => onPortfolioPress?.(item)}
+                  active={activePortfolioId === item.id}
+                />
+              ))}
+            </ScrollView>
+          </View>
+        )}
+      </View>
     </ScrollView>
   );
 }
@@ -211,78 +224,86 @@ function ProjectVariant({ card }: { card: Extract<DiscoveryCardData, { kind: 'pr
 const styles = StyleSheet.create({
   card: {
     flex: 1,
-    backgroundColor: Brand.canvas,
+    backgroundColor: Brand.cardCream,
     borderRadius: Radii.lg,
     borderWidth: 1,
-    borderColor: Brand.surface2,
+    borderColor: Brand.borderSoft,
     overflow: 'hidden',
   },
   cardContent: {
-    padding: Space.lg,
-    gap: 28, // Hinge-scale section breathing room between top-row, vibe, skills, portfolio
+    // No padding — sections manage their own. The photo hero must bleed
+    // edge-to-edge while the body below gets standard padding.
+    paddingBottom: Space.lg,
   },
 
-  // ── Seeker variant ──────────────────────────────────────────────────────
-  // Hinge-scale: avatar reads as a portrait, name is the dominant glyph,
-  // vibe is paragraph-readable, not a caption.
-  topRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-  },
-  avatar: {
-    width: 80,
-    height: 80,
-    borderRadius: Radii.full,
+  // ── Photo hero (Tier 1 Hinge-aligned) ───────────────────────────────────
+  heroBand: {
+    width: '100%',
+    height: 320,
+    position: 'relative',
     backgroundColor: Brand.seekerSurface,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-    borderWidth: 3,
-    borderColor: Brand.canvas,
-    // Soft shadow lifts the avatar off the card so it reads as a portrait,
-    // not just a placeholder circle. Same treatment Hinge gives the lead photo.
-    shadowColor: '#000',
-    shadowOpacity: 0.08,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 8,
-    elevation: 3,
   },
-  avatarImg: {
+  heroImg: {
     width: '100%',
     height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  avatarInitial: {
+  heroInitial: {
     fontFamily: AmbitFont.display,
-    fontSize: 36,
-    color: Brand.seekerInk,
+    fontSize: 120,
+    color: 'rgba(255, 255, 255, 0.92)',
+    letterSpacing: 2,
   },
-  nameCol: {
-    flex: 1,
-    gap: 4,
+  heroScrim: {
+    position: 'absolute',
+    left: 0, right: 0, bottom: 0,
+    height: 140,
   },
-  name: {
+  heroTextBlock: {
+    position: 'absolute',
+    left: Space.lg, right: Space.lg, bottom: 18,
+  },
+  heroName: {
     fontFamily: AmbitFont.display,
-    fontSize: 28,
-    color: Brand.inkPrimary,
-    lineHeight: 34,
+    fontSize: 32,
+    color: '#FFFFFF',
+    letterSpacing: 0.3,
   },
-  campusRow: {
+  heroCampusRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
+    marginTop: 4,
   },
-  campusText: {
+  heroCampus: {
     fontFamily: AmbitFont.body,
     fontSize: 14,
-    color: Brand.inkMuted,
+    color: 'rgba(255, 255, 255, 0.92)',
+    fontWeight: '500',
   },
-  vibe: {
+
+  // ── Body (everything below the photo hero) ──────────────────────────────
+  body: {
+    paddingHorizontal: Space.lg,
+    paddingTop: Space.lg + 4,
+    gap: 28,
+  },
+
+  // ── Hinge-style prompt label + display-serif answer ─────────────────────
+  promptLabel: {
     fontFamily: AmbitFont.body,
-    fontSize: 17,
-    fontStyle: 'italic',
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1.6,
+    color: Brand.accent,
+    marginBottom: 12,
+  },
+  vibePrompt: {
+    fontFamily: AmbitFont.display, // Zodiak Bold — the prompt voice
+    fontSize: 20,
     color: Brand.seekerInk,
-    lineHeight: 25,
+    lineHeight: 28,
   },
 
   // ── Shared ──────────────────────────────────────────────────────────────
