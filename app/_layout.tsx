@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet } from 'react-native';
 import { Slot } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -36,33 +36,36 @@ export default function RootLayout() {
   );
 }
 
-/// Root routing decision based on auth state:
-///   - auth.loading            → blank canvas (avoids one-frame flicker; the
-///                                inline OnboardingFlow opens with its own
-///                                splash so we don't need a separate one)
-///   - no user OR no profile   → OnboardingInline (the actual entry point)
-///   - user + profile complete → the candidate app
-/// Debug menu still works in both states for dev re-onboarding.
+/// Root routing decision based on auth state.
+///
+/// OnboardingInline stays mounted **persistently** until we're sure the
+/// signed-in user has a complete profile (`user != null && hasProfile === true`).
+/// Any earlier conditional switch — e.g. unmounting during the transient
+/// `hasProfile === null` window that opens right after sign-up — would tear
+/// down the `OnboardingProvider` mid-flow, throwing away the email/password
+/// the user just typed and remounting a fresh splash. That's how landing
+/// on Welcome after EduEmail submit used to happen: unmount + remount raced
+/// the splash auto-advance.
+///
+/// On cold boot, OnboardingInline mounts immediately so the splash plays;
+/// once the profile check resolves to `true`, Gate flips to the main app
+/// and the splash unmounts mid-animation (cleanup stops it cleanly). The
+/// debug menu still opens a separate modal OnboardingFlow for dev work.
 function Gate() {
   const { user, hasProfile, loading } = useAuth();
   const [debugOpen, setDebugOpen] = useState(false);
   const [debugOnboardingOpen, setDebugOnboardingOpen] = useState(false);
 
-  const needsOnboarding = !loading && (!user || hasProfile === false);
-  // While we're still resolving auth state, render nothing. The inline
-  // OnboardingFlow includes its own SplashScreen so there's no double-splash.
-  const resolving = loading || (user && hasProfile === null);
+  const showMainApp = !loading && user != null && hasProfile === true;
 
   return (
     <>
-      {resolving ? (
-        <View style={styles.safe} />
-      ) : needsOnboarding ? (
-        <OnboardingInline onComplete={() => { /* AuthContext re-route handles it */ }} />
-      ) : (
+      {showMainApp ? (
         <SafeAreaView style={styles.safe} edges={['top']}>
           <Slot />
         </SafeAreaView>
+      ) : (
+        <OnboardingInline onComplete={() => { /* AuthContext re-route handles it */ }} />
       )}
 
       <DebugMenuButton onPress={() => setDebugOpen(true)} />
