@@ -26,12 +26,20 @@ import type { DiscoveryCardData } from '../../data/mock';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 
-/// Pan thresholds. Hit either distance OR velocity to commit.
+/// Pan thresholds. Hit either distance OR velocity to commit. Commits
+/// also require the gesture's dominant axis to match the direction —
+/// otherwise a diagonal up-flick (thumb arcing while swiping up) gets
+/// misread as a horizontal pass/save.
 const SWIPE_X_DISTANCE = 120;   // pt
-const SWIPE_X_VELOCITY = 0.6;   // pt/ms
+const SWIPE_X_VELOCITY = 0.75;  // pt/ms (was 0.6 — too hair-trigger)
 const SWIPE_UP_DISTANCE = 80;   // pt (toward composer reveal)
+/// |dx|/|dy| (or inverse) must exceed this ratio for a commit to fire.
+/// 1.3 means a 30% imbalance — clear diagonals commit, ambiguous arcs
+/// (within 30% of square) snap back instead of guessing.
+const AXIS_DOMINANCE_RATIO = 1.3;
 const COMPOSER_RESTING_Y = -120; // where the card sits while composing
 const COMMIT_DURATION = 240;    // ms — fly-off animation length
+const HOLD_REVEAL_DELAY_MS = 500; // hold-without-moving threshold
 
 interface Props {
   deck: DiscoveryCardData[];
@@ -76,6 +84,45 @@ export function SwipeDeck({ deck, onPass, onSave, onMessageSend, emptyState }: P
     return () => { showSub.remove(); hideSub.remove(); };
   }, []);
   const position = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
+
+  /// Hold-to-reveal direction indicators. Touching the card without
+  /// moving for HOLD_REVEAL_DELAY_MS fades in three labels (PASS / SAVE /
+  /// SAY HI) anchored to the screen edges so new users can discover
+  /// what each direction does without trial-and-error. The reveal is
+  /// cancelled the moment a swipe begins (onPanResponderGrant) or the
+  /// finger lifts.
+  const holdOpacity = useRef(new Animated.Value(0)).current;
+  const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const cancelHoldTimer = () => {
+    if (holdTimerRef.current) {
+      clearTimeout(holdTimerRef.current);
+      holdTimerRef.current = null;
+    }
+  };
+  /// Half-opacity overlays so the card content underneath stays
+  /// recognizable through the tint. Fade IN target is 0.5, OUT is 0.
+  const fadeHoldIndicators = (to: 0 | 0.5) => {
+    Animated.timing(holdOpacity, {
+      toValue: to,
+      duration: to === 0.5 ? 220 : 140,
+      useNativeDriver: true,
+    }).start();
+  };
+  const armHoldReveal = () => {
+    if (composerOpen) return;
+    cancelHoldTimer();
+    holdTimerRef.current = setTimeout(() => {
+      fadeHoldIndicators(0.5);
+    }, HOLD_REVEAL_DELAY_MS);
+  };
+  const dismissHoldReveal = () => {
+    cancelHoldTimer();
+    fadeHoldIndicators(0);
+  };
+
+  // Clear any pending timer if the component unmounts mid-hold.
+  useEffect(() => () => cancelHoldTimer(), []);
 
   const current = deck[index];
 
@@ -223,6 +270,14 @@ export function SwipeDeck({ deck, onPass, onSave, onMessageSend, emptyState }: P
           return Math.abs(g.dx) > 6 || Math.abs(g.dy) > 6;
         },
 
+        // Real swipe started — kill the pending hold timer so a delayed
+        // fade-in doesn't fire mid-swipe, but DON'T fade out an already-
+        // visible reveal: the user explicitly wants the direction hints
+        // to stay overlaid on the card as it moves.
+        onPanResponderGrant: () => {
+          cancelHoldTimer();
+        },
+
         onPanResponderMove: (_e, g) => {
           if (composerOpen) {
             // Card is parked at COMPOSER_RESTING_Y. Downward drag closes
@@ -249,12 +304,23 @@ export function SwipeDeck({ deck, onPass, onSave, onMessageSend, emptyState }: P
             else snapToComposerRest();
             return;
           }
+          // Dominant-axis gate: a commit only fires if the user moved
+          // clearly in one direction. Equal-magnitude diagonal arcs
+          // (the left-thumb up-flick problem) fail both checks and
+          // snap back to center.
+          const absDx = Math.abs(g.dx);
+          const absDy = Math.abs(g.dy);
+          const horizDominant = absDx > absDy * AXIS_DOMINANCE_RATIO;
+          const vertDominant  = absDy > absDx * AXIS_DOMINANCE_RATIO;
+
           const passed =
-            g.dx <= -SWIPE_X_DISTANCE || g.vx <= -SWIPE_X_VELOCITY;
+            horizDominant &&
+            (g.dx <= -SWIPE_X_DISTANCE || g.vx <= -SWIPE_X_VELOCITY);
           const saved =
-            g.dx >= SWIPE_X_DISTANCE || g.vx >= SWIPE_X_VELOCITY;
+            horizDominant &&
+            (g.dx >= SWIPE_X_DISTANCE || g.vx >= SWIPE_X_VELOCITY);
           const upRevealed =
-            g.dy <= -SWIPE_UP_DISTANCE && Math.abs(g.dx) < SWIPE_X_DISTANCE;
+            vertDominant && g.dy <= -SWIPE_UP_DISTANCE;
 
           if (passed) commitPass(g);
           else if (saved) commitSave(g);
@@ -282,6 +348,9 @@ export function SwipeDeck({ deck, onPass, onSave, onMessageSend, emptyState }: P
       {/* Card layer. The "next" peek is intentionally not rendered — design
           decision: one card visible at a time. */}
       <Animated.View
+        onTouchStart={armHoldReveal}
+        onTouchEnd={dismissHoldReveal}
+        onTouchCancel={dismissHoldReveal}
         style={[
           styles.cardWrap,
           {
@@ -295,6 +364,34 @@ export function SwipeDeck({ deck, onPass, onSave, onMessageSend, emptyState }: P
         {...panResponder.panHandlers}
       >
         <DiscoveryCard card={current} />
+
+        {/* Hold-to-reveal direction overlays. Sit ON TOP of the card at
+            half opacity so the photo/gradient reads through them. Live
+            inside the card wrap so they travel with the card during a
+            swipe — the user gets a constant reminder of which edge they
+            were heading toward even after displacement. pointerEvents
+            =none so the underlying gesture is uninterrupted. */}
+        <Animated.View
+          pointerEvents="none"
+          style={[styles.holdHint, styles.holdHintLeft, { opacity: holdOpacity }]}
+        >
+          <Text style={styles.holdHintArrow}>←</Text>
+          <Text style={styles.holdHintLabel}>PASS</Text>
+        </Animated.View>
+        <Animated.View
+          pointerEvents="none"
+          style={[styles.holdHint, styles.holdHintRight, { opacity: holdOpacity }]}
+        >
+          <Text style={styles.holdHintLabel}>SAVE</Text>
+          <Text style={styles.holdHintArrow}>→</Text>
+        </Animated.View>
+        <Animated.View
+          pointerEvents="none"
+          style={[styles.holdHint, styles.holdHintTop, { opacity: holdOpacity }]}
+        >
+          <Text style={styles.holdHintArrow}>↑</Text>
+          <Text style={styles.holdHintLabel}>SAY HI</Text>
+        </Animated.View>
 
         {/* Edge action tints — quiet warm-tan glow when saving, muted gray
             when passing. Same Animated opacity idiom as the conditional
@@ -429,6 +526,48 @@ const styles = StyleSheet.create({
     right: 24,
     backgroundColor: Brand.surface1,
     borderColor: Brand.inkMuted,
+  },
+
+  // Hold-to-reveal direction overlays. Render inside the card wrap so
+  // they sit on top of the card surface and travel with it during a
+  // swipe. Opacity is driven externally (animated 0 → 0.5) — the
+  // background here is fully opaque black so the overall composite
+  // is ~50% black overlay against the warm card content.
+  holdHint: {
+    position: 'absolute',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 999,
+    backgroundColor: '#000000',
+  },
+  holdHintLeft: {
+    left: 16,
+    top: '46%',
+  },
+  holdHintRight: {
+    right: 16,
+    top: '46%',
+  },
+  holdHintTop: {
+    top: 16,
+    alignSelf: 'center',
+  },
+  holdHintLabel: {
+    fontFamily: AmbitFont.body,
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 1.5,
+    color: '#FFFFFF',
+  },
+  holdHintArrow: {
+    fontFamily: AmbitFont.body,
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    lineHeight: 16,
   },
 
   // Composer — appears below the lifted card.
