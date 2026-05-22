@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Eye, EyeSlash, HandWaving } from 'phosphor-react-native';
 import { BackChevron, Button, KeyboardDismiss } from '../../atoms';
 import { ANCHORED_CTA_BOTTOM } from '../../molecules/OnboardingContinue';
+import { SocialAuthButtons } from '../../molecules';
 import { useAuth } from '../../../context/AuthContext';
 import { Brand, AmbitFont, Radii, Space } from '../../../constants/theme';
 
@@ -22,11 +23,12 @@ interface Props {
 /// Wire to Supabase Auth (or Clerk) when auth lands.
 export function SignInScreen({ onBack, onSignedIn }: Props) {
   const insets = useSafeAreaInsets();
-  const { signInWithEmail } = useAuth();
+  const { signInWithEmail, signInWithApple, signInWithGoogle } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [socialBusy, setSocialBusy] = useState<'apple' | 'google' | null>(null);
   const [error, setError] = useState('');
 
   const isValid =
@@ -43,6 +45,32 @@ export function SignInScreen({ onBack, onSignedIn }: Props) {
       setError(e?.message ?? 'Invalid email or password.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleApple = async () => {
+    setSocialBusy('apple');
+    setError('');
+    try {
+      await signInWithApple();
+      onSignedIn();
+    } catch (e: any) {
+      Alert.alert('Apple sign-in failed', e?.message ?? 'Try again.');
+    } finally {
+      setSocialBusy(null);
+    }
+  };
+
+  const handleGoogle = async () => {
+    setSocialBusy('google');
+    setError('');
+    try {
+      await signInWithGoogle();
+      onSignedIn();
+    } catch (e: any) {
+      Alert.alert('Google sign-in failed', e?.message ?? 'Try again.');
+    } finally {
+      setSocialBusy(null);
     }
   };
 
@@ -63,6 +91,19 @@ export function SignInScreen({ onBack, onSignedIn }: Props) {
         <View style={styles.header}>
           <Text style={styles.headline}>Welcome back</Text>
           <Text style={styles.subtitle}>Pick up where you left off.</Text>
+        </View>
+
+        <View style={styles.socialWrap}>
+          <SocialAuthButtons
+            onAppleSignIn={handleApple}
+            onGoogleSignIn={handleGoogle}
+            busy={socialBusy}
+          />
+          <View style={styles.dividerRow}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>or email</Text>
+            <View style={styles.dividerLine} />
+          </View>
         </View>
 
         <View style={styles.form}>
@@ -141,6 +182,29 @@ const styles = StyleSheet.create({
     paddingHorizontal: Space.lg,
     marginTop: 40,
     marginBottom: Space.lg,
+  },
+  socialWrap: {
+    paddingHorizontal: Space.lg,
+    gap: 14,
+    marginBottom: Space.lg,
+  },
+  dividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginTop: 4,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: Brand.borderDefault,
+  },
+  dividerText: {
+    fontFamily: AmbitFont.body,
+    fontSize: 12,
+    color: Brand.inkMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 1.2,
   },
   headline: {
     fontFamily: AmbitFont.display,

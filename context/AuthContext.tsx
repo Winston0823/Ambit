@@ -1,7 +1,9 @@
 import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
+import { Platform } from 'react-native';
 import { Session, User } from '@supabase/supabase-js';
 import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
+import * as AppleAuthentication from 'expo-apple-authentication';
 import { supabase } from '../lib/supabase';
 import { registerForPushNotifications } from '../lib/pushNotifications';
 
@@ -110,7 +112,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  /// On iOS, use the native Apple Sign-In sheet via expo-apple-authentication
+  /// and exchange the resulting identity token directly with Supabase. This
+  /// is required by Apple's App Store review guidelines (4.8) for apps that
+  /// also offer Google sign-in, and gives a much better UX than the web
+  /// OAuth round-trip. On Android / web we fall back to the OAuth flow.
   const signInWithApple = async () => {
+    if (Platform.OS === 'ios' && (await AppleAuthentication.isAvailableAsync())) {
+      try {
+        const credential = await AppleAuthentication.signInAsync({
+          requestedScopes: [
+            AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+            AppleAuthentication.AppleAuthenticationScope.EMAIL,
+          ],
+        });
+        if (!credential.identityToken) {
+          throw new Error('No identity token returned from Apple.');
+        }
+        const { error } = await supabase.auth.signInWithIdToken({
+          provider: 'apple',
+          token:    credential.identityToken,
+        });
+        if (error) throw error;
+        return;
+      } catch (e: any) {
+        // User cancellation surfaces as a specific code; swallow silently
+        // so the UI doesn't show a confusing error toast.
+        if (e?.code === 'ERR_REQUEST_CANCELED') return;
+        throw e;
+      }
+    }
+
+    // Non-iOS fallback: web OAuth round-trip.
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'apple',
       options: { redirectTo, skipBrowserRedirect: true },

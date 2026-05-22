@@ -273,6 +273,7 @@ function Steps({ onDismiss }: { onDismiss: () => void }) {
           <WelcomeScreen
             onCreateAccount={advance}
             onSignIn={() => setStep('signIn')}
+            onSocialSignedIn={dismiss}
           />
         );
       case 'signIn':

@@ -1,17 +1,52 @@
-import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useState } from 'react';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '../../atoms';
+import { SocialAuthButtons } from '../../molecules';
+import { useAuth } from '../../../context/AuthContext';
 import { Brand, AmbitFont, Space } from '../../../constants/theme';
 
 interface Props {
   onCreateAccount: () => void;
   onSignIn: () => void;
+  /// Fired after Apple/Google sign-in succeeds. AuthContext flips the
+  /// session, so this is just the dismiss hook (parent re-routes via
+  /// hasProfile).
+  onSocialSignedIn: () => void;
 }
 
-/// S-003 Welcome. Dual-path entry: create a new account (onboarding) OR
-/// sign in (returning user). Returning users skip onboarding entirely.
-export function WelcomeScreen({ onCreateAccount, onSignIn }: Props) {
+/// S-003 Welcome. Three entry paths now:
+///   1. Continue with Apple / Google (one-tap, returning + new)
+///   2. Create account (email + edu-verification flow)
+///   3. Sign in (returning user, email + password)
+export function WelcomeScreen({ onCreateAccount, onSignIn, onSocialSignedIn }: Props) {
+  const { signInWithApple, signInWithGoogle } = useAuth();
+  const [busy, setBusy] = useState<'apple' | 'google' | null>(null);
+
+  const handleApple = async () => {
+    setBusy('apple');
+    try {
+      await signInWithApple();
+      onSocialSignedIn();
+    } catch (e: any) {
+      Alert.alert('Apple sign-in failed', e?.message ?? 'Try again.');
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const handleGoogle = async () => {
+    setBusy('google');
+    try {
+      await signInWithGoogle();
+      onSocialSignedIn();
+    } catch (e: any) {
+      Alert.alert('Google sign-in failed', e?.message ?? 'Try again.');
+    } finally {
+      setBusy(null);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.root}>
       <View style={styles.content}>
@@ -25,6 +60,18 @@ export function WelcomeScreen({ onCreateAccount, onSignIn }: Props) {
         </Text>
 
         <View style={styles.cta}>
+          <SocialAuthButtons
+            onAppleSignIn={handleApple}
+            onGoogleSignIn={handleGoogle}
+            busy={busy}
+          />
+
+          <View style={styles.dividerRow}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>or</Text>
+            <View style={styles.dividerLine} />
+          </View>
+
           <Button
             title="Create account"
             onPress={onCreateAccount}
@@ -91,6 +138,24 @@ const styles = StyleSheet.create({
   cta: {
     gap: 12,
     marginTop: 48,
+  },
+  dividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginVertical: 4,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: Brand.borderDefault,
+  },
+  dividerText: {
+    fontFamily: AmbitFont.body,
+    fontSize: 12,
+    color: Brand.inkMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 1.2,
   },
   fineprint: {
     fontFamily: AmbitFont.body,
