@@ -48,8 +48,8 @@ export function Chip({ label, selected = false, onPress }: Props) {
 
 const styles = StyleSheet.create({
   base: {
-    height: 36,
-    paddingHorizontal: 14,
+    height: 40,
+    paddingHorizontal: 16,
     borderRadius: Radii.pill,
     alignItems: 'center',
     justifyContent: 'center',
@@ -64,8 +64,9 @@ const styles = StyleSheet.create({
   },
   label: {
     fontFamily: AmbitFont.body,
-    fontSize: 13,
+    fontSize: 14,
+    fontWeight: '500',
   },
   labelOff: { color: Brand.inkBody },
-  labelOn: { color: Brand.inkOnBrand },
+  labelOn: { color: Brand.inkOnBrand, fontWeight: '600' },
 });

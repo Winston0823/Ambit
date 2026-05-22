@@ -19,7 +19,7 @@ import {
 } from '../../constants/theme';
 import type { PortfolioItem } from '../../data/mock';
 
-const BUBBLE_SIZE = 72;
+const BUBBLE_SIZE = 88;
 
 interface PortfolioBubbleProps {
   item: PortfolioItem;
@@ -100,7 +100,7 @@ export function AddPortfolioBubble({ onPress, label = 'Add' }: AddPortfolioBubbl
     <Animated.View style={[styles.wrap, { transform: [{ scale }] }]}>
       <Pressable onPress={press} style={styles.thumbWrap} hitSlop={6}>
         <View style={[styles.thumb, styles.addThumb]}>
-          <Plus size={28} color={Brand.accent} weight="bold" />
+          <Plus size={32} color={Brand.accent} weight="bold" />
         </View>
         <Text style={[styles.title, styles.addTitle]} numberOfLines={1}>
           {label}
@@ -116,8 +116,8 @@ const styles = StyleSheet.create({
   },
   thumbWrap: {
     alignItems: 'center',
-    gap: 8,
-    width: 88, // slightly wider than the bubble so title can wrap to 2 lines
+    gap: 10,
+    width: 104, // slightly wider than the bubble so title can wrap to 2 lines
   },
   thumb: {
     width: BUBBLE_SIZE,
@@ -140,11 +140,12 @@ const styles = StyleSheet.create({
   },
   thumbInitial: {
     fontFamily: AmbitFont.display,
-    fontSize: 28,
+    fontSize: 36,
     color: Brand.inkOnBrand,
   },
   title: {
-    ...TypeScale.helper,
+    fontFamily: AmbitFont.body,
+    fontSize: 14,
     fontWeight: '600',
     color: Brand.inkBody,
     textAlign: 'center',

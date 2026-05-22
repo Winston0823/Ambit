@@ -219,23 +219,34 @@ const styles = StyleSheet.create({
   },
   cardContent: {
     padding: Space.lg,
-    gap: Space.lg,
+    gap: 28, // Hinge-scale section breathing room between top-row, vibe, skills, portfolio
   },
 
   // ── Seeker variant ──────────────────────────────────────────────────────
+  // Hinge-scale: avatar reads as a portrait, name is the dominant glyph,
+  // vibe is paragraph-readable, not a caption.
   topRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
+    gap: 16,
   },
   avatar: {
-    width: 56,
-    height: 56,
+    width: 80,
+    height: 80,
     borderRadius: Radii.full,
     backgroundColor: Brand.seekerSurface,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
+    borderWidth: 3,
+    borderColor: Brand.canvas,
+    // Soft shadow lifts the avatar off the card so it reads as a portrait,
+    // not just a placeholder circle. Same treatment Hinge gives the lead photo.
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 8,
+    elevation: 3,
   },
   avatarImg: {
     width: '100%',
@@ -243,51 +254,55 @@ const styles = StyleSheet.create({
   },
   avatarInitial: {
     fontFamily: AmbitFont.display,
-    fontSize: 26,
+    fontSize: 36,
     color: Brand.seekerInk,
   },
   nameCol: {
     flex: 1,
-    gap: 2,
+    gap: 4,
   },
   name: {
     fontFamily: AmbitFont.display,
-    fontSize: 22,
+    fontSize: 28,
     color: Brand.inkPrimary,
-    lineHeight: 28,
+    lineHeight: 34,
   },
   campusRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 5,
   },
   campusText: {
-    ...TypeScale.helper,
+    fontFamily: AmbitFont.body,
+    fontSize: 14,
     color: Brand.inkMuted,
   },
   vibe: {
     fontFamily: AmbitFont.body,
-    fontSize: 15,
+    fontSize: 17,
     fontStyle: 'italic',
     color: Brand.seekerInk,
-    lineHeight: 21,
+    lineHeight: 25,
   },
 
   // ── Shared ──────────────────────────────────────────────────────────────
   section: {
-    gap: 10,
+    gap: 12,
   },
   sectionLabel: {
-    ...TypeScale.labelSm,
+    fontFamily: AmbitFont.body,
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 1.4,
     color: Brand.inkLabel,
   },
   chipRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: Space.sm,
+    gap: 10,
   },
   portfolioRow: {
-    gap: 14,
+    gap: 18,
     paddingRight: Space.lg, // breathing room at the end of the scroll
   },
 

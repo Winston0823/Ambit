@@ -52,7 +52,7 @@ export function SpeechBubble({
   );
 }
 
-const TAIL_SIZE = 9; // half-width of the tail; full base = 2 * 9 = 18pt
+const TAIL_SIZE = 11; // half-width of the tail; full base = 22pt
 
 const styles = StyleSheet.create({
   // The wrap is just a positioning context for the absolutely-positioned tail.
@@ -60,9 +60,9 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   bubble: {
-    borderRadius: Radii.lg,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    borderRadius: Radii.lg + 2,
+    paddingHorizontal: 18,
+    paddingVertical: 18,
   },
   tail: {
     position: 'absolute',
