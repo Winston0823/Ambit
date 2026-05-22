@@ -48,6 +48,19 @@ interface Props {
   onMessageSend: (card: DiscoveryCardData, text: string) => void;
   /// Render this when the deck is exhausted (no more cards to show).
   emptyState?: React.ReactNode;
+  /// Project skills used to highlight matching chips on seeker cards.
+  /// Forwarded to <DiscoveryCard>; ignored for project cards.
+  matchedSkills?: string[];
+  /// Fired when a portfolio bubble on the active (seeker) card is tapped.
+  /// Parent owns the modal state so it can also flip `gesturesDisabled` to
+  /// pause swipes while the modal sheet is open.
+  onPortfolioPress?: (item: import('../../data/mock').PortfolioItem) => void;
+  /// ID of the portfolio item whose modal is currently open. Lets the
+  /// active bubble show a faint accent ring.
+  activePortfolioId?: string | null;
+  /// When true, the PanResponder ignores movement. Used by the parent to
+  /// pause swipes while an overlay (portfolio modal, etc.) is in front.
+  gesturesDisabled?: boolean;
 }
 
 /// Tinder-style swipe deck. One card at a time, no peek.
@@ -62,7 +75,17 @@ interface Props {
 /// Animation idiom: legacy Animated.ValueXY + PanResponder + native driver
 /// for transforms. Matches the rest of this codebase (no Reanimated since
 /// Expo Go can't host the worklet runtime).
-export function SwipeDeck({ deck, onPass, onSave, onMessageSend, emptyState }: Props) {
+export function SwipeDeck({
+  deck,
+  onPass,
+  onSave,
+  onMessageSend,
+  emptyState,
+  matchedSkills,
+  onPortfolioPress,
+  activePortfolioId,
+  gesturesDisabled,
+}: Props) {
   const [index, setIndex] = useState(0);
   const [composerOpen, setComposerOpen] = useState(false);
   const [composerText, setComposerText] = useState('');
@@ -263,6 +286,8 @@ export function SwipeDeck({ deck, onPass, onSave, onMessageSend, emptyState }: P
         // really meant to swipe.
         onStartShouldSetPanResponder: () => false,
         onMoveShouldSetPanResponder: (_e, g) => {
+          // Any overlay in front (portfolio modal, etc.) freezes gestures.
+          if (gesturesDisabled) return false;
           // While composing: only claim downward intent so the user can
           // still scroll/select inside the composer without the card
           // chasing every micro-movement.
@@ -332,9 +357,10 @@ export function SwipeDeck({ deck, onPass, onSave, onMessageSend, emptyState }: P
           else cancelToCenter();
         },
       }),
-    // PanResponder closes over composerOpen + current, so rebuild when those change.
+    // PanResponder closes over composerOpen, current, and gesturesDisabled —
+    // rebuild when any of them change so the closure sees fresh values.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [composerOpen, current?.id],
+    [composerOpen, current?.id, gesturesDisabled],
   );
 
   // ─── Render ──────────────────────────────────────────────────────────────
@@ -363,7 +389,12 @@ export function SwipeDeck({ deck, onPass, onSave, onMessageSend, emptyState }: P
         ]}
         {...panResponder.panHandlers}
       >
-        <DiscoveryCard card={current} />
+        <DiscoveryCard
+          card={current}
+          matchedSkills={matchedSkills}
+          onPortfolioPress={onPortfolioPress}
+          activePortfolioId={activePortfolioId}
+        />
 
         {/* Hold-to-reveal direction overlays. Sit ON TOP of the card at
             half opacity so the photo/gradient reads through them. Live

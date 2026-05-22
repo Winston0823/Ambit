@@ -11,6 +11,7 @@ import { router } from 'expo-router';
 import { BookmarkSimple } from 'phosphor-react-native';
 import * as Haptics from 'expo-haptics';
 import { DiscoveryOverview, SwipeDeck } from '../../components/organisms';
+import { PortfolioModal } from '../../components/molecules';
 import { useProfileRole } from '../../hooks/useProfileRole';
 import { useSavedDeck } from '../../context/SavedDeckContext';
 import {
@@ -21,6 +22,7 @@ import {
 } from '../../constants/theme';
 import {
   type DiscoveryCardData,
+  type PortfolioItem,
   type ProjectCardData,
   type SeekerCardData,
   MOCK_PROJECTS,
@@ -157,7 +159,10 @@ async function fetchSeekerDeck(userId: string): Promise<SeekerCardData[]> {
       campusId: s.campus_id ?? '',
       skills: s.skills ?? [],
       vibeBlurb: s.vibe_blurb ?? '',
-      portfolioHighlight: '',
+      // Portfolio entries live in a separate table (TODO: portfolio_items).
+      // Until that ships, live seekers come through with an empty list and
+      // the discovery card hides the portfolio section gracefully.
+      portfolio: [],
     }));
 }
 
@@ -213,6 +218,37 @@ export default function DiscoveryFeed() {
   const [lastFiveSeen, setLastFiveSeen] = useState<DiscoveryCardData[]>([]);
   const [deckResetKey, setDeckResetKey] = useState(0);
   const [reinserted, setReinserted] = useState<DiscoveryCardData[]>([]);
+
+  /// Owner-side only: required_skills of the owner's most-recently-created
+  /// active project. Used to highlight matching chips on each seeker card.
+  /// `compat_for_project` already uses this same project to rank seekers,
+  /// so the highlight semantics line up with the deck order.
+  const [matchedSkills, setMatchedSkills] = useState<string[]>([]);
+  useEffect(() => {
+    if (role !== 'owner' || !user) {
+      setMatchedSkills([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from('projects')
+        .select('required_skills')
+        .eq('owner_id', user.id)
+        .eq('active', true)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (cancelled) return;
+      const skills = (data as { required_skills?: string[] } | null)?.required_skills ?? [];
+      setMatchedSkills(skills);
+    })();
+    return () => { cancelled = true; };
+  }, [role, user?.id]);
+
+  /// Active portfolio item drives the modal. Null = closed. While non-null,
+  /// SwipeDeck's PanResponder is frozen so swipes don't fire underneath.
+  const [activePortfolio, setActivePortfolio] = useState<PortfolioItem | null>(null);
 
   const activeDeck = useMemo(
     () => [...reinserted, ...deck.filter((c) => !reinserted.some((r) => r.id === c.id))],
@@ -380,8 +416,19 @@ export default function DiscoveryFeed() {
           onPass={handlePass}
           onSave={handleSave}
           onMessageSend={handleMessage}
+          matchedSkills={matchedSkills}
+          onPortfolioPress={setActivePortfolio}
+          activePortfolioId={activePortfolio?.id ?? null}
+          gesturesDisabled={!!activePortfolio}
         />
       )}
+
+      {/* Portfolio modal — read-only in discovery context (no onSave/onDelete).
+          Renders nothing while activePortfolio is null. */}
+      <PortfolioModal
+        item={activePortfolio}
+        onDismiss={() => setActivePortfolio(null)}
+      />
     </View>
   );
 }
