@@ -8,10 +8,9 @@ import {
   View,
 } from 'react-native';
 import { router } from 'expo-router';
-import { BookmarkSimple } from 'phosphor-react-native';
+import { ArrowsClockwise, BookmarkSimple } from 'phosphor-react-native';
 import * as Haptics from 'expo-haptics';
 import { DiscoveryOverview, SwipeDeck } from '../../components/organisms';
-import { PortfolioModal, ReachOutComposer } from '../../components/molecules';
 import { useProfileRole } from '../../hooks/useProfileRole';
 import { useSavedDeck } from '../../context/SavedDeckContext';
 import {
@@ -22,7 +21,6 @@ import {
 } from '../../constants/theme';
 import {
   type DiscoveryCardData,
-  type PortfolioItem,
   type ProjectCardData,
   type SeekerCardData,
   MOCK_PROJECTS,
@@ -159,10 +157,7 @@ async function fetchSeekerDeck(userId: string): Promise<SeekerCardData[]> {
       campusId: s.campus_id ?? '',
       skills: s.skills ?? [],
       vibeBlurb: s.vibe_blurb ?? '',
-      // Portfolio entries live in a separate table (TODO: portfolio_items).
-      // Until that ships, live seekers come through with an empty list and
-      // the discovery card hides the portfolio section gracefully.
-      portfolio: [],
+      portfolioHighlight: '',
     }));
 }
 
@@ -219,41 +214,6 @@ export default function DiscoveryFeed() {
   const [deckResetKey, setDeckResetKey] = useState(0);
   const [reinserted, setReinserted] = useState<DiscoveryCardData[]>([]);
 
-  /// Owner-side only: required_skills of the owner's most-recently-created
-  /// active project. Used to highlight matching chips on each seeker card.
-  /// `compat_for_project` already uses this same project to rank seekers,
-  /// so the highlight semantics line up with the deck order.
-  const [matchedSkills, setMatchedSkills] = useState<string[]>([]);
-  useEffect(() => {
-    if (role !== 'owner' || !user) {
-      setMatchedSkills([]);
-      return;
-    }
-    let cancelled = false;
-    (async () => {
-      const { data } = await supabase
-        .from('projects')
-        .select('required_skills')
-        .eq('owner_id', user.id)
-        .eq('active', true)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (cancelled) return;
-      const skills = (data as { required_skills?: string[] } | null)?.required_skills ?? [];
-      setMatchedSkills(skills);
-    })();
-    return () => { cancelled = true; };
-  }, [role, user?.id]);
-
-  /// Active portfolio item drives the modal. Null = closed. While non-null,
-  /// SwipeDeck's PanResponder is frozen so swipes don't fire underneath.
-  const [activePortfolio, setActivePortfolio] = useState<PortfolioItem | null>(null);
-
-  /// Card whose Reach Out button was tapped — drives the ReachOutComposer
-  /// modal. Same freeze-the-swipe-deck pattern as the portfolio modal.
-  const [reachOutCard, setReachOutCard] = useState<DiscoveryCardData | null>(null);
-
   const activeDeck = useMemo(
     () => [...reinserted, ...deck.filter((c) => !reinserted.some((r) => r.id === c.id))],
     [reinserted, deck],
@@ -290,20 +250,15 @@ export default function DiscoveryFeed() {
     }
   };
 
-  /// Reach-out send. Fires from the ReachOutComposer modal (which itself
-  /// opens when the user taps the pinned footer button on a card). Creates
-  /// or finds the conversation and posts the first message. Stays in the
-  /// discovery deck — the new conversation appears in the Chat tab via the
-  /// inbox's realtime subscription.
-  /// Also records the match outcome as 'applied' so the project doesn't
-  /// reappear in future decks. Seeker-side: project_id = card.id, seeker
-  /// = me. Owner-side: project_id = my first active project, seeker =
-  /// card.id.
-  const handleReachOutSend = async (card: DiscoveryCardData, text: string) => {
-    // Optimistic: close the modal + reset engagement counters immediately.
-    // The async work below happens in the background; if it fails, we surface
-    // an Alert. The user doesn't wait on the network to get back to the deck.
-    setReachOutCard(null);
+  /// Composer-send (swipe-up "Say hi" on a discovery card). Creates or
+  /// finds the conversation and posts the first message. Does NOT navigate
+  /// into the thread — the user stays in the discovery deck and the new
+  /// conversation surfaces in the Chat tab via the inbox's realtime
+  /// subscription. Also records the match outcome as 'applied' so the
+  /// project doesn't reappear in future decks. Seeker-side: project_id =
+  /// card.id, seeker = me. Owner-side: project_id = my first active
+  /// project, seeker = card.id.
+  const handleMessage = async (card: DiscoveryCardData, text: string) => {
     setConsecutiveSkips(0);
     setLastFiveSeen([]);
     if (!user) return;
@@ -388,6 +343,28 @@ export default function DiscoveryFeed() {
     setLastFiveSeen([]);
   };
 
+  /// Restart the deck. Clears skipped matches in the DB so the RPC
+  /// surfaces them again, drops local skip/overview state, and bumps
+  /// deckResetKey so the SwipeDeck remounts at index 0. We keep
+  /// 'applied' rows (those started conversations — don't re-show) and
+  /// 'saved' rows (the user explicitly bookmarked them in another tab).
+  const handleRefresh = useCallback(async () => {
+    if (!user) return;
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    }
+    await supabase
+      .from('matches')
+      .delete()
+      .eq('seeker_id', user.id)
+      .eq('outcome', 'skipped');
+    setReinserted([]);
+    setConsecutiveSkips(0);
+    setLastFiveSeen([]);
+    setDeckResetKey((k) => k + 1);
+    await fetchDeck();
+  }, [user, fetchDeck]);
+
   const goToSaved = () => {
     if (Platform.OS !== 'web') Haptics.selectionAsync().catch(() => {});
     router.push('/saved');
@@ -398,6 +375,15 @@ export default function DiscoveryFeed() {
   return (
     <View style={styles.root}>
       <View style={styles.topBar}>
+        <Pressable
+          onPress={handleRefresh}
+          hitSlop={12}
+          style={styles.refreshBtn}
+          accessibilityRole="button"
+          accessibilityLabel="Refresh deck"
+        >
+          <ArrowsClockwise size={22} color={Brand.inkPrimary} weight="regular" />
+        </Pressable>
         <Text style={styles.wordmark}>ambit</Text>
         <Pressable
           onPress={goToSaved}
@@ -424,28 +410,10 @@ export default function DiscoveryFeed() {
           deck={activeDeck}
           onPass={handlePass}
           onSave={handleSave}
-          onReachOut={setReachOutCard}
-          matchedSkills={matchedSkills}
-          onPortfolioPress={setActivePortfolio}
-          activePortfolioId={activePortfolio?.id ?? null}
-          gesturesDisabled={!!activePortfolio || !!reachOutCard}
+          onMessageSend={handleMessage}
+          emptyState={<DeckExhausted onRefresh={handleRefresh} />}
         />
       )}
-
-      {/* Portfolio modal — read-only in discovery context (no onSave/onDelete).
-          Renders nothing while activePortfolio is null. */}
-      <PortfolioModal
-        item={activePortfolio}
-        onDismiss={() => setActivePortfolio(null)}
-      />
-
-      {/* Reach Out composer — opens when the user taps the pinned footer
-          button on a card. Replaces the retired swipe-up gesture. */}
-      <ReachOutComposer
-        card={reachOutCard}
-        onDismiss={() => setReachOutCard(null)}
-        onSend={handleReachOutSend}
-      />
     </View>
   );
 }
@@ -454,6 +422,24 @@ function Skeleton() {
   return (
     <View style={styles.skeletonWrap}>
       <View style={styles.skeletonCard} />
+    </View>
+  );
+}
+
+/// Empty-state shown by SwipeDeck once the deck is exhausted. The
+/// "Start over" CTA wires into feed.tsx's handleRefresh — clears the
+/// user's skipped matches so the RPC re-surfaces them.
+function DeckExhausted({ onRefresh }: { onRefresh: () => void }) {
+  return (
+    <View style={styles.emptyWrap}>
+      <Text style={styles.emptyTitle}>You're all caught up.</Text>
+      <Text style={styles.emptySub}>
+        Want another look? Bring back the projects you skipped and start fresh.
+      </Text>
+      <Pressable onPress={onRefresh} style={styles.refreshCta}>
+        <ArrowsClockwise size={18} color={Brand.inkOnBrand} weight="bold" />
+        <Text style={styles.refreshCtaLabel}>Start over</Text>
+      </Pressable>
     </View>
   );
 }
@@ -483,6 +469,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  refreshBtn: {
+    position: 'absolute',
+    left: Space.lg,
+    top: 0,
+    bottom: 0,
+    width: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   skeletonWrap: {
     flex: 1,
     paddingHorizontal: Space.lg,
@@ -493,5 +488,41 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Brand.surface1,
     borderRadius: Radii.lg,
+  },
+  emptyWrap: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+    paddingHorizontal: Space.xl,
+  },
+  emptyTitle: {
+    fontFamily: AmbitFont.display,
+    fontSize: 24,
+    color: Brand.inkPrimary,
+    textAlign: 'center',
+  },
+  emptySub: {
+    fontFamily: AmbitFont.body,
+    fontSize: 14,
+    color: Brand.inkMuted,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  refreshCta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: Brand.primary,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: Radii.md,
+    marginTop: 12,
+  },
+  refreshCtaLabel: {
+    fontFamily: AmbitFont.body,
+    fontSize: 15,
+    fontWeight: '600',
+    color: Brand.inkOnBrand,
   },
 });
