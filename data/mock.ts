@@ -11,13 +11,13 @@ export interface Campus {
 /// LA-area campuses. USC + UCLA are the v1 anchor campuses; the rest are
 /// nearby schools where students might commute or collaborate.
 export const CAMPUSES: Campus[] = [
-  { id: 'usc',        name: 'University of Southern California', city: 'Los Angeles' },
-  { id: 'ucla',       name: 'UCLA',                              city: 'Los Angeles' },
-  { id: 'caltech',    name: 'Caltech',                           city: 'Pasadena' },
-  { id: 'lmu',        name: 'Loyola Marymount University',       city: 'Los Angeles' },
-  { id: 'pepperdine', name: 'Pepperdine University',             city: 'Malibu' },
-  { id: 'csula',      name: 'Cal State LA',                      city: 'Los Angeles' },
-  { id: 'oxy',        name: 'Occidental College',                city: 'Los Angeles' },
+  { id: 'usc',        name: 'USC',        city: 'Los Angeles' },
+  { id: 'ucla',       name: 'UCLA',       city: 'Los Angeles' },
+  { id: 'caltech',    name: 'Caltech',    city: 'Pasadena' },
+  { id: 'lmu',        name: 'LMU',        city: 'Los Angeles' },
+  { id: 'pepperdine', name: 'Pepperdine', city: 'Malibu' },
+  { id: 'csula',      name: 'Cal State LA', city: 'Los Angeles' },
+  { id: 'oxy',        name: 'Occidental College', city: 'Los Angeles' },
 ];
 
 /// Skill tag categories. Spec § 8.1 has the full taxonomy; this is a v0 subset.
@@ -37,7 +37,7 @@ export const SKILL_CATEGORIES: SkillCategory[] = [
   },
   {
     label: 'PRODUCT & BUSINESS',
-    tags: ['Product Strategy', 'User Research', 'Growth', 'Marketing', 'Sales', 'Operations'],
+    tags: ['Product Strategy', 'User Research', 'Growth Strategy', 'Marketing', 'Sales', 'Operations'],
   },
 ];
 
@@ -191,7 +191,7 @@ export const MOCK_SEEKERS: SeekerCardData[] = [
     name: 'Sam Liu',
     photoUri: null,
     campusId: 'usc',
-    skills: ['Growth', 'Marketing', 'Operations'],
+    skills: ['Growth Strategy', 'Marketing', 'Operations'],
     vibeBlurb: 'I make the engine that pulls people in. Big spreadsheet energy.',
     portfolio: [
       {
@@ -312,7 +312,7 @@ export const MOCK_PROJECTS: ProjectCardData[] = [
     ownerPhotoUri: null,
     ownerCampusId: 'usc',
     whyMatched: 'Both at USC · same vibe (calm + fast)',
-    skillsSought: ['Web', 'Growth', 'Brand'],
+    skillsSought: ['Web', 'Growth Strategy', 'Brand'],
     gradient: ['#E8C9A0', Brand.primary],
   },
   {
@@ -348,7 +348,7 @@ export const MOCK_PROJECTS: ProjectCardData[] = [
     ownerPhotoUri: null,
     ownerCampusId: 'usc',
     whyMatched: '4 shared skills · same campus',
-    skillsSought: ['Python', 'iOS', 'Growth'],
+    skillsSought: ['Python', 'iOS', 'Growth Strategy'],
     gradient: [Brand.seekerSurface, '#B48045'],
   },
 ];
