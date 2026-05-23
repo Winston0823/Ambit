@@ -64,6 +64,84 @@ export async function startConversationWithMessage(args: {
   return data as string;
 }
 
+/// Most-recent conversation id between the two users, in either
+/// orientation — owner/seeker or seeker/owner. Null if none exists.
+///
+/// The conversations table's unique constraint is (seeker_id, project_id)
+/// — so the existing RPC dedups by (seeker, project), not by user pair.
+/// Reach-out wants user-pair dedup ("my chat with Noah" not "my chat
+/// with Noah about Project A"), so we run our own lookup before falling
+/// back to the create RPC. Two queries because the participant pair can
+/// be stored in either orientation; we pick whichever returned a row, or
+/// the more recent one if both did (rare; only possible if the same
+/// person owns one project AND is a seeker on another the caller owns).
+export async function findExistingConversation(
+  myUserId: string,
+  otherUserId: string,
+): Promise<string | null> {
+  const [iAmOwner, iAmSeeker] = await Promise.all([
+    supabase
+      .from('conversations')
+      .select('id, last_message_at')
+      .eq('owner_id', myUserId)
+      .eq('seeker_id', otherUserId)
+      .order('last_message_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from('conversations')
+      .select('id, last_message_at')
+      .eq('seeker_id', myUserId)
+      .eq('owner_id', otherUserId)
+      .order('last_message_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ]);
+  const candidates = [iAmOwner.data, iAmSeeker.data].filter(
+    (d): d is { id: string; last_message_at: string } => !!d,
+  );
+  if (candidates.length === 0) return null;
+  candidates.sort((a, b) => b.last_message_at.localeCompare(a.last_message_at));
+  return candidates[0].id;
+}
+
+/// Reach out by user pair, not by (seeker, project) pair.
+///
+/// If a conversation already exists between (myUserId, otherUserId) — in
+/// either orientation, anchored to any project — append the message to it
+/// and return that conversation id. Otherwise call the existing RPC to
+/// create a new conversation tied to projectId+seekerId.
+///
+/// The `reused` flag lets the caller decide whether to celebrate ("Sent!")
+/// or signal continuity ("Added to your chat with Noah").
+export async function reachOutOrReuse(args: {
+  myUserId:    string;
+  otherUserId: string;
+  /// Used only when creating a new conversation. Ignored if an existing
+  /// one is reused (we don't reassign the chat's project_id mid-thread).
+  projectId:   string;
+  /// Seeker side of the new conversation. For seeker-initiated reaches
+  /// this is myUserId; for owner-initiated this is otherUserId.
+  seekerId:    string;
+  body:        string;
+}): Promise<{ conversationId: string; reused: boolean }> {
+  const existing = await findExistingConversation(args.myUserId, args.otherUserId);
+  if (existing) {
+    await sendTextMessage({
+      conversationId: existing,
+      senderId:       args.myUserId,
+      body:           args.body,
+    });
+    return { conversationId: existing, reused: true };
+  }
+  const fresh = await startConversationWithMessage({
+    projectId: args.projectId,
+    seekerId:  args.seekerId,
+    body:      args.body,
+  });
+  return { conversationId: fresh, reused: false };
+}
+
 export async function getInbox(): Promise<InboxItem[]> {
   const { data, error } = await supabase.rpc('get_inbox');
   if (error) throw error;
@@ -127,6 +205,10 @@ export async function sendImageMessage(args: {
   conversationId: string;
   senderId:       string;
   localUri:       string;
+  /// Optional caption text. Schema allows body and attachment_url on the
+  /// same row (check constraint is body OR attachment_url OR deleted_at),
+  /// so we can send a photo + caption as one message instead of two.
+  body?:          string;
   parentId?:      string | null;
   /// Same dedupe contract as sendTextMessage — see that doc.
   clientId?:      string;
@@ -146,6 +228,7 @@ export async function sendImageMessage(args: {
     });
   if (upErr) throw upErr;
 
+  const trimmedBody = args.body?.trim();
   const { data, error } = await supabase
     .from('messages')
     .insert({
@@ -153,6 +236,7 @@ export async function sendImageMessage(args: {
       conversation_id: args.conversationId,
       sender_id:       args.senderId,
       attachment_url:  path,
+      body:            trimmedBody && trimmedBody.length > 0 ? trimmedBody : null,
       parent_id:       args.parentId ?? null,
     })
     .select('*')

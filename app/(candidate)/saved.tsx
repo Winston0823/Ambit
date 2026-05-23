@@ -19,7 +19,7 @@ import { DiscoveryRowSummary } from '../../components/molecules';
 import { useSavedDeck } from '../../context/SavedDeckContext';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
-import { startConversationWithMessage } from '../../lib/messaging';
+import { reachOutOrReuse } from '../../lib/messaging';
 import type { DiscoveryCardData } from '../../data/mock';
 import {
   AmbitFont,
@@ -72,12 +72,24 @@ export default function SavedScreen() {
     if (!text || !card || !user || sending) return;
     setSending(true);
     try {
-      let projectId: string;
-      let seekerId:  string;
+      let projectId:   string;
+      let seekerId:    string;
+      let otherUserId: string;
 
       if (card.kind === 'project') {
-        projectId = card.id;
-        seekerId  = user.id;
+        // Project card needs ownerId for user-pair dedup; placeholders
+        // don't have a real owner UUID.
+        if (!UUID_RE.test(card.ownerId)) {
+          Alert.alert(
+            'Demo card',
+            "This is a placeholder card — messaging isn't wired for it yet.",
+          );
+          setSending(false);
+          return;
+        }
+        projectId   = card.id;
+        seekerId    = user.id;
+        otherUserId = card.ownerId;
         supabase
           .from('matches')
           .upsert(
@@ -86,7 +98,8 @@ export default function SavedScreen() {
           )
           .then(() => {});
       } else {
-        // Owner-saved seeker. Use owner's first active project as context.
+        // Owner-saved seeker. Use owner's first active project as context
+        // for a NEW chat; ignored if an existing chat is reused.
         const { data: proj } = await supabase
           .from('projects')
           .select('id')
@@ -103,21 +116,26 @@ export default function SavedScreen() {
           setSending(false);
           return;
         }
-        projectId = (proj as { id: string }).id;
-        seekerId  = card.id;
+        projectId   = (proj as { id: string }).id;
+        seekerId    = card.id;
+        otherUserId = card.id;
       }
 
-      const conversationId = await startConversationWithMessage({
+      // Dedup by user pair — append to any existing chat with this
+      // person regardless of which project anchored it.
+      const { conversationId } = await reachOutOrReuse({
+        myUserId:    user.id,
+        otherUserId,
         projectId,
         seekerId,
-        body: text,
+        body:        text,
       });
       unsave(card.id);
       setComposing(null);
       setDraft('');
       // replace so a Back tap from the thread returns to the feed,
       // not to a stale saved list with the now-unsaved card missing.
-      router.replace({ pathname: '/thread', params: { id: conversationId } });
+      router.replace({ pathname: '/chat/[id]', params: { id: conversationId } });
     } catch (e: any) {
       Alert.alert('Could not send', e?.message ?? 'Try again.');
     } finally {

@@ -82,6 +82,10 @@ export interface SeekerCardData {
 export interface ProjectCardData {
   kind: 'project';
   id: string;
+  /// UUID of the owner profile. Empty string for placeholder mock cards
+  /// (isRealUuid filters those out of messaging flows). Populated from
+  /// `compat_projects_for_seeker.owner_id` on the live deck.
+  ownerId: string;
   title: string;
   pitch: string;
   ownerName: string;
@@ -269,6 +273,7 @@ export const MOCK_SEEKERS: SeekerCardData[] = [
 export const MOCK_PROJECTS: ProjectCardData[] = [
   {
     kind: 'project',
+    ownerId: '',
     id: 'project-1',
     title: 'AI Study Tool',
     pitch: 'A study companion that learns the way you actually study — not the way textbooks assume you do.',
@@ -281,6 +286,7 @@ export const MOCK_PROJECTS: ProjectCardData[] = [
   },
   {
     kind: 'project',
+    ownerId: '',
     id: 'project-2',
     title: 'Hardware for student labs',
     pitch: 'Cheaper, open-source bench equipment so undergrad labs stop running on duct tape.',
@@ -293,6 +299,7 @@ export const MOCK_PROJECTS: ProjectCardData[] = [
   },
   {
     kind: 'project',
+    ownerId: '',
     id: 'project-3',
     title: 'Campus mental-health app',
     pitch: 'Anonymous, peer-led support that meets students where they actually are: their phones, at 2 a.m.',
@@ -305,6 +312,7 @@ export const MOCK_PROJECTS: ProjectCardData[] = [
   },
   {
     kind: 'project',
+    ownerId: '',
     id: 'project-4',
     title: 'Late-night food map',
     pitch: 'A map of every place still serving food past midnight near campus — built by students, for students.',
@@ -317,6 +325,7 @@ export const MOCK_PROJECTS: ProjectCardData[] = [
   },
   {
     kind: 'project',
+    ownerId: '',
     id: 'project-5',
     title: 'Sustainable thrift marketplace',
     pitch: 'Peer-to-peer clothing exchange that doesn\'t feel like a flea market and isn\'t run by middlemen.',
@@ -329,6 +338,7 @@ export const MOCK_PROJECTS: ProjectCardData[] = [
   },
   {
     kind: 'project',
+    ownerId: '',
     id: 'project-6',
     title: 'Indie-game studio v0',
     pitch: 'Looking for a small, weird team to make one strange, small game and ship it before graduation.',
@@ -341,6 +351,7 @@ export const MOCK_PROJECTS: ProjectCardData[] = [
   },
   {
     kind: 'project',
+    ownerId: '',
     id: 'project-7',
     title: 'Lecture-recap bot',
     pitch: 'A bot that watches your lecture recording and gives you a 3-bullet summary before you finish your coffee.',

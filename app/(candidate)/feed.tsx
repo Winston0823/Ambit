@@ -28,7 +28,7 @@ import {
   MOCK_SEEKERS,
 } from '../../data/mock';
 import { supabase } from '../../lib/supabase';
-import { startConversationWithMessage } from '../../lib/messaging';
+import { reachOutOrReuse } from '../../lib/messaging';
 import { useAuth } from '../../context/AuthContext';
 
 const SKIP_OVERVIEW_THRESHOLD = 5;
@@ -96,6 +96,7 @@ async function fetchProjectDeck(userId: string): Promise<ProjectCardData[]> {
     return {
       kind: 'project',
       id: r.project_id,
+      ownerId: r.owner_id,
       title: r.title,
       pitch: r.vibe_blurb || r.title,
       ownerName: ownerMap[r.owner_id]?.name ?? 'Unknown',
@@ -276,21 +277,23 @@ export default function DiscoveryFeed() {
     if (!user) return;
 
     try {
-      let projectId: string;
-      let seekerId:  string;
+      let projectId:   string;
+      let seekerId:    string;
+      let otherUserId: string;
 
       if (card.kind === 'project') {
         // Placeholder mock cards have ids like 'project-1'. Skip messaging
         // until the deck is wired to real Supabase project rows.
-        if (!isRealUuid(card.id)) {
+        if (!isRealUuid(card.id) || !isRealUuid(card.ownerId)) {
           Alert.alert(
             'Demo card',
             "This is a placeholder card — messaging isn't wired for it yet.",
           );
           return;
         }
-        projectId = card.id;
-        seekerId  = user.id;
+        projectId   = card.id;
+        seekerId    = user.id;
+        otherUserId = card.ownerId;
         // Mirror the existing match-outcome write so the project gets
         // filtered out of future decks.
         supabase
@@ -310,7 +313,9 @@ export default function DiscoveryFeed() {
           return;
         }
         // Owner messaging a seeker card. Look up the owner's first active
-        // project as the conversation context.
+        // project as the conversation context for a NEW conversation.
+        // (If a chat already exists with this seeker, reachOutOrReuse
+        // reuses it and this projectId is ignored.)
         const { data: proj } = await supabase
           .from('projects')
           .select('id')
@@ -326,20 +331,26 @@ export default function DiscoveryFeed() {
           );
           return;
         }
-        projectId = (proj as { id: string }).id;
-        seekerId  = card.id;
+        projectId   = (proj as { id: string }).id;
+        seekerId    = card.id;
+        otherUserId = card.id;
       }
 
-      await startConversationWithMessage({
+      // Dedup by user pair — if I already have a chat with this person
+      // (in either orientation, anchored to any project) the message
+      // lands in that existing thread instead of starting a new one.
+      await reachOutOrReuse({
+        myUserId:    user.id,
+        otherUserId,
         projectId,
         seekerId,
-        body: text,
+        body:        text,
       });
       // Intentionally no router.push here — the composer dismisses on its
-      // own and the new conversation appears in the Chat tab via the
-      // inbox realtime subscription.
+      // own and the message lands in the existing thread (or a fresh one)
+      // surfacing via the inbox's realtime subscription.
     } catch (e: any) {
-      console.warn('start_conversation_with_message failed:', e?.message ?? e);
+      console.warn('reach out failed:', e?.message ?? e);
     }
   };
 
