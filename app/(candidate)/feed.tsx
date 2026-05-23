@@ -11,6 +11,7 @@ import { router } from 'expo-router';
 import { ArrowsClockwise, BookmarkSimple } from 'phosphor-react-native';
 import * as Haptics from 'expo-haptics';
 import { DiscoveryOverview, SwipeDeck } from '../../components/organisms';
+import { ReachOutComposer } from '../../components/molecules';
 import { useProfileRole } from '../../hooks/useProfileRole';
 import { useSavedDeck } from '../../context/SavedDeckContext';
 import {
@@ -157,7 +158,9 @@ async function fetchSeekerDeck(userId: string): Promise<SeekerCardData[]> {
       campusId: s.campus_id ?? '',
       skills: s.skills ?? [],
       vibeBlurb: s.vibe_blurb ?? '',
-      portfolioHighlight: '',
+      // Real portfolio rows live in a separate table (TODO: portfolio_items).
+      // For now live seekers come through with no portfolio bubbles.
+      portfolio: [],
     }));
 }
 
@@ -214,6 +217,11 @@ export default function DiscoveryFeed() {
   const [deckResetKey, setDeckResetKey] = useState(0);
   const [reinserted, setReinserted] = useState<DiscoveryCardData[]>([]);
 
+  /// Card whose Reach Out button was tapped. Non-null = modal composer open.
+  /// SwipeDeck pauses its PanResponder via gesturesDisabled while non-null so
+  /// the deck doesn't swipe out from under the composer.
+  const [reachOutCard, setReachOutCard] = useState<DiscoveryCardData | null>(null);
+
   const activeDeck = useMemo(
     () => [...reinserted, ...deck.filter((c) => !reinserted.some((r) => r.id === c.id))],
     [reinserted, deck],
@@ -259,6 +267,10 @@ export default function DiscoveryFeed() {
   /// card.id, seeker = me. Owner-side: project_id = my first active
   /// project, seeker = card.id.
   const handleMessage = async (card: DiscoveryCardData, text: string) => {
+    // Dismiss the composer optimistically — the user shouldn't wait on the
+    // network round-trip to get back to the deck. If the RPC fails below
+    // we surface an Alert; reopening the modal isn't necessary.
+    setReachOutCard(null);
     setConsecutiveSkips(0);
     setLastFiveSeen([]);
     if (!user) return;
@@ -410,10 +422,20 @@ export default function DiscoveryFeed() {
           deck={activeDeck}
           onPass={handlePass}
           onSave={handleSave}
-          onMessageSend={handleMessage}
+          onReachOut={setReachOutCard}
+          gesturesDisabled={!!reachOutCard}
           emptyState={<DeckExhausted onRefresh={handleRefresh} />}
         />
       )}
+
+      {/* Reach Out composer — opens when the user taps the pinned footer
+          button on a card. Sending fires handleMessage which creates (or
+          finds) the conversation and resets the skip counter. */}
+      <ReachOutComposer
+        card={reachOutCard}
+        onDismiss={() => setReachOutCard(null)}
+        onSend={handleMessage}
+      />
     </View>
   );
 }
