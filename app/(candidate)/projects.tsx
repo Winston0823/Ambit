@@ -8,8 +8,9 @@ import {
   View,
 } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
-import { Plus } from 'phosphor-react-native';
+import { Compass, Plus } from 'phosphor-react-native';
 import { useAuth } from '../../context/AuthContext';
+import { useProfileRole } from '../../hooks/useProfileRole';
 import { supabase } from '../../lib/supabase';
 import { AmbitFont, Brand, Radii, Space } from '../../constants/theme';
 
@@ -28,6 +29,13 @@ interface ProjectRow {
 /// the form screens shows up without a manual pull-to-refresh.
 export default function ProjectsTab() {
   const { user } = useAuth();
+  const { role } = useProfileRole();
+  /// Pure seekers don't create projects — they join them. The CTA on this
+  /// tab redirects them to the discovery feed instead of the project-new
+  /// form. Owners and 'both' users still see the "New project" creation
+  /// flow. 'both' defaults to owner-mode here since they can already get
+  /// to discovery via the nav bar.
+  const isPureSeeker = role === 'seeker';
   const [projects, setProjects] = useState<ProjectRow[] | null>(null);
 
   const load = useCallback(async () => {
@@ -63,12 +71,18 @@ export default function ProjectsTab() {
       <Text style={styles.title}>Your projects</Text>
 
       <Pressable
-        onPress={() => router.push('/project-new')}
+        onPress={() => router.push(isPureSeeker ? '/feed' : '/project-new')}
         style={styles.newBtn}
         accessibilityRole="button"
       >
-        <Plus size={18} color={Brand.inkOnBrand} weight="bold" />
-        <Text style={styles.newBtnLabel}>New project</Text>
+        {isPureSeeker ? (
+          <Compass size={18} color={Brand.inkOnBrand} weight="bold" />
+        ) : (
+          <Plus size={18} color={Brand.inkOnBrand} weight="bold" />
+        )}
+        <Text style={styles.newBtnLabel}>
+          {isPureSeeker ? 'Find new project' : 'New project'}
+        </Text>
       </Pressable>
 
       {projects.length === 0 ? (
