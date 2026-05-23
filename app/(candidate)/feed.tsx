@@ -11,7 +11,7 @@ import { router } from 'expo-router';
 import { BookmarkSimple } from 'phosphor-react-native';
 import * as Haptics from 'expo-haptics';
 import { DiscoveryOverview, SwipeDeck } from '../../components/organisms';
-import { PortfolioModal } from '../../components/molecules';
+import { PortfolioModal, ReachOutComposer } from '../../components/molecules';
 import { useProfileRole } from '../../hooks/useProfileRole';
 import { useSavedDeck } from '../../context/SavedDeckContext';
 import {
@@ -250,6 +250,10 @@ export default function DiscoveryFeed() {
   /// SwipeDeck's PanResponder is frozen so swipes don't fire underneath.
   const [activePortfolio, setActivePortfolio] = useState<PortfolioItem | null>(null);
 
+  /// Card whose Reach Out button was tapped — drives the ReachOutComposer
+  /// modal. Same freeze-the-swipe-deck pattern as the portfolio modal.
+  const [reachOutCard, setReachOutCard] = useState<DiscoveryCardData | null>(null);
+
   const activeDeck = useMemo(
     () => [...reinserted, ...deck.filter((c) => !reinserted.some((r) => r.id === c.id))],
     [reinserted, deck],
@@ -286,15 +290,20 @@ export default function DiscoveryFeed() {
     }
   };
 
-  /// Composer-send (swipe-up "Say hi" on a discovery card). Creates or
-  /// finds the conversation and posts the first message. Does NOT navigate
-  /// into the thread — the user stays in the discovery deck and the new
-  /// conversation surfaces in the Chat tab via the inbox's realtime
-  /// subscription. Also records the match outcome as 'applied' so the
-  /// project doesn't reappear in future decks. Seeker-side: project_id =
-  /// card.id, seeker = me. Owner-side: project_id = my first active
-  /// project, seeker = card.id.
-  const handleMessage = async (card: DiscoveryCardData, text: string) => {
+  /// Reach-out send. Fires from the ReachOutComposer modal (which itself
+  /// opens when the user taps the pinned footer button on a card). Creates
+  /// or finds the conversation and posts the first message. Stays in the
+  /// discovery deck — the new conversation appears in the Chat tab via the
+  /// inbox's realtime subscription.
+  /// Also records the match outcome as 'applied' so the project doesn't
+  /// reappear in future decks. Seeker-side: project_id = card.id, seeker
+  /// = me. Owner-side: project_id = my first active project, seeker =
+  /// card.id.
+  const handleReachOutSend = async (card: DiscoveryCardData, text: string) => {
+    // Optimistic: close the modal + reset engagement counters immediately.
+    // The async work below happens in the background; if it fails, we surface
+    // an Alert. The user doesn't wait on the network to get back to the deck.
+    setReachOutCard(null);
     setConsecutiveSkips(0);
     setLastFiveSeen([]);
     if (!user) return;
@@ -415,11 +424,11 @@ export default function DiscoveryFeed() {
           deck={activeDeck}
           onPass={handlePass}
           onSave={handleSave}
-          onMessageSend={handleMessage}
+          onReachOut={setReachOutCard}
           matchedSkills={matchedSkills}
           onPortfolioPress={setActivePortfolio}
           activePortfolioId={activePortfolio?.id ?? null}
-          gesturesDisabled={!!activePortfolio}
+          gesturesDisabled={!!activePortfolio || !!reachOutCard}
         />
       )}
 
@@ -428,6 +437,14 @@ export default function DiscoveryFeed() {
       <PortfolioModal
         item={activePortfolio}
         onDismiss={() => setActivePortfolio(null)}
+      />
+
+      {/* Reach Out composer — opens when the user taps the pinned footer
+          button on a card. Replaces the retired swipe-up gesture. */}
+      <ReachOutComposer
+        card={reachOutCard}
+        onDismiss={() => setReachOutCard(null)}
+        onSend={handleReachOutSend}
       />
     </View>
   );

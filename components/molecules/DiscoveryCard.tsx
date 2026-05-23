@@ -1,13 +1,16 @@
 import React from 'react';
 import {
   Image,
+  Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { MapPin, Sparkle } from 'phosphor-react-native';
+import { MapPin, PaperPlaneTilt, Sparkle } from 'phosphor-react-native';
+import * as Haptics from 'expo-haptics';
 import { Chip } from '../atoms';
 import { PortfolioBubble } from './PortfolioBubble';
 import { SpeechBubble } from './SpeechBubble';
@@ -21,6 +24,8 @@ import {
 import type { DiscoveryCardData, PortfolioItem } from '../../data/mock';
 import { CAMPUSES } from '../../data/mock';
 
+const FOOTER_HEIGHT = 76; // pinned Reach Out footer
+
 interface Props {
   card: DiscoveryCardData;
   /// Project skills the seeker's chips should be highlighted against. Only
@@ -33,63 +38,102 @@ interface Props {
   /// ID of the portfolio item whose modal is currently visible — that bubble
   /// gets a faint brand ring so the user keeps spatial context.
   activePortfolioId?: string | null;
+  /// Called when the user taps the pinned "Reach out" footer button. Parent
+  /// opens the ReachOutComposer modal in response. Decoupled from the
+  /// swipe-deck gestures, which now only handle horizontal pass/save.
+  onReachOut?: (card: DiscoveryCardData) => void;
 }
 
 /// The visual half of a Discovery card. Pure render — no gestures, no state.
 /// Two variants via discriminated union on `kind`:
 ///
-///   - 'seeker'  → Owner sees this. Avatar+name top row, speech-bubble vibe,
-///                 highlighted skills, portfolio bubble row.
-///   - 'project' → Seeker sees this. Gradient hero + pitch + why-matched
-///                 (unchanged from the original layout).
+///   - 'seeker'  → Owner sees this. Photo hero + speech-bubble vibe +
+///                 highlighted skills + portfolio bubble row.
+///   - 'project' → Seeker sees this. Gradient hero + pitch + why-matched.
+///
+/// Both variants share the card chrome: cream surface, rounded border,
+/// scrollable body, and a pinned "Reach out" footer that opens the
+/// composer modal. Variants render content only.
 export function DiscoveryCard({
   card,
   matchedSkills,
   onPortfolioPress,
   activePortfolioId,
+  onReachOut,
 }: Props) {
-  return card.kind === 'seeker' ? (
-    <SeekerVariant
-      card={card}
-      matchedSkills={matchedSkills}
-      onPortfolioPress={onPortfolioPress}
-      activePortfolioId={activePortfolioId}
-    />
-  ) : (
-    <ProjectVariant card={card} />
+  return (
+    <View style={styles.card}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollPad}
+        showsVerticalScrollIndicator={false}
+      >
+        {card.kind === 'seeker' ? (
+          <SeekerContent
+            card={card}
+            matchedSkills={matchedSkills}
+            onPortfolioPress={onPortfolioPress}
+            activePortfolioId={activePortfolioId}
+          />
+        ) : (
+          <ProjectContent card={card} />
+        )}
+      </ScrollView>
+
+      <ReachOutFooter onPress={() => onReachOut?.(card)} />
+    </View>
   );
 }
 
-// ─── Seeker variant (owner's view of seekers) ──────────────────────────────
+// ─── Pinned footer with Reach Out button ──────────────────────────────────
 
-interface SeekerProps {
+function ReachOutFooter({ onPress }: { onPress: () => void }) {
+  const press = () => {
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    }
+    onPress();
+  };
+  return (
+    <View style={styles.footer} pointerEvents="box-none">
+      {/* Soft fade above the button so scrolling content fades behind it
+          instead of jamming against a hard edge */}
+      <LinearGradient
+        colors={['rgba(250, 246, 240, 0)', 'rgba(250, 246, 240, 0.98)']}
+        style={styles.footerFade}
+        pointerEvents="none"
+      />
+      <Pressable onPress={press} style={({ pressed }) => [styles.footerBtn, pressed && { opacity: 0.92 }]}>
+        <PaperPlaneTilt size={18} color={Brand.inkOnBrand} weight="fill" />
+        <Text style={styles.footerLabel}>Reach out</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+// ─── Seeker content (owner's view of seekers) ─────────────────────────────
+
+interface SeekerContentProps {
   card: Extract<DiscoveryCardData, { kind: 'seeker' }>;
   matchedSkills?: string[];
   onPortfolioPress?: (item: PortfolioItem) => void;
   activePortfolioId?: string | null;
 }
 
-function SeekerVariant({
+function SeekerContent({
   card,
   matchedSkills,
   onPortfolioPress,
   activePortfolioId,
-}: SeekerProps) {
+}: SeekerContentProps) {
   const initial = card.name[0]?.toUpperCase() ?? '?';
   const campus = CAMPUSES.find((c) => c.id === card.campusId);
   const matchedSet = new Set((matchedSkills ?? []).map((s) => s.toLowerCase()));
   const isMatched = (skill: string) => matchedSet.has(skill.toLowerCase());
 
   return (
-    <ScrollView
-      style={styles.card}
-      contentContainerStyle={styles.cardContent}
-      showsVerticalScrollIndicator={false}
-    >
-      {/* Photo hero — full-width band. Hinge-style: the person leads, the
-          name + campus float on a dark gradient scrim at the bottom-left.
-          When photoUri is missing, fall back to a warm gradient with the
-          name initial as the placeholder visual. */}
+    <>
+      {/* Photo hero — full-width band with name + campus on a dark scrim */}
       <View style={styles.heroBand}>
         {card.photoUri ? (
           <Image source={{ uri: card.photoUri }} style={styles.heroImg} />
@@ -103,7 +147,6 @@ function SeekerVariant({
             <Text style={styles.heroInitial}>{initial}</Text>
           </LinearGradient>
         )}
-        {/* Dark scrim makes the overlaid name readable over any photo */}
         <LinearGradient
           colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.55)']}
           style={styles.heroScrim}
@@ -120,7 +163,6 @@ function SeekerVariant({
         </View>
       </View>
 
-      {/* Body — padded; sections breathe at 28pt apart */}
       <View style={styles.body}>
         {card.vibeBlurb !== '' && (
           <View>
@@ -162,13 +204,13 @@ function SeekerVariant({
           </View>
         )}
       </View>
-    </ScrollView>
+    </>
   );
 }
 
-// ─── Project variant (seeker's view of projects) — unchanged from prior pass
+// ─── Project content (seeker's view of projects) ──────────────────────────
 
-function ProjectVariant({ card }: { card: Extract<DiscoveryCardData, { kind: 'project' }> }) {
+function ProjectContent({ card }: { card: Extract<DiscoveryCardData, { kind: 'project' }> }) {
   const initials = card.title
     .split(' ')
     .slice(0, 2)
@@ -177,7 +219,7 @@ function ProjectVariant({ card }: { card: Extract<DiscoveryCardData, { kind: 'pr
   const campus = CAMPUSES.find((c) => c.id === card.ownerCampusId);
 
   return (
-    <View style={styles.card}>
+    <>
       <LinearGradient
         colors={card.gradient}
         start={{ x: 0, y: 0 }}
@@ -215,7 +257,7 @@ function ProjectVariant({ card }: { card: Extract<DiscoveryCardData, { kind: 'pr
           </View>
         </View>
       </View>
-    </View>
+    </>
   );
 }
 
@@ -229,14 +271,47 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Brand.borderSoft,
     overflow: 'hidden',
+    // Card is the positioning context for the absolute-pinned footer.
+    position: 'relative',
   },
-  cardContent: {
-    // No padding — sections manage their own. The photo hero must bleed
-    // edge-to-edge while the body below gets standard padding.
-    paddingBottom: Space.lg,
+  scroll: { flex: 1 },
+  scrollPad: {
+    // Bottom padding clears the pinned footer so the last item never gets
+    // hidden behind it.
+    paddingBottom: FOOTER_HEIGHT + Space.lg,
   },
 
-  // ── Photo hero (Tier 1 Hinge-aligned) ───────────────────────────────────
+  // ── Pinned Reach Out footer ─────────────────────────────────────────────
+  footer: {
+    position: 'absolute',
+    left: 0, right: 0, bottom: 0,
+    paddingHorizontal: Space.lg,
+    paddingBottom: 16,
+    paddingTop: 12,
+  },
+  footerFade: {
+    position: 'absolute',
+    left: 0, right: 0, top: -28,
+    height: 40,
+  },
+  footerBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    minHeight: 52,
+    backgroundColor: Brand.primary,
+    borderRadius: Radii.md,
+  },
+  footerLabel: {
+    fontFamily: AmbitFont.body,
+    fontSize: 16,
+    fontWeight: '600',
+    color: Brand.inkOnBrand,
+    letterSpacing: 0.2,
+  },
+
+  // ── Photo hero (seeker) ────────────────────────────────────────────────
   heroBand: {
     width: '100%',
     height: 320,
@@ -283,14 +358,14 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
 
-  // ── Body (everything below the photo hero) ──────────────────────────────
+  // ── Body (everything below the hero) ───────────────────────────────────
   body: {
     paddingHorizontal: Space.lg,
     paddingTop: Space.lg + 4,
     gap: 28,
   },
 
-  // ── Hinge-style prompt label + display-serif answer ─────────────────────
+  // ── Hinge-style prompt label + display-serif answer ────────────────────
   promptLabel: {
     fontFamily: AmbitFont.body,
     fontSize: 11,
@@ -300,7 +375,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   vibePrompt: {
-    fontFamily: AmbitFont.display, // Zodiak Bold — the prompt voice
+    fontFamily: AmbitFont.display,
     fontSize: 20,
     color: Brand.seekerInk,
     lineHeight: 28,
@@ -324,10 +399,10 @@ const styles = StyleSheet.create({
   },
   portfolioRow: {
     gap: 18,
-    paddingRight: Space.lg, // breathing room at the end of the scroll
+    paddingRight: Space.lg,
   },
 
-  // ── Project variant (unchanged styling) ─────────────────────────────────
+  // ── Project variant ────────────────────────────────────────────────────
   projectHero: {
     height: 180,
     alignItems: 'center',

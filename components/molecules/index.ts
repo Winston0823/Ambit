@@ -10,3 +10,4 @@ export { SocialAuthButtons } from './SocialAuthButtons';
 export { SpeechBubble } from './SpeechBubble';
 export { PortfolioBubble, AddPortfolioBubble } from './PortfolioBubble';
 export { PortfolioModal } from './PortfolioModal';
+export { ReachOutComposer } from './ReachOutComposer';
