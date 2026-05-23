@@ -8,7 +8,7 @@ import {
   View,
 } from 'react-native';
 import { router } from 'expo-router';
-import { BookmarkSimple } from 'phosphor-react-native';
+import { ArrowsClockwise, BookmarkSimple } from 'phosphor-react-native';
 import * as Haptics from 'expo-haptics';
 import { DiscoveryOverview, SwipeDeck } from '../../components/organisms';
 import { useProfileRole } from '../../hooks/useProfileRole';
@@ -343,6 +343,28 @@ export default function DiscoveryFeed() {
     setLastFiveSeen([]);
   };
 
+  /// Restart the deck. Clears skipped matches in the DB so the RPC
+  /// surfaces them again, drops local skip/overview state, and bumps
+  /// deckResetKey so the SwipeDeck remounts at index 0. We keep
+  /// 'applied' rows (those started conversations — don't re-show) and
+  /// 'saved' rows (the user explicitly bookmarked them in another tab).
+  const handleRefresh = useCallback(async () => {
+    if (!user) return;
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    }
+    await supabase
+      .from('matches')
+      .delete()
+      .eq('seeker_id', user.id)
+      .eq('outcome', 'skipped');
+    setReinserted([]);
+    setConsecutiveSkips(0);
+    setLastFiveSeen([]);
+    setDeckResetKey((k) => k + 1);
+    await fetchDeck();
+  }, [user, fetchDeck]);
+
   const goToSaved = () => {
     if (Platform.OS !== 'web') Haptics.selectionAsync().catch(() => {});
     router.push('/saved');
@@ -353,6 +375,15 @@ export default function DiscoveryFeed() {
   return (
     <View style={styles.root}>
       <View style={styles.topBar}>
+        <Pressable
+          onPress={handleRefresh}
+          hitSlop={12}
+          style={styles.refreshBtn}
+          accessibilityRole="button"
+          accessibilityLabel="Refresh deck"
+        >
+          <ArrowsClockwise size={22} color={Brand.inkPrimary} weight="regular" />
+        </Pressable>
         <Text style={styles.wordmark}>ambit</Text>
         <Pressable
           onPress={goToSaved}
@@ -380,6 +411,7 @@ export default function DiscoveryFeed() {
           onPass={handlePass}
           onSave={handleSave}
           onMessageSend={handleMessage}
+          emptyState={<DeckExhausted onRefresh={handleRefresh} />}
         />
       )}
     </View>
@@ -390,6 +422,24 @@ function Skeleton() {
   return (
     <View style={styles.skeletonWrap}>
       <View style={styles.skeletonCard} />
+    </View>
+  );
+}
+
+/// Empty-state shown by SwipeDeck once the deck is exhausted. The
+/// "Start over" CTA wires into feed.tsx's handleRefresh — clears the
+/// user's skipped matches so the RPC re-surfaces them.
+function DeckExhausted({ onRefresh }: { onRefresh: () => void }) {
+  return (
+    <View style={styles.emptyWrap}>
+      <Text style={styles.emptyTitle}>You're all caught up.</Text>
+      <Text style={styles.emptySub}>
+        Want another look? Bring back the projects you skipped and start fresh.
+      </Text>
+      <Pressable onPress={onRefresh} style={styles.refreshCta}>
+        <ArrowsClockwise size={18} color={Brand.inkOnBrand} weight="bold" />
+        <Text style={styles.refreshCtaLabel}>Start over</Text>
+      </Pressable>
     </View>
   );
 }
@@ -419,6 +469,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  refreshBtn: {
+    position: 'absolute',
+    left: Space.lg,
+    top: 0,
+    bottom: 0,
+    width: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   skeletonWrap: {
     flex: 1,
     paddingHorizontal: Space.lg,
@@ -429,5 +488,41 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Brand.surface1,
     borderRadius: Radii.lg,
+  },
+  emptyWrap: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+    paddingHorizontal: Space.xl,
+  },
+  emptyTitle: {
+    fontFamily: AmbitFont.display,
+    fontSize: 24,
+    color: Brand.inkPrimary,
+    textAlign: 'center',
+  },
+  emptySub: {
+    fontFamily: AmbitFont.body,
+    fontSize: 14,
+    color: Brand.inkMuted,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  refreshCta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: Brand.primary,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: Radii.md,
+    marginTop: 12,
+  },
+  refreshCtaLabel: {
+    fontFamily: AmbitFont.body,
+    fontSize: 15,
+    fontWeight: '600',
+    color: Brand.inkOnBrand,
   },
 });
