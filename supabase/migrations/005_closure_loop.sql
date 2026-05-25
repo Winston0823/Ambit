@@ -448,10 +448,15 @@ begin
   join profiles partner on partner.id =
     (case when c.owner_id = (select id from me) then c.seeker_id else c.owner_id end)
   left join lateral (
-    select body, attachment_url, sender_id, deleted_at
-    from messages
-    where conversation_id = c.id
-    order by created_at desc
+    -- Alias is required: the function's RETURNS TABLE has a
+    -- `conversation_id` column, which shadows the messages column inside
+    -- PL/pgSQL — `where conversation_id = c.id` errors with 42702
+    -- "column reference \"conversation_id\" is ambiguous". Aliasing
+    -- forces the reference to resolve against the table.
+    select m.body, m.attachment_url, m.sender_id, m.deleted_at
+    from messages m
+    where m.conversation_id = c.id
+    order by m.created_at desc
     limit 1
   ) last_msg on true
   left join conversation_reads r
