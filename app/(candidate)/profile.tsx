@@ -32,6 +32,7 @@ import {
 } from '../../components/molecules';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
+import { readLocalFileAsArrayBuffer } from '../../lib/messaging';
 import { CAMPUSES, SKILL_CATEGORIES } from '../../data/mock';
 import type { PortfolioItem } from '../../data/mock';
 import {
@@ -135,15 +136,17 @@ export default function ProfileTab() {
     // Show the local URI immediately so the UI updates without waiting.
     setProfile((p) => (p ? { ...p, photo_url: asset.uri } : p));
 
-    // Upload + persist real URL in the background.
+    // Upload + persist real URL in the background. Use the ArrayBuffer
+    // route from readLocalFileAsArrayBuffer — fetch().blob() silently
+    // produces 0-byte uploads on React Native and leaves the avatar as
+    // a gray placeholder everywhere it renders.
     try {
       const ext = (asset.uri.match(/\.([a-zA-Z0-9]+)$/)?.[1] ?? 'jpg').toLowerCase();
       const path = `${user.id}/avatar.${ext}`;
-      const response = await fetch(asset.uri);
-      const blob = await response.blob();
+      const bytes = await readLocalFileAsArrayBuffer(asset.uri);
       await supabase.storage
         .from('avatars')
-        .upload(path, blob, { upsert: true, contentType: `image/${ext}` });
+        .upload(path, bytes, { upsert: true, contentType: `image/${ext}` });
       const { data } = supabase.storage.from('avatars').getPublicUrl(path);
       await supabase.from('profiles').update({ photo_url: data.publicUrl }).eq('id', user.id);
       setProfile((p) => (p ? { ...p, photo_url: data.publicUrl } : p));

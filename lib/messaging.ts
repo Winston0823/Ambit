@@ -1,5 +1,17 @@
 import { randomUUID } from 'expo-crypto';
+import { File } from 'expo-file-system';
 import { supabase } from './supabase';
+
+/// Read a local file URI (file:// or content://) as an ArrayBuffer ready
+/// to hand to Supabase Storage. Why not `fetch(uri).blob()`? On React
+/// Native that path silently produces a 0-byte blob in many Expo SDK +
+/// platform combinations — the upload "succeeds" but the file in
+/// storage is empty, so the image renders as a gray rectangle later.
+/// The expo-file-system v19 `File` class reads real bytes via its
+/// native module, so .arrayBuffer() returns the actual file contents.
+export async function readLocalFileAsArrayBuffer(uri: string): Promise<ArrayBuffer> {
+  return new File(uri).arrayBuffer();
+}
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -213,17 +225,17 @@ export async function sendImageMessage(args: {
   /// Same dedupe contract as sendTextMessage — see that doc.
   clientId?:      string;
 }): Promise<MessageRow> {
-  // Read the local file as bytes. expo-file-system would also work; using
-  // fetch() keeps us dep-free here (it works for file:// URIs in RN).
-  const res = await fetch(args.localUri);
-  const blob = await res.blob();
+  // Read the local file as an ArrayBuffer via expo-file-system. The
+  // fetch().blob() route silently produces 0-byte uploads on RN; this
+  // path produces real bytes. See readLocalFileAsArrayBuffer above.
   const ext = (args.localUri.match(/\.([a-zA-Z0-9]+)$/)?.[1] ?? 'jpg').toLowerCase();
   const path = `${args.conversationId}/${randomUUID()}.${ext}`;
+  const bytes = await readLocalFileAsArrayBuffer(args.localUri);
 
   const { error: upErr } = await supabase.storage
     .from('chat-attachments')
-    .upload(path, blob, {
-      contentType: blob.type || `image/${ext}`,
+    .upload(path, bytes, {
+      contentType: `image/${ext}`,
       upsert: false,
     });
   if (upErr) throw upErr;

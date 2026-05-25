@@ -1,5 +1,6 @@
 import React, { createContext, ReactNode, useContext, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { readLocalFileAsArrayBuffer } from '../lib/messaging';
 
 export type Role = 'owner' | 'seeker' | 'both';
 
@@ -101,13 +102,14 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
     let photoUrl: string | null = profile.photoUri;
 
     if (profile.photoUri?.startsWith('file://') || profile.photoUri?.startsWith('content://')) {
+      // ArrayBuffer route — fetch().blob() silently 0-bytes on RN.
+      // See readLocalFileAsArrayBuffer in lib/messaging.ts.
       const ext = profile.photoUri.split('.').pop()?.toLowerCase() ?? 'jpg';
       const path = `${userId}/avatar.${ext}`;
-      const response = await fetch(profile.photoUri);
-      const blob = await response.blob();
+      const bytes = await readLocalFileAsArrayBuffer(profile.photoUri);
       const { error: uploadError } = await supabase.storage
         .from('avatars')
-        .upload(path, blob, { upsert: true, contentType: `image/${ext}` });
+        .upload(path, bytes, { upsert: true, contentType: `image/${ext}` });
       if (!uploadError) {
         const { data } = supabase.storage.from('avatars').getPublicUrl(path);
         photoUrl = data.publicUrl;
