@@ -107,17 +107,54 @@ export default function ProfileTab() {
   const [activePortfolio, setActivePortfolio] = useState<PortfolioItem | null>(null);
 
   // Initial fetch
+  //
+  // Two-phase: first try the full select (including the closure-loop
+  // response-rate columns). If the column doesn't exist in this
+  // project's schema (the closure-loop migration may not be applied
+  // yet), Postgres returns a column-doesn't-exist error and the WHOLE
+  // query fails — wiping the user's profile to null and rendering
+  // every field as "Tap to add…". So we fall back to the baseline
+  // select that's guaranteed to work, and just leave the response-rate
+  // pill hidden.
   useEffect(() => {
     if (!user) { setLoading(false); return; }
     let cancelled = false;
     (async () => {
-      const { data } = await supabase
+      const full = await supabase
         .from('profiles')
         .select('id, name, vibe_blurb, skills, role, campus_id, photo_url, response_rate, avg_response_minutes')
         .eq('id', user.id)
         .maybeSingle();
       if (cancelled) return;
-      setProfile(data as ProfileRow | null);
+
+      if (!full.error) {
+        setProfile(full.data as ProfileRow | null);
+        setLoading(false);
+        return;
+      }
+
+      // Likely a missing column — log it once, then retry with the
+      // baseline columns so the rest of the editor still works.
+      console.warn(
+        'profile fetch (full) failed, retrying baseline:',
+        full.error.message,
+      );
+      const base = await supabase
+        .from('profiles')
+        .select('id, name, vibe_blurb, skills, role, campus_id, photo_url')
+        .eq('id', user.id)
+        .maybeSingle();
+      if (cancelled) return;
+      if (base.error) {
+        console.warn('profile fetch (baseline) also failed:', base.error.message);
+        setProfile(null);
+      } else {
+        setProfile(
+          base.data
+            ? ({ ...(base.data as object), response_rate: null, avg_response_minutes: null } as ProfileRow)
+            : null,
+        );
+      }
       setLoading(false);
     })();
     return () => { cancelled = true; };

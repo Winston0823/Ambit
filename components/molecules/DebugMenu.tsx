@@ -6,16 +6,24 @@ import { Brand, AmbitFont } from '../../constants/theme';
 
 interface ButtonProps { onPress: () => void; }
 
-/// Floating wrench in top-right. Tap → opens debug sheet.
+/// Floating wrench tucked at the bottom-center, beneath the LiquidNavBar
+/// icon row. Sits in the nav bar's safe-area padding zone so it doesn't
+/// compete with the four tab icons but stays reachable. Bottom-anchored
+/// (insets.bottom-aware) so it floats just above the home indicator on
+/// notched devices.
 export function DebugMenuButton({ onPress }: ButtonProps) {
   const insets = useSafeAreaInsets();
+  // 4pt floor on no-notch devices; centered within the safe-area band
+  // on notched ones (insets.bottom ≈ 34pt → the button sits ~10pt above
+  // the home indicator line and ~6pt below the nav-bar icon row).
+  const bottom = Math.max(4, insets.bottom - 24);
   return (
     <Pressable
       onPress={onPress}
-      style={[styles.fab, { top: insets.top + 8 }]}
+      style={[styles.fab, { bottom }]}
       accessibilityLabel="Developer menu"
     >
-      <Feather name="tool" size={16} color="#fff" />
+      <Feather name="tool" size={14} color="#fff" />
     </Pressable>
   );
 }
@@ -77,13 +85,21 @@ function Row({ k, v }: { k: string; v: string }) {
 const styles = StyleSheet.create({
   fab: {
     position: 'absolute',
-    right: 16,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    // Center horizontally regardless of screen width. left:'50%' + a
+    // negative marginLeft equal to half the button width is the
+    // canonical RN centering trick when the parent isn't a flex layout.
+    left: '50%',
+    marginLeft: -14, // half of width 28
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.55)',
+    // Translucent fill blends with the dark nav bar background it sits
+    // over. A faint border keeps it visible against the dark surface.
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    borderWidth: 0.5,
+    borderColor: 'rgba(255,255,255,0.30)',
     shadowColor: '#000',
     shadowOpacity: 0.25,
     shadowRadius: 10,
