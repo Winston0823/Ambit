@@ -5,26 +5,46 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Keyboard,
   KeyboardAvoidingView,
+  LayoutAnimation,
+  type LayoutAnimationConfig,
   Modal,
   Platform,
   Pressable,
   StyleSheet,
   Text,
+  UIManager,
   View,
 } from 'react-native';
+
+// Android needs an explicit opt-in for LayoutAnimation; iOS is on by default.
+// Safe to call repeatedly — RN no-ops on subsequent calls.
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+
+/// Shared spring-ish layout transition used for the composer's
+/// grid/banner show-hide flows. Roughly matches the keyboard's
+/// animation duration so the grid slot feels continuous when
+/// swapping between keyboard and attachment panel.
+const SMOOTH_LAYOUT: LayoutAnimationConfig = {
+  duration: 240,
+  create: { type: 'easeInEaseOut', property: 'opacity' },
+  update: { type: 'easeInEaseOut' },
+  delete: { type: 'easeInEaseOut', property: 'opacity' },
+};
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { RealtimeChannel } from '@supabase/supabase-js';
-import { BackChevron } from '../../components/atoms';
+import * as Haptics from 'expo-haptics';
 import {
   MessageBubble,
   type MessageStatus,
   TypingIndicator,
-} from '../../components/molecules';
-import { ChatComposer } from '../../components/organisms';
-import { useAuth } from '../../context/AuthContext';
-import { supabase } from '../../lib/supabase';
+} from '../../../components/molecules';
+import { ChatComposer } from '../../../components/organisms';
+import { useAuth } from '../../../context/AuthContext';
+import { supabase } from '../../../lib/supabase';
 import {
   deleteMessage,
   editMessage,
@@ -36,8 +56,8 @@ import {
   toggleReaction,
   type MessageRow,
   type ReactionRow,
-} from '../../lib/messaging';
-import { AmbitFont, Brand, Radii, Space } from '../../constants/theme';
+} from '../../../lib/messaging';
+import { AmbitFont, Brand, Radii, Space } from '../../../constants/theme';
 
 const QUICK_REACTIONS = ['👍', '❤️', '😂', '🙏', '🔥', '👀'];
 
@@ -61,7 +81,6 @@ interface ConvoMeta {
 export default function ThreadScreen() {
   const { id: conversationId } = useLocalSearchParams<{ id: string }>();
   const { user } = useAuth();
-  const insets = useSafeAreaInsets();
 
   const [meta, setMeta] = useState<ConvoMeta | null>(null);
   const [messages, setMessages] = useState<MessageRow[]>([]);
@@ -90,6 +109,34 @@ export default function ThreadScreen() {
   const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const channelRef = useRef<RealtimeChannel | null>(null);
   const listRef = useRef<FlatList<MessageRow>>(null);
+
+  /// Attachment grid (WeChat-style) — state lives here so the FlatList
+  /// can close it on scroll/tap. Opening dismisses the keyboard so the
+  /// grid panel slots into its vacated footprint. Closing is handled by:
+  ///   - the + toggle re-tapped
+  ///   - the TextInput receiving focus (ChatComposer calls onCloseAttachMenu)
+  ///   - the messages list being scrolled or tapped (handlers below)
+  /// Wrap a state setter so the next layout pass animates smoothly.
+  /// Used for reply/edit banners and other show/hide transitions where
+  /// the surrounding container needs to grow or shrink with the change.
+  const setAnimated = <T,>(setter: (v: T) => void) => (v: T) => {
+    LayoutAnimation.configureNext(SMOOTH_LAYOUT);
+    setter(v);
+  };
+  const setReplyToAnimated  = setAnimated(setReplyTo);
+  const setEditingAnimated  = setAnimated(setEditing);
+
+  const [attachMenuOpen, setAttachMenuOpen] = useState(false);
+  const openAttachMenu = () => {
+    Keyboard.dismiss();
+    LayoutAnimation.configureNext(SMOOTH_LAYOUT);
+    setAttachMenuOpen(true);
+  };
+  const closeAttachMenu = () => {
+    LayoutAnimation.configureNext(SMOOTH_LAYOUT);
+    setAttachMenuOpen(false);
+  };
+  const toggleAttachMenu = () => (attachMenuOpen ? closeAttachMenu() : openAttachMenu());
 
   // ── Initial load ─────────────────────────────────────────────
   useEffect(() => {
@@ -347,7 +394,7 @@ export default function ThreadScreen() {
     };
     setMessages((prev) => [...prev, optimistic]);
     markPending(clientId);
-    setReplyTo(null);
+    setReplyToAnimated(null);
     scrollToEnd();
 
     try {
@@ -369,10 +416,11 @@ export default function ThreadScreen() {
     }
   };
 
-  const handleSendImage = async (localUri: string) => {
+  const handleSendImage = async (localUri: string, body?: string) => {
     if (!user || !conversationId) return;
     const clientId = randomUUID();
     const parentId = replyTo?.id ?? null;
+    const captionTrimmed = body?.trim() || null;
 
     // Optimistic insert with the LOCAL file:// URI in attachment_url.
     // MessageBubble's useAttachmentUrl detects file:// and passes it
@@ -382,7 +430,7 @@ export default function ThreadScreen() {
       id:              clientId,
       conversation_id: conversationId,
       sender_id:       user.id,
-      body:            null,
+      body:            captionTrimmed,
       attachment_url:  localUri,
       parent_id:       parentId,
       edited_at:       null,
@@ -391,7 +439,7 @@ export default function ThreadScreen() {
     };
     setMessages((prev) => [...prev, optimistic]);
     markPending(clientId);
-    setReplyTo(null);
+    setReplyToAnimated(null);
     scrollToEnd();
 
     try {
@@ -399,6 +447,7 @@ export default function ThreadScreen() {
         conversationId,
         senderId: user.id,
         localUri,
+        body: captionTrimmed ?? undefined,
         parentId,
         clientId,
       });
@@ -444,7 +493,7 @@ export default function ThreadScreen() {
   const handleSaveEdit = async (body: string) => {
     if (!editing) return;
     await editMessage(editing.id, body);
-    setEditing(null);
+    setEditingAnimated(null);
   };
 
   const handleTypingPing = () => {
@@ -470,11 +519,11 @@ export default function ThreadScreen() {
     const m = selectedMessage;
     setSelectedMessage(null);
     if (!m) return;
-    if (action === 'reply') setReplyTo(m);
+    if (action === 'reply') setReplyToAnimated(m);
     else if (action === 'copy') {
       if (m.body) await Clipboard.setStringAsync(m.body);
     } else if (action === 'edit') {
-      if (m.sender_id === user?.id && m.body) setEditing(m);
+      if (m.sender_id === user?.id && m.body) setEditingAnimated(m);
     } else if (action === 'delete') {
       Alert.alert('Delete message?', 'This cannot be undone.', [
         { text: 'Cancel', style: 'cancel' },
@@ -495,32 +544,54 @@ export default function ThreadScreen() {
   };
 
   // ── Render ───────────────────────────────────────────────────
-  if (loading || !meta || !user) {
-    return (
-      <View style={[styles.root, styles.center]}>
-        <BackChevron onPress={() => router.back()} />
-        <ActivityIndicator color={Brand.accent} />
-      </View>
-    );
-  }
-
-  const isOwnSelected = selectedMessage?.sender_id === user.id;
+  // Same header row in both loading and loaded states so the chevron
+  // + title don't visually jump when `meta` resolves. The body below
+  // swaps between an ActivityIndicator and the messages list.
+  const isOwnSelected = selectedMessage?.sender_id === user?.id;
 
   return (
     <View style={styles.root}>
-      <BackChevron onPress={() => router.back()} />
+      {/* Header row: back chevron + centered title stack on a single line.
+          The parent SafeAreaView in app/_layout.tsx already pads for the
+          top inset, so paddingTop here is just visual breathing room
+          (Dynamic Island clearance is handled by SafeAreaView). Mirrors
+          iMessage/WeChat where the title sits flush below the status bar.
+          Chevron lives inline (not as the absolute BackChevron atom) so
+          it shares the row's vertical center with the title. A right-side
+          spacer of equal width keeps the title visually centered. */}
+      <View style={styles.headerRow}>
+        <Pressable
+          onPress={() => {
+            if (Platform.OS !== 'web') Haptics.selectionAsync().catch(() => {});
+            // We live inside the chat/ Stack now — back pops to the
+            // inbox cleanly, and iOS gives us swipe-back for free.
+            router.back();
+          }}
+          hitSlop={10}
+          style={styles.headerBack}
+          accessibilityRole="button"
+          accessibilityLabel="Back"
+        >
+          <Text style={styles.headerBackGlyph}>‹</Text>
+        </Pressable>
 
-      {/* Header. Sits above the safe-area inset; the BackChevron is
-          absolutely positioned by the atom itself. */}
-      <View style={[styles.header, { paddingTop: insets.top + 40 }]}>
-        <Text style={styles.partnerName} numberOfLines={1}>
-          {meta.partner_name}
-        </Text>
-        <Text style={styles.projectLine} numberOfLines={1}>
-          on {meta.project_title}
-        </Text>
+        <View style={styles.headerTitleStack}>
+          <Text style={styles.partnerName} numberOfLines={1}>
+            {meta?.partner_name ?? ' '}
+          </Text>
+          <Text style={styles.projectLine} numberOfLines={1}>
+            {meta ? `on ${meta.project_title}` : ' '}
+          </Text>
+        </View>
+
+        <View style={styles.headerBack} />
       </View>
 
+      {loading || !meta || !user ? (
+        <View style={styles.loadingBody}>
+          <ActivityIndicator color={Brand.accent} />
+        </View>
+      ) : (
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={{ flex: 1 }}
@@ -531,6 +602,13 @@ export default function ThreadScreen() {
           data={messages}
           keyExtractor={(m) => m.id}
           contentContainerStyle={styles.listContent}
+          // WeChat parity: scrolling or tapping the messages list closes
+          // the attachment grid. onScrollBeginDrag covers any drag/scroll;
+          // onTouchStart catches pure taps without claiming the gesture
+          // (FlatList still owns scroll). Both are guarded by attachMenuOpen
+          // so they're no-ops while the grid is closed.
+          onScrollBeginDrag={attachMenuOpen ? closeAttachMenu : undefined}
+          onTouchStart={attachMenuOpen ? closeAttachMenu : undefined}
           renderItem={({ item }) => {
             const parent = item.parent_id
               ? messages.find((m) => m.id === item.parent_id) ?? null
@@ -562,16 +640,20 @@ export default function ThreadScreen() {
 
         <ChatComposer
           replyTo={replyTo}
-          onClearReply={() => setReplyTo(null)}
+          onClearReply={() => setReplyToAnimated(null)}
           editing={editing}
-          onClearEditing={() => setEditing(null)}
+          onClearEditing={() => setEditingAnimated(null)}
           nameById={nameById}
           onSendText={handleSendText}
           onSendImage={handleSendImage}
           onSaveEdit={handleSaveEdit}
           onTypingPing={handleTypingPing}
+          attachMenuOpen={attachMenuOpen}
+          onToggleAttachMenu={toggleAttachMenu}
+          onCloseAttachMenu={closeAttachMenu}
         />
       </KeyboardAvoidingView>
+      )}
 
       {/* Action sheet on long-press. Modal so it lives above keyboard. */}
       <Modal
@@ -634,14 +716,40 @@ function MenuButton({
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Brand.canvas },
-  center: { alignItems: 'center', justifyContent: 'center' },
-
-  header: {
-    paddingHorizontal: Space.lg,
-    paddingBottom: Space.md,
+  // Loading body — sits below the header row and fills the remaining
+  // vertical space so the spinner is centered in what would otherwise
+  // be the messages-list area. Keeps the header pinned at its final
+  // position so there's no jump when meta resolves.
+  loadingBody: {
+    flex: 1,
     alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Space.md,
+    paddingTop: 6,
+    paddingBottom: Space.md,
     borderBottomWidth: 1,
     borderBottomColor: Brand.borderDefault,
+  },
+  headerBack: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerBackGlyph: {
+    fontFamily: AmbitFont.body,
+    fontSize: 28,
+    lineHeight: 32,
+    color: Brand.inkMuted,
+  },
+  headerTitleStack: {
+    flex: 1,
+    alignItems: 'center',
   },
   partnerName: {
     fontFamily: AmbitFont.display,

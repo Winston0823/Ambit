@@ -7,7 +7,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { Check, Checks, PencilSimple, Warning } from 'phosphor-react-native';
+import { Check, Checks, Paperclip, PencilSimple, Warning } from 'phosphor-react-native';
 import type { MessageRow, ReactionRow } from '../../lib/messaging';
 import { getCachedAttachmentUrl } from '../../lib/messaging';
 import { AmbitFont, Brand, Radii, Space } from '../../constants/theme';
@@ -115,7 +115,9 @@ export function MessageBubble({
           isMine && status === 'failed' && styles.bubbleFailed,
         ]}
       >
-        {/* Reply preview — small bar above the body that quotes the parent. */}
+        {/* Reply preview — small bar above the body that quotes the parent.
+            For attachment-only parents, an inline Paperclip + "Photo" label
+            stands in for the body. */}
         {parent && (
           <View style={[styles.replyQuote, isMine && styles.replyQuoteMine]}>
             <Text
@@ -124,14 +126,32 @@ export function MessageBubble({
             >
               {nameById[parent.sender_id] ?? 'Unknown'}
             </Text>
-            <Text
-              style={[styles.replyBody, isMine && styles.replyBodyMine]}
-              numberOfLines={2}
-            >
-              {parent.deleted_at
-                ? 'Message deleted'
-                : parent.body ?? (parent.attachment_url ? '📎 Attachment' : '')}
-            </Text>
+            {parent.deleted_at ? (
+              <Text
+                style={[styles.replyBody, isMine && styles.replyBodyMine]}
+                numberOfLines={2}
+              >
+                Message deleted
+              </Text>
+            ) : parent.body ? (
+              <Text
+                style={[styles.replyBody, isMine && styles.replyBodyMine]}
+                numberOfLines={2}
+              >
+                {parent.body}
+              </Text>
+            ) : parent.attachment_url ? (
+              <View style={styles.replyBodyRow}>
+                <Paperclip
+                  size={12}
+                  color={isMine ? Brand.inkOnBrand : Brand.inkMuted}
+                  weight="regular"
+                />
+                <Text style={[styles.replyBody, isMine && styles.replyBodyMine]}>
+                  Photo
+                </Text>
+              </View>
+            ) : null}
           </View>
         )}
 
@@ -287,6 +307,11 @@ const styles = StyleSheet.create({
     color: Brand.inkMuted,
   },
   replyBodyMine: { color: 'rgba(255,255,255,0.85)' },
+  replyBodyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
 
   metaRow: {
     flexDirection: 'row',

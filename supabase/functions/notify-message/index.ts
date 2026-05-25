@@ -106,7 +106,7 @@ Deno.serve(async (req) => {
   // Truncate so iOS doesn't blow out the notification line.
   const preview = msg.body
     ? msg.body.length > 140 ? msg.body.slice(0, 137) + '…' : msg.body
-    : msg.attachment_url ? '📎 Sent an attachment' : 'New message';
+    : msg.attachment_url ? 'Sent a photo' : 'New message';
 
   const expoMessages: ExpoMessage[] = tokens.map((t: { token: string }) => ({
     to:    t.token,

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Paperclip } from 'phosphor-react-native';
 import type { InboxItem } from '../../lib/messaging';
 import { AmbitFont, Brand, Radii, Space } from '../../constants/theme';
 
@@ -13,15 +14,21 @@ export function InboxRow({ item, meId, onPress }: Props) {
   const sentByMe = item.last_message_sender_id === meId;
   const initial = (item.partner_name ?? '?').slice(0, 1).toUpperCase();
 
-  const preview = item.last_message_deleted
+  /// Attachment-only messages render an inline Phosphor paperclip + "Photo"
+  /// label in the preview line. Body-only and deleted messages render as
+  /// plain text. The "You: " prefix sits before either path.
+  const isAttachmentOnly =
+    !item.last_message_deleted &&
+    !item.last_message_body &&
+    !!item.last_message_attachment_url;
+
+  const previewText = item.last_message_deleted
     ? 'Message deleted'
     : item.last_message_body
       ? item.last_message_body
       : item.last_message_attachment_url
-        ? '📎 Attachment'
+        ? 'Photo'
         : 'Say hi';
-
-  const previewLine = sentByMe ? `You: ${preview}` : preview;
 
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [
@@ -49,12 +56,33 @@ export function InboxRow({ item, meId, onPress }: Props) {
           on {item.project_title}
         </Text>
         <View style={styles.previewLine}>
-          <Text
-            style={[styles.preview, item.unread_count > 0 && !sentByMe && styles.previewUnread]}
-            numberOfLines={1}
-          >
-            {previewLine}
-          </Text>
+          <View style={styles.previewTextWrap}>
+            {sentByMe && (
+              <Text
+                style={[styles.preview, item.unread_count > 0 && !sentByMe && styles.previewUnread]}
+              >
+                You:{' '}
+              </Text>
+            )}
+            {isAttachmentOnly && (
+              <Paperclip
+                size={13}
+                color={item.unread_count > 0 && !sentByMe ? Brand.inkBody : Brand.inkMuted}
+                weight="regular"
+                style={styles.previewIcon}
+              />
+            )}
+            <Text
+              style={[
+                styles.preview,
+                styles.previewBody,
+                item.unread_count > 0 && !sentByMe && styles.previewUnread,
+              ]}
+              numberOfLines={1}
+            >
+              {previewText}
+            </Text>
+          </View>
           {item.unread_count > 0 && !sentByMe && (
             <View style={styles.unreadDot}>
               <Text style={styles.unreadDotText}>
@@ -134,11 +162,21 @@ const styles = StyleSheet.create({
     gap: 8,
     marginTop: 2,
   },
-  preview: {
+  previewTextWrap: {
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  previewIcon: {
+    marginRight: 4,
+  },
+  preview: {
     fontFamily: AmbitFont.body,
     fontSize: 13,
     color: Brand.inkMuted,
+  },
+  previewBody: {
+    flex: 1,
   },
   previewUnread: {
     color: Brand.inkBody,

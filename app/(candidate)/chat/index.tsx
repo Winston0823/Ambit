@@ -9,11 +9,11 @@ import {
 } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { MagnifyingGlass } from 'phosphor-react-native';
-import { InboxRow } from '../../components/molecules';
-import { useAuth } from '../../context/AuthContext';
-import { supabase } from '../../lib/supabase';
-import { getInbox, type InboxItem } from '../../lib/messaging';
-import { AmbitFont, Brand, Radii, Space } from '../../constants/theme';
+import { InboxRow } from '../../../components/molecules';
+import { useAuth } from '../../../context/AuthContext';
+import { supabase } from '../../../lib/supabase';
+import { getInbox, type InboxItem } from '../../../lib/messaging';
+import { AmbitFont, Brand, Radii, Space } from '../../../constants/theme';
 
 /// S-050 Inbox. Lists every conversation the signed-in user is in,
 /// sorted by last_message_at. Refetches on focus AND subscribes to
@@ -75,7 +75,7 @@ export default function ChatTab() {
         <Text style={styles.eyebrow}>CONVERSATIONS</Text>
         <Text style={styles.title}>Inbox</Text>
         <Pressable
-          onPress={() => router.push('/search')}
+          onPress={() => router.push('/chat/search')}
           style={styles.searchBtn}
           accessibilityLabel="Search messages"
         >
@@ -101,7 +101,10 @@ export default function ChatTab() {
                 item={item}
                 meId={user.id}
                 onPress={() =>
-                  router.push({ pathname: '/thread', params: { id: item.conversation_id } })
+                  router.push({
+                    pathname: '/chat/[id]',
+                    params: { id: item.conversation_id },
+                  })
                 }
               />
             ) : null

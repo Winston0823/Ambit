@@ -9,6 +9,10 @@ const TAB_TO_ROUTE: Record<NavTabKey, string> = {
   profile: 'profile',
 };
 
+/// The chat tab is a nested Stack (chat/_layout.tsx) so thread + search
+/// live inside it as proper push targets. The Tabs navigator's active
+/// route is still 'chat' for any screen within that stack — no extra
+/// mapping needed.
 const ROUTE_TO_TAB: Record<string, NavTabKey> = {
   feed: 'discovery',
   chat: 'chat',
@@ -42,9 +46,6 @@ export default function CandidateLayout() {
           Hidden from the nav bar via href:null. */}
       <Tabs.Screen name="project-new" options={{ href: null }} />
       <Tabs.Screen name="project-edit" options={{ href: null }} />
-      {/* Messaging — thread + search reached from the chat tab. */}
-      <Tabs.Screen name="thread" options={{ href: null }} />
-      <Tabs.Screen name="search" options={{ href: null }} />
     </Tabs>
   );
 }
