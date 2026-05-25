@@ -25,11 +25,34 @@ alter table conversations
   add column if not exists hired_proposed_by uuid references auth.users(id),
   add column if not exists hired_at timestamptz;
 
--- Generated column: 72h after the conversation opened. Used by the
--- auto-decline sweep. Cannot reference other tables, only same-row cols.
+-- auto_decline_at = created_at + 72h. We use a regular column + a
+-- BEFORE INSERT trigger instead of a STORED generated column because
+-- Postgres considers `timestamptz + interval` non-IMMUTABLE (an
+-- interval with units like 'month' or 'day' could shift across DST),
+-- even though 'hours' specifically is safe. STORED generated columns
+-- require IMMUTABLE expressions; the check fails on the whole
+-- expression. Same semantic effect via the trigger.
 alter table conversations
-  add column if not exists auto_decline_at timestamptz
-    generated always as (created_at + interval '72 hours') stored;
+  add column if not exists auto_decline_at timestamptz;
+
+-- Backfill rows that existed before this migration. Idempotent — only
+-- touches rows whose auto_decline_at is still null.
+update conversations
+   set auto_decline_at = created_at + interval '72 hours'
+ where auto_decline_at is null;
+
+create or replace function trg_set_auto_decline_at()
+returns trigger language plpgsql as $$
+begin
+  new.auto_decline_at := new.created_at + interval '72 hours';
+  return new;
+end;
+$$;
+
+drop trigger if exists set_auto_decline_at on conversations;
+create trigger set_auto_decline_at
+  before insert on conversations
+  for each row execute function trg_set_auto_decline_at();
 
 create index if not exists idx_conversations_status_decline
   on conversations (status, auto_decline_at)
