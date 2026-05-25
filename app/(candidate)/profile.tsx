@@ -34,6 +34,12 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { readLocalFileAsArrayBuffer } from '../../lib/messaging';
+import {
+  deletePortfolioItem,
+  fetchPortfolioForUser,
+  upsertPortfolioItem,
+} from '../../lib/portfolio';
+import { randomUUID } from 'expo-crypto';
 import { formatResponseRate, formatResponseTime } from '../../lib/closureLoop';
 import { CAMPUSES, SKILL_CATEGORIES } from '../../data/mock';
 import type { PortfolioItem } from '../../data/mock';
@@ -96,7 +102,9 @@ export default function ProfileTab() {
   const [profile, setProfile] = useState<ProfileRow | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Portfolio is local state for now.
+  // Portfolio is now persisted in Supabase via lib/portfolio.ts.
+  // Local state mirrors the DB for snappy UI; mutations write through
+  // optimistically and reconcile from the network on save errors.
   const [portfolio, setPortfolio] = useState<PortfolioItem[]>([]);
 
   // Edit modal state
@@ -215,29 +223,76 @@ export default function ProfileTab() {
     }
   };
 
-  // ── Portfolio CRUD (local-only for v1) ────────────────────────────────────
+  // ── Portfolio CRUD (Supabase-backed) ──────────────────────────────────────
 
-  const handleSavePortfolio = (updated: PortfolioItem) => {
-    setPortfolio((prev) => {
-      const exists = prev.some((p) => p.id === updated.id);
-      return exists ? prev.map((p) => (p.id === updated.id ? updated : p)) : [...prev, updated];
-    });
+  // Initial portfolio load — runs once when the user becomes known.
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    (async () => {
+      const items = await fetchPortfolioForUser(user.id);
+      if (!cancelled) setPortfolio(items);
+    })();
+    return () => { cancelled = true; };
+  }, [user?.id]);
+
+  /// Save: optimistic local update + write-through. If the write
+  /// fails, the next focus refetch will reconcile back to truth.
+  const handleSavePortfolio = async (updated: PortfolioItem) => {
+    if (!user) return;
+    const exists = portfolio.some((p) => p.id === updated.id);
+    const position = exists
+      ? portfolio.findIndex((p) => p.id === updated.id)
+      : portfolio.length;
+    // Optimistic local mirror.
+    setPortfolio((prev) =>
+      exists ? prev.map((p) => (p.id === updated.id ? updated : p)) : [...prev, updated],
+    );
     setActivePortfolio(null);
+    try {
+      await upsertPortfolioItem({
+        userId:      user.id,
+        id:          updated.id,
+        title:       updated.title,
+        description: updated.description,
+        imageUrl:    updated.imageUri,
+        position,
+      });
+    } catch (e: any) {
+      console.warn('portfolio upsert failed:', e?.message ?? e);
+      // Refetch to reconcile if the write actually failed.
+      const items = await fetchPortfolioForUser(user.id);
+      setPortfolio(items);
+    }
   };
-  const handleDeletePortfolio = (id: string) => {
+
+  const handleDeletePortfolio = async (id: string) => {
     setPortfolio((prev) => prev.filter((p) => p.id !== id));
     setActivePortfolio(null);
+    try {
+      await deletePortfolioItem(id);
+    } catch (e: any) {
+      console.warn('portfolio delete failed:', e?.message ?? e);
+      if (user) {
+        const items = await fetchPortfolioForUser(user.id);
+        setPortfolio(items);
+      }
+    }
   };
+
   const addNewPortfolio = () => {
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     }
+    // Real UUID so the DB upsert lands on the same row when the user
+    // hits Save in the PortfolioModal. The old slug-style id ('new-...')
+    // would have made the DB treat every save as a fresh insert.
     setActivePortfolio({
-      id: `new-${Date.now()}`,
-      imageUri: null,
-      title: '',
+      id:          randomUUID(),
+      imageUri:    null,
+      title:       '',
       description: '',
-      gradient: PORTFOLIO_GRADIENTS[portfolio.length % PORTFOLIO_GRADIENTS.length],
+      gradient:    PORTFOLIO_GRADIENTS[portfolio.length % PORTFOLIO_GRADIENTS.length],
     });
   };
 

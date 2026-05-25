@@ -28,7 +28,8 @@ import {
   MOCK_SEEKERS,
 } from '../../data/mock';
 import { supabase } from '../../lib/supabase';
-import { reachOutOrReuse } from '../../lib/messaging';
+import { startConversationWithMessage } from '../../lib/messaging';
+import { fetchPortfoliosByUser } from '../../lib/portfolio';
 import { useAuth } from '../../context/AuthContext';
 
 const SKIP_OVERVIEW_THRESHOLD = 5;
@@ -142,6 +143,11 @@ async function fetchSeekerDeck(userId: string): Promise<SeekerCardData[]> {
 
   const scoreMap = Object.fromEntries(rows.map((r) => [r.seeker_id, r.score]));
 
+  // Bulk-fetch portfolios for all seekers in one query → assigned per-card
+  // below. Without this we'd do N+1 queries (one per seeker) or every
+  // live seeker would show no portfolio bubbles even when they have them.
+  const portfolioMap = await fetchPortfoliosByUser(seekerIds);
+
   return (seekers as {
     id: string;
     name: string;
@@ -159,9 +165,7 @@ async function fetchSeekerDeck(userId: string): Promise<SeekerCardData[]> {
       campusId: s.campus_id ?? '',
       skills: s.skills ?? [],
       vibeBlurb: s.vibe_blurb ?? '',
-      // Real portfolio rows live in a separate table (TODO: portfolio_items).
-      // For now live seekers come through with no portfolio bubbles.
-      portfolio: [],
+      portfolio: portfolioMap.get(s.id) ?? [],
     }));
 }
 
@@ -277,9 +281,8 @@ export default function DiscoveryFeed() {
     if (!user) return;
 
     try {
-      let projectId:   string;
-      let seekerId:    string;
-      let otherUserId: string;
+      let projectId: string;
+      let seekerId:  string;
 
       if (card.kind === 'project') {
         // Placeholder mock cards have ids like 'project-1'. Skip messaging
@@ -291,9 +294,8 @@ export default function DiscoveryFeed() {
           );
           return;
         }
-        projectId   = card.id;
-        seekerId    = user.id;
-        otherUserId = card.ownerId;
+        projectId = card.id;
+        seekerId  = user.id;
         // Mirror the existing match-outcome write so the project gets
         // filtered out of future decks.
         supabase
@@ -313,9 +315,7 @@ export default function DiscoveryFeed() {
           return;
         }
         // Owner messaging a seeker card. Look up the owner's first active
-        // project as the conversation context for a NEW conversation.
-        // (If a chat already exists with this seeker, reachOutOrReuse
-        // reuses it and this projectId is ignored.)
+        // project as the conversation context.
         const { data: proj } = await supabase
           .from('projects')
           .select('id')
@@ -331,24 +331,22 @@ export default function DiscoveryFeed() {
           );
           return;
         }
-        projectId   = (proj as { id: string }).id;
-        seekerId    = card.id;
-        otherUserId = card.id;
+        projectId = (proj as { id: string }).id;
+        seekerId  = card.id;
       }
 
-      // Dedup by user pair — if I already have a chat with this person
-      // (in either orientation, anchored to any project) the message
-      // lands in that existing thread instead of starting a new one.
-      await reachOutOrReuse({
-        myUserId:    user.id,
-        otherUserId,
+      // Per-project semantics: each reach-out about a different project
+      // becomes its own thread. The DB-side ON CONFLICT in
+      // start_conversation_with_message means re-reaching about the same
+      // project appends to the existing thread, which is correct dedup.
+      await startConversationWithMessage({
         projectId,
         seekerId,
-        body:        text,
+        body: text,
       });
       // Intentionally no router.push here — the composer dismisses on its
-      // own and the message lands in the existing thread (or a fresh one)
-      // surfacing via the inbox's realtime subscription.
+      // own and the new conversation surfaces in the Chat tab via the
+      // inbox's realtime subscription.
     } catch (e: any) {
       console.warn('reach out failed:', e?.message ?? e);
     }
