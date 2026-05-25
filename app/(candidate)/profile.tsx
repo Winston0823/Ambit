@@ -17,6 +17,7 @@ import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   Camera,
+  Chat,
   Check,
   MapPin,
   PencilSimpleLine,
@@ -33,6 +34,7 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { readLocalFileAsArrayBuffer } from '../../lib/messaging';
+import { formatResponseRate, formatResponseTime } from '../../lib/closureLoop';
 import { CAMPUSES, SKILL_CATEGORIES } from '../../data/mock';
 import type { PortfolioItem } from '../../data/mock';
 import {
@@ -51,7 +53,22 @@ interface ProfileRow {
   role: 'owner' | 'seeker' | 'both' | null;
   campus_id: string | null;
   photo_url: string | null;
+  /// Closure-loop cache: fraction of reach-outs acted on within 72h.
+  /// null until the user has at least one conversation aged past 72h.
+  response_rate: number | null;
+  avg_response_minutes: number | null;
 }
+
+/// Display copy for the role pill. 'both' is the catch-all for people
+/// who actively recruit AND search; we name it explicitly rather than
+/// hiding it under one of the others so the user knows what they
+/// picked.
+const ROLE_LABEL: Record<NonNullable<ProfileRow['role']>, string> = {
+  seeker: 'Looking to join a project',
+  owner:  'Recruiting for my project',
+  both:   'Both',
+};
+const ROLE_OPTIONS: NonNullable<ProfileRow['role']>[] = ['seeker', 'owner', 'both'];
 
 const PORTFOLIO_GRADIENTS: [string, string][] = [
   [Brand.primary, Brand.accent],
@@ -86,6 +103,7 @@ export default function ProfileTab() {
   const [textEdit, setTextEdit] = useState<TextEditState | null>(null);
   const [skillsOpen, setSkillsOpen] = useState(false);
   const [campusOpen, setCampusOpen] = useState(false);
+  const [roleOpen, setRoleOpen] = useState(false);
   const [activePortfolio, setActivePortfolio] = useState<PortfolioItem | null>(null);
 
   // Initial fetch
@@ -95,7 +113,7 @@ export default function ProfileTab() {
     (async () => {
       const { data } = await supabase
         .from('profiles')
-        .select('id, name, vibe_blurb, skills, role, campus_id, photo_url')
+        .select('id, name, vibe_blurb, skills, role, campus_id, photo_url, response_rate, avg_response_minutes')
         .eq('id', user.id)
         .maybeSingle();
       if (cancelled) return;
@@ -112,11 +130,16 @@ export default function ProfileTab() {
 
   /// Update a single Supabase column and mirror the change locally for
   /// immediate UI feedback. We don't wait for the round-trip — optimistic
-  /// updates feel snappy and the network call is fire-and-forget.
+  /// updates feel snappy. Errors are logged so silent failures (RLS
+  /// denial, schema mismatch, etc.) show up in the dev console instead
+  /// of producing a UI that pretends the save worked.
   const updateField = async (field: keyof ProfileRow, value: ProfileRow[keyof ProfileRow]) => {
     if (!user) return;
     setProfile((p) => (p ? { ...p, [field]: value } : p));
-    await supabase.from('profiles').update({ [field]: value }).eq('id', user.id);
+    const { error } = await supabase.from('profiles').update({ [field]: value }).eq('id', user.id);
+    if (error) {
+      console.warn(`profile.${String(field)} update failed:`, error.message);
+    }
   };
 
   const pickPhoto = async () => {
@@ -261,6 +284,41 @@ export default function ProfileTab() {
                 </Text>
                 <PencilSimpleLine size={11} color={Brand.inkMuted} weight="regular" />
               </Pressable>
+
+              {/* Role pill — shows current seeker/owner/both intent.
+                  Tap → opens RoleEditModal to switch. Always shown
+                  (defaulting to 'Pick a role' if null) so the user
+                  always knows which side of the marketplace their
+                  card represents. */}
+              <Pressable
+                onPress={() => setRoleOpen(true)}
+                style={styles.rolePill}
+                hitSlop={4}
+                accessibilityLabel="Change role"
+              >
+                <Text style={styles.rolePillText}>
+                  {profile?.role ? ROLE_LABEL[profile.role] : 'Pick a role'}
+                </Text>
+                <PencilSimpleLine size={11} color={Brand.accent} weight="regular" />
+              </Pressable>
+
+              {/* Closure-loop response-rate pill. Only rendered when
+                  the user has at least one conversation aged past 72h
+                  (response_rate becomes non-null). */}
+              {profile && (profile.response_rate != null || profile.avg_response_minutes != null) && (
+                <View style={styles.responseRow}>
+                  <Chat size={11} color={Brand.accent} weight="regular" />
+                  <Text style={styles.responseText}>
+                    {[
+                      formatResponseTime(profile.avg_response_minutes) &&
+                        `Responds ${formatResponseTime(profile.avg_response_minutes)}`,
+                      formatResponseRate(profile.response_rate),
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </Text>
+                </View>
+              )}
             </View>
           </View>
 
@@ -356,6 +414,16 @@ export default function ProfileTab() {
         onSave={(id) => {
           updateField('campus_id', id);
           setCampusOpen(false);
+        }}
+      />
+
+      <RoleEditModal
+        visible={roleOpen}
+        selected={profile?.role ?? null}
+        onCancel={() => setRoleOpen(false)}
+        onSave={(role) => {
+          updateField('role', role);
+          setRoleOpen(false);
         }}
       />
 
@@ -571,6 +639,64 @@ function CampusEditModal({
   );
 }
 
+// ─── RoleEditModal — single-select 3-option picker ───────────────────────
+
+function RoleEditModal({
+  visible,
+  selected,
+  onCancel,
+  onSave,
+}: {
+  visible: boolean;
+  selected: ProfileRow['role'];
+  onCancel: () => void;
+  onSave: (role: NonNullable<ProfileRow['role']>) => void;
+}) {
+  return (
+    <Modal transparent animationType="fade" visible={visible} onRequestClose={onCancel}>
+      <View style={modalStyles.root}>
+        <Pressable style={modalStyles.scrim} onPress={onCancel} />
+        <View style={modalStyles.sheet}>
+          <View style={modalStyles.sheetHeader}>
+            <Text style={modalStyles.sheetTitle}>What are you here for?</Text>
+            <Pressable onPress={onCancel} hitSlop={10}>
+              <X size={20} color={Brand.inkMuted} weight="bold" />
+            </Pressable>
+          </View>
+
+          <View style={{ gap: 8 }}>
+            {ROLE_OPTIONS.map((r) => {
+              const isSelected = r === selected;
+              return (
+                <Pressable
+                  key={r}
+                  onPress={() => onSave(r)}
+                  style={[
+                    modalStyles.campusRow,
+                    isSelected && modalStyles.campusRowSelected,
+                  ]}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text
+                      style={[
+                        modalStyles.campusName,
+                        isSelected && { color: Brand.seekerInk },
+                      ]}
+                    >
+                      {ROLE_LABEL[r]}
+                    </Text>
+                  </View>
+                  {isSelected && <Check size={18} color={Brand.seekerInk} weight="bold" />}
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 // ─── Styles ──────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
@@ -664,6 +790,50 @@ const styles = StyleSheet.create({
     ...TypeScale.helper,
     color: Brand.inkMuted,
     flexShrink: 1,
+  },
+
+  // Role pill — what side of the marketplace this card is for.
+  // Warm-tan accent border + light fill keeps it visually distinct
+  // from neutral campus/name rows, signaling "this is a chooser."
+  rolePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    backgroundColor: Brand.seekerSurface,
+    borderWidth: 1,
+    borderColor: Brand.accent,
+    alignSelf: 'flex-start',
+    marginTop: 8,
+  },
+  rolePillText: {
+    fontFamily: AmbitFont.body,
+    fontSize: 12,
+    fontWeight: '600',
+    color: Brand.accent,
+    letterSpacing: 0.2,
+  },
+
+  // Closure-loop response-rate pill (sits under the campus line).
+  responseRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    backgroundColor: Brand.surface1,
+    alignSelf: 'flex-start',
+    marginTop: 6,
+  },
+  responseText: {
+    fontFamily: AmbitFont.body,
+    fontSize: 11,
+    fontWeight: '600',
+    color: Brand.accent,
+    letterSpacing: 0.2,
   },
 
   vibeRow: {
