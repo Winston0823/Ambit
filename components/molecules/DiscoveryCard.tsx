@@ -24,7 +24,11 @@ import {
 import type { DiscoveryCardData, PortfolioItem } from '../../data/mock';
 import { CAMPUSES } from '../../data/mock';
 
-const FOOTER_HEIGHT = 76; // pinned Reach Out footer
+/// Small floating reach-out button anchored in the card's top-left
+/// corner. 38pt circle so it reads as a deliberate UI affordance
+/// without dominating the hero; 14pt inset clears the card's
+/// rounded corner.
+const REACH_BTN_SIZE = 38;
 
 interface Props {
   card: DiscoveryCardData;
@@ -38,9 +42,10 @@ interface Props {
   /// ID of the portfolio item whose modal is currently visible — that bubble
   /// gets a faint brand ring so the user keeps spatial context.
   activePortfolioId?: string | null;
-  /// Called when the user taps the pinned "Reach out" footer button. Parent
-  /// opens the ReachOutComposer modal in response. Decoupled from the
-  /// swipe-deck gestures, which now only handle horizontal pass/save.
+  /// Called when the user taps the floating reach-out bubble in the
+  /// card's top-left corner. Parent opens the ReachOutComposer modal in
+  /// response. Decoupled from the swipe-deck gestures, which still
+  /// reveal the composer on swipe-up.
   onReachOut?: (card: DiscoveryCardData) => void;
 }
 
@@ -80,14 +85,14 @@ export function DiscoveryCard({
         )}
       </ScrollView>
 
-      <ReachOutFooter onPress={() => onReachOut?.(card)} />
+      <ReachOutBubble onPress={() => onReachOut?.(card)} />
     </View>
   );
 }
 
-// ─── Pinned footer with Reach Out button ──────────────────────────────────
+// ─── Floating reach-out button (top-left of card) ─────────────────────────
 
-function ReachOutFooter({ onPress }: { onPress: () => void }) {
+function ReachOutBubble({ onPress }: { onPress: () => void }) {
   const press = () => {
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
@@ -95,19 +100,15 @@ function ReachOutFooter({ onPress }: { onPress: () => void }) {
     onPress();
   };
   return (
-    <View style={styles.footer} pointerEvents="box-none">
-      {/* Soft fade above the button so scrolling content fades behind it
-          instead of jamming against a hard edge */}
-      <LinearGradient
-        colors={['rgba(250, 246, 240, 0)', 'rgba(250, 246, 240, 0.98)']}
-        style={styles.footerFade}
-        pointerEvents="none"
-      />
-      <Pressable onPress={press} style={({ pressed }) => [styles.footerBtn, pressed && { opacity: 0.92 }]}>
-        <PaperPlaneTilt size={18} color={Brand.inkOnBrand} weight="fill" />
-        <Text style={styles.footerLabel}>Reach out</Text>
-      </Pressable>
-    </View>
+    <Pressable
+      onPress={press}
+      hitSlop={10}
+      style={({ pressed }) => [styles.reachBubble, pressed && { opacity: 0.85 }]}
+      accessibilityRole="button"
+      accessibilityLabel="Reach out"
+    >
+      <PaperPlaneTilt size={18} color={Brand.seekerInk} weight="fill" />
+    </Pressable>
   );
 }
 
@@ -271,44 +272,35 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Brand.borderSoft,
     overflow: 'hidden',
-    // Card is the positioning context for the absolute-pinned footer.
+    // Card is the positioning context for the floating reach-out bubble.
     position: 'relative',
   },
   scroll: { flex: 1 },
   scrollPad: {
-    // Bottom padding clears the pinned footer so the last item never gets
-    // hidden behind it.
-    paddingBottom: FOOTER_HEIGHT + Space.lg,
+    paddingBottom: Space.lg,
   },
 
-  // ── Pinned Reach Out footer ─────────────────────────────────────────────
-  footer: {
+  // ── Floating reach-out bubble (top-left, absolute) ──────────────────────
+  // Cream-on-warm circle with a soft shadow so it lifts off the card's
+  // gradient hero. Tap target boosted with hitSlop on the Pressable.
+  reachBubble: {
     position: 'absolute',
-    left: 0, right: 0, bottom: 0,
-    paddingHorizontal: Space.lg,
-    paddingBottom: 16,
-    paddingTop: 12,
-  },
-  footerFade: {
-    position: 'absolute',
-    left: 0, right: 0, top: -28,
-    height: 40,
-  },
-  footerBtn: {
-    flexDirection: 'row',
+    top: 14,
+    left: 14,
+    width: REACH_BTN_SIZE,
+    height: REACH_BTN_SIZE,
+    borderRadius: REACH_BTN_SIZE / 2,
+    backgroundColor: Brand.canvas,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 10,
-    minHeight: 52,
-    backgroundColor: Brand.primary,
-    borderRadius: Radii.md,
-  },
-  footerLabel: {
-    fontFamily: AmbitFont.body,
-    fontSize: 16,
-    fontWeight: '600',
-    color: Brand.inkOnBrand,
-    letterSpacing: 0.2,
+    // Elevation against the gradient hero — light enough not to feel
+    // skeuomorphic, dark enough to read as a floating affordance.
+    shadowColor: '#000',
+    shadowOpacity: 0.18,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 4,
+    zIndex: 10,
   },
 
   // ── Photo hero (seeker) ────────────────────────────────────────────────

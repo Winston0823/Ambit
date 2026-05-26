@@ -36,6 +36,12 @@ interface Props {
   /// Optimistic-send state for my own messages. Defaults to 'sent' if the
   /// message has been confirmed by the server.
   status?:       MessageStatus;
+  /// Avatar URL of the message sender. Rounded-square thumbnail rendered
+  /// next to the bubble (left for partner, right for mine). Null falls
+  /// back to a colored initial.
+  avatarUrl?:    string | null;
+  /// Display name of the sender (used for the initial-fallback avatar).
+  senderName?:   string;
   /// Tap reaction chip → toggle off / on (caller routes to toggleReaction).
   onToggleReaction: (emoji: string) => void;
   /// Long press → action sheet (react / reply / copy / edit / delete).
@@ -73,6 +79,36 @@ function useAttachmentUrl(path: string | null): string | null {
   return url;
 }
 
+/// Rounded-square avatar rendered next to each bubble. 32pt with 8pt
+/// radius (App-Store-icon vibe). Falls back to the sender's first
+/// initial on a muted surface when no photo is available, and also
+/// when the remote image fails to load.
+function Avatar({
+  url,
+  name,
+}: {
+  url?: string | null;
+  name?: string;
+}) {
+  const [failed, setFailed] = useState(false);
+  const initial = (name ?? '?').trim().slice(0, 1).toUpperCase() || '?';
+  const showImage = !!url && !failed;
+  return (
+    <View style={styles.avatar}>
+      {showImage ? (
+        <Image
+          source={{ uri: url! }}
+          style={styles.avatarImg}
+          resizeMode="cover"
+          onError={() => setFailed(true)}
+        />
+      ) : (
+        <Text style={styles.avatarInitial}>{initial}</Text>
+      )}
+    </View>
+  );
+}
+
 export function MessageBubble({
   message,
   isMine,
@@ -82,6 +118,8 @@ export function MessageBubble({
   partnerLastReadAt,
   meId,
   status = 'sent',
+  avatarUrl,
+  senderName,
   onToggleReaction,
   onLongPress,
   onRetry,
@@ -89,6 +127,23 @@ export function MessageBubble({
   const attachmentUrl = useAttachmentUrl(message.attachment_url);
   const isDeleted = !!message.deleted_at;
   const wasEdited = !!message.edited_at && !isDeleted;
+  const kind = message.kind ?? 'user';
+
+  // System messages (closure-loop) render as a centered banner pill
+  // rather than a speech bubble. Reactions / read receipts / replies
+  // don't apply to them.
+  if (kind !== 'user') {
+    return (
+      <View style={styles.systemRow}>
+        <View style={[styles.systemPill, kindToPillStyle(kind)]}>
+          <Text style={styles.systemText}>
+            {systemPrefix(kind, nameById[message.sender_id])}
+            {message.body ? `: ${message.body}` : ''}
+          </Text>
+        </View>
+      </View>
+    );
+  }
 
   const readByPartner =
     isMine &&
@@ -103,18 +158,23 @@ export function MessageBubble({
 
   return (
     <View style={[styles.row, isMine ? styles.rowMine : styles.rowTheirs]}>
-      <Pressable
-        onLongPress={isDeleted ? undefined : onLongPress}
-        onPress={isMine && status === 'failed' ? onRetry : undefined}
-        delayLongPress={250}
-        style={[
-          styles.bubble,
-          isMine ? styles.bubbleMine : styles.bubbleTheirs,
-          isDeleted && styles.bubbleDeleted,
-          isMine && status === 'sending' && styles.bubblePending,
-          isMine && status === 'failed' && styles.bubbleFailed,
-        ]}
-      >
+      {/* Inner row aligns the avatar to the bubble's bottom edge —
+          iMessage pattern. Partner avatar on the LEFT (outside-of-
+          screen-edge side), mine on the RIGHT for the mirror. */}
+      <View style={styles.bubbleRow}>
+        {!isMine && <Avatar url={avatarUrl} name={senderName} />}
+        <Pressable
+          onLongPress={isDeleted ? undefined : onLongPress}
+          onPress={isMine && status === 'failed' ? onRetry : undefined}
+          delayLongPress={250}
+          style={[
+            styles.bubble,
+            isMine ? styles.bubbleMine : styles.bubbleTheirs,
+            isDeleted && styles.bubbleDeleted,
+            isMine && status === 'sending' && styles.bubblePending,
+            isMine && status === 'failed' && styles.bubbleFailed,
+          ]}
+        >
         {/* Reply preview — small bar above the body that quotes the parent.
             For attachment-only parents, an inline Paperclip + "Photo" label
             stands in for the body. */}
@@ -199,6 +259,8 @@ export function MessageBubble({
           )}
         </View>
       </Pressable>
+        {isMine && <Avatar url={avatarUrl} name={senderName} />}
+      </View>
 
       {/* Reactions row sits under the bubble, on the same side. */}
       {Object.keys(groupedReactions).length > 0 && (
@@ -233,6 +295,34 @@ function formatTime(iso: string): string {
   return `${h}:${m} ${am ? 'AM' : 'PM'}`;
 }
 
+/// Friendly prefix for system-message rendering. We swap the sender's
+/// name (or "They") in to anchor whose action triggered the banner.
+function systemPrefix(kind: NonNullable<MessageRow['kind']>, senderDisplayName?: string): string {
+  const who = senderDisplayName ?? 'They';
+  switch (kind) {
+    case 'system_pass':            return `${who} passed`;
+    case 'system_hire_proposed':   return `${who} proposed marking this as Hired`;
+    case 'system_hired':           return `It's a match — hired!`;
+    case 'system_auto_declined':   return `${who} is reviewing other candidates`;
+    case 'user':
+    default:                       return '';
+  }
+}
+
+function kindToPillStyle(kind: NonNullable<MessageRow['kind']>) {
+  switch (kind) {
+    case 'system_hired':
+    case 'system_hire_proposed':
+      return styles.systemPillWarm;
+    case 'system_pass':
+    case 'system_auto_declined':
+      return styles.systemPillMuted;
+    case 'user':
+    default:
+      return null;
+  }
+}
+
 const styles = StyleSheet.create({
   row: {
     paddingHorizontal: Space.md,
@@ -241,8 +331,59 @@ const styles = StyleSheet.create({
   rowMine:   { alignItems: 'flex-end' },
   rowTheirs: { alignItems: 'flex-start' },
 
+  // Inner row that pairs the avatar with the bubble. alignItems:flex-end
+  // anchors the avatar to the bubble's bottom edge regardless of how
+  // tall the bubble grows (multi-line text, attached image, etc.).
+  bubbleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 8,
+  },
+
+  // Rounded-square avatar. 32pt with 8pt radius — App-Store-icon shape,
+  // distinct from the circular hero avatars elsewhere in the app.
+  avatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: Brand.surface2,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarImg: { width: '100%', height: '100%' },
+  avatarInitial: {
+    fontFamily: AmbitFont.body,
+    fontSize: 14,
+    fontWeight: '700',
+    color: Brand.inkLabel,
+  },
+
+  // System-message banner (closure-loop events). Centered, narrow, muted.
+  systemRow: {
+    paddingHorizontal: Space.lg,
+    marginVertical: 10,
+    alignItems: 'center',
+  },
+  systemPill: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 999,
+    maxWidth: '85%',
+  },
+  systemPillMuted: { backgroundColor: Brand.surface2 },
+  systemPillWarm:  { backgroundColor: Brand.seekerSurface },
+  systemText: {
+    fontFamily: AmbitFont.body,
+    fontSize: 13,
+    color: Brand.inkMuted,
+    textAlign: 'center',
+  },
+
   bubble: {
-    maxWidth: '78%',
+    // Reduced from 78% to 70% to make room for the side avatar without
+    // breaking the visual rhythm of multi-line messages.
+    maxWidth: '70%',
     borderRadius: Radii.lg,
     paddingHorizontal: 12,
     paddingVertical: 8,
@@ -345,7 +486,7 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 4,
     marginTop: 2,
-    maxWidth: '78%',
+    maxWidth: '70%',
   },
   reactionRowMine:   { justifyContent: 'flex-end' },
   reactionRowTheirs: { justifyContent: 'flex-start' },

@@ -6,3 +6,4 @@ export { DiscoveryOverview } from './DiscoveryOverview';
 export { ProjectForm } from './ProjectForm';
 export type { ProjectFormValues } from './ProjectForm';
 export { ChatComposer } from './ChatComposer';
+export { PartnerProfileIsland } from './PartnerProfileIsland';

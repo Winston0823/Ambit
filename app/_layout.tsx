@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { StyleSheet } from 'react-native';
 import { Slot } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -9,8 +9,7 @@ import { RoleProvider } from '../context/RoleContext';
 import { AuthProvider, useAuth } from '../context/AuthContext';
 import { SavedDeckProvider } from '../context/SavedDeckContext';
 import { Brand } from '../constants/theme';
-import { DebugMenuButton, DebugMenuSheet } from '../components/molecules';
-import { OnboardingFlow, OnboardingInline } from '../components/organisms';
+import { OnboardingInline } from '../components/organisms';
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
@@ -43,47 +42,22 @@ export default function RootLayout() {
 /// Any earlier conditional switch — e.g. unmounting during the transient
 /// `hasProfile === null` window that opens right after sign-up — would tear
 /// down the `OnboardingProvider` mid-flow, throwing away the email/password
-/// the user just typed and remounting a fresh splash. That's how landing
-/// on Welcome after EduEmail submit used to happen: unmount + remount raced
-/// the splash auto-advance.
+/// the user just typed and remounting a fresh splash.
 ///
 /// On cold boot, OnboardingInline mounts immediately so the splash plays;
 /// once the profile check resolves to `true`, Gate flips to the main app
-/// and the splash unmounts mid-animation (cleanup stops it cleanly). The
-/// debug menu still opens a separate modal OnboardingFlow for dev work.
+/// and the splash unmounts mid-animation.
 function Gate() {
   const { user, hasProfile, loading } = useAuth();
-  const [debugOpen, setDebugOpen] = useState(false);
-  const [debugOnboardingOpen, setDebugOnboardingOpen] = useState(false);
 
   const showMainApp = !loading && user != null && hasProfile === true;
 
-  return (
-    <>
-      {showMainApp ? (
-        <SafeAreaView style={styles.safe} edges={['top']}>
-          <Slot />
-        </SafeAreaView>
-      ) : (
-        <OnboardingInline onComplete={() => { /* AuthContext re-route handles it */ }} />
-      )}
-
-      <DebugMenuButton onPress={() => setDebugOpen(true)} />
-
-      <DebugMenuSheet
-        visible={debugOpen}
-        onClose={() => setDebugOpen(false)}
-        onStartOnboarding={() => {
-          setDebugOpen(false);
-          setTimeout(() => setDebugOnboardingOpen(true), 200);
-        }}
-      />
-
-      <OnboardingFlow
-        visible={debugOnboardingOpen}
-        onDismiss={() => setDebugOnboardingOpen(false)}
-      />
-    </>
+  return showMainApp ? (
+    <SafeAreaView style={styles.safe} edges={['top']}>
+      <Slot />
+    </SafeAreaView>
+  ) : (
+    <OnboardingInline onComplete={() => { /* AuthContext re-route handles it */ }} />
   );
 }
 

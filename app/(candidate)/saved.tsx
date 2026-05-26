@@ -19,7 +19,7 @@ import { DiscoveryRowSummary } from '../../components/molecules';
 import { useSavedDeck } from '../../context/SavedDeckContext';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
-import { reachOutOrReuse } from '../../lib/messaging';
+import { startConversationWithMessage } from '../../lib/messaging';
 import type { DiscoveryCardData } from '../../data/mock';
 import {
   AmbitFont,
@@ -72,13 +72,10 @@ export default function SavedScreen() {
     if (!text || !card || !user || sending) return;
     setSending(true);
     try {
-      let projectId:   string;
-      let seekerId:    string;
-      let otherUserId: string;
+      let projectId: string;
+      let seekerId:  string;
 
       if (card.kind === 'project') {
-        // Project card needs ownerId for user-pair dedup; placeholders
-        // don't have a real owner UUID.
         if (!UUID_RE.test(card.ownerId)) {
           Alert.alert(
             'Demo card',
@@ -87,9 +84,8 @@ export default function SavedScreen() {
           setSending(false);
           return;
         }
-        projectId   = card.id;
-        seekerId    = user.id;
-        otherUserId = card.ownerId;
+        projectId = card.id;
+        seekerId  = user.id;
         supabase
           .from('matches')
           .upsert(
@@ -98,8 +94,8 @@ export default function SavedScreen() {
           )
           .then(() => {});
       } else {
-        // Owner-saved seeker. Use owner's first active project as context
-        // for a NEW chat; ignored if an existing chat is reused.
+        // Owner-saved seeker. Use the owner's first active project as
+        // the conversation's project anchor.
         const { data: proj } = await supabase
           .from('projects')
           .select('id')
@@ -116,19 +112,17 @@ export default function SavedScreen() {
           setSending(false);
           return;
         }
-        projectId   = (proj as { id: string }).id;
-        seekerId    = card.id;
-        otherUserId = card.id;
+        projectId = (proj as { id: string }).id;
+        seekerId  = card.id;
       }
 
-      // Dedup by user pair — append to any existing chat with this
-      // person regardless of which project anchored it.
-      const { conversationId } = await reachOutOrReuse({
-        myUserId:    user.id,
-        otherUserId,
+      // Per-project semantics: each reach-out about a different project
+      // gets its own thread. The DB-side ON CONFLICT in
+      // start_conversation_with_message handles same-project dedup.
+      const conversationId = await startConversationWithMessage({
         projectId,
         seekerId,
-        body:        text,
+        body: text,
       });
       unsave(card.id);
       setComposing(null);

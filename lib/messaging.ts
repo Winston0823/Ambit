@@ -25,6 +25,10 @@ export interface MessageRow {
   edited_at:       string | null;
   deleted_at:      string | null;
   created_at:      string;
+  /// 'user' for normal participant messages; the rest are closure-loop
+  /// system messages rendered as centered banners rather than speech
+  /// bubbles. Server default = 'user' so legacy rows are fine.
+  kind?:           'user' | 'system_pass' | 'system_hire_proposed' | 'system_hired' | 'system_auto_declined';
 }
 
 export interface ReactionRow {
@@ -46,6 +50,14 @@ export interface InboxItem {
   last_message_sender_id:      string | null;
   last_message_deleted:        boolean;
   unread_count:                number;
+  /// Closure-loop fields. `status` drives badges + composer-disable in
+  /// the thread; `hired_proposed_by` lets the receiving side know to
+  /// show the Confirm banner; `auto_decline_at` is mostly informational.
+  status:                      'active' | 'passed' | 'hired_pending' | 'hired' | 'auto_declined';
+  pass_reason:                 string | null;
+  hired_at:                    string | null;
+  hired_proposed_by:           string | null;
+  auto_decline_at:             string | null;
 }
 
 export interface SearchHit {
@@ -74,84 +86,6 @@ export async function startConversationWithMessage(args: {
   });
   if (error) throw error;
   return data as string;
-}
-
-/// Most-recent conversation id between the two users, in either
-/// orientation — owner/seeker or seeker/owner. Null if none exists.
-///
-/// The conversations table's unique constraint is (seeker_id, project_id)
-/// — so the existing RPC dedups by (seeker, project), not by user pair.
-/// Reach-out wants user-pair dedup ("my chat with Noah" not "my chat
-/// with Noah about Project A"), so we run our own lookup before falling
-/// back to the create RPC. Two queries because the participant pair can
-/// be stored in either orientation; we pick whichever returned a row, or
-/// the more recent one if both did (rare; only possible if the same
-/// person owns one project AND is a seeker on another the caller owns).
-export async function findExistingConversation(
-  myUserId: string,
-  otherUserId: string,
-): Promise<string | null> {
-  const [iAmOwner, iAmSeeker] = await Promise.all([
-    supabase
-      .from('conversations')
-      .select('id, last_message_at')
-      .eq('owner_id', myUserId)
-      .eq('seeker_id', otherUserId)
-      .order('last_message_at', { ascending: false })
-      .limit(1)
-      .maybeSingle(),
-    supabase
-      .from('conversations')
-      .select('id, last_message_at')
-      .eq('seeker_id', myUserId)
-      .eq('owner_id', otherUserId)
-      .order('last_message_at', { ascending: false })
-      .limit(1)
-      .maybeSingle(),
-  ]);
-  const candidates = [iAmOwner.data, iAmSeeker.data].filter(
-    (d): d is { id: string; last_message_at: string } => !!d,
-  );
-  if (candidates.length === 0) return null;
-  candidates.sort((a, b) => b.last_message_at.localeCompare(a.last_message_at));
-  return candidates[0].id;
-}
-
-/// Reach out by user pair, not by (seeker, project) pair.
-///
-/// If a conversation already exists between (myUserId, otherUserId) — in
-/// either orientation, anchored to any project — append the message to it
-/// and return that conversation id. Otherwise call the existing RPC to
-/// create a new conversation tied to projectId+seekerId.
-///
-/// The `reused` flag lets the caller decide whether to celebrate ("Sent!")
-/// or signal continuity ("Added to your chat with Noah").
-export async function reachOutOrReuse(args: {
-  myUserId:    string;
-  otherUserId: string;
-  /// Used only when creating a new conversation. Ignored if an existing
-  /// one is reused (we don't reassign the chat's project_id mid-thread).
-  projectId:   string;
-  /// Seeker side of the new conversation. For seeker-initiated reaches
-  /// this is myUserId; for owner-initiated this is otherUserId.
-  seekerId:    string;
-  body:        string;
-}): Promise<{ conversationId: string; reused: boolean }> {
-  const existing = await findExistingConversation(args.myUserId, args.otherUserId);
-  if (existing) {
-    await sendTextMessage({
-      conversationId: existing,
-      senderId:       args.myUserId,
-      body:           args.body,
-    });
-    return { conversationId: existing, reused: true };
-  }
-  const fresh = await startConversationWithMessage({
-    projectId: args.projectId,
-    seekerId:  args.seekerId,
-    body:      args.body,
-  });
-  return { conversationId: fresh, reused: false };
 }
 
 export async function getInbox(): Promise<InboxItem[]> {

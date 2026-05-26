@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { MagnifyingGlass } from 'phosphor-react-native';
-import { InboxRow } from '../../../components/molecules';
+import { InboxRow, PassReasonSheet } from '../../../components/molecules';
 import { useAuth } from '../../../context/AuthContext';
 import { supabase } from '../../../lib/supabase';
 import { getInbox, type InboxItem } from '../../../lib/messaging';
@@ -22,6 +22,10 @@ import { AmbitFont, Brand, Radii, Space } from '../../../constants/theme';
 export default function ChatTab() {
   const { user } = useAuth();
   const [items, setItems] = useState<InboxItem[] | null>(null);
+  /// Pass-reason sheet state. Mounted once at the screen level; each
+  /// InboxRow fires `onPassRequest(id)` to open it for a specific
+  /// conversation. `onPassed` flips the row's status optimistically.
+  const [passTargetId, setPassTargetId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!user) {
@@ -106,6 +110,7 @@ export default function ChatTab() {
                     params: { id: item.conversation_id },
                   })
                 }
+                onPassRequest={(id) => setPassTargetId(id)}
               />
             ) : null
           }
@@ -113,6 +118,24 @@ export default function ChatTab() {
           contentContainerStyle={{ paddingBottom: 100 }}
         />
       )}
+
+      <PassReasonSheet
+        visible={!!passTargetId}
+        conversationId={passTargetId}
+        onClose={() => setPassTargetId(null)}
+        onPassed={(id, reason) => {
+          // Optimistic: bump status locally so the row reflects passed
+          // state immediately. The next inbox refetch (or realtime
+          // postgres_changes event on messages) will confirm.
+          setItems((prev) =>
+            (prev ?? []).map((it) =>
+              it.conversation_id === id
+                ? { ...it, status: 'passed', pass_reason: reason }
+                : it,
+            ),
+          );
+        }}
+      />
     </View>
   );
 }

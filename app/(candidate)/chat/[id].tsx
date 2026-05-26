@@ -985,8 +985,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: Space.md,
     paddingTop: 6,
     paddingBottom: Space.md,
-    borderBottomWidth: 1,
-    borderBottomColor: Brand.borderDefault,
   },
   // 36pt circular pill used for back + overflow. Light gray surface
   // with a hairline border reads as a subtle button without competing
