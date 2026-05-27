@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   Animated,
+  Easing,
   Image,
   KeyboardAvoidingView,
   Modal,
@@ -48,32 +49,126 @@ export function PortfolioModal({ item, onDismiss, onSave, onDelete }: Props) {
   const [draftTitle, setDraftTitle] = useState('');
   const [draftDescription, setDraftDescription] = useState('');
 
-  // Fade + scale entry animation. Modal mounts with visible=true on the next
-  // tick so the animation always plays from 0 (no instant pop on rapid taps).
-  const scrimOpacity = useRef(new Animated.Value(0)).current;
-  const sheetScale  = useRef(new Animated.Value(0.94)).current;
-  const sheetOpacity = useRef(new Animated.Value(0)).current;
+  // Cinematic open/close choreography. The exit animation needs the
+  // modal to remain mounted through its end, so we keep a local
+  // `mounted` flag and defer the unmount until the exit settles.
+  //
+  // Entry (420ms): scrim fades first (0ms, 280ms ease-out expo), then
+  // sheet rises from 36px below with opacity + scale (60ms delay,
+  // 420ms ease-out expo), then content settles in (180ms delay, 280ms).
+  //
+  // Exit (260ms): everything dissolves in parallel with ease-in cubic.
+  // Sheet drifts down 12px while shrinking — feels weighty, not just gone.
+  const [mounted, setMounted] = useState(false);
+  const scrimOpacity     = useRef(new Animated.Value(0)).current;
+  const sheetOpacity     = useRef(new Animated.Value(0)).current;
+  const sheetScale       = useRef(new Animated.Value(0.92)).current;
+  const sheetTranslateY  = useRef(new Animated.Value(36)).current;
+  const contentOpacity   = useRef(new Animated.Value(0)).current;
+
+  // Ease-out expo — classic cinematic deceleration. Bezier matches the
+  // curve used elsewhere in the codebase (cubic-bezier(0.16, 1, 0.3, 1)).
+  const easeOutExpo = Easing.bezier(0.16, 1, 0.3, 1);
+  const easeInCubic = Easing.in(Easing.cubic);
 
   useEffect(() => {
     if (item) {
-      // Reset mode and drafts whenever a fresh item is opened.
+      // Mount, reset drafts, then animate in.
+      setMounted(true);
       setMode('view');
       setDraftTitle(item.title);
       setDraftDescription(item.description);
-      Animated.parallel([
-        Animated.timing(scrimOpacity, { toValue: 1, duration: 220, useNativeDriver: true }),
-        Animated.spring(sheetScale, { toValue: 1, friction: 8, tension: 110, useNativeDriver: true }),
-        Animated.timing(sheetOpacity, { toValue: 1, duration: 220, useNativeDriver: true }),
-      ]).start();
-    } else {
-      // Reset for next open
-      scrimOpacity.setValue(0);
-      sheetScale.setValue(0.94);
-      sheetOpacity.setValue(0);
-    }
-  }, [item, scrimOpacity, sheetScale, sheetOpacity]);
 
-  if (!item) return null;
+      // Reset all animated values to entry start positions.
+      scrimOpacity.setValue(0);
+      sheetOpacity.setValue(0);
+      sheetScale.setValue(0.92);
+      sheetTranslateY.setValue(36);
+      contentOpacity.setValue(0);
+
+      Animated.parallel([
+        // Stage 1 — scrim fades in (no delay).
+        Animated.timing(scrimOpacity, {
+          toValue: 1,
+          duration: 280,
+          easing: easeOutExpo,
+          useNativeDriver: true,
+        }),
+        // Stage 2 — sheet rises from below, scales up, and fades in.
+        // 60ms delay so the scrim leads.
+        Animated.timing(sheetOpacity, {
+          toValue: 1,
+          duration: 320,
+          delay: 60,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(sheetScale, {
+          toValue: 1,
+          duration: 420,
+          delay: 60,
+          easing: easeOutExpo,
+          useNativeDriver: true,
+        }),
+        Animated.timing(sheetTranslateY, {
+          toValue: 0,
+          duration: 420,
+          delay: 60,
+          easing: easeOutExpo,
+          useNativeDriver: true,
+        }),
+        // Stage 3 — interior content fades after the sheet is mostly in.
+        Animated.timing(contentOpacity, {
+          toValue: 1,
+          duration: 280,
+          delay: 180,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else if (mounted) {
+      // Item cleared — run exit animation, then unmount.
+      Animated.parallel([
+        Animated.timing(sheetOpacity, {
+          toValue: 0,
+          duration: 220,
+          easing: easeInCubic,
+          useNativeDriver: true,
+        }),
+        Animated.timing(sheetScale, {
+          toValue: 0.96,
+          duration: 260,
+          easing: easeInCubic,
+          useNativeDriver: true,
+        }),
+        Animated.timing(sheetTranslateY, {
+          toValue: 12,
+          duration: 260,
+          easing: easeInCubic,
+          useNativeDriver: true,
+        }),
+        Animated.timing(scrimOpacity, {
+          toValue: 0,
+          duration: 240,
+          easing: easeInCubic,
+          useNativeDriver: true,
+        }),
+      ]).start(({ finished }) => {
+        if (finished) setMounted(false);
+      });
+    }
+    // We intentionally exclude `mounted` from deps — including it would
+    // re-run the effect every time we set it false, which would loop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [item]);
+
+  // Capture the last item in a ref so we can keep rendering it through
+  // the exit animation after the parent has cleared `item`.
+  const lastItemRef = useRef<PortfolioItem | null>(null);
+  if (item) lastItemRef.current = item;
+  const displayItem = item ?? lastItemRef.current;
+
+  if (!mounted || !displayItem) return null;
 
   const isEditable = !!onSave;
   const canSave = mode === 'edit' && draftTitle.trim().length > 0;
@@ -96,7 +191,7 @@ export function PortfolioModal({ item, onDismiss, onSave, onDelete }: Props) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     }
     onSave({
-      ...item,
+      ...displayItem,
       title: draftTitle.trim(),
       description: draftDescription.trim(),
     });
@@ -107,14 +202,14 @@ export function PortfolioModal({ item, onDismiss, onSave, onDelete }: Props) {
     if (Platform.OS !== 'web') {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
     }
-    onDelete(item.id);
+    onDelete(displayItem.id);
   };
 
   return (
     <Modal
       transparent
       animationType="none"
-      visible={!!item}
+      visible={mounted}
       onRequestClose={onDismiss}
       statusBarTranslucent
     >
@@ -127,26 +222,33 @@ export function PortfolioModal({ item, onDismiss, onSave, onDelete }: Props) {
           <Pressable style={styles.scrim} onPress={handleScrimPress} />
         </Animated.View>
 
-        {/* Sheet — animated scale + opacity entry. */}
+        {/* Sheet — staged entry: opacity + scale + translateY rising
+            from below. Exit: scale down + drift down + fade. */}
         <Animated.View
           style={[
             styles.sheet,
-            { opacity: sheetOpacity, transform: [{ scale: sheetScale }] },
+            {
+              opacity: sheetOpacity,
+              transform: [
+                { translateY: sheetTranslateY },
+                { scale: sheetScale },
+              ],
+            },
           ]}
         >
           {/* Image hero */}
           <View style={styles.imgWrap}>
-            {item.imageUri ? (
-              <Image source={{ uri: item.imageUri }} style={styles.img} />
+            {displayItem.imageUri ? (
+              <Image source={{ uri: displayItem.imageUri }} style={styles.img} />
             ) : (
               <LinearGradient
-                colors={item.gradient}
+                colors={displayItem.gradient}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.img}
               >
                 <Text style={styles.imgInitial}>
-                  {(item.title[0] ?? '').toUpperCase()}
+                  {(displayItem.title[0] ?? '').toUpperCase()}
                 </Text>
               </LinearGradient>
             )}
@@ -164,12 +266,13 @@ export function PortfolioModal({ item, onDismiss, onSave, onDelete }: Props) {
             )}
           </View>
 
-          {/* Body */}
-          <View style={styles.body}>
+          {/* Body — wrapped in Animated.View so title + description
+              fade in slightly after the sheet has finished rising. */}
+          <Animated.View style={[styles.body, { opacity: contentOpacity }]}>
             {mode === 'view' ? (
               <>
-                <Text style={styles.title}>{item.title}</Text>
-                <Text style={styles.description}>{item.description}</Text>
+                <Text style={styles.title}>{displayItem.title}</Text>
+                <Text style={styles.description}>{displayItem.description}</Text>
               </>
             ) : (
               <>
@@ -211,7 +314,7 @@ export function PortfolioModal({ item, onDismiss, onSave, onDelete }: Props) {
                 </View>
               </>
             )}
-          </View>
+          </Animated.View>
         </Animated.View>
       </KeyboardAvoidingView>
     </Modal>

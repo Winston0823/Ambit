@@ -33,6 +33,20 @@ export const Brand = {
   // Nav-bar palette
   navBarBg:       'rgb(41, 41, 41)',   // dark gray, solid (matches SwiftUI Color(white: 0.16))
   navBarHairline: 'rgba(255,255,255,0.06)',
+
+  // Discovery card v2 — synthesis tokens (terracotta for skills, sage for Venn,
+  // brown glass for the liquid-glass CTA). Added 2026-05-26 with the g-synthesis
+  // port; see /tmp/ambit-card-explorations/g-synthesis.html for the mock.
+  terracotta:        '#C76F4A',
+  terracottaSurface: 'rgba(199, 111, 74, 0.06)',
+  terracottaBorder:  'rgba(199, 111, 74, 0.18)',
+  sage:              '#8A9B7A',
+  sageBg:            'rgba(138, 155, 122, 0.10)',
+  sageBorder:        'rgba(138, 155, 122, 0.22)',
+  glassInk:          'rgba(180, 128, 69, 0.88)',  // translucent accent tan — brand-signature warm color, opaque enough to read as primary action on cream
+  glassInkHover:     'rgba(180, 128, 69, 0.96)',
+  glassHighlight:    'rgba(255, 255, 255, 0.34)', // inset top edge — brighter "lit glass" feel
+  glassEdge:         'rgba(255, 255, 255, 0.28)', // outer hairline stroke so the pill's edge is defined on cream
 } as const;
 
 // ---------- Typography ----------

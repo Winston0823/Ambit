@@ -11,7 +11,8 @@ import { router } from 'expo-router';
 import { ArrowsClockwise, BookmarkSimple } from 'phosphor-react-native';
 import * as Haptics from 'expo-haptics';
 import { DiscoveryOverview, SwipeDeck } from '../../components/organisms';
-import { ReachOutComposer } from '../../components/molecules';
+import { PortfolioModal, ReachOutComposer } from '../../components/molecules';
+import type { PortfolioItem } from '../../data/mock';
 import { useProfileRole } from '../../hooks/useProfileRole';
 import { useSavedDeck } from '../../context/SavedDeckContext';
 import {
@@ -194,6 +195,28 @@ export default function DiscoveryFeed() {
   const [liveDeck, setLiveDeck] = useState<DiscoveryCardData[] | null>(null);
   const [deckLoading, setDeckLoading] = useState(false);
 
+  // Viewer's own skills — drives the matched-first ordering, the SHARED
+  // tags, and the shared-count in the OverlapVenn on every card. Loaded
+  // once on mount from the profiles row. Empty array on first paint /
+  // for users without skills; everything still renders, just without
+  // matches highlighted.
+  const [viewerSkills, setViewerSkills] = useState<string[]>([]);
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('skills')
+        .eq('id', user.id)
+        .maybeSingle();
+      if (cancelled) return;
+      const skills = (data as { skills: string[] | null } | null)?.skills ?? [];
+      setViewerSkills(skills);
+    })();
+    return () => { cancelled = true; };
+  }, [user]);
+
   const fetchDeck = useCallback(async () => {
     if (!user || roleLoading) return;
     setDeckLoading(true);
@@ -226,6 +249,11 @@ export default function DiscoveryFeed() {
   /// SwipeDeck pauses its PanResponder via gesturesDisabled while non-null so
   /// the deck doesn't swipe out from under the composer.
   const [reachOutCard, setReachOutCard] = useState<DiscoveryCardData | null>(null);
+
+  /// Portfolio item the user tapped to expand. Non-null = PortfolioModal
+  /// visible. Pause SwipeDeck gestures while open so the deck doesn't
+  /// swipe out from under the modal.
+  const [activePortfolio, setActivePortfolio] = useState<PortfolioItem | null>(null);
 
   const activeDeck = useMemo(
     () => [...reinserted, ...deck.filter((c) => !reinserted.some((r) => r.id === c.id))],
@@ -429,10 +457,13 @@ export default function DiscoveryFeed() {
         <SwipeDeck
           key={deckResetKey}
           deck={activeDeck}
+          matchedSkills={viewerSkills}
           onPass={handlePass}
           onSave={handleSave}
           onReachOut={setReachOutCard}
-          gesturesDisabled={!!reachOutCard}
+          onPortfolioPress={setActivePortfolio}
+          activePortfolioId={activePortfolio?.id ?? null}
+          gesturesDisabled={!!reachOutCard || !!activePortfolio}
           emptyState={<DeckExhausted onRefresh={handleRefresh} />}
         />
       )}
@@ -444,6 +475,15 @@ export default function DiscoveryFeed() {
         card={reachOutCard}
         onDismiss={() => setReachOutCard(null)}
         onSend={handleMessage}
+      />
+
+      {/* Portfolio detail — opens when the user taps the "Currently
+          shipping" preview tile on a card. View-mode only (no onSave /
+          onDelete), so the modal just surfaces the description and
+          dismisses on scrim tap. */}
+      <PortfolioModal
+        item={activePortfolio}
+        onDismiss={() => setActivePortfolio(null)}
       />
     </View>
   );

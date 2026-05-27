@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import {
+  Animated,
   Image,
   Platform,
   Pressable,
@@ -9,56 +10,38 @@ import {
   View,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { MapPin, PaperPlaneTilt, Sparkle } from 'phosphor-react-native';
+import { BlurView } from 'expo-blur';
+import Svg, { Path, Circle, Text as SvgText } from 'react-native-svg';
+import { PaperPlaneTilt } from 'phosphor-react-native';
 import * as Haptics from 'expo-haptics';
-import { Chip } from '../atoms';
-import { PortfolioBubble } from './PortfolioBubble';
-import { SpeechBubble } from './SpeechBubble';
 import {
   Brand,
   AmbitFont,
   Radii,
   Space,
-  TypeScale,
 } from '../../constants/theme';
 import type { DiscoveryCardData, PortfolioItem } from '../../data/mock';
 import { CAMPUSES } from '../../data/mock';
 
-/// Small floating reach-out button anchored in the card's top-left
-/// corner. 38pt circle so it reads as a deliberate UI affordance
-/// without dominating the hero; 14pt inset clears the card's
-/// rounded corner.
-const REACH_BTN_SIZE = 38;
-
 interface Props {
   card: DiscoveryCardData;
-  /// Project skills the seeker's chips should be highlighted against. Only
-  /// meaningful for the 'seeker' variant; passing it on a project card is a
-  /// no-op. Empty array or undefined = no highlighting.
+  /// Skills the viewer cares about (their project's skill list when an
+  /// owner is viewing seekers, the viewer's own skill list when a seeker
+  /// is viewing projects). Used to compute the shared-skill count in the
+  /// Venn diagram and to tag matched skills in the capability list.
   matchedSkills?: string[];
-  /// Called when a portfolio bubble is tapped. Parent owns the modal state
-  /// so the swipe deck can pause its PanResponder while the modal is open.
   onPortfolioPress?: (item: PortfolioItem) => void;
-  /// ID of the portfolio item whose modal is currently visible — that bubble
-  /// gets a faint brand ring so the user keeps spatial context.
   activePortfolioId?: string | null;
-  /// Called when the user taps the floating reach-out bubble in the
-  /// card's top-left corner. Parent opens the ReachOutComposer modal in
-  /// response. Decoupled from the swipe-deck gestures, which still
-  /// reveal the composer on swipe-up.
   onReachOut?: (card: DiscoveryCardData) => void;
 }
 
-/// The visual half of a Discovery card. Pure render — no gestures, no state.
-/// Two variants via discriminated union on `kind`:
+/// Discovery card — visual half only. No gestures, no state. SwipeDeck
+/// wraps this with the PanResponder.
 ///
-///   - 'seeker'  → Owner sees this. Photo hero + speech-bubble vibe +
-///                 highlighted skills + portfolio bubble row.
-///   - 'project' → Seeker sees this. Gradient hero + pitch + why-matched.
-///
-/// Both variants share the card chrome: cream surface, rounded border,
-/// scrollable body, and a pinned "Reach out" footer that opens the
-/// composer modal. Variants render content only.
+/// Layout matches g-synthesis.html: framed square photo, identity, vibe
+/// pull-quote with a giant decorative SVG curl behind it, terracotta
+/// wave-glyph skill rows, portfolio preview (seeker only), Venn overlap,
+/// liquid-glass brown CTA pinned at the bottom.
 export function DiscoveryCard({
   card,
   matchedSkills,
@@ -66,6 +49,10 @@ export function DiscoveryCard({
   activePortfolioId,
   onReachOut,
 }: Props) {
+  const firstName = card.kind === 'seeker'
+    ? card.name.split(' ')[0]
+    : card.ownerName.split(' ')[0];
+
   return (
     <View style={styles.card}>
       <ScrollView
@@ -81,18 +68,30 @@ export function DiscoveryCard({
             activePortfolioId={activePortfolioId}
           />
         ) : (
-          <ProjectContent card={card} />
+          <ProjectContent card={card} matchedSkills={matchedSkills} />
         )}
       </ScrollView>
 
-      <ReachOutBubble onPress={() => onReachOut?.(card)} />
+      <ReachOutLiquidGlass
+        firstName={firstName}
+        onPress={() => onReachOut?.(card)}
+      />
     </View>
   );
 }
 
-// ─── Floating reach-out button (top-left of card) ─────────────────────────
+// ─── Liquid-glass CTA ──────────────────────────────────────────────────────
+// BlurView captures content scrolling underneath natively (UIVisualEffectView
+// on iOS, FrameLayout blur on Android). Layered: blur → brown tint → top
+// highlight → contents.
 
-function ReachOutBubble({ onPress }: { onPress: () => void }) {
+function ReachOutLiquidGlass({
+  firstName,
+  onPress,
+}: {
+  firstName: string;
+  onPress: () => void;
+}) {
   const press = () => {
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
@@ -100,19 +99,296 @@ function ReachOutBubble({ onPress }: { onPress: () => void }) {
     onPress();
   };
   return (
-    <Pressable
-      onPress={press}
-      hitSlop={10}
-      style={({ pressed }) => [styles.reachBubble, pressed && { opacity: 0.85 }]}
-      accessibilityRole="button"
-      accessibilityLabel="Reach out"
-    >
-      <PaperPlaneTilt size={18} color={Brand.seekerInk} weight="fill" />
+    <View style={styles.ctaWrap} pointerEvents="box-none">
+      <Pressable
+        onPress={press}
+        style={({ pressed }) => [
+          styles.ctaContainer,
+          pressed && { transform: [{ scale: 0.985 }] },
+        ]}
+        accessibilityRole="button"
+        accessibilityLabel={`Reach out to ${firstName}`}
+      >
+        <BlurView intensity={48} tint="default" style={styles.ctaBlur}>
+          <View style={styles.ctaTint} pointerEvents="none" />
+          <View style={styles.ctaTopHighlight} pointerEvents="none" />
+          <PaperPlaneTilt size={16} color={Brand.cardCream} weight="fill" />
+          <Text style={styles.ctaLabel}>Reach out to {firstName}</Text>
+        </BlurView>
+      </Pressable>
+    </View>
+  );
+}
+
+// ─── Shared sub-components ─────────────────────────────────────────────────
+
+function Eyebrow({
+  children,
+  color = Brand.accent,
+}: {
+  children: string;
+  color?: string;
+}) {
+  return <Text style={[styles.eyebrow, { color }]}>{children}</Text>;
+}
+
+/// Square photo (1:1) inside D's thin warm-tan gradient hairline frame.
+/// Aspect ratio chosen for chat-avatar portability — same crop works
+/// in inbox row, chat header, discovery overview, etc.
+function FramedPhoto({
+  uri,
+  fallbackGradient,
+  fallbackInitials,
+}: {
+  uri: string | null;
+  fallbackGradient?: readonly [string, string];
+  fallbackInitials?: string;
+}) {
+  return (
+    <View style={styles.photoStage}>
+      <LinearGradient
+        colors={[Brand.accent, 'rgba(180, 128, 69, 0.32)']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.photoFrame}
+      >
+        <View style={styles.photoInner}>
+          {uri ? (
+            <Image source={{ uri }} style={styles.photoImg} resizeMode="cover" />
+          ) : (
+            <LinearGradient
+              colors={fallbackGradient ?? [Brand.primary, Brand.accent]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.photoFallback}
+            >
+              {fallbackInitials && (
+                <Text style={styles.photoFallbackInitials}>{fallbackInitials}</Text>
+              )}
+            </LinearGradient>
+          )}
+        </View>
+      </LinearGradient>
+    </View>
+  );
+}
+
+/// Vibe pull-quote — giant decorative italic curly quote glyph behind
+/// the italic body text. Using the system serif italic gives us the
+/// actual `“` character at large size (looks identical to the HTML
+/// mock's Fraunces fallback). RN renders this as a styled Text layer
+/// underneath the body Text via absolute positioning + zIndex.
+function VibePullQuote({ text }: { text: string }) {
+  return (
+    <View style={styles.vibePull}>
+      <Text
+        style={styles.vibeGlyph}
+        pointerEvents="none"
+        allowFontScaling={false}
+        numberOfLines={1}
+      >
+        {'“'}
+      </Text>
+      <Text style={styles.vibeText}>{text}</Text>
+    </View>
+  );
+}
+
+/// Single skill row with a wave-contour glyph in terracotta for matched
+/// skills (3 stacked sines at descending opacity) or muted gray for
+/// non-matched (single sine).
+function SkillRow({
+  label,
+  matched,
+}: {
+  label: string;
+  matched: boolean;
+}) {
+  const color = matched ? Brand.terracotta : Brand.inkLabel;
+  return (
+    <View style={styles.skillRow}>
+      <Svg width={24} height={14} viewBox="0 0 24 14">
+        <Path
+          d="M0 7 Q 6 2 12 7 T 24 7"
+          stroke={color}
+          strokeWidth={1.2}
+          fill="none"
+        />
+        {matched && (
+          <>
+            <Path
+              d="M0 11 Q 7 6 14 11 T 24 11"
+              stroke={color}
+              strokeWidth={1.2}
+              fill="none"
+              opacity={0.55}
+            />
+            <Path
+              d="M0 3 Q 8 -2 15 3 T 24 3"
+              stroke={color}
+              strokeWidth={1.2}
+              fill="none"
+              opacity={0.32}
+            />
+          </>
+        )}
+      </Svg>
+      <Text
+        style={[
+          styles.skillLabel,
+          matched && styles.skillLabelMatched,
+        ]}
+      >
+        {label}
+      </Text>
+      {matched && <Text style={styles.skillTag}>SHARED</Text>}
+    </View>
+  );
+}
+
+/// Portfolio preview tile — 16:10 cover (gradient placeholder until real
+/// project images land) + title only. Whole tile is pressable; the
+/// scale-spring press feedback (two-stage: snap down quick, spring back)
+/// makes the tap-to-modal feel physically connected. Pattern matches
+/// PortfolioBubble.tsx so the codebase's motion vocabulary stays coherent.
+function PortfolioPreview({
+  item,
+  active,
+  onPress,
+}: {
+  item: PortfolioItem;
+  active: boolean;
+  onPress: () => void;
+}) {
+  const scale = useRef(new Animated.Value(1)).current;
+  const onPressIn = () => {
+    Animated.spring(scale, {
+      toValue: 0.96,
+      friction: 8,
+      tension: 220,
+      useNativeDriver: true,
+    }).start();
+  };
+  const onPressOut = () => {
+    Animated.spring(scale, {
+      toValue: 1,
+      friction: 5,
+      tension: 180,
+      useNativeDriver: true,
+    }).start();
+  };
+  return (
+    <Pressable onPress={onPress} onPressIn={onPressIn} onPressOut={onPressOut}>
+      <Animated.View
+        style={[styles.portfolioPreview, { transform: [{ scale }] }]}
+      >
+        <View style={[styles.portfolioCover, active && styles.portfolioCoverActive]}>
+          {item.imageUri ? (
+            <Image source={{ uri: item.imageUri }} style={styles.portfolioCoverImg} resizeMode="cover" />
+          ) : (
+            <LinearGradient
+              colors={item.gradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.portfolioCoverFill}
+            >
+              <View style={styles.portfolioCoverOutline} pointerEvents="none" />
+            </LinearGradient>
+          )}
+        </View>
+        <Text style={styles.portfolioTitle} numberOfLines={1}>
+          {item.title}
+        </Text>
+      </Animated.View>
     </Pressable>
   );
 }
 
-// ─── Seeker content (owner's view of seekers) ─────────────────────────────
+/// The Overlap — two-circle Venn (warm tan + sage) with the shared-skill
+/// count and labeled axes. Visual anchor for "why you two", replaces a
+/// text-only why-line.
+function OverlapVenn({
+  sharedCount,
+  leftLabel,
+  rightLabel,
+}: {
+  sharedCount: number;
+  leftLabel: string;
+  rightLabel: string;
+}) {
+  return (
+    <View style={styles.overlap}>
+      <Svg
+        width="100%"
+        height={130}
+        viewBox="0 0 320 130"
+        preserveAspectRatio="xMidYMid meet"
+      >
+        <Circle
+          cx={125}
+          cy={65}
+          r={55}
+          fill="rgba(180, 128, 69, 0.18)"
+          stroke="rgba(180, 128, 69, 0.55)"
+          strokeWidth={1.5}
+        />
+        <Circle
+          cx={195}
+          cy={65}
+          r={55}
+          fill="rgba(138, 155, 122, 0.22)"
+          stroke="rgba(138, 155, 122, 0.6)"
+          strokeWidth={1.5}
+        />
+        <SvgText
+          x={160}
+          y={62}
+          fontSize={30}
+          fontStyle="italic"
+          textAnchor="middle"
+          fill={Brand.seekerInk}
+        >
+          {String(sharedCount)}
+        </SvgText>
+        <SvgText
+          x={160}
+          y={80}
+          fontSize={9}
+          fontWeight="700"
+          textAnchor="middle"
+          fill={Brand.seekerInk}
+          letterSpacing="2"
+        >
+          SHARED
+        </SvgText>
+        <SvgText
+          x={78}
+          y={125}
+          fontSize={10}
+          fontWeight="700"
+          textAnchor="middle"
+          fill={Brand.inkLabel}
+          letterSpacing="1.8"
+        >
+          {leftLabel.toUpperCase()}
+        </SvgText>
+        <SvgText
+          x={242}
+          y={125}
+          fontSize={10}
+          fontWeight="700"
+          textAnchor="middle"
+          fill={Brand.inkLabel}
+          letterSpacing="1.8"
+        >
+          {rightLabel.toUpperCase()}
+        </SvgText>
+      </Svg>
+    </View>
+  );
+}
+
+// ─── Seeker content ────────────────────────────────────────────────────────
 
 interface SeekerContentProps {
   card: Extract<DiscoveryCardData, { kind: 'seeker' }>;
@@ -127,142 +403,147 @@ function SeekerContent({
   onPortfolioPress,
   activePortfolioId,
 }: SeekerContentProps) {
-  const initial = card.name[0]?.toUpperCase() ?? '?';
   const campus = CAMPUSES.find((c) => c.id === card.campusId);
   const matchedSet = new Set((matchedSkills ?? []).map((s) => s.toLowerCase()));
-  const isMatched = (skill: string) => matchedSet.has(skill.toLowerCase());
+  const sharedCount = card.skills.filter((s) => matchedSet.has(s.toLowerCase())).length;
+  const ordered = [...card.skills].sort((a, b) => {
+    const am = matchedSet.has(a.toLowerCase()) ? 0 : 1;
+    const bm = matchedSet.has(b.toLowerCase()) ? 0 : 1;
+    return am - bm;
+  });
+  const featured = card.portfolio[0];
+  const firstName = card.name.split(' ')[0];
 
   return (
-    <>
-      {/* Photo hero — full-width band with name + campus on a dark scrim */}
-      <View style={styles.heroBand}>
-        {card.photoUri ? (
-          <Image source={{ uri: card.photoUri }} style={styles.heroImg} />
-        ) : (
-          <LinearGradient
-            colors={[Brand.primary, Brand.accent]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.heroImg}
-          >
-            <Text style={styles.heroInitial}>{initial}</Text>
-          </LinearGradient>
-        )}
-        <LinearGradient
-          colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.55)']}
-          style={styles.heroScrim}
-          pointerEvents="none"
-        />
-        <View style={styles.heroTextBlock}>
-          <Text style={styles.heroName} numberOfLines={1}>{card.name}</Text>
-          {campus && (
-            <View style={styles.heroCampusRow}>
-              <MapPin size={13} color="rgba(255,255,255,0.92)" weight="fill" />
-              <Text style={styles.heroCampus} numberOfLines={1}>{campus.name}</Text>
-            </View>
-          )}
+    <View style={styles.body}>
+      <FramedPhoto uri={card.photoUri} />
+
+      <View style={styles.identity}>
+        <Text style={styles.name}>{card.name}</Text>
+        <Text style={styles.role} numberOfLines={1}>
+          {campus ? `${campus.name}` : ''}
+        </Text>
+      </View>
+
+      {card.vibeBlurb !== '' && <VibePullQuote text={card.vibeBlurb} />}
+
+      {card.skills.length > 0 && (
+        <View style={styles.section}>
+          <Eyebrow>WHAT THEY BUILD</Eyebrow>
+          <View style={styles.skillsBox}>
+            {ordered.map((s) => (
+              <SkillRow
+                key={s}
+                label={s}
+                matched={matchedSet.has(s.toLowerCase())}
+              />
+            ))}
+          </View>
         </View>
-      </View>
+      )}
 
-      <View style={styles.body}>
-        {card.vibeBlurb !== '' && (
-          <View>
-            <Text style={styles.promptLabel}>IN THEIR WORDS</Text>
-            <SpeechBubble color={Brand.seekerSurface} tailAnchor="top-left" tailOffset={20}>
-              <Text style={styles.vibePrompt}>{card.vibeBlurb}</Text>
-            </SpeechBubble>
-          </View>
-        )}
+      {featured && (
+        <View style={styles.section}>
+          <Eyebrow>CURRENTLY SHIPPING</Eyebrow>
+          <PortfolioPreview
+            item={featured}
+            active={activePortfolioId === featured.id}
+            onPress={() => onPortfolioPress?.(featured)}
+          />
+        </View>
+      )}
 
-        {card.skills.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionLabel}>SKILLS</Text>
-            <View style={styles.chipRow}>
-              {card.skills.map((s) => (
-                <Chip key={s} label={s} selected={isMatched(s)} />
-              ))}
-            </View>
-          </View>
-        )}
-
-        {card.portfolio.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionLabel}>PORTFOLIO</Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.portfolioRow}
-            >
-              {card.portfolio.map((item) => (
-                <PortfolioBubble
-                  key={item.id}
-                  item={item}
-                  onPress={() => onPortfolioPress?.(item)}
-                  active={activePortfolioId === item.id}
-                />
-              ))}
-            </ScrollView>
-          </View>
-        )}
-      </View>
-    </>
+      {(sharedCount > 0 || campus) && (
+        <View style={styles.section}>
+          <Eyebrow>THE OVERLAP</Eyebrow>
+          <OverlapVenn
+            sharedCount={sharedCount}
+            leftLabel={firstName}
+            rightLabel="You"
+          />
+        </View>
+      )}
+    </View>
   );
 }
 
-// ─── Project content (seeker's view of projects) ──────────────────────────
+// ─── Project content ───────────────────────────────────────────────────────
 
-function ProjectContent({ card }: { card: Extract<DiscoveryCardData, { kind: 'project' }> }) {
+interface ProjectContentProps {
+  card: Extract<DiscoveryCardData, { kind: 'project' }>;
+  matchedSkills?: string[];
+}
+
+function ProjectContent({ card, matchedSkills }: ProjectContentProps) {
   const initials = card.title
     .split(' ')
     .slice(0, 2)
     .map((w) => w[0]?.toUpperCase() ?? '')
     .join('');
   const campus = CAMPUSES.find((c) => c.id === card.ownerCampusId);
+  const matchedSet = new Set((matchedSkills ?? []).map((s) => s.toLowerCase()));
+  const sharedCount = card.skillsSought.filter((s) => matchedSet.has(s.toLowerCase())).length;
+  const ordered = [...card.skillsSought].sort((a, b) => {
+    const am = matchedSet.has(a.toLowerCase()) ? 0 : 1;
+    const bm = matchedSet.has(b.toLowerCase()) ? 0 : 1;
+    return am - bm;
+  });
+  const ownerFirstName = card.ownerName.split(' ')[0];
 
   return (
-    <>
-      <LinearGradient
-        colors={card.gradient}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.projectHero}
-      >
-        <Text style={styles.heroInitials}>{initials}</Text>
-      </LinearGradient>
+    <View style={styles.body}>
+      <FramedPhoto
+        uri={null}
+        fallbackGradient={card.gradient}
+        fallbackInitials={initials}
+      />
 
-      <View style={styles.projectBody}>
-        <Text style={styles.projectTitle}>{card.title}</Text>
-        <Text style={styles.pitch}>{card.pitch}</Text>
-
+      <View style={styles.identity}>
+        <Text style={styles.name} numberOfLines={2}>{card.title}</Text>
         <View style={styles.ownerRow}>
           <View style={styles.ownerAvatar}>
-            <Text style={styles.ownerAvatarText}>{card.ownerName[0]}</Text>
+            {card.ownerPhotoUri ? (
+              <Image source={{ uri: card.ownerPhotoUri }} style={styles.ownerAvatarImg} />
+            ) : (
+              <Text style={styles.ownerAvatarInitial}>{card.ownerName[0]}</Text>
+            )}
           </View>
-          <Text style={styles.ownerText} numberOfLines={1}>
-            {card.ownerName}
-            {campus && <Text style={styles.ownerDot}>  ·  {campus.name}</Text>}
+          <Text style={styles.role} numberOfLines={1}>
+            {card.ownerName}{campus ? ` · ${campus.name}` : ''}
           </Text>
         </View>
+      </View>
 
-        <View style={styles.whyRow}>
-          <Sparkle size={14} color={Brand.accent} weight="fill" />
-          <Text style={styles.whyText}>{card.whyMatched}</Text>
-        </View>
+      {card.pitch !== '' && <VibePullQuote text={card.pitch} />}
 
+      {card.skillsSought.length > 0 && (
         <View style={styles.section}>
-          <Text style={styles.sectionLabel}>LOOKING FOR</Text>
-          <View style={styles.chipRow}>
-            {card.skillsSought.map((s) => (
-              <Chip key={s} label={s} selected={false} />
+          <Eyebrow>LOOKING FOR</Eyebrow>
+          <View style={styles.skillsBox}>
+            {ordered.map((s) => (
+              <SkillRow
+                key={s}
+                label={s}
+                matched={matchedSet.has(s.toLowerCase())}
+              />
             ))}
           </View>
         </View>
+      )}
+
+      <View style={styles.section}>
+        <Eyebrow>THE OVERLAP</Eyebrow>
+        <OverlapVenn
+          sharedCount={sharedCount}
+          leftLabel={ownerFirstName}
+          rightLabel="You"
+        />
       </View>
-    </>
+    </View>
   );
 }
 
-// ─── Styles ─────────────────────────────────────────────────────────────────
+// ─── Styles ────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   card: {
@@ -272,194 +553,294 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Brand.borderSoft,
     overflow: 'hidden',
-    // Card is the positioning context for the floating reach-out bubble.
     position: 'relative',
   },
   scroll: { flex: 1 },
   scrollPad: {
-    paddingBottom: Space.lg,
+    paddingBottom: 110, // clear the floating CTA
   },
 
-  // ── Floating reach-out bubble (top-left, absolute) ──────────────────────
-  // Cream-on-warm circle with a soft shadow so it lifts off the card's
-  // gradient hero. Tap target boosted with hitSlop on the Pressable.
-  reachBubble: {
-    position: 'absolute',
-    top: 14,
-    left: 14,
-    width: REACH_BTN_SIZE,
-    height: REACH_BTN_SIZE,
-    borderRadius: REACH_BTN_SIZE / 2,
-    backgroundColor: Brand.canvas,
+  body: {
+    paddingHorizontal: 24,
+    paddingTop: 26,
+    gap: 30,
+  },
+
+  // ── Photo frame (square, gradient hairline) ─────────────────────────────
+  photoStage: {
+    width: '100%',
+    aspectRatio: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    // Elevation against the gradient hero — light enough not to feel
-    // skeuomorphic, dark enough to read as a floating affordance.
-    shadowColor: '#000',
-    shadowOpacity: 0.18,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 4,
-    zIndex: 10,
   },
-
-  // ── Photo hero (seeker) ────────────────────────────────────────────────
-  heroBand: {
+  photoFrame: {
+    width: '86%',
+    aspectRatio: 1,
+    padding: 1,
+    borderRadius: 13,
+    shadowColor: '#4D361D',
+    shadowOpacity: 0.22,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 18 },
+    elevation: 6,
+  },
+  photoInner: {
     width: '100%',
-    height: 320,
-    position: 'relative',
-    backgroundColor: Brand.seekerSurface,
+    height: '100%',
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: Brand.cardCream,
   },
-  heroImg: {
+  photoImg: {
+    width: '100%',
+    height: '100%',
+  },
+  photoFallback: {
     width: '100%',
     height: '100%',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  heroInitial: {
+  photoFallbackInitials: {
     fontFamily: AmbitFont.display,
-    fontSize: 120,
-    color: 'rgba(255, 255, 255, 0.92)',
-    letterSpacing: 2,
-  },
-  heroScrim: {
-    position: 'absolute',
-    left: 0, right: 0, bottom: 0,
-    height: 140,
-  },
-  heroTextBlock: {
-    position: 'absolute',
-    left: Space.lg, right: Space.lg, bottom: 18,
-  },
-  heroName: {
-    fontFamily: AmbitFont.display,
-    fontSize: 32,
-    color: '#FFFFFF',
-    letterSpacing: 0.3,
-  },
-  heroCampusRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    marginTop: 4,
-  },
-  heroCampus: {
-    fontFamily: AmbitFont.body,
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.92)',
-    fontWeight: '500',
-  },
-
-  // ── Body (everything below the hero) ───────────────────────────────────
-  body: {
-    paddingHorizontal: Space.lg,
-    paddingTop: Space.lg + 4,
-    gap: 28,
-  },
-
-  // ── Hinge-style prompt label + display-serif answer ────────────────────
-  promptLabel: {
-    fontFamily: AmbitFont.body,
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 1.6,
-    color: Brand.accent,
-    marginBottom: 12,
-  },
-  vibePrompt: {
-    fontFamily: AmbitFont.display,
-    fontSize: 20,
-    color: Brand.seekerInk,
-    lineHeight: 28,
-  },
-
-  // ── Shared ──────────────────────────────────────────────────────────────
-  section: {
-    gap: 12,
-  },
-  sectionLabel: {
-    fontFamily: AmbitFont.body,
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 1.4,
-    color: Brand.inkLabel,
-  },
-  chipRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
-  portfolioRow: {
-    gap: 18,
-    paddingRight: Space.lg,
-  },
-
-  // ── Project variant ────────────────────────────────────────────────────
-  projectHero: {
-    height: 180,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  heroInitials: {
-    fontFamily: AmbitFont.display,
-    fontSize: 64,
+    fontSize: 72,
     color: 'rgba(255, 255, 255, 0.88)',
     letterSpacing: 2,
   },
-  projectBody: {
-    flex: 1,
-    padding: Space.lg,
-    gap: 14,
+
+  // ── Identity ────────────────────────────────────────────────────────────
+  identity: {
+    gap: 8,
   },
-  projectTitle: {
+  name: {
     fontFamily: AmbitFont.display,
-    fontSize: 26,
-    color: Brand.inkPrimary,
-    lineHeight: 32,
+    fontSize: 34,
+    lineHeight: 36,
+    color: Brand.seekerInk,
+    letterSpacing: -0.4,
   },
-  pitch: {
-    ...TypeScale.lead,
-    color: Brand.inkBody,
-    lineHeight: 23,
+  role: {
+    fontFamily: AmbitFont.body,
+    fontSize: 13,
+    color: Brand.inkLabel,
+    fontWeight: '500',
+    letterSpacing: 0.1,
   },
   ownerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 8,
   },
   ownerAvatar: {
     width: 24,
     height: 24,
-    borderRadius: Radii.full,
+    borderRadius: 12,
     backgroundColor: Brand.seekerSurface,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
   },
-  ownerAvatarText: {
+  ownerAvatarImg: { width: '100%', height: '100%' },
+  ownerAvatarInitial: {
     fontFamily: AmbitFont.body,
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
     color: Brand.seekerInk,
   },
-  ownerText: {
-    ...TypeScale.helper,
-    color: Brand.inkBody,
-    flex: 1,
+
+  // ── Vibe pull-quote ─────────────────────────────────────────────────────
+  vibePull: {
+    position: 'relative',
+    paddingTop: 16,
+    paddingLeft: 0,
+    paddingRight: 4,
+    paddingBottom: 4,
   },
-  ownerDot: { color: Brand.inkMuted },
-  whyRow: {
+  // Giant decorative italic curly quote behind the vibe text. Letting
+  // RN compute lineHeight from fontSize avoids clipping (a smaller
+  // lineHeight cropped the 160px glyph to small bottom slivers). The
+  // visible curl portion of an italic " sits in the upper ~40% of the
+  // em-box; with a slightly negative top, the curl lands across the
+  // first words of the vibe text below.
+  vibeGlyph: {
+    position: 'absolute',
+    top: -40,
+    left: -8,
+    width: 260,             // wide enough for the full double-curl glyph
+    fontSize: 170,
+    fontFamily: Platform.select({ ios: 'Georgia', android: 'serif', default: 'serif' }),
+    fontStyle: 'italic',
+    color: Brand.primary,
+    opacity: 0.5,
+    letterSpacing: -2,
+    includeFontPadding: false,
+    zIndex: 0,
+  },
+  vibeText: {
+    position: 'relative',
+    zIndex: 1,
+    fontFamily: Platform.select({ ios: 'Georgia', android: 'serif', default: 'serif' }),
+    fontStyle: 'italic',
+    fontSize: 24,
+    lineHeight: 32,
+    color: Brand.seekerInk,
+    letterSpacing: -0.3,
+  },
+
+  // ── Section ─────────────────────────────────────────────────────────────
+  section: {
+    gap: 14,
+  },
+  eyebrow: {
+    fontFamily: AmbitFont.body,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1.8,
+    textTransform: 'uppercase',
+  },
+
+  // ── Skills (terracotta wave glyphs) ─────────────────────────────────────
+  skillsBox: {
+    backgroundColor: Brand.terracottaSurface,
+    borderColor: Brand.terracottaBorder,
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    gap: 10,
+  },
+  skillRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    backgroundColor: Brand.seekerSurface,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    borderRadius: Radii.sm,
-    alignSelf: 'flex-start',
+    gap: 12,
   },
-  whyText: {
-    ...TypeScale.helper,
+  skillLabel: {
+    fontFamily: AmbitFont.body,
+    fontSize: 15,
+    color: Brand.inkBody,
+    fontWeight: '500',
+    flex: 1,
+  },
+  skillLabelMatched: {
     color: Brand.seekerInk,
     fontWeight: '600',
+  },
+  skillTag: {
+    fontFamily: AmbitFont.body,
+    fontSize: 9.5,
+    fontWeight: '700',
+    color: Brand.terracotta,
+    letterSpacing: 1.7,
+    textTransform: 'uppercase',
+  },
+
+  // ── Portfolio preview (16:10 cover, title only) ─────────────────────────
+  portfolioPreview: {
+    gap: 12,
+  },
+  portfolioCover: {
+    width: '100%',
+    aspectRatio: 16 / 10,
+    borderRadius: 14,
+    overflow: 'hidden',
+    shadowColor: '#4D361D',
+    shadowOpacity: 0.24,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 12 },
+    elevation: 4,
+  },
+  portfolioCoverActive: {
+    // subtle ring when matching modal is open
+    borderWidth: 1.5,
+    borderColor: Brand.accent,
+  },
+  portfolioCoverFill: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  portfolioCoverOutline: {
+    position: 'absolute',
+    top: 38,
+    left: 90,
+    right: 90,
+    bottom: 38,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.36)',
+  },
+  portfolioCoverImg: {
+    width: '100%',
+    height: '100%',
+  },
+  portfolioTitle: {
+    fontFamily: AmbitFont.display,
+    fontSize: 19,
+    color: Brand.seekerInk,
+    letterSpacing: -0.2,
+  },
+
+  // ── Overlap Venn ────────────────────────────────────────────────────────
+  overlap: {
+    backgroundColor: Brand.sageBg,
+    borderRadius: 14,
+    paddingHorizontal: 18,
+    paddingTop: 22,
+    paddingBottom: 16,
+    alignItems: 'center',
+  },
+
+  // ── Liquid-glass CTA ────────────────────────────────────────────────────
+  ctaWrap: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    bottom: 16,
+    zIndex: 5,
+  },
+  ctaContainer: {
+    borderRadius: 999,
+    overflow: 'hidden',
+    // Heavier shadow — pulls the pill clearly off the cream surface so
+    // it reads as a primary, tappable action (huashu Light/Dark Mode
+    // Contrast guidance: glass on light needs strong edge definition).
+    shadowColor: '#281810',
+    shadowOpacity: 0.55,
+    shadowRadius: 36,
+    shadowOffset: { width: 0, height: 14 },
+    elevation: 10,
+    // Outer hairline stroke gives the pill a defined edge even on the
+    // light cream card surface where the glass tint blends in.
+    borderWidth: 1,
+    borderColor: Brand.glassEdge,
+  },
+  ctaBlur: {
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    overflow: 'hidden',
+  },
+  ctaTint: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: Brand.glassInk,
+  },
+  ctaTopHighlight: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 1,
+    backgroundColor: Brand.glassHighlight,
+  },
+  ctaLabel: {
+    fontFamily: AmbitFont.body,
+    fontSize: 15,
+    fontWeight: '600',
+    color: Brand.cardCream,
+    letterSpacing: 0.1,
   },
 });
