@@ -32,7 +32,13 @@
       "expo-router",
       "expo-font",
       "expo-web-browser",
-      "expo-apple-authentication"
+      "expo-apple-authentication",
+      [
+        "expo-calendar",
+        {
+          "calendarPermission": "Ambit uses your calendar to add scheduled meetings."
+        }
+      ]
     ]
   }
 }

@@ -10,6 +10,8 @@ import {
 import { Check, Checks, Paperclip, PencilSimple, Warning } from 'phosphor-react-native';
 import type { MessageRow, ReactionRow } from '../../lib/messaging';
 import { getCachedAttachmentUrl } from '../../lib/messaging';
+import type { SchedulingRequestRow } from '../../lib/scheduling';
+import { SchedulingBubble } from './SchedulingBubble';
 import { AmbitFont, Brand, Radii, Space } from '../../constants/theme';
 
 /// Send lifecycle for a locally-originated message — used to render the
@@ -48,6 +50,10 @@ interface Props {
   onLongPress:   () => void;
   /// Tap → retry a failed send. Only invoked when status === 'failed'.
   onRetry?:      () => void;
+  /// When the message links to a scheduling_request, the parent provides
+  /// the request row so the bubble can render the SchedulingBubble card
+  /// in place of the normal body. Null while loading.
+  schedulingRequest?: SchedulingRequestRow | null;
 }
 
 /// Resolve a path into a renderable URL. Local URIs (file://) pass through
@@ -123,6 +129,7 @@ export function MessageBubble({
   onToggleReaction,
   onLongPress,
   onRetry,
+  schedulingRequest,
 }: Props) {
   const attachmentUrl = useAttachmentUrl(message.attachment_url);
   const isDeleted = !!message.deleted_at;
@@ -141,6 +148,20 @@ export function MessageBubble({
             {message.body ? `: ${message.body}` : ''}
           </Text>
         </View>
+      </View>
+    );
+  }
+
+  // Scheduling messages bypass the regular bubble chrome — the
+  // SchedulingBubble card is its own self-contained surface.
+  if (message.scheduling_request_id && schedulingRequest && !isDeleted) {
+    return (
+      <View style={[styles.row, isMine ? styles.rowMine : styles.rowTheirs]}>
+        <SchedulingBubble
+          request={schedulingRequest}
+          meId={meId}
+          isMine={isMine}
+        />
       </View>
     );
   }

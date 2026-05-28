@@ -22,6 +22,10 @@ export interface MessageRow {
   body:            string | null;
   attachment_url:  string | null;
   parent_id:       string | null;
+  /// When set, this message represents a scheduling action; the bubble
+  /// renders the SchedulingBubble card by looking up the request by id.
+  /// Added in migration 008_scheduling.
+  scheduling_request_id?: string | null;
   edited_at:       string | null;
   deleted_at:      string | null;
   created_at:      string;

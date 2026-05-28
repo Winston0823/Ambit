@@ -44,7 +44,7 @@ import {
   PassReasonSheet,
   TypingIndicator,
 } from '../../../components/molecules';
-import { ChatComposer, PartnerProfileIsland } from '../../../components/organisms';
+import { ChatComposer, PartnerProfileIsland, SchedulingComposer } from '../../../components/organisms';
 import {
   confirmHire,
   proposeHire,
@@ -64,6 +64,10 @@ import {
   type MessageRow,
   type ReactionRow,
 } from '../../../lib/messaging';
+import {
+  listSchedulingRequests,
+  type SchedulingRequestRow,
+} from '../../../lib/scheduling';
 import { AmbitFont, Brand, Radii, Space } from '../../../constants/theme';
 
 const QUICK_REACTIONS = ['👍', '❤️', '😂', '🙏', '🔥', '👀'];
@@ -106,12 +110,14 @@ export default function ThreadScreen() {
   const [myName, setMyName] = useState<string>('You');
   const [messages, setMessages] = useState<MessageRow[]>([]);
   const [reactions, setReactions] = useState<ReactionRow[]>([]);
+  const [schedulingRequests, setSchedulingRequests] = useState<SchedulingRequestRow[]>([]);
   const [partnerLastReadAt, setPartnerLastReadAt] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   const [replyTo, setReplyTo] = useState<MessageRow | null>(null);
   const [editing, setEditing] = useState<MessageRow | null>(null);
   const [selectedMessage, setSelectedMessage] = useState<MessageRow | null>(null);
+  const [schedulingOpen, setSchedulingOpen] = useState(false);
 
   /// Optimistic send tracking. A message id lives in `pendingIds` while
   /// its insert is in flight, moves to `failedIds` if the request errors
@@ -263,9 +269,10 @@ export default function ThreadScreen() {
         hired_proposed_by: (convo as any).hired_proposed_by ?? null,
       };
 
-      const [msgs, reacts, partnerRead, selfProfile] = await Promise.all([
+      const [msgs, reacts, schedReqs, partnerRead, selfProfile] = await Promise.all([
         listMessages(conversationId, { limit: 200 }),
         listReactions(conversationId),
+        listSchedulingRequests(conversationId),
         supabase
           .from('conversation_reads')
           .select('last_read_at')
@@ -285,6 +292,7 @@ export default function ThreadScreen() {
       setMeta(partner);
       setMessages(msgs);
       setReactions(reacts);
+      setSchedulingRequests(schedReqs);
       setPartnerLastReadAt(partnerRead);
       setMyPhotoUrl((selfProfile as { photo_url: string | null } | null)?.photo_url ?? null);
       setMyName((selfProfile as { name: string | null } | null)?.name ?? 'You');
@@ -375,6 +383,28 @@ export default function ThreadScreen() {
       },
     );
 
+    ch.on(
+      'postgres_changes',
+      {
+        event:  '*',
+        schema: 'public',
+        table:  'scheduling_requests',
+        filter: `conversation_id=eq.${conversationId}`,
+      },
+      (payload) => {
+        if (payload.eventType === 'INSERT') {
+          setSchedulingRequests((prev) => {
+            const row = payload.new as SchedulingRequestRow;
+            if (prev.some((r) => r.id === row.id)) return prev;
+            return [...prev, row];
+          });
+        } else if (payload.eventType === 'UPDATE') {
+          const row = payload.new as SchedulingRequestRow;
+          setSchedulingRequests((prev) => prev.map((r) => (r.id === row.id ? row : r)));
+        }
+      },
+    );
+
     ch.on('broadcast', { event: 'typing' }, ({ payload }) => {
       if (payload.userId === user.id) return;
       setPartnerTyping(true);
@@ -403,6 +433,14 @@ export default function ThreadScreen() {
       markConversationRead(conversationId);
     }
   }, [conversationId, messages.length]);
+
+  // ── Auto-add accepted meetings to the recipient's calendar ───
+  // The accepter's optimistic path (in SchedulingBubble) handles their
+  // side. The proposer sees an "Add to my calendar" button in the bubble
+  // and chooses to tap it — we don't auto-add on their device because
+  // surprising a passive viewer with a system permission prompt is bad
+  // UX. (If we wanted symmetry later, we could try silent-add when
+  // permission has already been granted before.)
 
   // ── Auto-scroll on new message ───────────────────────────────
   useEffect(() => {
@@ -735,6 +773,9 @@ export default function ThreadScreen() {
             const isMine = item.sender_id === user.id;
             const avatarUrl = isMine ? myPhotoUrl : meta.partner_photo_url;
             const senderName = isMine ? myName : meta.partner_name;
+            const schedRequest = item.scheduling_request_id
+              ? schedulingRequests.find((r) => r.id === item.scheduling_request_id) ?? null
+              : null;
             return (
               <MessageBubble
                 message={item}
@@ -747,6 +788,7 @@ export default function ThreadScreen() {
                 status={status}
                 avatarUrl={avatarUrl}
                 senderName={senderName}
+                schedulingRequest={schedRequest}
                 onToggleReaction={(emoji) => handleToggleReaction(item, emoji)}
                 onLongPress={() => handleLongPress(item)}
                 onRetry={() => handleRetry(item.id)}
@@ -768,6 +810,7 @@ export default function ThreadScreen() {
             onSendText={handleSendText}
             onSendImage={handleSendImage}
             onSaveEdit={handleSaveEdit}
+            onOpenScheduling={() => setSchedulingOpen(true)}
             onTypingPing={handleTypingPing}
             attachMenuOpen={attachMenuOpen}
             onToggleAttachMenu={toggleAttachMenu}
@@ -837,6 +880,14 @@ export default function ThreadScreen() {
           // Optimistic: flip local meta so banner + composer-lock land instantly.
           setMeta((m) => (m ? { ...m, status: 'passed', pass_reason: reason } : m));
         }}
+      />
+
+      <SchedulingComposer
+        visible={schedulingOpen}
+        conversationId={conversationId ?? null}
+        defaultTitle={meta ? `Chat about ${meta.project_title}` : 'Quick chat'}
+        onClose={() => setSchedulingOpen(false)}
+        onProposed={() => { /* realtime INSERT will append the bubble */ }}
       />
 
       {/* Action sheet on long-press. Modal so it lives above keyboard. */}

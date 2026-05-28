@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import {
+  CalendarPlus,
   Camera,
   FileText,
   ImageSquare,
@@ -42,6 +43,9 @@ interface Props {
   /// invokes this when the user taps Send (WhatsApp/iMessage pattern).
   onSendImage:     (localUri: string, body?: string) => Promise<void> | void;
   onSaveEdit:      (body: string) => Promise<void> | void;
+  /// Opens the scheduling composer modal. When undefined, the calendar
+  /// button is hidden (e.g. on screens where scheduling is disabled).
+  onOpenScheduling?: () => void;
   /// Fired on every meaningful keystroke. Caller debounces & broadcasts
   /// presence; the composer just signals intent.
   onTypingPing:    () => void;
@@ -68,6 +72,7 @@ export function ChatComposer({
   onSendText,
   onSendImage,
   onSaveEdit,
+  onOpenScheduling,
   onTypingPing,
   attachMenuOpen,
   onToggleAttachMenu,
@@ -273,6 +278,17 @@ export function ChatComposer({
                 weight="bold"
               />
             </Animated.View>
+          </Pressable>
+        )}
+
+        {!editing && onOpenScheduling && (
+          <Pressable
+            onPress={onOpenScheduling}
+            hitSlop={10}
+            style={styles.iconBtn}
+            accessibilityLabel="Propose a meeting"
+          >
+            <CalendarPlus size={20} color={Brand.inkMuted} weight="regular" />
           </Pressable>
         )}
 
