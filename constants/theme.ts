@@ -47,6 +47,21 @@ export const Brand = {
   glassInkHover:     'rgba(180, 128, 69, 0.96)',
   glassHighlight:    'rgba(255, 255, 255, 0.34)', // inset top edge — brighter "lit glass" feel
   glassEdge:         'rgba(255, 255, 255, 0.28)', // outer hairline stroke so the pill's edge is defined on cream
+
+  // Hearth surface — chat thread direction. Warm radial-style washes layered
+  // over the canvas, glass icon buttons, tactile bubbles with gradient + rim.
+  hearthBgTop:        '#FAEAD0', // top wash stop (warm peach)
+  hearthBgBottom:     '#F1DDB6', // bottom wash stop (warm tan)
+  hearthBgBase:       '#F5EFE6', // canvas underneath the washes
+  hearthGlassBg:      'rgba(255,255,255,0.7)',
+  hearthGlassEdge:    'rgba(255,255,255,0.95)',
+  hearthGlassShadow:  'rgba(120,80,40,0.18)',
+  hearthBubbleMineTop:    '#C68F58', // mine bubble gradient — top stop (lighter tan)
+  hearthBubbleMineBottom: '#B48045', // mine bubble gradient — bottom stop (deeper accent tan)
+  hearthBubbleMineShadow: 'rgba(180,128,69,0.32)',
+  hearthBubbleTheirsShadow: 'rgba(120,80,40,0.08)',
+  hearthInkOnTan:     '#FFFFFF',
+  hearthPresenceGreen:'#6E8C3F',
 } as const;
 
 // ---------- Typography ----------

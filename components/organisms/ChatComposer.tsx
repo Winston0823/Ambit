@@ -410,9 +410,9 @@ function AttachTile({ Icon, label, tint, onPress, disabled }: AttachTileProps) {
 
 const styles = StyleSheet.create({
   root: {
-    backgroundColor: Brand.canvas,
-    borderTopWidth: 1,
-    borderTopColor: Brand.borderDefault,
+    // Hearth: transparent root sits over the screen's warm wash. The
+    // input row provides its own glassy surface.
+    backgroundColor: 'transparent',
   },
   banner: {
     flexDirection: 'row',
@@ -524,7 +524,9 @@ const styles = StyleSheet.create({
     height: 280,
     paddingHorizontal: Space.md,
     paddingTop: 18,
-    backgroundColor: Brand.surface1,
+    backgroundColor: Brand.hearthGlassBg,
+    borderTopWidth: 1,
+    borderTopColor: Brand.hearthGlassEdge,
   },
   attachGridRow: {
     flexDirection: 'row',
@@ -553,12 +555,14 @@ const styles = StyleSheet.create({
   attachTileLabelDisabled: { color: Brand.inkMuted },
   input: {
     flex: 1,
-    minHeight: 38,
+    minHeight: 40,
     maxHeight: 120,
-    backgroundColor: Brand.surface1,
-    borderRadius: 20,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    backgroundColor: Brand.hearthGlassBg,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: Brand.hearthGlassEdge,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
     fontFamily: AmbitFont.body,
     fontSize: 15,
     color: Brand.inkBody,
@@ -567,7 +571,7 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: Brand.primary,
+    backgroundColor: Brand.accent,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 0,

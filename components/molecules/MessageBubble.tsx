@@ -7,6 +7,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Check, Checks, Paperclip, PencilSimple, Warning } from 'phosphor-react-native';
 import type { MessageRow, ReactionRow } from '../../lib/messaging';
 import { getCachedAttachmentUrl } from '../../lib/messaging';
@@ -218,6 +219,18 @@ export function MessageBubble({
             isMine && status === 'failed' && styles.bubbleFailed,
           ]}
         >
+        {/* Hearth: tan gradient fill on my own bubbles — vertical, lighter
+            tan at the top fading to deeper accent tan at the bottom. The
+            outer Pressable clips it via overflow:hidden + borderRadius. */}
+        {isMine && !isDeleted && status !== 'failed' && (
+          <LinearGradient
+            pointerEvents="none"
+            colors={[Brand.hearthBubbleMineTop, Brand.hearthBubbleMineBottom]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 0, y: 1 }}
+            style={StyleSheet.absoluteFillObject}
+          />
+        )}
         {/* Reply preview — small bar above the body that quotes the parent.
             For attachment-only parents, an inline Paperclip + "Photo" label
             stands in for the body. */}
@@ -409,17 +422,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   systemPill: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 999,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 14,
     maxWidth: '85%',
+    borderWidth: 1,
+    borderColor: Brand.hearthGlassEdge,
+    shadowColor: Brand.hearthGlassShadow,
+    shadowOpacity: 1,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2,
   },
-  systemPillMuted: { backgroundColor: Brand.surface2 },
-  systemPillWarm:  { backgroundColor: Brand.seekerSurface },
+  systemPillMuted: { backgroundColor: Brand.hearthGlassBg },
+  systemPillWarm:  { backgroundColor: 'rgba(255,243,222,0.85)' },
   systemText: {
     fontFamily: AmbitFont.body,
     fontSize: 13,
-    color: Brand.inkMuted,
+    fontWeight: '600',
+    color: Brand.inkBody,
     textAlign: 'center',
   },
 
@@ -427,18 +448,29 @@ const styles = StyleSheet.create({
     // Reduced from 78% to 70% to make room for the side avatar without
     // breaking the visual rhythm of multi-line messages.
     maxWidth: '70%',
-    borderRadius: Radii.lg,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
     gap: 4,
+    overflow: 'hidden', // clips the LinearGradient fill on mine
   },
   bubbleMine: {
-    backgroundColor: Brand.primary,
+    backgroundColor: Brand.hearthBubbleMineBottom, // base in case gradient fails to mount
     borderBottomRightRadius: 6,
+    shadowColor: Brand.hearthBubbleMineShadow,
+    shadowOpacity: 1,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 5,
   },
   bubbleTheirs: {
-    backgroundColor: Brand.surface1,
+    backgroundColor: '#FFFFFF',
     borderBottomLeftRadius: 6,
+    shadowColor: Brand.hearthBubbleTheirsShadow,
+    shadowOpacity: 1,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 2,
   },
   bubbleDeleted: { opacity: 0.65 },
   // Optimistic-send tints: while in flight the bubble is slightly

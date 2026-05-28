@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   Animated,
+  Easing,
+  Keyboard,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -41,16 +43,42 @@ interface Props {
 /// card-internal scroll and the swipe-up gesture.
 export function ReachOutComposer({ card, onDismiss, onSend }: Props) {
   const [text, setText] = useState('');
+  /// 'compose' = normal form. 'sending' = the user just hit Send and we're
+  /// running the celebration choreography. After ~1200ms in 'sending' we
+  /// fire `onSend` (parent then dismisses), so the user sees the paper
+  /// plane fly off + the "on its way" line before returning to the deck.
+  const [phase, setPhase] = useState<'compose' | 'sending'>('compose');
 
-  // Animated entry — fade scrim + spring the sheet up. Same idiom as
-  // PortfolioModal for visual consistency.
+  // Sheet entry — same as PortfolioModal so the system feels coherent.
   const scrimOpacity = useRef(new Animated.Value(0)).current;
   const sheetY       = useRef(new Animated.Value(40)).current;
   const sheetOpacity = useRef(new Animated.Value(0)).current;
 
+  // Celebration — driven from handleSend. The plane detaches from the
+  // send button and flies up-right off-screen; the form fades to a
+  // memory; the "on its way" line fades in at center; a subtle brand-tan
+  // tint sweeps across the sheet to celebrate.
+  const planeX        = useRef(new Animated.Value(0)).current;
+  const planeY        = useRef(new Animated.Value(0)).current;
+  const planeRotate   = useRef(new Animated.Value(0)).current;
+  const planeOpacity  = useRef(new Animated.Value(1)).current;
+  const formOpacity   = useRef(new Animated.Value(1)).current;
+  const successOpacity = useRef(new Animated.Value(0)).current;
+  const tintOpacity   = useRef(new Animated.Value(0)).current;
+
   useEffect(() => {
     if (card) {
       setText('');
+      setPhase('compose');
+      // Reset all celebration values so reopening the composer is clean.
+      planeX.setValue(0);
+      planeY.setValue(0);
+      planeRotate.setValue(0);
+      planeOpacity.setValue(1);
+      formOpacity.setValue(1);
+      successOpacity.setValue(0);
+      tintOpacity.setValue(0);
+
       Animated.parallel([
         Animated.timing(scrimOpacity, { toValue: 1, duration: 220, useNativeDriver: true }),
         Animated.spring(sheetY,  { toValue: 0, friction: 8, tension: 110, useNativeDriver: true }),
@@ -61,7 +89,9 @@ export function ReachOutComposer({ card, onDismiss, onSend }: Props) {
       sheetY.setValue(40);
       sheetOpacity.setValue(0);
     }
-  }, [card, scrimOpacity, sheetY, sheetOpacity]);
+  }, [card, scrimOpacity, sheetY, sheetOpacity,
+      planeX, planeY, planeRotate, planeOpacity,
+      formOpacity, successOpacity, tintOpacity]);
 
   if (!card) return null;
 
@@ -84,12 +114,88 @@ export function ReachOutComposer({ card, onDismiss, onSend }: Props) {
   };
 
   const handleSend = () => {
-    if (!canSend) return;
+    if (!canSend || phase === 'sending') return;
     if (Platform.OS !== 'web') {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     }
-    onSend(card, text.trim());
+    setPhase('sending');
+    Keyboard.dismiss();
+
+    // ── Celebration choreography (~1200ms before firing onSend) ──
+    // Paper plane detaches from the send button and flies up-right off
+    // the screen. Form fades to a soft memory. A brand-tan tint sweeps
+    // across the sheet (peak ~360ms in). The italic "on its way" line
+    // settles in at the form's center after the plane has launched.
+    Animated.parallel([
+      // Plane flight — fast acceleration, smooth tail-off. Ease-out cubic
+      // so the plane really takes off rather than drifting evenly.
+      Animated.timing(planeX, {
+        toValue: 220,
+        duration: 720,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(planeY, {
+        toValue: -260,
+        duration: 720,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(planeRotate, {
+        toValue: 1,
+        duration: 720,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(planeOpacity, {
+        toValue: 0,
+        duration: 720,
+        delay: 280,
+        easing: Easing.in(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      // Form fades back so the success line can read uncontested.
+      Animated.timing(formOpacity, {
+        toValue: 0.12,
+        duration: 380,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      // Tan tint sweeps — comes up, peaks, dissolves.
+      Animated.sequence([
+        Animated.timing(tintOpacity, {
+          toValue: 0.22,
+          duration: 280,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(tintOpacity, {
+          toValue: 0,
+          duration: 540,
+          easing: Easing.in(Easing.cubic),
+          useNativeDriver: true,
+        }),
+      ]),
+      // "On its way" line — fades in after the plane has launched.
+      Animated.timing(successOpacity, {
+        toValue: 1,
+        duration: 380,
+        delay: 360,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    // Hand off to the parent slightly after the success line has settled.
+    // Parent will set card=null which triggers our exit animation.
+    setTimeout(() => onSend(card, text.trim()), 1200);
   };
+
+  // Convert the planeRotate 0→1 driver into a degree value for the icon.
+  const planeRotateDeg = planeRotate.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '24deg'],
+  });
 
   return (
     <Modal
@@ -113,42 +219,92 @@ export function ReachOutComposer({ card, onDismiss, onSend }: Props) {
             { opacity: sheetOpacity, transform: [{ translateY: sheetY }] },
           ]}
         >
-          <View style={styles.header}>
-            <Text style={styles.title}>Say hi</Text>
-            <Pressable
-              onPress={handleDismiss}
-              hitSlop={10}
-              accessibilityLabel="Cancel"
-            >
-              <X size={20} color={Brand.inkMuted} weight="bold" />
-            </Pressable>
-          </View>
+          {/* Form — fades back when the celebration kicks off. */}
+          <Animated.View style={{ opacity: formOpacity }} pointerEvents={phase === 'sending' ? 'none' : 'auto'}>
+            <View style={styles.header}>
+              <Text style={styles.title}>Say hi</Text>
+              <Pressable
+                onPress={handleDismiss}
+                hitSlop={10}
+                accessibilityLabel="Cancel"
+              >
+                <X size={20} color={Brand.inkMuted} weight="bold" />
+              </Pressable>
+            </View>
 
-          <TextInput
-            value={text}
-            onChangeText={setText}
-            placeholder={placeholder}
-            placeholderTextColor={Brand.inkPlaceholder}
-            multiline
-            autoFocus
-            style={styles.input}
-            maxLength={400}
+            <TextInput
+              value={text}
+              onChangeText={setText}
+              placeholder={placeholder}
+              placeholderTextColor={Brand.inkPlaceholder}
+              multiline
+              autoFocus
+              style={styles.input}
+              maxLength={400}
+              editable={phase === 'compose'}
+            />
+
+            <View style={styles.actions}>
+              <Pressable
+                onPress={handleSend}
+                disabled={!canSend || phase === 'sending'}
+                style={({ pressed }) => [
+                  styles.sendBtn,
+                  !canSend && styles.sendBtnDisabled,
+                  pressed && canSend && { opacity: 0.9 },
+                ]}
+              >
+                {/* The icon inside the button stays hidden during flight
+                    so it doesn't double up with the detached flying plane. */}
+                <Animated.View style={{ opacity: phase === 'sending' ? 0 : 1 }}>
+                  <PaperPlaneTilt size={16} color={Brand.inkOnBrand} weight="fill" />
+                </Animated.View>
+                <Text style={styles.sendLabel}>Send</Text>
+              </Pressable>
+            </View>
+          </Animated.View>
+
+          {/* Brand-tan tint sweep — peaks ~360ms into the celebration,
+              then dissolves. Subtle warmth, not a flash. */}
+          <Animated.View
+            pointerEvents="none"
+            style={[styles.tintSweep, { opacity: tintOpacity }]}
           />
 
-          <View style={styles.actions}>
-            <Pressable
-              onPress={handleSend}
-              disabled={!canSend}
-              style={({ pressed }) => [
-                styles.sendBtn,
-                !canSend && styles.sendBtnDisabled,
-                pressed && canSend && { opacity: 0.9 },
+          {/* Detached flying paper plane — anchored at the send button's
+              original glyph position (bottom-right of the sheet) so the
+              "icon flies off the button" effect reads correctly. */}
+          {phase === 'sending' && (
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                styles.flyingPlane,
+                {
+                  opacity: planeOpacity,
+                  transform: [
+                    { translateX: planeX },
+                    { translateY: planeY },
+                    { rotate: planeRotateDeg },
+                  ],
+                },
               ]}
             >
-              <PaperPlaneTilt size={16} color={Brand.inkOnBrand} weight="fill" />
-              <Text style={styles.sendLabel}>Send</Text>
-            </Pressable>
-          </View>
+              <PaperPlaneTilt size={22} color={Brand.accent} weight="fill" />
+            </Animated.View>
+          )}
+
+          {/* "On its way to {firstName}" — fades in after the plane
+              has launched, sits at the center of the sheet area. */}
+          {phase === 'sending' && (
+            <Animated.View
+              pointerEvents="none"
+              style={[styles.successLine, { opacity: successOpacity }]}
+            >
+              <Text style={styles.successText}>
+                Your message is on its way to {firstName}.
+              </Text>
+            </Animated.View>
+          )}
         </Animated.View>
       </KeyboardAvoidingView>
     </Modal>
@@ -222,5 +378,45 @@ const styles = StyleSheet.create({
     ...TypeScale.title,
     fontSize: 15,
     color: Brand.inkOnBrand,
+  },
+
+  // ── Celebration overlays (phase === 'sending') ────────────────────────
+  // Warm brand-tan tint that pulses across the sheet on send. Sits above
+  // the form layer but below the flying plane + success line.
+  tintSweep: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: Brand.primary,
+    borderTopLeftRadius: Radii.lg + 4,
+    borderTopRightRadius: Radii.lg + 4,
+  },
+  // Flying paper plane — anchored at approximately the send button's
+  // PaperPlaneTilt icon position. Sheet padding is Space.lg (24) from
+  // each edge; the icon sits inside the button at ~28px in from the
+  // sheet's right padding edge, and ~28px up from the sheet's bottom
+  // padding. Tuned visually so it appears to launch from the button.
+  flyingPlane: {
+    position: 'absolute',
+    right: 60,
+    bottom: 38,
+    width: 22,
+    height: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  // "On its way to Alex" — centered Fraunces italic over the form area.
+  successLine: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: Space.lg,
+  },
+  successText: {
+    fontFamily: Platform.select({ ios: 'Georgia', android: 'serif', default: 'serif' }),
+    fontStyle: 'italic',
+    fontSize: 19,
+    color: Brand.seekerInk,
+    textAlign: 'center',
+    lineHeight: 26,
+    letterSpacing: -0.2,
   },
 });

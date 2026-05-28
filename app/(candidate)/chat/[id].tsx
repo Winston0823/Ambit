@@ -37,6 +37,7 @@ const SMOOTH_LAYOUT: LayoutAnimationConfig = {
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import * as Haptics from 'expo-haptics';
+import { LinearGradient } from 'expo-linear-gradient';
 import { CaretLeft, DotsThree } from 'phosphor-react-native';
 import {
   MessageBubble,
@@ -722,6 +723,22 @@ export default function ThreadScreen() {
 
   return (
     <View style={styles.root}>
+      {/* Hearth surface — two soft washes layered over the cream base
+          fake a warm radial glow at the top and bottom of the screen.
+          pointerEvents="none" so taps fall through to content above. */}
+      <LinearGradient
+        pointerEvents="none"
+        colors={[Brand.hearthBgTop, 'rgba(245,239,230,0)']}
+        locations={[0, 0.55]}
+        style={styles.washTop}
+      />
+      <LinearGradient
+        pointerEvents="none"
+        colors={['rgba(245,239,230,0)', Brand.hearthBgBottom]}
+        locations={[0.5, 1]}
+        style={styles.washBottom}
+      />
+
       {/* Header row: circular back (left) + reserved center (the floating
           PartnerProfileIsland sits over this space, absolutely
           positioned) + circular overflow ⋯ (right). The island handles
@@ -1081,7 +1098,22 @@ function StatusBanner({
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: Brand.canvas },
+  root: { flex: 1, backgroundColor: Brand.hearthBgBase },
+
+  // Hearth washes — absolutely positioned so they sit behind everything
+  // else in the screen but in front of the cream root canvas.
+  washTop: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0,
+    height: 360,
+    zIndex: 0,
+  },
+  washBottom: {
+    position: 'absolute',
+    bottom: 0, left: 0, right: 0,
+    height: 360,
+    zIndex: 0,
+  },
   // Loading body — sits below the header row and fills the remaining
   // vertical space so the spinner is centered in what would otherwise
   // be the messages-list area. Keeps the header pinned at its final
@@ -1099,36 +1131,44 @@ const styles = StyleSheet.create({
     paddingTop: 6,
     paddingBottom: Space.md,
   },
-  // 36pt circular pill used for back + overflow. Light gray surface
-  // with a hairline border reads as a subtle button without competing
-  // with the dark Dynamic-Island-style pill in the center.
+  // 40pt circular glass button used for back + overflow. Translucent
+  // white surface over the warm wash reads as floating glass — pairs
+  // with the Dynamic-Island pill, the bubble shadows, and the composer.
   circleBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Brand.surface1,
+    backgroundColor: Brand.hearthGlassBg,
     borderWidth: 1,
-    borderColor: Brand.borderDefault,
+    borderColor: Brand.hearthGlassEdge,
+    shadowColor: Brand.hearthGlassShadow,
+    shadowOpacity: 1,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 4,
   },
   headerSpacer: {
     flex: 1,
   },
 
-  // Closure-loop banner
+  // Closure-loop banner — glass card variant of the system pill
   banner: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    paddingHorizontal: Space.lg,
+    marginHorizontal: Space.md,
+    marginVertical: 6,
+    paddingHorizontal: Space.md,
     paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: Brand.borderDefault,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: Brand.hearthGlassEdge,
   },
-  bannerWarm:  { backgroundColor: Brand.seekerSurface },
-  bannerHired: { backgroundColor: Brand.primary },
-  bannerMuted: { backgroundColor: Brand.surface1 },
+  bannerWarm:  { backgroundColor: 'rgba(255,243,222,0.9)' },
+  bannerHired: { backgroundColor: Brand.accent },
+  bannerMuted: { backgroundColor: Brand.hearthGlassBg },
   bannerText: {
     flex: 1,
     fontFamily: AmbitFont.body,
@@ -1157,9 +1197,12 @@ const styles = StyleSheet.create({
   composerLocked: {
     paddingHorizontal: Space.lg,
     paddingVertical: 14,
-    backgroundColor: Brand.surface1,
-    borderTopWidth: 1,
-    borderTopColor: Brand.borderDefault,
+    marginHorizontal: Space.md,
+    marginBottom: Space.md,
+    backgroundColor: Brand.hearthGlassBg,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: Brand.hearthGlassEdge,
     alignItems: 'center',
   },
   composerLockedText: {

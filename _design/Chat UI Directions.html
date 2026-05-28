@@ -1,0 +1,886 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Ambit · Chat UI — Three Directions</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT,WONK@0,9..144,300..900,0..100,0..1;1,9..144,300..900,0..100,0..1&family=Plus+Jakarta+Sans:ital,wght@0,300..800;1,300..800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --tan: #B48045;
+    --tan-soft: #D7B98C;
+    --tan-glow: #E8D0A7;
+    --cream: #F5EFE6;
+    --cream-deep: #ECE2D0;
+    --cream-shell: #FAF4EA;
+    --ink: #1F1A14;
+    --ink-2: #3D332A;
+    --ink-mute: #8A7A66;
+    --hair: rgba(31,26,20,0.08);
+    --hair-strong: rgba(31,26,20,0.14);
+    --paper: #FBF6EC;
+    --rouge: #9A3B2B;
+    --moss: #5F6A4B;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    background: #E9E2D4;
+    background-image:
+      radial-gradient(1200px 800px at 20% 0%, #F0E8D6 0%, transparent 60%),
+      radial-gradient(900px 700px at 100% 100%, #E2D6BE 0%, transparent 55%);
+    font-family: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
+    color: var(--ink);
+    min-height: 100vh;
+  }
+  .page {
+    padding: 56px 48px 96px;
+    max-width: 1700px;
+    margin: 0 auto;
+  }
+  .deck-head { margin-bottom: 40px; max-width: 920px; }
+  .eyebrow {
+    font-family: "Plus Jakarta Sans";
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--ink-mute);
+    margin-bottom: 16px;
+  }
+  h1 {
+    font-family: "Fraunces", Georgia, serif;
+    font-variation-settings: "opsz" 144, "SOFT" 0, "WONK" 1;
+    font-style: italic;
+    font-weight: 400;
+    font-size: 56px;
+    line-height: 1.04;
+    letter-spacing: -0.02em;
+    margin: 0 0 16px;
+    color: var(--ink);
+  }
+  h1 em { font-style: normal; color: var(--tan); }
+  .lede {
+    font-family: "Fraunces";
+    font-variation-settings: "opsz" 24;
+    font-weight: 350;
+    font-size: 18px;
+    line-height: 1.55;
+    color: var(--ink-2);
+    max-width: 720px;
+  }
+  .row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 56px;
+    justify-content: center;
+    align-items: flex-start;
+    margin-top: 32px;
+  }
+  .phone-block { width: 393px; }
+  .phone-tag {
+    display: flex; align-items: baseline; gap: 12px;
+    margin-bottom: 20px; padding-left: 4px;
+  }
+  .phone-tag .letter {
+    font-family: "Fraunces"; font-style: italic; font-weight: 400;
+    font-variation-settings: "opsz" 144, "WONK" 1;
+    font-size: 64px; line-height: 0.85; color: var(--tan);
+  }
+  .phone-tag .name {
+    font-family: "Fraunces"; font-weight: 500; font-size: 22px;
+    font-variation-settings: "opsz" 36;
+    letter-spacing: -0.01em; color: var(--ink);
+  }
+  .phone-tag .sub {
+    display: block; margin-top: 2px;
+    font-family: "Plus Jakarta Sans"; font-size: 11px; font-weight: 600;
+    letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink-mute);
+  }
+  .phone-notes {
+    margin-top: 20px; padding: 16px 18px;
+    background: rgba(255,255,255,0.55);
+    border: 1px solid var(--hair);
+    border-radius: 14px;
+    font-family: "Plus Jakarta Sans"; font-size: 12.5px; line-height: 1.55;
+    color: var(--ink-2);
+  }
+  .phone-notes b {
+    font-family: "Fraunces"; font-style: italic; font-weight: 500;
+    color: var(--tan); font-size: 13.5px;
+  }
+
+  /* iPhone bezel */
+  .bezel {
+    display: inline-block; padding: 12px; background: #000;
+    border-radius: 60px;
+    box-shadow: 0 0 0 2px #1f2937, 0 30px 80px rgba(0,0,0,0.25);
+  }
+  .screen {
+    position: relative; width: 393px; height: 852px;
+    border-radius: 48px; overflow: hidden; background: #fff;
+  }
+  .status-bar {
+    position: absolute; inset: 0 0 auto 0; height: 54px;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 32px; z-index: 20;
+    font: 600 16px/1 -apple-system, "SF Pro Text", sans-serif;
+    pointer-events: none;
+  }
+  .island {
+    position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+    width: 124px; height: 36px; background: #000; border-radius: 999px; z-index: 30;
+  }
+  .home {
+    position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%);
+    width: 140px; height: 5px; background: rgba(0,0,0,0.28);
+    border-radius: 999px; z-index: 10; pointer-events: none;
+  }
+  .content {
+    position: absolute; top: 54px; left: 0; right: 0; bottom: 34px;
+    display: flex; flex-direction: column;
+  }
+  .battery {
+    display: flex; align-items: center; gap: 6px;
+  }
+  .battery-shell {
+    width: 26px; height: 12px; border: 1.5px solid currentColor;
+    border-radius: 3px; padding: 1.2px; position: relative; opacity: 0.85;
+  }
+  .battery-shell::after {
+    content: ""; position: absolute; top: 3px; right: -3px;
+    width: 2px; height: 6px; background: currentColor; border-radius: 0 1px 1px 0;
+  }
+  .battery-fill { height: 100%; width: 80%; background: currentColor; border-radius: 1px; opacity: 0.9; }
+
+  /* ============ A · Letter Press (Kenya Hara × Editorial) ============ */
+  .A .screen { background: var(--paper); }
+  .A .header {
+    padding: 14px 24px 12px;
+    display: grid; grid-template-columns: 36px 1fr 36px; align-items: center;
+    gap: 14px;
+  }
+  .A .icon-btn {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: transparent; border: 1px solid var(--hair-strong);
+    display: grid; place-items: center; color: var(--ink);
+  }
+  .A .partner {
+    text-align: center; line-height: 1.05;
+  }
+  .A .partner .name {
+    font-family: "Fraunces"; font-style: italic; font-weight: 400;
+    font-variation-settings: "opsz" 36, "WONK" 1;
+    font-size: 22px; letter-spacing: -0.005em; color: var(--ink);
+  }
+  .A .partner .meta {
+    margin-top: 4px;
+    font-family: "Plus Jakarta Sans"; font-size: 10.5px;
+    letter-spacing: 0.22em; text-transform: uppercase; color: var(--ink-mute);
+  }
+  .A .feed { flex: 1; overflow: auto; padding: 8px 28px 16px; }
+  .A .day-mark {
+    text-align: center; margin: 22px 0 12px;
+    font-family: "Plus Jakarta Sans"; font-size: 10px; letter-spacing: 0.26em;
+    text-transform: uppercase; color: var(--ink-mute);
+    display: flex; align-items: center; gap: 12px;
+  }
+  .A .day-mark::before, .A .day-mark::after {
+    content: ""; flex: 1; height: 1px; background: var(--hair);
+  }
+  .A .sys {
+    margin: 14px 0; text-align: center;
+    font-family: "Fraunces"; font-style: italic; font-variation-settings: "opsz" 14;
+    font-size: 13px; color: var(--ink-mute); line-height: 1.5;
+  }
+  .A .sys .pin {
+    display: inline-block; width: 4px; height: 4px; border-radius: 50%;
+    background: var(--tan); vertical-align: middle; margin: 0 8px 2px;
+  }
+  .A .msg { display: flex; gap: 10px; margin: 18px 0; }
+  .A .msg.mine { flex-direction: row-reverse; }
+  .A .avatar {
+    width: 30px; height: 30px; border-radius: 7px; flex-shrink: 0;
+    display: grid; place-items: center;
+    font-family: "Fraunces"; font-weight: 500; font-size: 12px;
+    color: var(--paper);
+  }
+  .A .avatar.j { background: linear-gradient(135deg, #6F5B43, #957458); }
+  .A .avatar.m { background: linear-gradient(135deg, var(--tan), #C99A6A); }
+  .A .bub {
+    max-width: 252px; padding: 11px 14px 12px;
+    background: #fff; border: 1px solid var(--hair);
+    border-radius: 14px;
+    font-family: "Plus Jakarta Sans"; font-size: 14.5px; line-height: 1.45;
+    color: var(--ink-2);
+    box-shadow: 0 1px 0 rgba(31,26,20,0.03);
+  }
+  .A .mine .bub {
+    background: var(--cream-deep);
+    border-color: rgba(180,128,69,0.18);
+    color: var(--ink);
+  }
+  .A .quote {
+    font-family: "Fraunces"; font-style: italic; font-variation-settings: "opsz" 18;
+    font-size: 15.5px; line-height: 1.45; color: var(--ink);
+  }
+  .A .composer {
+    margin: 0 24px 14px; padding: 12px 14px;
+    background: #fff; border: 1px solid var(--hair-strong);
+    border-radius: 22px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .A .composer .plus {
+    width: 30px; height: 30px; border-radius: 50%;
+    background: var(--ink); color: var(--paper);
+    display: grid; place-items: center;
+  }
+  .A .composer .input {
+    flex: 1; font-family: "Fraunces"; font-style: italic;
+    font-variation-settings: "opsz" 18;
+    font-size: 15px; color: var(--ink-mute);
+  }
+  .A .composer .send {
+    width: 30px; height: 30px; border-radius: 50%;
+    background: var(--tan); color: white;
+    display: grid; place-items: center;
+  }
+
+  /* ============ B · Salon (Pentagram × Editorial masthead) ============ */
+  .B .screen { background: var(--cream-shell); }
+  .B .header {
+    padding: 16px 22px 16px;
+    background: #fff;
+    border-bottom: 1px solid var(--hair);
+    display: grid;
+    grid-template-columns: 40px 1fr 40px;
+    align-items: center;
+    gap: 14px;
+  }
+  .B .icon-btn {
+    width: 40px; height: 40px; border-radius: 12px;
+    background: var(--cream); display: grid; place-items: center;
+    color: var(--ink);
+  }
+  .B .masthead { text-align: center; }
+  .B .masthead .label {
+    font-family: "Plus Jakarta Sans"; font-size: 9.5px; font-weight: 700;
+    letter-spacing: 0.32em; text-transform: uppercase; color: var(--tan);
+  }
+  .B .masthead .name {
+    font-family: "Fraunces"; font-weight: 600; font-style: italic;
+    font-variation-settings: "opsz" 36, "WONK" 1;
+    font-size: 22px; letter-spacing: -0.015em; margin-top: 2px; color: var(--ink);
+  }
+  .B .ribbon {
+    margin: 0; padding: 10px 22px;
+    background: var(--ink); color: var(--cream-shell);
+    display: flex; justify-content: space-between; align-items: center;
+    font-family: "Plus Jakarta Sans"; font-size: 11px; font-weight: 600;
+    letter-spacing: 0.18em; text-transform: uppercase;
+  }
+  .B .ribbon .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--tan-soft); margin-right: 8px; vertical-align: middle; }
+  .B .feed { flex: 1; overflow: auto; padding: 18px 20px 14px; }
+  .B .entry { margin-bottom: 22px; }
+  .B .entry .meta {
+    font-family: "Plus Jakarta Sans"; font-size: 9.5px; font-weight: 700;
+    letter-spacing: 0.24em; text-transform: uppercase; color: var(--ink-mute);
+    margin-bottom: 8px; display: flex; align-items: center; gap: 8px;
+  }
+  .B .entry .meta .rule { flex: 1; height: 1px; background: var(--hair); }
+  .B .entry.mine { text-align: right; }
+  .B .entry.mine .meta { justify-content: flex-end; }
+  .B .entry.mine .meta .rule { order: -1; }
+  .B .entry .body {
+    display: flex; gap: 14px; align-items: flex-start;
+  }
+  .B .entry.mine .body { flex-direction: row-reverse; }
+  .B .avatar {
+    width: 48px; height: 48px; border-radius: 10px;
+    flex-shrink: 0; display: grid; place-items: center;
+    font-family: "Fraunces"; font-style: italic; font-weight: 500; font-size: 18px;
+    color: white;
+    box-shadow: 0 2px 0 rgba(31,26,20,0.06);
+  }
+  .B .avatar.j { background: linear-gradient(140deg, #4A3A2A, #6F5340); }
+  .B .avatar.m { background: linear-gradient(140deg, var(--tan), #D7A06E); }
+  .B .bub {
+    background: white; border-radius: 4px 18px 18px 18px;
+    padding: 14px 16px;
+    font-family: "Plus Jakarta Sans"; font-size: 14.5px; line-height: 1.5;
+    color: var(--ink); max-width: 240px;
+    border: 1px solid var(--hair);
+    box-shadow: 0 1px 0 rgba(31,26,20,0.04);
+  }
+  .B .mine .bub {
+    background: var(--ink); color: var(--cream-shell);
+    border-color: transparent;
+    border-radius: 18px 4px 18px 18px;
+  }
+  .B .pull {
+    font-family: "Fraunces"; font-style: italic; font-variation-settings: "opsz" 18, "WONK" 1;
+    font-size: 16.5px; line-height: 1.4;
+  }
+  .B .sys {
+    margin: 22px 0; text-align: center;
+    padding: 10px 14px; border-top: 1px solid var(--hair); border-bottom: 1px solid var(--hair);
+  }
+  .B .sys .k {
+    font-family: "Plus Jakarta Sans"; font-size: 9.5px; font-weight: 700;
+    letter-spacing: 0.3em; text-transform: uppercase; color: var(--tan);
+  }
+  .B .sys .v {
+    margin-top: 4px;
+    font-family: "Fraunces"; font-style: italic; font-variation-settings: "opsz" 24, "WONK" 1;
+    font-size: 18px; color: var(--ink);
+  }
+  .B .composer {
+    margin: 0 16px 14px; background: white;
+    border: 1px solid var(--hair-strong);
+    border-radius: 28px;
+    padding: 8px 8px 8px 14px;
+    display: flex; align-items: center; gap: 8px;
+    box-shadow: 0 6px 14px rgba(31,26,20,0.04);
+  }
+  .B .composer .plus {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: var(--cream); color: var(--ink);
+    display: grid; place-items: center;
+  }
+  .B .composer .input {
+    flex: 1; font-family: "Plus Jakarta Sans"; font-size: 14.5px;
+    color: var(--ink-mute);
+  }
+  .B .composer .send {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: var(--ink); color: var(--cream-shell);
+    display: grid; place-items: center;
+  }
+
+  /* ============ C · Hearth (Field.io × Tactile warmth) ============ */
+  .C .screen {
+    background:
+      radial-gradient(140% 60% at 50% 0%, #FAEAD0 0%, transparent 55%),
+      radial-gradient(120% 60% at 50% 100%, #F1DDB6 0%, transparent 60%),
+      var(--cream);
+  }
+  .C .header {
+    padding: 14px 18px 10px;
+    display: grid; grid-template-columns: 40px 1fr 40px;
+    align-items: center; gap: 12px;
+  }
+  .C .icon-btn {
+    width: 40px; height: 40px; border-radius: 50%;
+    background: rgba(255,255,255,0.7);
+    border: 1px solid rgba(255,255,255,0.9);
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.9),
+      0 6px 14px rgba(120,80,40,0.12);
+    display: grid; place-items: center; color: var(--ink);
+    backdrop-filter: blur(10px);
+  }
+  .C .pill {
+    margin: 0 auto;
+    height: 44px; padding: 4px 16px 4px 4px;
+    border-radius: 999px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.85), rgba(255,255,255,0.65));
+    border: 1px solid rgba(255,255,255,0.9);
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.9),
+      inset 0 -1px 0 rgba(180,128,69,0.18),
+      0 10px 24px rgba(180,128,69,0.18);
+    display: flex; align-items: center; gap: 10px;
+    backdrop-filter: blur(10px);
+    position: relative;
+  }
+  .C .pill::after {
+    content: ""; position: absolute; inset: -8px; z-index: -1;
+    border-radius: 999px;
+    background: radial-gradient(60% 100% at 50% 50%, rgba(232,208,167,0.65), transparent 70%);
+    filter: blur(8px);
+  }
+  .C .pill .pfp {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: linear-gradient(140deg, var(--tan), #D7A06E);
+    display: grid; place-items: center;
+    color: white; font-family: "Fraunces"; font-weight: 500; font-style: italic; font-size: 15px;
+    box-shadow: 0 1px 0 rgba(255,255,255,0.4) inset, 0 2px 6px rgba(120,80,40,0.25);
+    position: relative;
+  }
+  .C .pill .pfp::after {
+    content: ""; position: absolute; right: -2px; bottom: -2px;
+    width: 12px; height: 12px; border-radius: 50%;
+    background: #6E8C3F; border: 2px solid var(--cream-shell);
+    box-shadow: 0 0 0 2px rgba(110,140,63,0.25);
+  }
+  .C .pill .who {
+    line-height: 1.05;
+  }
+  .C .pill .who .name {
+    font-family: "Fraunces"; font-style: italic; font-weight: 500;
+    font-variation-settings: "opsz" 18, "WONK" 1;
+    font-size: 15.5px; color: var(--ink); letter-spacing: -0.005em;
+  }
+  .C .pill .who .status {
+    margin-top: 1px;
+    font-family: "Plus Jakarta Sans"; font-size: 10.5px; font-weight: 600;
+    color: #5B7A2C; letter-spacing: 0.04em;
+  }
+  .C .feed { flex: 1; overflow: auto; padding: 6px 18px 14px; }
+  .C .sys {
+    margin: 16px auto; max-width: 260px;
+    text-align: center;
+    background: rgba(255,255,255,0.55);
+    border: 1px solid rgba(255,255,255,0.85);
+    border-radius: 14px;
+    padding: 10px 14px;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.9), 0 4px 10px rgba(180,128,69,0.1);
+  }
+  .C .sys .lbl {
+    font-family: "Plus Jakarta Sans"; font-size: 9.5px; font-weight: 700;
+    letter-spacing: 0.22em; text-transform: uppercase; color: var(--tan);
+  }
+  .C .sys .v {
+    margin-top: 2px;
+    font-family: "Fraunces"; font-style: italic; font-variation-settings: "opsz" 18;
+    font-size: 14.5px; color: var(--ink);
+  }
+  .C .msg { display: flex; gap: 10px; margin: 14px 0; align-items: flex-end; }
+  .C .msg.mine { flex-direction: row-reverse; }
+  .C .ava {
+    width: 32px; height: 32px; border-radius: 8px;
+    flex-shrink: 0; display: grid; place-items: center;
+    color: white; font-family: "Fraunces"; font-style: italic;
+    font-weight: 500; font-size: 13px;
+    box-shadow: 0 4px 10px rgba(120,80,40,0.18);
+    transform: translateY(4px);
+  }
+  .C .ava.j { background: linear-gradient(140deg, #5C4A36, #856547); }
+  .C .ava.m { background: linear-gradient(140deg, var(--tan), #D7A06E); }
+  .C .bub {
+    max-width: 248px;
+    padding: 12px 15px 13px;
+    border-radius: 20px;
+    font-family: "Plus Jakarta Sans"; font-size: 14.5px; line-height: 1.45;
+    color: var(--ink);
+    position: relative;
+  }
+  .C .msg:not(.mine) .bub {
+    background: white;
+    border-radius: 20px 20px 20px 6px;
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,1),
+      0 1px 0 rgba(31,26,20,0.04),
+      0 8px 18px rgba(120,80,40,0.08);
+  }
+  .C .mine .bub {
+    background: linear-gradient(180deg, #C68F58, var(--tan));
+    color: white;
+    border-radius: 20px 20px 6px 20px;
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.35),
+      inset 0 -2px 0 rgba(120,70,30,0.25),
+      0 8px 20px rgba(180,128,69,0.32);
+  }
+  .C .quote {
+    font-family: "Fraunces"; font-style: italic;
+    font-variation-settings: "opsz" 18, "WONK" 1;
+    font-size: 15.5px; line-height: 1.45;
+  }
+  .C .composer {
+    margin: 0 18px 14px;
+    background: rgba(255,255,255,0.75);
+    border: 1px solid rgba(255,255,255,0.95);
+    border-radius: 28px;
+    padding: 8px 8px 8px 8px;
+    display: flex; align-items: center; gap: 10px;
+    backdrop-filter: blur(14px);
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.95),
+      inset 0 -1px 0 rgba(180,128,69,0.15),
+      0 14px 28px rgba(180,128,69,0.18);
+  }
+  .C .composer .plus {
+    width: 40px; height: 40px; border-radius: 50%;
+    background: linear-gradient(180deg, #2E2620, var(--ink));
+    color: var(--cream-shell);
+    display: grid; place-items: center;
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.15),
+      0 4px 10px rgba(0,0,0,0.2);
+  }
+  .C .composer .input {
+    flex: 1; padding-left: 4px;
+    font-family: "Plus Jakarta Sans"; font-size: 14.5px;
+    color: var(--ink-mute);
+  }
+  .C .composer .send {
+    width: 40px; height: 40px; border-radius: 50%;
+    background: linear-gradient(180deg, #D29762, var(--tan));
+    color: white;
+    display: grid; place-items: center;
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.4),
+      0 6px 14px rgba(180,128,69,0.45);
+  }
+
+  /* Footer compare grid */
+  .compare {
+    margin-top: 88px;
+    display: grid; grid-template-columns: 200px 1fr 1fr 1fr;
+    gap: 0;
+    background: rgba(255,255,255,0.45);
+    border: 1px solid var(--hair);
+    border-radius: 18px;
+    overflow: hidden;
+    font-family: "Plus Jakarta Sans"; font-size: 13px;
+  }
+  .compare .h {
+    background: var(--ink); color: var(--cream-shell);
+    padding: 14px 18px;
+    font-weight: 700; letter-spacing: 0.04em;
+  }
+  .compare .h.dim { background: var(--ink-2); }
+  .compare .h.row-h {
+    background: transparent; color: var(--ink-mute);
+    font-family: "Plus Jakarta Sans"; font-weight: 700;
+    font-size: 10.5px; letter-spacing: 0.24em; text-transform: uppercase;
+    padding: 14px 18px;
+    border-top: 1px solid var(--hair);
+  }
+  .compare .c {
+    padding: 14px 18px; line-height: 1.5; color: var(--ink-2);
+    border-top: 1px solid var(--hair); border-left: 1px solid var(--hair);
+  }
+  .compare .c b {
+    font-family: "Fraunces"; font-style: italic; font-weight: 500; color: var(--tan);
+  }
+</style>
+</head>
+<body>
+  <div class="page">
+
+    <header class="deck-head">
+      <div class="eyebrow">Ambit · Chat thread · Design exploration</div>
+      <h1>Three directions for the room <em>where deals get made.</em></h1>
+      <p class="lede">
+        Same brand (warm tan + cream, Fraunces WONK, Plus Jakarta Sans), same surfaces
+        (back, partner identity, overflow, list, composer with plus-icon grid) —
+        three different philosophies of <em>how the conversation should feel</em>.
+        Pick one to refine, or mix attributes between them.
+      </p>
+    </header>
+
+    <div class="row">
+
+      <!-- =================== A · LETTER PRESS =================== -->
+      <div class="phone-block A">
+        <div class="phone-tag">
+          <span class="letter">A</span>
+          <div>
+            <div class="name">Letter Press</div>
+            <span class="sub">Kenya Hara · Editorial restraint</span>
+          </div>
+        </div>
+
+        <div class="bezel">
+          <div class="screen">
+            <div class="status-bar">
+              <span>9:41</span>
+              <div class="battery">
+                <svg width="16" height="11" viewBox="0 0 16 11"><path d="M2 9.5 L8 4 L14 9.5" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <div class="battery-shell"><div class="battery-fill"></div></div>
+              </div>
+            </div>
+            <div class="island"></div>
+
+            <div class="content">
+              <div class="header">
+                <button class="icon-btn">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M15 6L9 12L15 18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
+                <div class="partner">
+                  <div class="name">Jordan Asare</div>
+                  <div class="meta">Project Solstice</div>
+                </div>
+                <button class="icon-btn">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="6" cy="12" r="1.5" fill="currentColor"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/><circle cx="18" cy="12" r="1.5" fill="currentColor"/></svg>
+                </button>
+              </div>
+
+              <div class="feed">
+                <div class="day-mark">Today · 9:41</div>
+
+                <div class="sys">
+                  <em>Matched on Project Solstice</em> <span class="pin"></span> <em>brand identity, motion</em>
+                </div>
+
+                <div class="msg">
+                  <div class="avatar j">J</div>
+                  <div class="bub">
+                    <div class="quote">Hey — saw your portfolio. Your motion work is gorgeous, especially the festival reel.</div>
+                  </div>
+                </div>
+
+                <div class="msg mine">
+                  <div class="avatar m">M</div>
+                  <div class="bub">Thanks Jordan! Love the brief. Quick q — is the timeline flexible past June?</div>
+                </div>
+
+                <div class="msg">
+                  <div class="avatar j">J</div>
+                  <div class="bub">End of June ideally, but I can stretch if the right person shows up. Coffee this week?</div>
+                </div>
+
+                <div class="sys">
+                  <em>Meeting proposed</em> <span class="pin"></span> Thu · 3:00 PM
+                </div>
+              </div>
+
+              <div class="composer">
+                <div class="plus">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                </div>
+                <div class="input">Write to Jordan…</div>
+                <div class="send">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M5 12l14-7-5 7 5 7-14-7z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" fill="currentColor"/></svg>
+                </div>
+              </div>
+            </div>
+
+            <div class="home"></div>
+          </div>
+        </div>
+
+        <div class="phone-notes">
+          <b>Where it shines.</b> Reads like a printed correspondence — quiet, intentional, deeply on-brand for an app whose body voice is Fraunces. System events live as italic marginalia, not loud banners. The header is type-led, no chrome.<br><br>
+          <b>Where it bends.</b> Less visual hierarchy for high-frequency chatters; the warmth lives in the typography rather than the surface, so users have to read the room.
+        </div>
+      </div>
+
+      <!-- =================== B · SALON =================== -->
+      <div class="phone-block B">
+        <div class="phone-tag">
+          <span class="letter">B</span>
+          <div>
+            <div class="name">Salon</div>
+            <span class="sub">Pentagram · Magazine masthead</span>
+          </div>
+        </div>
+
+        <div class="bezel">
+          <div class="screen">
+            <div class="status-bar">
+              <span>9:41</span>
+              <div class="battery">
+                <svg width="16" height="11" viewBox="0 0 16 11"><path d="M2 9.5 L8 4 L14 9.5" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <div class="battery-shell"><div class="battery-fill"></div></div>
+              </div>
+            </div>
+            <div class="island"></div>
+
+            <div class="content">
+              <div class="header">
+                <button class="icon-btn">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M15 6L9 12L15 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
+                <div class="masthead">
+                  <div class="label">In conversation with</div>
+                  <div class="name">Jordan Asare</div>
+                </div>
+                <button class="icon-btn">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="6" cy="12" r="1.6" fill="currentColor"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><circle cx="18" cy="12" r="1.6" fill="currentColor"/></svg>
+                </button>
+              </div>
+
+              <div class="ribbon">
+                <span><span class="dot"></span>Project Solstice</span>
+                <span>Active · 2m ago</span>
+              </div>
+
+              <div class="feed">
+                <div class="entry">
+                  <div class="meta"><span>Jordan</span><span>·</span><span>9:32 AM</span><span class="rule"></span></div>
+                  <div class="body">
+                    <div class="avatar j">J</div>
+                    <div class="bub">
+                      <div class="pull">Your motion reel for the festival — that's the energy I want for Solstice.</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="entry mine">
+                  <div class="meta"><span class="rule"></span><span>You</span><span>·</span><span>9:34 AM</span></div>
+                  <div class="body">
+                    <div class="avatar m">M</div>
+                    <div class="bub">Love the brief. Quick q on the timeline — past June possible?</div>
+                  </div>
+                </div>
+
+                <div class="sys">
+                  <div class="k">Meeting proposed</div>
+                  <div class="v">Thursday · 3:00 PM</div>
+                </div>
+
+                <div class="entry">
+                  <div class="meta"><span>Jordan</span><span>·</span><span>9:41 AM</span><span class="rule"></span></div>
+                  <div class="body">
+                    <div class="avatar j">J</div>
+                    <div class="bub">June ideally — stretchable for the right collaborator. Coffee this week?</div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="composer">
+                <div class="plus">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+                </div>
+                <div class="input">Reply to Jordan…</div>
+                <div class="send">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M5 12l14-7-5 7 5 7-14-7z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" fill="currentColor"/></svg>
+                </div>
+              </div>
+            </div>
+            <div class="home"></div>
+          </div>
+        </div>
+
+        <div class="phone-notes">
+          <b>Where it shines.</b> Treats every exchange like a published piece — small-caps byline, rule lines, italic pull-quotes. Strong hierarchy means you can scan the thread fast. The black ribbon doubles as the live "active now" surface.<br><br>
+          <b>Where it bends.</b> Higher chrome budget than A or C — header + ribbon eat ~120pt before any message. Best when chats are dense and meaningful, not chatty.
+        </div>
+      </div>
+
+      <!-- =================== C · HEARTH =================== -->
+      <div class="phone-block C">
+        <div class="phone-tag">
+          <span class="letter">C</span>
+          <div>
+            <div class="name">Hearth</div>
+            <span class="sub">Field.io · Tactile warmth</span>
+          </div>
+        </div>
+
+        <div class="bezel">
+          <div class="screen">
+            <div class="status-bar">
+              <span>9:41</span>
+              <div class="battery">
+                <svg width="16" height="11" viewBox="0 0 16 11"><path d="M2 9.5 L8 4 L14 9.5" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <div class="battery-shell"><div class="battery-fill"></div></div>
+              </div>
+            </div>
+            <div class="island"></div>
+
+            <div class="content">
+              <div class="header">
+                <button class="icon-btn">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M15 6L9 12L15 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
+                <div class="pill">
+                  <div class="pfp">J</div>
+                  <div class="who">
+                    <div class="name">Jordan Asare</div>
+                    <div class="status">● Active now</div>
+                  </div>
+                </div>
+                <button class="icon-btn">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="6" cy="12" r="1.6" fill="currentColor"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><circle cx="18" cy="12" r="1.6" fill="currentColor"/></svg>
+                </button>
+              </div>
+
+              <div class="feed">
+                <div class="sys">
+                  <div class="lbl">Matched · Project Solstice</div>
+                  <div class="v">brand identity · motion · type</div>
+                </div>
+
+                <div class="msg">
+                  <div class="ava j">J</div>
+                  <div class="bub">
+                    <div class="quote">Your motion work is gorgeous — that festival reel especially.</div>
+                  </div>
+                </div>
+
+                <div class="msg mine">
+                  <div class="ava m">M</div>
+                  <div class="bub">Thanks Jordan! Quick q — is the timeline flexible past June?</div>
+                </div>
+
+                <div class="msg">
+                  <div class="ava j">J</div>
+                  <div class="bub">End of June ideally. Coffee this week?</div>
+                </div>
+
+                <div class="sys">
+                  <div class="lbl">Meeting proposed</div>
+                  <div class="v">Thursday · 3:00 PM</div>
+                </div>
+              </div>
+
+              <div class="composer">
+                <div class="plus">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                </div>
+                <div class="input">Message Jordan…</div>
+                <div class="send">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M5 12l14-7-5 7 5 7-14-7z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" fill="currentColor"/></svg>
+                </div>
+              </div>
+            </div>
+
+            <div class="home"></div>
+          </div>
+        </div>
+
+        <div class="phone-notes">
+          <b>Where it shines.</b> Hinge-grade warmth — the surface itself glows. The Dynamic-Island pill stays from the current build but earns its keep: live presence ("Active now") + soft halo + tappable identity. Bubbles feel like clay; the Reach Out button's liquid-glass language extends naturally.<br><br>
+          <b>Where it bends.</b> Highest visual cost of the three — glow, blur, gradients. Needs careful contrast checking on cream-on-cream and motion that respects <em>prefers-reduced-motion</em>.
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ============== Compare grid ============== -->
+    <div class="compare">
+      <div class="h">Attribute</div>
+      <div class="h dim">A · Letter Press</div>
+      <div class="h dim">B · Salon</div>
+      <div class="h dim">C · Hearth</div>
+
+      <div class="h row-h">Header chrome</div>
+      <div class="c">Type-only · 2 thin icon buttons · italic display name centered</div>
+      <div class="c">Masthead + black ribbon · highest hierarchy · "in conversation with" label</div>
+      <div class="c">Dynamic-Island pill with photo, name, live presence dot · glows softly</div>
+
+      <div class="h row-h">Message bubble</div>
+      <div class="c">White card on paper, soft hairline, mine is <b>cream-deep</b>, partner italic-serif body</div>
+      <div class="c">Sharp 4pt corner on speaker side · partner white · mine <b>ink black</b> for contrast</div>
+      <div class="c">Tactile · inner highlight + drop shadow · mine is <b>tan gradient</b> with rim light</div>
+
+      <div class="h row-h">System message</div>
+      <div class="c">Italic serif sentence with a tan dot pin — reads as marginalia, not banner</div>
+      <div class="c">Rule-bounded plate · all-caps key + Fraunces value · feels like a sidebar callout</div>
+      <div class="c">Soft glass card · uppercase tan label + serif italic value · pillowed in surface</div>
+
+      <div class="h row-h">Composer</div>
+      <div class="c">Thin pill · italic placeholder · ink plus, tan send</div>
+      <div class="c">Wide pill · cream tile plus, ink send · drop shadow lifts it off page</div>
+      <div class="c">Liquid-glass pill · gradient plus + tan gradient send · matches Reach Out CTA</div>
+
+      <div class="h row-h">Best for</div>
+      <div class="c">Premium feel · low chat volume · users who'd describe Ambit as "thoughtful"</div>
+      <div class="c">Curators & editors · users treating each match like a published intro</div>
+      <div class="c">Hinge-grade emotional warmth · highest perceived craft · best demo screen</div>
+
+      <div class="h row-h">Risk</div>
+      <div class="c">May read as "quiet" to power users</div>
+      <div class="c">Chrome budget; needs the chats to live up to the masthead</div>
+      <div class="c">Highest a11y/perf budget; cream-on-cream contrast needs care</div>
+    </div>
+
+  </div>
+</body>
+</html>

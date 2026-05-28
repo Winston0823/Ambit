@@ -33,8 +33,9 @@ const { width: SCREEN_W } = Dimensions.get('window');
 /// Collapsed state is a small dark "bubble" with the partner's pfp
 /// inside — iMessage's contact-avatar look at the top of a thread. Tap
 /// to morph into the full profile card.
-const PILL_W = 48;
-const PILL_H = 48;
+// Hearth pill: wider glass pill with photo + name + presence row.
+const PILL_W = 200;
+const PILL_H = 44;
 const CARD_W = SCREEN_W - 24;
 const CARD_H = 560;
 const AVATAR_IN_PILL_SIZE = 36;
@@ -201,10 +202,10 @@ export function PartnerProfileIsland({
     inputRange:  [0, 1],
     outputRange: [(SCREEN_W - PILL_W) / 2, (SCREEN_W - CARD_W) / 2],
   });
-  const radius = progress.interpolate({ inputRange: [0, 1], outputRange: [18, 24] });
+  const radius = progress.interpolate({ inputRange: [0, 1], outputRange: [22, 24] });
   const bgColor = progress.interpolate({
     inputRange:  [0, 1],
-    outputRange: [Brand.navBarBg, Brand.cardCream],
+    outputRange: [Brand.hearthGlassBg, Brand.cardCream],
   });
   const backdropOpacity = progress.interpolate({
     inputRange:  [0, 1],
@@ -280,6 +281,14 @@ export function PartnerProfileIsland({
                 </Text>
               </View>
             )}
+            <View style={styles.pillWho}>
+              <Text style={styles.pillName} numberOfLines={1}>
+                {(partnerName ?? '').split(' ')[0] || 'Profile'}
+              </Text>
+              <Text style={styles.pillStatus} numberOfLines={1}>
+                ● Active now
+              </Text>
+            </View>
           </Pressable>
         </Animated.View>
 
@@ -487,34 +496,37 @@ const styles = StyleSheet.create({
   },
 
   // The island itself — absolutely positioned, centered horizontally.
-  // Shadow gives it lift against the chat content even when collapsed.
+  // Hearth: warm amber shadow + soft white edge so the pill reads as
+  // floating glass against the cream wash.
   island: {
-    // `left` is driven by an Animated interpolation in the component
-    // so the pill stays horizontally centered at both endpoints
-    // (collapsed → screen center; expanded → 12pt margins).
     position: 'absolute',
     overflow: 'hidden',
     zIndex: 30,
-    shadowColor: '#000',
-    shadowOpacity: 0.2,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
+    borderWidth: 1,
+    borderColor: Brand.hearthGlassEdge,
+    shadowColor: Brand.hearthGlassShadow,
+    shadowOpacity: 1,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 10 },
     elevation: 8,
   },
 
-  // Collapsed pill content
+  // Collapsed pill content — Hearth direction. Glassy pill with photo
+  // on the left, partner first-name + presence on the right. Wider
+  // (200pt) than the previous pfp-only bubble.
   collapsedLayer: {
     ...StyleSheet.absoluteFillObject,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  // Tap target that fills the collapsed bubble. The pfp itself is the
-  // only content — no text, no caret — keeping the bubble visually tight.
   collapsedHit: {
     width: '100%',
     height: '100%',
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    paddingLeft: 4,
+    paddingRight: 14,
+    gap: 8,
   },
   pillAvatar: {
     width: AVATAR_IN_PILL_SIZE,
@@ -530,6 +542,25 @@ const styles = StyleSheet.create({
     fontFamily: AmbitFont.display,
     fontSize: 18,
     color: Brand.inkLabel,
+  },
+  pillWho: {
+    flex: 1,
+    minWidth: 0,
+  },
+  pillName: {
+    fontFamily: AmbitFont.body,
+    fontSize: 14,
+    fontWeight: '700',
+    color: Brand.inkPrimary,
+    letterSpacing: -0.1,
+  },
+  pillStatus: {
+    fontFamily: AmbitFont.body,
+    fontSize: 10.5,
+    fontWeight: '600',
+    color: Brand.hearthPresenceGreen,
+    letterSpacing: 0.05,
+    marginTop: 1,
   },
 
   // Expanded card content

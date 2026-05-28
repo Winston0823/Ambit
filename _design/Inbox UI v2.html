@@ -1,0 +1,608 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Ambit · Inbox v2 — iMessage pinned + countdown</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT,WONK@0,9..144,300..900,0..100,0..1;1,9..144,300..900,0..100,0..1&family=Plus+Jakarta+Sans:ital,wght@0,300..800;1,300..800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --tan: #B48045;
+    --tan-soft: #D7B98C;
+    --tan-glow: #E8D0A7;
+    --cream: #F5EFE6;
+    --cream-deep: #ECE2D0;
+    --cream-shell: #FAF4EA;
+    --ink: #1F1A14;
+    --ink-2: #3D332A;
+    --ink-mute: #8A7A66;
+    --hair: rgba(31,26,20,0.08);
+    --hair-strong: rgba(31,26,20,0.14);
+    --paper: #FBF6EC;
+    --rouge: #9A3B2B;
+    --rouge-soft: #C56A53;
+    --moss: #5F6A4B;
+    --green: #6E8C3F;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    background: #E9E2D4;
+    background-image:
+      radial-gradient(1200px 800px at 20% 0%, #F0E8D6 0%, transparent 60%),
+      radial-gradient(900px 700px at 100% 100%, #E2D6BE 0%, transparent 55%);
+    font-family: "Plus Jakarta Sans", system-ui, sans-serif;
+    color: var(--ink);
+    min-height: 100vh;
+  }
+  .page { padding: 56px 48px 96px; max-width: 1500px; margin: 0 auto; }
+  .deck-head { margin-bottom: 40px; max-width: 920px; }
+  .eyebrow {
+    font-size: 11px; font-weight: 700;
+    letter-spacing: 0.22em; text-transform: uppercase; color: var(--ink-mute);
+    margin-bottom: 16px;
+  }
+  h1 {
+    font-family: "Fraunces", serif;
+    font-variation-settings: "opsz" 144, "WONK" 1;
+    font-style: italic; font-weight: 400;
+    font-size: 56px; line-height: 1.04; letter-spacing: -0.02em;
+    margin: 0 0 16px;
+  }
+  h1 em { font-style: normal; color: var(--tan); }
+  .lede {
+    font-family: "Fraunces"; font-variation-settings: "opsz" 24;
+    font-weight: 350; font-size: 18px; line-height: 1.55;
+    color: var(--ink-2); max-width: 720px;
+  }
+  .row {
+    display: flex; flex-wrap: wrap; gap: 48px;
+    justify-content: center; align-items: flex-start; margin-top: 32px;
+  }
+  .phone-block { width: 393px; }
+  .phone-tag { display: flex; align-items: baseline; gap: 12px; margin-bottom: 20px; padding-left: 4px; }
+  .phone-tag .letter {
+    font-family: "Fraunces"; font-style: italic; font-weight: 400;
+    font-variation-settings: "opsz" 144, "WONK" 1;
+    font-size: 64px; line-height: 0.85; color: var(--tan);
+  }
+  .phone-tag .name {
+    font-family: "Fraunces"; font-weight: 500; font-size: 22px;
+    font-variation-settings: "opsz" 36;
+    letter-spacing: -0.01em;
+  }
+  .phone-tag .sub {
+    display: block; margin-top: 2px;
+    font-size: 11px; font-weight: 600;
+    letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink-mute);
+  }
+
+  .bezel {
+    display: inline-block; padding: 12px; background: #000;
+    border-radius: 60px;
+    box-shadow: 0 0 0 2px #1f2937, 0 30px 80px rgba(0,0,0,0.25);
+  }
+  .screen {
+    position: relative; width: 393px; height: 852px;
+    border-radius: 48px; overflow: hidden;
+    background:
+      radial-gradient(140% 60% at 50% 0%, #FAEAD0 0%, transparent 55%),
+      radial-gradient(120% 60% at 50% 100%, #F1DDB6 0%, transparent 60%),
+      var(--cream);
+  }
+  .status-bar {
+    position: absolute; inset: 0 0 auto 0; height: 54px;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 32px; z-index: 20;
+    font: 600 16px/1 -apple-system, "SF Pro Text", sans-serif;
+    pointer-events: none;
+  }
+  .island { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); width: 124px; height: 36px; background: #000; border-radius: 999px; z-index: 30; }
+  .home { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); width: 140px; height: 5px; background: rgba(0,0,0,0.28); border-radius: 999px; z-index: 10; pointer-events: none; }
+  .content { position: absolute; top: 54px; left: 0; right: 0; bottom: 34px; display: flex; flex-direction: column; }
+  .battery { display: flex; align-items: center; gap: 6px; }
+  .battery-shell { width: 26px; height: 12px; border: 1.5px solid currentColor; border-radius: 3px; padding: 1.2px; position: relative; opacity: 0.85; }
+  .battery-shell::after { content: ""; position: absolute; top: 3px; right: -3px; width: 2px; height: 6px; background: currentColor; border-radius: 0 1px 1px 0; }
+  .battery-fill { height: 100%; width: 80%; background: currentColor; border-radius: 1px; opacity: 0.9; }
+
+  .tabbar {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    background: rgba(255,255,255,0.85);
+    border-top: 1px solid var(--hair);
+    backdrop-filter: blur(20px);
+    display: flex; padding: 10px 24px 20px;
+    justify-content: space-around;
+    z-index: 5;
+  }
+  .tab { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; color: var(--ink-mute); }
+  .tab.active { background: var(--ink); color: var(--cream-shell); }
+
+  /* ============ HEAD ============ */
+  .head { padding: 14px 22px 6px; }
+  .head h2 {
+    margin: 0;
+    font-family: "Fraunces"; font-style: italic; font-weight: 400;
+    font-variation-settings: "opsz" 144, "WONK" 1;
+    font-size: 38px; letter-spacing: -0.02em; line-height: 1; color: var(--ink);
+  }
+  .head .meta {
+    margin-top: 8px;
+    font-size: 12px; font-weight: 600; color: var(--ink-mute);
+    letter-spacing: 0.04em;
+  }
+  .head .meta b { color: var(--ink); }
+
+  .search {
+    margin: 12px 22px 8px;
+    background: rgba(255,255,255,0.7);
+    border: 1px solid rgba(255,255,255,0.95);
+    border-radius: 999px; padding: 9px 14px;
+    display: flex; align-items: center; gap: 10px;
+    backdrop-filter: blur(10px);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.95), 0 4px 10px rgba(180,128,69,0.08);
+    color: var(--ink-mute); font-size: 13.5px;
+  }
+
+  /* ============ PINNED ROW (iMessage parity) ============ */
+  .pinned-strip {
+    padding: 16px 22px 14px;
+  }
+  .pinned-label {
+    font-size: 9.5px; font-weight: 700; letter-spacing: 0.3em;
+    text-transform: uppercase; color: var(--tan);
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 12px;
+  }
+  .pinned-label svg { color: var(--tan); }
+  .pinned-row {
+    display: flex; gap: 18px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
+  .pinned-row::-webkit-scrollbar { display: none; }
+  .pin-tile {
+    flex-shrink: 0;
+    width: 64px;
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    position: relative;
+  }
+  .pin-ava {
+    width: 64px; height: 64px; border-radius: 16px;
+    color: white; display: grid; place-items: center;
+    font-family: "Fraunces"; font-weight: 500; font-style: italic; font-size: 22px;
+    box-shadow: 0 6px 14px rgba(120,80,40,0.22);
+    position: relative;
+  }
+  .pin-ava.t1 { background: linear-gradient(140deg, #5C4A36, #856547); }
+  .pin-ava.t2 { background: linear-gradient(140deg, var(--tan), #D7A06E); }
+  .pin-ava.t3 { background: linear-gradient(140deg, #6A4F33, #99744A); }
+  .pin-ava.t4 { background: linear-gradient(140deg, #876C4F, #B58F66); }
+  .pin-ava.t5 { background: linear-gradient(140deg, #5F6A4B, #84956A); }
+  .pin-ava .live {
+    position: absolute; right: -3px; bottom: -3px;
+    width: 16px; height: 16px; border-radius: 50%;
+    background: var(--green); border: 3px solid var(--cream);
+  }
+  /* New-message dot on a pinned tile — iMessage parity */
+  .pin-ava .new-dot {
+    position: absolute; top: -4px; right: -4px;
+    width: 14px; height: 14px; border-radius: 50%;
+    background: var(--tan); border: 2.5px solid var(--cream);
+  }
+  /* Tiny iMessage-style message preview overlay on top of pinned tile */
+  .pin-bubble {
+    position: absolute; top: -10px; right: -22px;
+    max-width: 130px;
+    padding: 5px 9px; border-radius: 12px 12px 12px 4px;
+    background: white;
+    font-size: 11px; line-height: 1.25; color: var(--ink-2);
+    border: 1px solid rgba(255,255,255,0.95);
+    box-shadow: 0 6px 12px rgba(120,80,40,0.18);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    z-index: 2;
+  }
+  .pin-name {
+    font-family: "Fraunces"; font-weight: 500; font-size: 12px;
+    line-height: 1.1;
+    color: var(--ink); text-align: center;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    max-width: 100%;
+  }
+
+  /* ============ LIST (flat, no day groupings) ============ */
+  .list { flex: 1; overflow: auto; padding: 4px 16px 80px; }
+  .list-label {
+    padding: 10px 6px 8px;
+    font-size: 9.5px; font-weight: 700; letter-spacing: 0.3em;
+    text-transform: uppercase; color: var(--ink-mute);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .list-label::after { content: ""; flex: 1; height: 1px; background: var(--hair); }
+
+  .item {
+    background: rgba(255,255,255,0.65);
+    border: 1px solid rgba(255,255,255,0.95);
+    border-radius: 18px;
+    padding: 12px;
+    margin: 8px 0;
+    display: flex; gap: 12px; align-items: center;
+    backdrop-filter: blur(8px);
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.95),
+      0 4px 10px rgba(180,128,69,0.06);
+  }
+  /* Unanswered reach-out — warmer surface + amber edge */
+  .item.pending {
+    background: linear-gradient(180deg, #FFEFD6, #FCDFB4);
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.95),
+      0 8px 16px rgba(180,128,69,0.18);
+  }
+
+  .ava {
+    width: 50px; height: 50px; border-radius: 12px;
+    color: white; display: grid; place-items: center;
+    font-family: "Fraunces"; font-weight: 500; font-style: italic; font-size: 17px;
+    flex-shrink: 0;
+    box-shadow: 0 4px 10px rgba(120,80,40,0.18);
+    position: relative;
+  }
+  .ava.t1 { background: linear-gradient(140deg, #5C4A36, #856547); }
+  .ava.t2 { background: linear-gradient(140deg, var(--tan), #D7A06E); }
+  .ava.t3 { background: linear-gradient(140deg, #6A4F33, #99744A); }
+  .ava.t4 { background: linear-gradient(140deg, #876C4F, #B58F66); }
+  .ava.t5 { background: linear-gradient(140deg, #5F6A4B, #84956A); }
+  .ava .live {
+    position: absolute; right: -2px; bottom: -2px;
+    width: 14px; height: 14px; border-radius: 50%;
+    background: var(--green); border: 2.5px solid var(--cream);
+  }
+
+  .body { flex: 1; min-width: 0; }
+  .top-line {
+    display: flex; justify-content: space-between; align-items: baseline; gap: 8px;
+  }
+  .name {
+    font-family: "Fraunces"; font-weight: 500; font-size: 17px;
+    font-variation-settings: "opsz" 24, "WONK" 1;
+    letter-spacing: -0.005em; color: var(--ink);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .time {
+    font-size: 10.5px; font-weight: 600; color: var(--ink-mute);
+    letter-spacing: 0.04em; flex-shrink: 0;
+  }
+  .item.pending .time { color: var(--rouge); }
+  .ctx {
+    font-size: 10px; font-weight: 700; letter-spacing: 0.18em;
+    text-transform: uppercase; color: var(--tan); margin-top: 2px;
+  }
+  .item.pending .ctx { color: var(--rouge); }
+  .preview {
+    margin-top: 4px;
+    font-size: 13.5px; line-height: 1.4; color: var(--ink-2);
+    overflow: hidden; text-overflow: ellipsis;
+    display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical;
+  }
+  .preview b { font-weight: 600; color: var(--ink); }
+  .meta-row {
+    display: flex; align-items: center; gap: 6px; margin-top: 6px; flex-wrap: wrap;
+  }
+  .pin {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 8px; border-radius: 999px;
+    font-size: 10px; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase;
+  }
+  .pin.reply { background: var(--ink); color: var(--cream-shell); }
+  .pin.hired { background: var(--green); color: white; }
+  .pin.active { background: var(--green); color: white; }
+  .pin.passed { background: var(--ink-mute); color: var(--cream-shell); }
+
+  /* Countdown for unanswered reach-outs */
+  .countdown {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 2px 8px 2px 6px; border-radius: 999px;
+    background: rgba(154,59,43,0.12);
+    color: var(--rouge);
+    font-size: 10.5px; font-weight: 700;
+    letter-spacing: 0.04em;
+  }
+  .countdown.urgent { background: var(--rouge); color: white; }
+  .countdown svg { flex-shrink: 0; }
+
+  .unread {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--tan); margin-left: 8px; flex-shrink: 0;
+  }
+
+  /* ============ DESIGN NOTES BLOCK ============ */
+  .notes {
+    margin-top: 56px;
+    background: rgba(255,255,255,0.45);
+    border: 1px solid var(--hair); border-radius: 18px;
+    padding: 28px 32px; max-width: 920px;
+    font-size: 14px; line-height: 1.65; color: var(--ink-2);
+  }
+  .notes h3 {
+    margin: 0 0 8px;
+    font-family: "Fraunces"; font-style: italic; font-weight: 500;
+    font-variation-settings: "opsz" 36, "WONK" 1;
+    font-size: 22px; color: var(--ink); letter-spacing: -0.005em;
+  }
+  .notes h4 {
+    margin: 20px 0 6px;
+    font-size: 10.5px; font-weight: 700; letter-spacing: 0.24em;
+    text-transform: uppercase; color: var(--tan);
+  }
+  .notes ul { padding-left: 20px; margin: 0; }
+  .notes li { margin-bottom: 4px; }
+  .notes b {
+    font-family: "Fraunces"; font-style: italic; font-weight: 500;
+    color: var(--ink);
+  }
+  .notes code {
+    background: rgba(31,26,20,0.06); padding: 1px 6px; border-radius: 4px;
+    font-family: "JetBrains Mono", monospace; font-size: 12.5px;
+  }
+</style>
+</head>
+<body>
+  <div class="page">
+
+    <header class="deck-head">
+      <div class="eyebrow">Ambit · Inbox v2 · Refined direction</div>
+      <h1>iMessage's pinned row, <em>Ambit's warmth.</em></h1>
+      <p class="lede">
+        One flat list — no time-of-day groupings. Pinned chats live as large rounded-square
+        tiles up top (iMessage parity, Ambit shape). Unanswered reach-outs run a <em>72-hour
+        countdown</em> until auto-close; the badge turns from amber to rouge as it ticks down,
+        the card glows warmer to draw the eye.
+      </p>
+    </header>
+
+    <div class="row">
+
+      <div class="phone-block">
+        <div class="phone-tag">
+          <span class="letter">G</span>
+          <div>
+            <div class="name">Inbox v2</div>
+            <span class="sub">iMessage pinned · flat list · countdown</span>
+          </div>
+        </div>
+
+        <div class="bezel">
+          <div class="screen">
+            <div class="status-bar"><span>9:41</span>
+              <div class="battery">
+                <svg width="16" height="11" viewBox="0 0 16 11"><path d="M2 9.5 L8 4 L14 9.5" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <div class="battery-shell"><div class="battery-fill"></div></div>
+              </div>
+            </div>
+            <div class="island"></div>
+
+            <div class="content">
+              <div class="head">
+                <h2>Chats</h2>
+                <div class="meta"><b>5</b> ongoing · <b>2</b> need a reply · <b>1</b> hired</div>
+              </div>
+
+              <div class="search">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.8"/><path d="M21 21L16 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                <span>Search people, projects…</span>
+              </div>
+
+              <!-- ============ PINNED ROW ============ -->
+              <div class="pinned-strip">
+                <div class="pinned-label">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none"><path d="M12 2v8M5 14h14l-2 6H7l-2-6zm0 0V8h14v6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  Pinned
+                </div>
+
+                <div class="pinned-row">
+                  <div class="pin-tile">
+                    <div class="pin-ava t1">JA<div class="live"></div><div class="new-dot"></div></div>
+                    <div class="pin-bubble">Coffee this week?</div>
+                    <div class="pin-name">Jordan</div>
+                  </div>
+                  <div class="pin-tile">
+                    <div class="pin-ava t2">SC</div>
+                    <div class="pin-name">Sasha</div>
+                  </div>
+                  <div class="pin-tile">
+                    <div class="pin-ava t5">PV</div>
+                    <div class="pin-name">Prof. V</div>
+                  </div>
+                  <div class="pin-tile">
+                    <div class="pin-ava t4">DK</div>
+                    <div class="pin-name">Diego</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- ============ FLAT LIST ============ -->
+              <div class="list">
+                <div class="list-label">All chats</div>
+
+                <!-- Unanswered incoming — countdown is the hero affordance -->
+                <div class="item pending">
+                  <div class="ava t3">NR</div>
+                  <div class="body">
+                    <div class="top-line">
+                      <span class="name">Noor Rahimi</span>
+                      <span class="time">3h ago</span>
+                    </div>
+                    <div class="ctx">Late Night Radio · Reached out to you</div>
+                    <div class="preview">"Loved the typography on your reel — is print also part of your range?"</div>
+                    <div class="meta-row">
+                      <span class="countdown urgent">
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M12 7v5l3 2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                        21h until auto-close
+                      </span>
+                    </div>
+                  </div>
+                  <div class="unread"></div>
+                </div>
+
+                <!-- Another unanswered, less urgent -->
+                <div class="item pending">
+                  <div class="ava t4">EM</div>
+                  <div class="body">
+                    <div class="top-line">
+                      <span class="name">Emi Tanaka</span>
+                      <span class="time">Yesterday</span>
+                    </div>
+                    <div class="ctx">Stillwater Cafe · Reached out to you</div>
+                    <div class="preview">"Quick question about availability for the brand refresh in June."</div>
+                    <div class="meta-row">
+                      <span class="countdown">
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M12 7v5l3 2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                        2d 14h left
+                      </span>
+                    </div>
+                  </div>
+                  <div class="unread"></div>
+                </div>
+
+                <!-- Sasha — replied / hired -->
+                <div class="item">
+                  <div class="ava t2">SC</div>
+                  <div class="body">
+                    <div class="top-line">
+                      <span class="name">Sasha Cho</span>
+                      <span class="time">1h</span>
+                    </div>
+                    <div class="ctx">USC AI Lab</div>
+                    <div class="preview"><b>You:</b> Sounds good — sending over the brief now.</div>
+                    <div class="meta-row">
+                      <span class="pin hired">Hired</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Jordan — pinned, in active conversation -->
+                <div class="item">
+                  <div class="ava t1">JA<div class="live"></div></div>
+                  <div class="body">
+                    <div class="top-line">
+                      <span class="name">Jordan Asare</span>
+                      <span class="time">2 min</span>
+                    </div>
+                    <div class="ctx">Project Solstice</div>
+                    <div class="preview"><b>Jordan:</b> End of June ideally. Coffee this week?</div>
+                    <div class="meta-row">
+                      <span class="pin reply">Reply</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Diego — quiet -->
+                <div class="item">
+                  <div class="ava t4">DK</div>
+                  <div class="body">
+                    <div class="top-line">
+                      <span class="name">Diego Kim</span>
+                      <span class="time">4:30 PM</span>
+                    </div>
+                    <div class="ctx">USC Racing · Branding</div>
+                    <div class="preview">Acknowledged. Waiting on the new pitch deck before next conversation.</div>
+                  </div>
+                </div>
+
+                <!-- Prof V — older, no urgency -->
+                <div class="item">
+                  <div class="ava t5">PV</div>
+                  <div class="body">
+                    <div class="top-line">
+                      <span class="name">Prof. Vinod</span>
+                      <span class="time">Mon</span>
+                    </div>
+                    <div class="ctx">CTIN 489</div>
+                    <div class="preview">"Thanks for the playtest notes — let's schedule a debrief."</div>
+                  </div>
+                </div>
+
+                <!-- Auto-closed example (faded) -->
+                <div class="item" style="opacity:0.5">
+                  <div class="ava t3" style="filter:saturate(0.4)">RB</div>
+                  <div class="body">
+                    <div class="top-line">
+                      <span class="name">Riley Brooks</span>
+                      <span class="time">May 20</span>
+                    </div>
+                    <div class="ctx" style="color:var(--ink-mute)">Auto-closed · missed reach out</div>
+                    <div class="preview">"Hey Maya, would love to chat about the festival reel…"</div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="tabbar">
+                <div class="tab"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M3 12L12 4L21 12" stroke="currentColor" stroke-width="1.8"/><path d="M5 10v10h14V10" stroke="currentColor" stroke-width="1.8"/></svg></div>
+                <div class="tab"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="4" y="4" width="16" height="16" rx="4" stroke="currentColor" stroke-width="1.8"/></svg></div>
+                <div class="tab active"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M4 6h16v12H8l-4 3V6z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></div>
+                <div class="tab"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="1.8"/><path d="M4 20c0-4 4-7 8-7s8 3 8 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></div>
+              </div>
+            </div>
+            <div class="home"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ NOTES ============ -->
+    <div class="notes">
+      <h3>Behavior spec</h3>
+
+      <h4>Pinned row</h4>
+      <ul>
+        <li><b>Long-press</b> any row in the list → action sheet with <b>Pin</b>. Long-press a pinned tile → <b>Unpin</b>.</li>
+        <li>Max <b>4 pinned</b> (iMessage parity). Try to pin a 5th → "Unpin one first" toast.</li>
+        <li>Pinned tile is the partner's photo as a <b>64pt rounded-square</b> (14pt radius) — same shape language as the inbox row avatars, just larger.</li>
+        <li>An <b>amber dot</b> top-right indicates an unread message on the pinned chat (iMessage-parity).</li>
+        <li>If the pinned chat has a fresh incoming message, the latest line floats over the tile as a small bubble for ~3 seconds after the message lands (then fades).</li>
+        <li>Pinned tiles don't show countdowns — pinned implies "I care about this one, surface it" — the urgency UX lives in the flat list.</li>
+      </ul>
+
+      <h4>Flat list (no day groupings)</h4>
+      <ul>
+        <li>One single list under a <code>All chats</code> label. Sorted by <b>last_message_at desc</b>, with one exception: unanswered <i>incoming</i> reach-outs (status = "needs your reply") are pinned to the top of the list regardless of recency.</li>
+        <li>Last-message preview is always shown. Prefix <b>"You:"</b> when the latest message is mine, or speaker name when it's the partner's most recent (so the user can see at a glance who owes a reply).</li>
+        <li>Status pins on the right edge of the meta row: <b>Reply</b> (dark), <b>Hired</b> (green), <b>Passed</b> (muted). Replace the older "Active" badge — implicit via meta and last message.</li>
+      </ul>
+
+      <h4>Unanswered reach-out countdown</h4>
+      <ul>
+        <li>When the <b>other side reaches out and we haven't responded</b>, the conversation enters status <code>awaiting_reply</code>. The row gets the <b>warm tan card surface</b> + context line "Reached out to you" + <b>countdown pill</b>.</li>
+        <li>Countdown shows <b>time until 72-hour auto-close</b>: <code>created_at + 72h - now()</code>.</li>
+        <li>Color tier flips:
+          <ul>
+            <li><code>≥ 24h left</code> → muted amber pill, neutral text</li>
+            <li><code>&lt; 24h left</code> → solid rouge pill (urgent)</li>
+          </ul>
+        </li>
+        <li>Format: <code>2d 14h left</code> · <code>21h until auto-close</code> · <code>14m until auto-close</code> — collapse units once below the next threshold.</li>
+        <li>Lazy evaluation per existing closure-loop pattern — the inbox query computes the remaining time at read time; no cron needed for this surface.</li>
+      </ul>
+
+      <h4>Auto-close behavior</h4>
+      <ul>
+        <li>At <b>T+72h with no reply</b>, the conversation flips to <code>auto_declined</code>. Row goes <b>faded</b> with the muted "Auto-closed · missed reach out" context line.</li>
+        <li>Both users become re-eligible to appear in each other's <b>discovery feed</b>. On the discovery card, a small <b>"Missed reach out"</b> ribbon appears (Phosphor <code>ArrowUUpLeft</code> icon, muted tan).</li>
+        <li>Re-reach-out from discovery <b>resets</b> the conversation status to <code>awaiting_reply</code>, starts a fresh 72-hour timer, and inserts a system message "Reached out again after the previous request expired" so the recipient has context.</li>
+        <li>Either side can also tap the auto-closed row in inbox to send a new opener — same effect.</li>
+      </ul>
+
+      <h4>What's intentionally absent</h4>
+      <ul>
+        <li><b>No time-of-day section headers</b> (Today / Yesterday / This week) — you asked for one flat list. Time-context is preserved per-row via the right-aligned timestamp.</li>
+        <li><b>No filter chips</b> — pinned + flat sort + countdown is enough triage signal. Search at top handles "find a specific person."</li>
+        <li><b>No "Active now" pill</b> — kept as the small green dot on the avatar only (consistent with the Hearth thread pill).</li>
+      </ul>
+    </div>
+
+  </div>
+</body>
+</html>

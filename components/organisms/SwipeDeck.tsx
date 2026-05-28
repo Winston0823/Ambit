@@ -212,6 +212,7 @@ export function SwipeDeck({
         {...panResponder.panHandlers}
       >
         <DiscoveryCard
+          key={current.id}
           card={current}
           matchedSkills={matchedSkills}
           onPortfolioPress={onPortfolioPress}

@@ -1,0 +1,970 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Ambit · Inbox — Three Directions</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT,WONK@0,9..144,300..900,0..100,0..1;1,9..144,300..900,0..100,0..1&family=Plus+Jakarta+Sans:ital,wght@0,300..800;1,300..800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --tan: #B48045;
+    --tan-soft: #D7B98C;
+    --tan-glow: #E8D0A7;
+    --cream: #F5EFE6;
+    --cream-deep: #ECE2D0;
+    --cream-shell: #FAF4EA;
+    --ink: #1F1A14;
+    --ink-2: #3D332A;
+    --ink-mute: #8A7A66;
+    --hair: rgba(31,26,20,0.08);
+    --hair-strong: rgba(31,26,20,0.14);
+    --paper: #FBF6EC;
+    --rouge: #9A3B2B;
+    --moss: #5F6A4B;
+    --green: #6E8C3F;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    background: #E9E2D4;
+    background-image:
+      radial-gradient(1200px 800px at 20% 0%, #F0E8D6 0%, transparent 60%),
+      radial-gradient(900px 700px at 100% 100%, #E2D6BE 0%, transparent 55%);
+    font-family: "Plus Jakarta Sans", system-ui, sans-serif;
+    color: var(--ink);
+    min-height: 100vh;
+  }
+  .page { padding: 56px 48px 96px; max-width: 1700px; margin: 0 auto; }
+  .deck-head { margin-bottom: 40px; max-width: 920px; }
+  .eyebrow {
+    font-size: 11px; font-weight: 700;
+    letter-spacing: 0.22em; text-transform: uppercase; color: var(--ink-mute);
+    margin-bottom: 16px;
+  }
+  h1 {
+    font-family: "Fraunces", serif;
+    font-variation-settings: "opsz" 144, "WONK" 1;
+    font-style: italic; font-weight: 400;
+    font-size: 56px; line-height: 1.04; letter-spacing: -0.02em;
+    margin: 0 0 16px;
+  }
+  h1 em { font-style: normal; color: var(--tan); }
+  .lede {
+    font-family: "Fraunces"; font-variation-settings: "opsz" 24;
+    font-weight: 350; font-size: 18px; line-height: 1.55;
+    color: var(--ink-2); max-width: 720px;
+  }
+  .row {
+    display: flex; flex-wrap: wrap; gap: 56px;
+    justify-content: center; align-items: flex-start; margin-top: 32px;
+  }
+  .phone-block { width: 393px; }
+  .phone-tag { display: flex; align-items: baseline; gap: 12px; margin-bottom: 20px; padding-left: 4px; }
+  .phone-tag .letter {
+    font-family: "Fraunces"; font-style: italic; font-weight: 400;
+    font-variation-settings: "opsz" 144, "WONK" 1;
+    font-size: 64px; line-height: 0.85; color: var(--tan);
+  }
+  .phone-tag .name {
+    font-family: "Fraunces"; font-weight: 500; font-size: 22px;
+    font-variation-settings: "opsz" 36;
+    letter-spacing: -0.01em;
+  }
+  .phone-tag .sub {
+    display: block; margin-top: 2px;
+    font-size: 11px; font-weight: 600;
+    letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink-mute);
+  }
+  .phone-notes {
+    margin-top: 20px; padding: 16px 18px;
+    background: rgba(255,255,255,0.55);
+    border: 1px solid var(--hair); border-radius: 14px;
+    font-size: 12.5px; line-height: 1.55; color: var(--ink-2);
+  }
+  .phone-notes b {
+    font-family: "Fraunces"; font-style: italic; font-weight: 500;
+    color: var(--tan); font-size: 13.5px;
+  }
+
+  .bezel {
+    display: inline-block; padding: 12px; background: #000;
+    border-radius: 60px;
+    box-shadow: 0 0 0 2px #1f2937, 0 30px 80px rgba(0,0,0,0.25);
+  }
+  .screen {
+    position: relative; width: 393px; height: 852px;
+    border-radius: 48px; overflow: hidden; background: #fff;
+  }
+  .status-bar {
+    position: absolute; inset: 0 0 auto 0; height: 54px;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 32px; z-index: 20;
+    font: 600 16px/1 -apple-system, "SF Pro Text", sans-serif;
+    pointer-events: none;
+  }
+  .island { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); width: 124px; height: 36px; background: #000; border-radius: 999px; z-index: 30; }
+  .home { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); width: 140px; height: 5px; background: rgba(0,0,0,0.28); border-radius: 999px; z-index: 10; pointer-events: none; }
+  .content { position: absolute; top: 54px; left: 0; right: 0; bottom: 34px; display: flex; flex-direction: column; }
+  .battery { display: flex; align-items: center; gap: 6px; }
+  .battery-shell { width: 26px; height: 12px; border: 1.5px solid currentColor; border-radius: 3px; padding: 1.2px; position: relative; opacity: 0.85; }
+  .battery-shell::after { content: ""; position: absolute; top: 3px; right: -3px; width: 2px; height: 6px; background: currentColor; border-radius: 0 1px 1px 0; }
+  .battery-fill { height: 100%; width: 80%; background: currentColor; border-radius: 1px; opacity: 0.9; }
+
+  .tabbar {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    background: rgba(255,255,255,0.85);
+    border-top: 1px solid var(--hair);
+    backdrop-filter: blur(20px);
+    display: flex; padding: 10px 24px 20px;
+    justify-content: space-around;
+    z-index: 5;
+  }
+  .tab {
+    width: 44px; height: 44px; border-radius: 50%;
+    display: grid; place-items: center;
+    color: var(--ink-mute);
+  }
+  .tab.active {
+    background: var(--ink); color: var(--cream-shell);
+  }
+
+  /* ============ D · Snug (Hearth-aligned) ============ */
+  .D .screen {
+    background:
+      radial-gradient(140% 60% at 50% 0%, #FAEAD0 0%, transparent 55%),
+      radial-gradient(120% 60% at 50% 100%, #F1DDB6 0%, transparent 60%),
+      var(--cream);
+  }
+  .D .head { padding: 14px 22px 8px; }
+  .D .head .greeting {
+    font-family: "Fraunces"; font-style: italic; font-weight: 400;
+    font-variation-settings: "opsz" 72, "WONK" 1;
+    font-size: 30px; line-height: 1.05; letter-spacing: -0.015em;
+    color: var(--ink);
+  }
+  .D .head .greeting em { font-style: normal; color: var(--tan); }
+  .D .head .meta {
+    margin-top: 6px;
+    font-size: 11.5px; font-weight: 600; color: var(--ink-mute);
+    letter-spacing: 0.04em;
+  }
+  .D .search {
+    margin: 14px 22px 8px;
+    background: rgba(255,255,255,0.7);
+    border: 1px solid rgba(255,255,255,0.95);
+    border-radius: 999px; padding: 10px 14px;
+    display: flex; align-items: center; gap: 10px;
+    backdrop-filter: blur(10px);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.95), 0 4px 12px rgba(180,128,69,0.1);
+    color: var(--ink-mute); font-size: 14px;
+  }
+  .D .filters {
+    margin: 6px 22px 8px;
+    display: flex; gap: 8px; overflow-x: auto;
+  }
+  .D .chip {
+    flex-shrink: 0; padding: 7px 14px;
+    border-radius: 999px;
+    font-size: 12px; font-weight: 600;
+    background: rgba(255,255,255,0.55);
+    border: 1px solid rgba(255,255,255,0.9);
+    color: var(--ink-2);
+  }
+  .D .chip.active {
+    background: var(--ink); color: var(--cream-shell);
+    border-color: transparent;
+  }
+  .D .chip .n {
+    font-family: "Fraunces"; font-style: italic; font-size: 11px;
+    margin-left: 4px; opacity: 0.7;
+  }
+  .D .list { flex: 1; overflow: auto; padding: 4px 16px 80px; }
+  .D .item {
+    background: rgba(255,255,255,0.7);
+    border: 1px solid rgba(255,255,255,0.95);
+    border-radius: 20px;
+    padding: 14px 14px 14px 14px;
+    margin: 8px 0;
+    display: flex; gap: 12px; align-items: center;
+    backdrop-filter: blur(8px);
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.95),
+      0 6px 14px rgba(180,128,69,0.08);
+  }
+  .D .item.urgent {
+    background: linear-gradient(180deg, #FFEFD6, #FCDFB4);
+    border-color: rgba(255,255,255,0.95);
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.95),
+      0 10px 22px rgba(180,128,69,0.22);
+  }
+  .D .ava {
+    width: 52px; height: 52px; border-radius: 14px;
+    color: white;
+    display: grid; place-items: center;
+    font-family: "Fraunces"; font-weight: 500; font-style: italic;
+    font-size: 19px;
+    flex-shrink: 0;
+    position: relative;
+    box-shadow: 0 4px 10px rgba(120,80,40,0.18);
+  }
+  .D .ava.t1 { background: linear-gradient(140deg, #5C4A36, #856547); }
+  .D .ava.t2 { background: linear-gradient(140deg, var(--tan), #D7A06E); }
+  .D .ava.t3 { background: linear-gradient(140deg, #6A4F33, #99744A); }
+  .D .ava.t4 { background: linear-gradient(140deg, #876C4F, #B58F66); }
+  .D .ava.t5 { background: linear-gradient(140deg, #5F6A4B, #84956A); }
+  .D .ava .ring {
+    position: absolute; inset: -3px; border-radius: 17px;
+    pointer-events: none;
+  }
+  .D .ava.live .ring {
+    box-shadow: 0 0 0 2px rgba(110,140,63,0.75), 0 0 14px rgba(110,140,63,0.4);
+  }
+  .D .ava .dot {
+    position: absolute; right: -2px; bottom: -2px;
+    width: 14px; height: 14px; border-radius: 50%;
+    background: var(--green); border: 2.5px solid var(--cream-shell);
+  }
+  .D .body { flex: 1; min-width: 0; }
+  .D .top-line {
+    display: flex; justify-content: space-between; align-items: baseline; gap: 8px;
+  }
+  .D .name {
+    font-family: "Fraunces"; font-weight: 500; font-size: 17px;
+    font-variation-settings: "opsz" 24, "WONK" 1;
+    letter-spacing: -0.005em; color: var(--ink);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .D .time {
+    font-size: 10.5px; font-weight: 600; color: var(--ink-mute);
+    letter-spacing: 0.04em; flex-shrink: 0;
+  }
+  .D .item.urgent .time { color: var(--rouge); }
+  .D .ctx {
+    font-size: 10.5px; font-weight: 700; letter-spacing: 0.18em;
+    text-transform: uppercase; color: var(--tan); margin-top: 2px;
+  }
+  .D .item.urgent .ctx { color: var(--rouge); }
+  .D .preview {
+    margin-top: 4px;
+    font-size: 13.5px; line-height: 1.4; color: var(--ink-2);
+    overflow: hidden; text-overflow: ellipsis;
+    display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical;
+  }
+  .D .preview b { font-weight: 600; color: var(--ink); }
+  .D .badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    margin-top: 6px;
+    padding: 3px 8px; border-radius: 999px;
+    background: var(--ink); color: var(--cream-shell);
+    font-size: 10px; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase;
+  }
+  .D .badge.green { background: var(--green); }
+  .D .badge.rouge { background: var(--rouge); }
+  .D .unread {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--tan); margin-left: 8px; flex-shrink: 0;
+  }
+
+  /* ============ E · Atelier Index (Editorial) ============ */
+  .E .screen { background: var(--paper); }
+  .E .head {
+    padding: 18px 24px 14px;
+    border-bottom: 1px solid var(--hair);
+  }
+  .E .head .label {
+    font-size: 10px; font-weight: 700; letter-spacing: 0.3em;
+    text-transform: uppercase; color: var(--tan);
+  }
+  .E .head h2 {
+    margin: 4px 0 0;
+    font-family: "Fraunces"; font-weight: 400; font-style: italic;
+    font-variation-settings: "opsz" 72, "WONK" 1;
+    font-size: 36px; letter-spacing: -0.02em; line-height: 1;
+    color: var(--ink);
+  }
+  .E .head .meta {
+    margin-top: 8px;
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 11px; font-weight: 600; color: var(--ink-mute);
+    letter-spacing: 0.04em;
+  }
+  .E .head .meta b { color: var(--ink); font-weight: 700; }
+  .E .nav {
+    display: flex; padding: 0 24px; border-bottom: 1px solid var(--hair);
+    gap: 18px;
+  }
+  .E .nav .item {
+    padding: 12px 0; font-size: 11px; font-weight: 700;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--ink-mute);
+    border-bottom: 2px solid transparent;
+  }
+  .E .nav .item.on {
+    color: var(--ink); border-bottom-color: var(--ink);
+  }
+  .E .nav .item .n {
+    font-family: "Fraunces"; font-style: italic; font-size: 11px;
+    margin-left: 3px; opacity: 0.6;
+  }
+  .E .list { flex: 1; overflow: auto; padding-bottom: 80px; }
+  .E .entry {
+    display: grid;
+    grid-template-columns: 56px 1fr auto;
+    gap: 16px; align-items: start;
+    padding: 18px 24px;
+    border-bottom: 1px solid var(--hair);
+    position: relative;
+  }
+  .E .entry.unread::before {
+    content: ""; position: absolute; left: 0; top: 18px; bottom: 18px;
+    width: 2px; background: var(--tan);
+  }
+  .E .ava {
+    width: 56px; height: 56px; border-radius: 6px;
+    color: white; display: grid; place-items: center;
+    font-family: "Fraunces"; font-weight: 500; font-style: italic;
+    font-size: 20px;
+  }
+  .E .ava.t1 { background: linear-gradient(140deg, #4A3A2A, #6F5340); }
+  .E .ava.t2 { background: linear-gradient(140deg, var(--tan), #D7A06E); }
+  .E .ava.t3 { background: linear-gradient(140deg, #6A4F33, #99744A); }
+  .E .ava.t4 { background: linear-gradient(140deg, #876C4F, #B58F66); }
+  .E .ava.t5 { background: linear-gradient(140deg, #5F6A4B, #84956A); }
+  .E .name {
+    font-family: "Fraunces"; font-weight: 500; font-size: 19px;
+    font-variation-settings: "opsz" 24, "WONK" 1;
+    letter-spacing: -0.005em; line-height: 1.1; color: var(--ink);
+  }
+  .E .byline {
+    margin-top: 3px;
+    font-size: 9.5px; font-weight: 700; letter-spacing: 0.22em;
+    text-transform: uppercase; color: var(--ink-mute);
+  }
+  .E .byline b { color: var(--tan); }
+  .E .preview {
+    margin-top: 8px;
+    font-family: "Fraunces"; font-style: italic;
+    font-variation-settings: "opsz" 14;
+    font-size: 14px; line-height: 1.45; color: var(--ink-2);
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .E .right {
+    text-align: right; min-width: 50px;
+  }
+  .E .time {
+    font-family: "Plus Jakarta Sans"; font-size: 10.5px; font-weight: 600;
+    color: var(--ink-mute); letter-spacing: 0.04em;
+  }
+  .E .pin {
+    margin-top: 6px;
+    display: inline-block; padding: 2px 7px;
+    border: 1px solid var(--ink); border-radius: 2px;
+    font-size: 9px; font-weight: 700; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--ink);
+  }
+  .E .pin.rouge { color: var(--rouge); border-color: var(--rouge); }
+  .E .pin.green { color: var(--green); border-color: var(--green); }
+  .E .sec {
+    padding: 22px 24px 8px;
+    font-size: 9.5px; font-weight: 700; letter-spacing: 0.3em;
+    text-transform: uppercase; color: var(--ink-mute);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .E .sec::after {
+    content: ""; flex: 1; height: 1px; background: var(--hair);
+  }
+
+  /* ============ F · Triage Stack (Hinge-style) ============ */
+  .F .screen {
+    background: linear-gradient(180deg, #FAEAD0 0%, var(--cream) 30%, #ECE2D0 100%);
+  }
+  .F .head { padding: 16px 22px 8px; }
+  .F .head .label {
+    font-size: 10px; font-weight: 700; letter-spacing: 0.3em;
+    text-transform: uppercase; color: var(--tan);
+  }
+  .F .head h2 {
+    margin: 4px 0 6px;
+    font-family: "Fraunces"; font-weight: 400; font-style: italic;
+    font-variation-settings: "opsz" 144, "WONK" 1;
+    font-size: 38px; letter-spacing: -0.02em; line-height: 1;
+  }
+  .F .head .stats {
+    display: flex; gap: 14px; margin-top: 8px;
+    font-size: 11.5px; color: var(--ink-mute); font-weight: 600;
+  }
+  .F .head .stats b {
+    font-family: "Fraunces"; font-style: italic; font-weight: 500;
+    color: var(--ink); font-size: 14px;
+    margin-right: 3px;
+  }
+  .F .hero {
+    margin: 12px 18px 6px;
+    background: linear-gradient(180deg, #FFFCF6, #FFF3DE);
+    border: 1px solid rgba(255,255,255,0.95);
+    border-radius: 28px;
+    padding: 18px;
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,1),
+      0 18px 36px rgba(180,128,69,0.22);
+    position: relative;
+    overflow: hidden;
+  }
+  .F .hero::before {
+    content: ""; position: absolute; top: -30px; right: -30px;
+    width: 160px; height: 160px;
+    background: radial-gradient(circle, var(--tan-glow) 0%, transparent 70%);
+    opacity: 0.5;
+  }
+  .F .hero .urgent-tag {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 10px; border-radius: 999px;
+    background: var(--rouge); color: white;
+    font-size: 10px; font-weight: 700; letter-spacing: 0.16em;
+    text-transform: uppercase;
+    margin-bottom: 14px;
+  }
+  .F .hero-top {
+    display: flex; gap: 14px; align-items: center;
+  }
+  .F .hero-ava {
+    width: 68px; height: 68px; border-radius: 16px;
+    background: linear-gradient(140deg, #4A3A2A, #6F5340);
+    color: white; display: grid; place-items: center;
+    font-family: "Fraunces"; font-weight: 500; font-style: italic;
+    font-size: 26px;
+    box-shadow: 0 6px 14px rgba(120,80,40,0.25);
+    position: relative;
+    flex-shrink: 0;
+  }
+  .F .hero-ava .dot {
+    position: absolute; right: -3px; bottom: -3px;
+    width: 18px; height: 18px; border-radius: 50%;
+    background: var(--green); border: 3px solid var(--cream-shell);
+  }
+  .F .hero-name {
+    font-family: "Fraunces"; font-weight: 500;
+    font-variation-settings: "opsz" 36, "WONK" 1;
+    font-size: 22px; line-height: 1.1; color: var(--ink);
+  }
+  .F .hero-ctx {
+    margin-top: 2px;
+    font-size: 11px; font-weight: 700; letter-spacing: 0.18em;
+    text-transform: uppercase; color: var(--rouge);
+  }
+  .F .hero-message {
+    margin-top: 16px;
+    font-family: "Fraunces"; font-style: italic;
+    font-variation-settings: "opsz" 18, "WONK" 1;
+    font-size: 17px; line-height: 1.45; color: var(--ink);
+    border-left: 2px solid var(--tan); padding-left: 12px;
+  }
+  .F .hero-actions {
+    margin-top: 16px;
+    display: flex; gap: 10px;
+  }
+  .F .hero-actions button {
+    flex: 1; padding: 12px;
+    border-radius: 999px; border: none;
+    font-family: "Plus Jakarta Sans"; font-size: 13px; font-weight: 700;
+    letter-spacing: 0.04em;
+  }
+  .F .btn-primary {
+    background: var(--ink); color: var(--cream-shell);
+    box-shadow: 0 8px 18px rgba(31,26,20,0.25);
+  }
+  .F .btn-ghost {
+    background: rgba(255,255,255,0.7);
+    border: 1px solid var(--hair-strong) !important;
+    color: var(--ink);
+  }
+  .F .queue-label {
+    padding: 24px 24px 8px;
+    font-size: 10px; font-weight: 700; letter-spacing: 0.3em;
+    text-transform: uppercase; color: var(--ink-mute);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .F .queue-label::after {
+    content: ""; flex: 1; height: 1px; background: var(--hair);
+  }
+  .F .queue { padding: 0 18px 80px; }
+  .F .q-item {
+    background: rgba(255,255,255,0.5);
+    border: 1px solid rgba(255,255,255,0.9);
+    border-radius: 16px;
+    padding: 12px;
+    margin: 8px 0;
+    display: flex; gap: 12px; align-items: center;
+    backdrop-filter: blur(8px);
+  }
+  .F .q-ava {
+    width: 40px; height: 40px; border-radius: 10px;
+    color: white; display: grid; place-items: center;
+    font-family: "Fraunces"; font-weight: 500; font-style: italic;
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+  .F .q-ava.t1 { background: linear-gradient(140deg, var(--tan), #D7A06E); }
+  .F .q-ava.t2 { background: linear-gradient(140deg, #6A4F33, #99744A); }
+  .F .q-ava.t3 { background: linear-gradient(140deg, #5F6A4B, #84956A); }
+  .F .q-ava.t4 { background: linear-gradient(140deg, #876C4F, #B58F66); }
+  .F .q-name {
+    font-family: "Fraunces"; font-weight: 500; font-size: 15px;
+    line-height: 1.15;
+  }
+  .F .q-prev {
+    margin-top: 2px;
+    font-size: 12.5px; color: var(--ink-mute);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    max-width: 200px;
+  }
+  .F .q-meta { text-align: right; }
+  .F .q-time { font-size: 10px; color: var(--ink-mute); font-weight: 600; }
+  .F .q-pin {
+    margin-top: 4px; display: inline-block;
+    padding: 2px 6px; border-radius: 4px;
+    font-size: 9px; font-weight: 700; letter-spacing: 0.1em;
+    text-transform: uppercase;
+    background: var(--ink); color: var(--cream-shell);
+  }
+  .F .q-pin.green { background: var(--green); }
+
+  /* compare */
+  .compare {
+    margin-top: 88px;
+    display: grid; grid-template-columns: 200px 1fr 1fr 1fr;
+    background: rgba(255,255,255,0.45);
+    border: 1px solid var(--hair); border-radius: 18px; overflow: hidden;
+    font-size: 13px;
+  }
+  .compare .h { background: var(--ink); color: var(--cream-shell); padding: 14px 18px; font-weight: 700; }
+  .compare .h.dim { background: var(--ink-2); }
+  .compare .h.row-h {
+    background: transparent; color: var(--ink-mute); font-weight: 700;
+    font-size: 10.5px; letter-spacing: 0.24em; text-transform: uppercase;
+    padding: 14px 18px; border-top: 1px solid var(--hair);
+  }
+  .compare .c {
+    padding: 14px 18px; line-height: 1.5; color: var(--ink-2);
+    border-top: 1px solid var(--hair); border-left: 1px solid var(--hair);
+  }
+  .compare .c b { font-family: "Fraunces"; font-style: italic; font-weight: 500; color: var(--tan); }
+</style>
+</head>
+<body>
+  <div class="page">
+
+    <header class="deck-head">
+      <div class="eyebrow">Ambit · Inbox · Design exploration</div>
+      <h1>Three ways to <em>open the door</em>.</h1>
+      <p class="lede">
+        Building on the Hearth thread direction you picked, here are three approaches to the
+        inbox — same brand, three different ideas about <em>what a list of chats wants to do</em>:
+        a warm card list, an editorial index, or a triage stack that surfaces what needs action first.
+      </p>
+    </header>
+
+    <div class="row">
+
+      <!-- =================== D · SNUG =================== -->
+      <div class="phone-block D">
+        <div class="phone-tag">
+          <span class="letter">D</span>
+          <div>
+            <div class="name">Snug</div>
+            <span class="sub">Hearth-aligned · glass cards</span>
+          </div>
+        </div>
+
+        <div class="bezel">
+          <div class="screen">
+            <div class="status-bar"><span>9:41</span>
+              <div class="battery">
+                <svg width="16" height="11" viewBox="0 0 16 11"><path d="M2 9.5 L8 4 L14 9.5" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <div class="battery-shell"><div class="battery-fill"></div></div>
+              </div>
+            </div>
+            <div class="island"></div>
+
+            <div class="content">
+              <div class="head">
+                <div class="greeting">Morning, <em>Maya</em></div>
+                <div class="meta">5 ongoing · 2 need a reply</div>
+              </div>
+              <div class="search">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.8"/><path d="M21 21L16 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                <span>Search people, projects…</span>
+              </div>
+              <div class="filters">
+                <div class="chip active">All<span class="n">5</span></div>
+                <div class="chip">Needs reply<span class="n">2</span></div>
+                <div class="chip">Active now<span class="n">1</span></div>
+                <div class="chip">Hired<span class="n">1</span></div>
+              </div>
+              <div class="list">
+                <div class="item urgent">
+                  <div class="ava t1 live">JA<div class="ring"></div><div class="dot"></div></div>
+                  <div class="body">
+                    <div class="top-line">
+                      <span class="name">Jordan Asare</span>
+                      <span class="time">2 min</span>
+                    </div>
+                    <div class="ctx">Project Solstice</div>
+                    <div class="preview"><b>Jordan:</b> End of June ideally. Coffee this week?</div>
+                  </div>
+                  <div class="unread"></div>
+                </div>
+
+                <div class="item">
+                  <div class="ava t2">SC</div>
+                  <div class="body">
+                    <div class="top-line">
+                      <span class="name">Sasha Cho</span>
+                      <span class="time">1h</span>
+                    </div>
+                    <div class="ctx">USC AI Lab</div>
+                    <div class="preview"><b>You:</b> Sounds good — sending over the brief now.</div>
+                    <span class="badge green">Hired</span>
+                  </div>
+                </div>
+
+                <div class="item">
+                  <div class="ava t3">NR</div>
+                  <div class="body">
+                    <div class="top-line">
+                      <span class="name">Noor Rahimi</span>
+                      <span class="time">3h</span>
+                    </div>
+                    <div class="ctx">Late Night Radio</div>
+                    <div class="preview">Hey! Loved the typography on your reel — is print also your thing?</div>
+                  </div>
+                  <div class="unread"></div>
+                </div>
+
+                <div class="item">
+                  <div class="ava t4">DK</div>
+                  <div class="body">
+                    <div class="top-line">
+                      <span class="name">Diego Kim</span>
+                      <span class="time">Yesterday</span>
+                    </div>
+                    <div class="ctx">USC Racing · Branding</div>
+                    <div class="preview"><b>You:</b> 👍</div>
+                  </div>
+                </div>
+
+                <div class="item">
+                  <div class="ava t5">PV</div>
+                  <div class="body">
+                    <div class="top-line">
+                      <span class="name">Prof. Vinod</span>
+                      <span class="time">Mon</span>
+                    </div>
+                    <div class="ctx">CTIN 489</div>
+                    <div class="preview">Thanks for the playtest notes — let's schedule a debrief.</div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="tabbar">
+                <div class="tab"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M3 12L12 4L21 12" stroke="currentColor" stroke-width="1.8"/><path d="M5 10v10h14V10" stroke="currentColor" stroke-width="1.8"/></svg></div>
+                <div class="tab"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="4" y="4" width="16" height="16" rx="4" stroke="currentColor" stroke-width="1.8"/></svg></div>
+                <div class="tab active"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M4 6h16v12H8l-4 3V6z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></div>
+                <div class="tab"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="1.8"/><path d="M4 20c0-4 4-7 8-7s8 3 8 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></div>
+              </div>
+            </div>
+            <div class="home"></div>
+          </div>
+        </div>
+
+        <div class="phone-notes">
+          <b>Where it shines.</b> Speaks the same dialect as Hearth — glass cards on warm wash, live presence as a glow ring, urgent threads lift up via warm gradient. Greeting + counter sets context fast.<br><br>
+          <b>Where it bends.</b> A lot of background luminance can fatigue at scale (50+ threads). Filter chips help.
+        </div>
+      </div>
+
+      <!-- =================== E · ATELIER INDEX =================== -->
+      <div class="phone-block E">
+        <div class="phone-tag">
+          <span class="letter">E</span>
+          <div>
+            <div class="name">Atelier Index</div>
+            <span class="sub">Editorial · table-of-contents</span>
+          </div>
+        </div>
+
+        <div class="bezel">
+          <div class="screen">
+            <div class="status-bar"><span>9:41</span>
+              <div class="battery">
+                <svg width="16" height="11" viewBox="0 0 16 11"><path d="M2 9.5 L8 4 L14 9.5" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <div class="battery-shell"><div class="battery-fill"></div></div>
+              </div>
+            </div>
+            <div class="island"></div>
+
+            <div class="content">
+              <div class="head">
+                <div class="label">Volume 04 · May</div>
+                <h2>Correspondence</h2>
+                <div class="meta">
+                  <span><b>5</b> open</span>
+                  <span><b>2</b> need a reply</span>
+                  <span><b>1</b> hired</span>
+                </div>
+              </div>
+              <div class="nav">
+                <div class="item on">All<span class="n">5</span></div>
+                <div class="item">Active<span class="n">3</span></div>
+                <div class="item">Hired<span class="n">1</span></div>
+                <div class="item">Archive</div>
+              </div>
+
+              <div class="list">
+                <div class="sec">Today</div>
+
+                <div class="entry unread">
+                  <div class="ava t1">JA</div>
+                  <div>
+                    <div class="name">Jordan Asare</div>
+                    <div class="byline"><b>Project Solstice</b> · brand identity</div>
+                    <div class="preview">"End of June ideally, but I can stretch if the right person shows up. Coffee this week?"</div>
+                  </div>
+                  <div class="right">
+                    <div class="time">9:41 AM</div>
+                    <div class="pin rouge">Reply</div>
+                  </div>
+                </div>
+
+                <div class="entry">
+                  <div class="ava t2">SC</div>
+                  <div>
+                    <div class="name">Sasha Cho</div>
+                    <div class="byline"><b>USC AI Lab</b> · research</div>
+                    <div class="preview">Sending over the brief now — let me know if anything's unclear before we kick off.</div>
+                  </div>
+                  <div class="right">
+                    <div class="time">8:14 AM</div>
+                    <div class="pin green">Hired</div>
+                  </div>
+                </div>
+
+                <div class="sec">Yesterday</div>
+
+                <div class="entry unread">
+                  <div class="ava t3">NR</div>
+                  <div>
+                    <div class="name">Noor Rahimi</div>
+                    <div class="byline"><b>Late Night Radio</b> · typography</div>
+                    <div class="preview">"Loved the typography on your reel — is print also part of your range?"</div>
+                  </div>
+                  <div class="right">
+                    <div class="time">11:02 PM</div>
+                    <div class="pin rouge">Reply</div>
+                  </div>
+                </div>
+
+                <div class="entry">
+                  <div class="ava t4">DK</div>
+                  <div>
+                    <div class="name">Diego Kim</div>
+                    <div class="byline"><b>USC Racing</b> · branding</div>
+                    <div class="preview">Acknowledged. Waiting on the new pitch deck before next conversation.</div>
+                  </div>
+                  <div class="right">
+                    <div class="time">4:30 PM</div>
+                  </div>
+                </div>
+
+                <div class="sec">This week</div>
+
+                <div class="entry">
+                  <div class="ava t5">PV</div>
+                  <div>
+                    <div class="name">Prof. Vinod</div>
+                    <div class="byline"><b>CTIN 489</b> · faculty</div>
+                    <div class="preview">"Thanks for the playtest notes — let's schedule a debrief for next office hours."</div>
+                  </div>
+                  <div class="right">
+                    <div class="time">Mon</div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="tabbar">
+                <div class="tab"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M3 12L12 4L21 12" stroke="currentColor" stroke-width="1.8"/><path d="M5 10v10h14V10" stroke="currentColor" stroke-width="1.8"/></svg></div>
+                <div class="tab"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="4" y="4" width="16" height="16" rx="4" stroke="currentColor" stroke-width="1.8"/></svg></div>
+                <div class="tab active"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M4 6h16v12H8l-4 3V6z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></div>
+                <div class="tab"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="1.8"/><path d="M4 20c0-4 4-7 8-7s8 3 8 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></div>
+              </div>
+            </div>
+            <div class="home"></div>
+          </div>
+        </div>
+
+        <div class="phone-notes">
+          <b>Where it shines.</b> Reads like a literary magazine's table of contents — italic Fraunces names, ALL-CAPS bylines for project context, rule-bordered "Reply" / "Hired" pins. Sections by day group cognitive load. Scales to hundreds without losing legibility.<br><br>
+          <b>Where it bends.</b> Cooler temperature than Snug. The warmth lives in type and color cues rather than surface — if you want the inbox to <em>hug</em>, this won't do it.
+        </div>
+      </div>
+
+      <!-- =================== F · TRIAGE STACK =================== -->
+      <div class="phone-block F">
+        <div class="phone-tag">
+          <span class="letter">F</span>
+          <div>
+            <div class="name">Triage Stack</div>
+            <span class="sub">Hinge-style · action-first</span>
+          </div>
+        </div>
+
+        <div class="bezel">
+          <div class="screen">
+            <div class="status-bar"><span>9:41</span>
+              <div class="battery">
+                <svg width="16" height="11" viewBox="0 0 16 11"><path d="M2 9.5 L8 4 L14 9.5" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <div class="battery-shell"><div class="battery-fill"></div></div>
+              </div>
+            </div>
+            <div class="island"></div>
+
+            <div class="content">
+              <div class="head">
+                <div class="label">Up next</div>
+                <h2>Your move.</h2>
+                <div class="stats">
+                  <span><b>2</b>replies pending</span>
+                  <span><b>1</b>active now</span>
+                  <span><b>1</b>hired</span>
+                </div>
+              </div>
+
+              <div class="hero">
+                <div class="urgent-tag">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="6"/></svg>
+                  Active now · most recent
+                </div>
+                <div class="hero-top">
+                  <div class="hero-ava">JA<div class="dot"></div></div>
+                  <div>
+                    <div class="hero-name">Jordan Asare</div>
+                    <div class="hero-ctx">Project Solstice</div>
+                  </div>
+                </div>
+                <div class="hero-message">End of June ideally, but I can stretch if the right person shows up. Coffee this week?</div>
+                <div class="hero-actions">
+                  <button class="btn-ghost">Pass</button>
+                  <button class="btn-primary">Open chat →</button>
+                </div>
+              </div>
+
+              <div class="queue-label">Queue · 4 more</div>
+              <div class="queue">
+                <div class="q-item">
+                  <div class="q-ava t1">NR</div>
+                  <div style="flex:1;min-width:0">
+                    <div class="q-name">Noor Rahimi</div>
+                    <div class="q-prev">"Is print part of your range?"</div>
+                  </div>
+                  <div class="q-meta">
+                    <div class="q-time">3h</div>
+                    <span class="q-pin">Reply</span>
+                  </div>
+                </div>
+                <div class="q-item">
+                  <div class="q-ava t2">SC</div>
+                  <div style="flex:1;min-width:0">
+                    <div class="q-name">Sasha Cho</div>
+                    <div class="q-prev">Brief sent — kickoff Wed</div>
+                  </div>
+                  <div class="q-meta">
+                    <div class="q-time">1h</div>
+                    <span class="q-pin green">Hired</span>
+                  </div>
+                </div>
+                <div class="q-item">
+                  <div class="q-ava t3">PV</div>
+                  <div style="flex:1;min-width:0">
+                    <div class="q-name">Prof. Vinod</div>
+                    <div class="q-prev">Debrief schedule</div>
+                  </div>
+                  <div class="q-meta">
+                    <div class="q-time">Mon</div>
+                  </div>
+                </div>
+                <div class="q-item">
+                  <div class="q-ava t4">DK</div>
+                  <div style="flex:1;min-width:0">
+                    <div class="q-name">Diego Kim</div>
+                    <div class="q-prev">Waiting on pitch deck</div>
+                  </div>
+                  <div class="q-meta">
+                    <div class="q-time">Yesterday</div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="tabbar">
+                <div class="tab"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M3 12L12 4L21 12" stroke="currentColor" stroke-width="1.8"/><path d="M5 10v10h14V10" stroke="currentColor" stroke-width="1.8"/></svg></div>
+                <div class="tab"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="4" y="4" width="16" height="16" rx="4" stroke="currentColor" stroke-width="1.8"/></svg></div>
+                <div class="tab active"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M4 6h16v12H8l-4 3V6z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></div>
+                <div class="tab"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="1.8"/><path d="M4 20c0-4 4-7 8-7s8 3 8 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></div>
+              </div>
+            </div>
+            <div class="home"></div>
+          </div>
+        </div>
+
+        <div class="phone-notes">
+          <b>Where it shines.</b> Surfaces the next action instead of a flat list. The hero card is hard to ignore — message preview is the actual quote in serif italic. "Pass" and "Open chat" act like Hinge's discard/keep. Queue below is scannable.<br><br>
+          <b>Where it bends.</b> Heavier visual weight per screen — only one or two threads per fold. Best for low/medium chat volume; busy power-users may prefer E.
+        </div>
+      </div>
+
+    </div>
+
+    <div class="compare">
+      <div class="h">Attribute</div>
+      <div class="h dim">D · Snug</div>
+      <div class="h dim">E · Atelier Index</div>
+      <div class="h dim">F · Triage Stack</div>
+
+      <div class="h row-h">Top of screen</div>
+      <div class="c">Serif greeting ("Morning, Maya"), glass search pill, filter chips</div>
+      <div class="c">Volume number + serif heading, stat triplet, tab-style nav</div>
+      <div class="c">"Up next / Your move." serif headline, stat triplet, hero card immediately</div>
+
+      <div class="h row-h">List unit</div>
+      <div class="c">Glass card, rounded-square avatar, live ring for "active now", urgent items lift in tan gradient</div>
+      <div class="c">Newspaper-style entry, rule lines, ALL-CAPS byline for project, italic serif preview as a pull-quote</div>
+      <div class="c">Big hero card for top thread (full message in serif italic) + smaller queue cards below</div>
+
+      <div class="h row-h">Urgency signal</div>
+      <div class="c">Warm gradient surface + rouge timestamp + small dark badge</div>
+      <div class="c">Rule-pinned "Reply" / "Hired" labels on the right margin</div>
+      <div class="c">Hero card *is* the urgency signal · action buttons are immediate</div>
+
+      <div class="h row-h">Best for</div>
+      <div class="c">Default chat-heavy daily use · matches Hearth thread surface</div>
+      <div class="c">Power users with many threads · scales gracefully · feels editorial</div>
+      <div class="c">Low/medium volume · users who want the app to tell them what to do next</div>
+
+      <div class="h row-h">Risk</div>
+      <div class="c">Background luminance fatigue past ~20 threads</div>
+      <div class="c">Cooler temperature; warmth is in type, not surface</div>
+      <div class="c">One-per-screen pacing slows triage for busy days</div>
+
+      <div class="h row-h">Pairs with Hearth thread</div>
+      <div class="c"><b>Most coherent.</b> Same surface language, ring as presence, glass composer reads as continuation.</div>
+      <div class="c">Editorial contrast — feels like the cover/index for the warm chat inside.</div>
+      <div class="c">Mixed — the hero card has Hearth's tactility; the queue is more utilitarian.</div>
+    </div>
+
+  </div>
+</body>
+</html>
