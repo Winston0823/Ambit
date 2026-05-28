@@ -44,7 +44,13 @@ import {
   PassReasonSheet,
   TypingIndicator,
 } from '../../../components/molecules';
-import { ChatComposer, PartnerProfileIsland, SchedulingComposer } from '../../../components/organisms';
+import {
+  AvailabilityPollComposer,
+  AvailabilityPollModal,
+  ChatComposer,
+  PartnerProfileIsland,
+  SchedulingComposer,
+} from '../../../components/organisms';
 import {
   confirmHire,
   proposeHire,
@@ -68,6 +74,10 @@ import {
   listSchedulingRequests,
   type SchedulingRequestRow,
 } from '../../../lib/scheduling';
+import {
+  listAvailabilityPolls,
+  type AvailabilityPollRow,
+} from '../../../lib/availability';
 import { AmbitFont, Brand, Radii, Space } from '../../../constants/theme';
 
 const QUICK_REACTIONS = ['👍', '❤️', '😂', '🙏', '🔥', '👀'];
@@ -111,6 +121,9 @@ export default function ThreadScreen() {
   const [messages, setMessages] = useState<MessageRow[]>([]);
   const [reactions, setReactions] = useState<ReactionRow[]>([]);
   const [schedulingRequests, setSchedulingRequests] = useState<SchedulingRequestRow[]>([]);
+  const [polls, setPolls] = useState<AvailabilityPollRow[]>([]);
+  const [openPollId, setOpenPollId] = useState<string | null>(null);
+  const [pollComposerOpen, setPollComposerOpen] = useState(false);
   const [partnerLastReadAt, setPartnerLastReadAt] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -118,6 +131,10 @@ export default function ThreadScreen() {
   const [editing, setEditing] = useState<MessageRow | null>(null);
   const [selectedMessage, setSelectedMessage] = useState<MessageRow | null>(null);
   const [schedulingOpen, setSchedulingOpen] = useState(false);
+  const openPoll = useMemo(
+    () => polls.find((p) => p.id === openPollId) ?? null,
+    [polls, openPollId],
+  );
 
   /// Optimistic send tracking. A message id lives in `pendingIds` while
   /// its insert is in flight, moves to `failedIds` if the request errors
@@ -269,10 +286,11 @@ export default function ThreadScreen() {
         hired_proposed_by: (convo as any).hired_proposed_by ?? null,
       };
 
-      const [msgs, reacts, schedReqs, partnerRead, selfProfile] = await Promise.all([
+      const [msgs, reacts, schedReqs, availPolls, partnerRead, selfProfile] = await Promise.all([
         listMessages(conversationId, { limit: 200 }),
         listReactions(conversationId),
         listSchedulingRequests(conversationId),
+        listAvailabilityPolls(conversationId),
         supabase
           .from('conversation_reads')
           .select('last_read_at')
@@ -293,6 +311,7 @@ export default function ThreadScreen() {
       setMessages(msgs);
       setReactions(reacts);
       setSchedulingRequests(schedReqs);
+      setPolls(availPolls);
       setPartnerLastReadAt(partnerRead);
       setMyPhotoUrl((selfProfile as { photo_url: string | null } | null)?.photo_url ?? null);
       setMyName((selfProfile as { name: string | null } | null)?.name ?? 'You');
@@ -401,6 +420,28 @@ export default function ThreadScreen() {
         } else if (payload.eventType === 'UPDATE') {
           const row = payload.new as SchedulingRequestRow;
           setSchedulingRequests((prev) => prev.map((r) => (r.id === row.id ? row : r)));
+        }
+      },
+    );
+
+    ch.on(
+      'postgres_changes',
+      {
+        event:  '*',
+        schema: 'public',
+        table:  'availability_polls',
+        filter: `conversation_id=eq.${conversationId}`,
+      },
+      (payload) => {
+        if (payload.eventType === 'INSERT') {
+          setPolls((prev) => {
+            const row = payload.new as AvailabilityPollRow;
+            if (prev.some((p) => p.id === row.id)) return prev;
+            return [...prev, row];
+          });
+        } else if (payload.eventType === 'UPDATE') {
+          const row = payload.new as AvailabilityPollRow;
+          setPolls((prev) => prev.map((p) => (p.id === row.id ? row : p)));
         }
       },
     );
@@ -776,6 +817,9 @@ export default function ThreadScreen() {
             const schedRequest = item.scheduling_request_id
               ? schedulingRequests.find((r) => r.id === item.scheduling_request_id) ?? null
               : null;
+            const availPoll = item.availability_poll_id
+              ? polls.find((p) => p.id === item.availability_poll_id) ?? null
+              : null;
             return (
               <MessageBubble
                 message={item}
@@ -789,6 +833,8 @@ export default function ThreadScreen() {
                 avatarUrl={avatarUrl}
                 senderName={senderName}
                 schedulingRequest={schedRequest}
+                availabilityPoll={availPoll}
+                onOpenAvailabilityPoll={setOpenPollId}
                 onToggleReaction={(emoji) => handleToggleReaction(item, emoji)}
                 onLongPress={() => handleLongPress(item)}
                 onRetry={() => handleRetry(item.id)}
@@ -811,6 +857,7 @@ export default function ThreadScreen() {
             onSendImage={handleSendImage}
             onSaveEdit={handleSaveEdit}
             onOpenScheduling={() => setSchedulingOpen(true)}
+            onOpenAvailabilityPoll={() => setPollComposerOpen(true)}
             onTypingPing={handleTypingPing}
             attachMenuOpen={attachMenuOpen}
             onToggleAttachMenu={toggleAttachMenu}
@@ -888,6 +935,21 @@ export default function ThreadScreen() {
         defaultTitle={meta ? `Chat about ${meta.project_title}` : 'Quick chat'}
         onClose={() => setSchedulingOpen(false)}
         onProposed={() => { /* realtime INSERT will append the bubble */ }}
+      />
+
+      <AvailabilityPollComposer
+        visible={pollComposerOpen}
+        conversationId={conversationId ?? null}
+        defaultTitle={meta ? `When can we meet about ${meta.project_title}?` : 'When can we meet?'}
+        onClose={() => setPollComposerOpen(false)}
+        onProposed={() => { /* realtime INSERT will append the bubble */ }}
+      />
+
+      <AvailabilityPollModal
+        visible={!!openPoll}
+        poll={openPoll}
+        meId={user.id}
+        onClose={() => setOpenPollId(null)}
       />
 
       {/* Action sheet on long-press. Modal so it lives above keyboard. */}

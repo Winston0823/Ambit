@@ -26,6 +26,9 @@ export interface MessageRow {
   /// renders the SchedulingBubble card by looking up the request by id.
   /// Added in migration 008_scheduling.
   scheduling_request_id?: string | null;
+  /// When set, this message announces an availability poll; the bubble
+  /// renders AvailabilityPollBubble. Added in migration 009_when2meet.
+  availability_poll_id?: string | null;
   edited_at:       string | null;
   deleted_at:      string | null;
   created_at:      string;

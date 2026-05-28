@@ -13,3 +13,5 @@ export { PortfolioModal } from './PortfolioModal';
 export { ReachOutComposer } from './ReachOutComposer';
 export { PassReasonSheet } from './PassReasonSheet';
 export { SchedulingBubble } from './SchedulingBubble';
+export { AvailabilityGrid } from './AvailabilityGrid';
+export { AvailabilityPollBubble } from './AvailabilityPollBubble';

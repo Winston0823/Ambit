@@ -12,6 +12,8 @@ import type { MessageRow, ReactionRow } from '../../lib/messaging';
 import { getCachedAttachmentUrl } from '../../lib/messaging';
 import type { SchedulingRequestRow } from '../../lib/scheduling';
 import { SchedulingBubble } from './SchedulingBubble';
+import type { AvailabilityPollRow } from '../../lib/availability';
+import { AvailabilityPollBubble } from './AvailabilityPollBubble';
 import { AmbitFont, Brand, Radii, Space } from '../../constants/theme';
 
 /// Send lifecycle for a locally-originated message — used to render the
@@ -54,6 +56,11 @@ interface Props {
   /// the request row so the bubble can render the SchedulingBubble card
   /// in place of the normal body. Null while loading.
   schedulingRequest?: SchedulingRequestRow | null;
+  /// When the message announces an availability poll, the parent
+  /// provides the poll row so the bubble can render
+  /// AvailabilityPollBubble. Tap on "Open" propagates up.
+  availabilityPoll?: AvailabilityPollRow | null;
+  onOpenAvailabilityPoll?: (pollId: string) => void;
 }
 
 /// Resolve a path into a renderable URL. Local URIs (file://) pass through
@@ -130,6 +137,8 @@ export function MessageBubble({
   onLongPress,
   onRetry,
   schedulingRequest,
+  availabilityPoll,
+  onOpenAvailabilityPoll,
 }: Props) {
   const attachmentUrl = useAttachmentUrl(message.attachment_url);
   const isDeleted = !!message.deleted_at;
@@ -161,6 +170,19 @@ export function MessageBubble({
           request={schedulingRequest}
           meId={meId}
           isMine={isMine}
+        />
+      </View>
+    );
+  }
+
+  // Availability poll messages — same idea as scheduling.
+  if (message.availability_poll_id && availabilityPoll && !isDeleted) {
+    return (
+      <View style={[styles.row, isMine ? styles.rowMine : styles.rowTheirs]}>
+        <AvailabilityPollBubble
+          poll={availabilityPoll}
+          isMine={isMine}
+          onOpen={() => onOpenAvailabilityPoll?.(availabilityPoll.id)}
         />
       </View>
     );

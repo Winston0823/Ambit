@@ -21,6 +21,7 @@ import {
   Paperclip,
   PencilSimple,
   Plus,
+  Users,
   X,
 } from 'phosphor-react-native';
 import type { MessageRow } from '../../lib/messaging';
@@ -46,6 +47,10 @@ interface Props {
   /// Opens the scheduling composer modal. When undefined, the calendar
   /// button is hidden (e.g. on screens where scheduling is disabled).
   onOpenScheduling?: () => void;
+  /// Opens the when-to-meet (availability poll) composer. Independent
+  /// from onOpenScheduling — that one books a specific time, this one
+  /// runs a poll across a date range.
+  onOpenAvailabilityPoll?: () => void;
   /// Fired on every meaningful keystroke. Caller debounces & broadcasts
   /// presence; the composer just signals intent.
   onTypingPing:    () => void;
@@ -73,6 +78,7 @@ export function ChatComposer({
   onSendImage,
   onSaveEdit,
   onOpenScheduling,
+  onOpenAvailabilityPoll,
   onTypingPing,
   attachMenuOpen,
   onToggleAttachMenu,
@@ -289,6 +295,17 @@ export function ChatComposer({
             accessibilityLabel="Propose a meeting"
           >
             <CalendarPlus size={20} color={Brand.inkMuted} weight="regular" />
+          </Pressable>
+        )}
+
+        {!editing && onOpenAvailabilityPoll && (
+          <Pressable
+            onPress={onOpenAvailabilityPoll}
+            hitSlop={10}
+            style={styles.iconBtn}
+            accessibilityLabel="Run an availability poll"
+          >
+            <Users size={20} color={Brand.inkMuted} weight="regular" />
           </Pressable>
         )}
 

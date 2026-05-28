@@ -16,6 +16,31 @@ export async function ensureCalendarPermission(): Promise<boolean> {
   return next.status === 'granted';
 }
 
+/// Pulls events from every calendar visible to the app, in the given
+/// window. Used by the availability-poll grid to pre-block cells that
+/// collide with the user's existing events. Returns busy intervals as
+/// `[start, end]` Date pairs. Silently returns an empty list on
+/// permission denial — callers degrade gracefully (no pre-blocks).
+export async function getBusyEvents(
+  windowStart: Date,
+  windowEnd:   Date,
+): Promise<{ start: Date; end: Date }[]> {
+  const granted = await ensureCalendarPermission();
+  if (!granted) return [];
+
+  const calendars = await Calendar.getCalendarsAsync(Calendar.EntityTypes.EVENT);
+  if (calendars.length === 0) return [];
+
+  const ids = calendars.map((c) => c.id);
+  const events = await Calendar.getEventsAsync(ids, windowStart, windowEnd);
+  return events
+    .filter((e) => !e.allDay)
+    .map((e) => ({
+      start: new Date(e.startDate as string),
+      end:   new Date(e.endDate   as string),
+    }));
+}
+
 /// Picks the best writable calendar on the device:
 ///   - iOS: the user's default (whichever calendar they've set as primary
 ///     in iOS Settings → Calendar — typically iCloud or their Google

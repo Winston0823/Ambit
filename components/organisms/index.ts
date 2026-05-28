@@ -8,3 +8,5 @@ export type { ProjectFormValues } from './ProjectForm';
 export { ChatComposer } from './ChatComposer';
 export { PartnerProfileIsland } from './PartnerProfileIsland';
 export { SchedulingComposer } from './SchedulingComposer';
+export { AvailabilityPollComposer } from './AvailabilityPollComposer';
+export { AvailabilityPollModal } from './AvailabilityPollModal';
