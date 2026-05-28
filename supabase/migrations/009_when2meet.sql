@@ -22,14 +22,14 @@ create table if not exists availability_polls (
   end_date                        date not null,
   day_start_hour                  int  not null default 9  check (day_start_hour between 0 and 23),
   day_end_hour                    int  not null default 21 check (day_end_hour between 1 and 24),
-  /// IANA timezone the poll's hours are anchored to. The proposer's tz
-  /// at poll creation — both sides see slot labels in this tz so the
-  /// grid columns line up regardless of where the recipient lives.
+  -- IANA timezone the poll's hours are anchored to. The proposer's tz
+  -- at poll creation — both sides see slot labels in this tz so the
+  -- grid columns line up regardless of where the recipient lives.
   tz                              text not null,
   status                          text not null default 'open'
     check (status in ('open', 'closed', 'cancelled')),
-  /// Set once finalize_availability_poll fires — points at the
-  /// scheduling_requests row created in the 'accepted' state.
+  -- Set once finalize_availability_poll fires — points at the
+  -- scheduling_requests row created in the 'accepted' state.
   settled_scheduling_request_id   uuid references scheduling_requests(id) on delete set null,
   created_at                      timestamptz not null default now(),
   updated_at                      timestamptz not null default now(),
