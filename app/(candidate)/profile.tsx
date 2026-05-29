@@ -311,7 +311,10 @@ export default function ProfileTab() {
     <View style={styles.root}>
       {/* Header — minimal: an eyebrow label so the user knows they're in
           edit mode, plus a sign-out button in the corner. */}
-      <View style={[styles.header, { paddingTop: Space.sm }]}>
+      {/* Just clear the safe area — no extra top gap. The 44px header band
+          centers the eyebrow + sign-out button, giving a snug top that sits
+          right below the Dynamic Island. */}
+      <View style={[styles.header, { marginTop: insets.top }]}>
         <Text style={styles.eyebrow}>YOUR CARD</Text>
         <Pressable
           onPress={() => { signOut().catch(() => {}); }}

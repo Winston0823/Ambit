@@ -38,12 +38,16 @@ interface Props {
 const DURATIONS = [15, 30, 45, 60] as const;
 const HOUR_OPTIONS = Array.from({ length: 24 }, (_, i) => i);
 
-/// Two-step modal:
-///   1. SETUP — proposer picks date range, hours, duration
-///   2. MARK  — proposer fills in their available cells on the grid
-///               (pre-blocked by their own calendar events)
-/// On Send, posts both the poll and the proposer's initial response in
-/// one RPC.
+/// When2meet flow — opens directly into the marking grid with sensible
+/// defaults (today through +4 days, 9am–9pm, 30-min cells). The Setup
+/// screen still exists for advanced edits (date range, hours, duration)
+/// and is reachable from the grid header. On Send, posts both the poll
+/// and the proposer's initial response in one RPC.
+///
+/// Previously this modal opened to a Setup screen that visually
+/// duplicated the SchedulingComposer (date pickers, duration), forcing
+/// the user through two near-identical screens before they could mark
+/// any times. Now the grid is the primary surface; setup is the detour.
 export function AvailabilityPollComposer({
   visible,
   conversationId,
@@ -51,7 +55,9 @@ export function AvailabilityPollComposer({
   onClose,
   onProposed,
 }: Props) {
-  const [step, setStep]                 = useState<'setup' | 'mark'>('setup');
+  // Default to 'mark' so the grid is the first thing the user sees.
+  // 'setup' is reachable from the grid header for advanced edits.
+  const [step, setStep]                 = useState<'setup' | 'mark'>('mark');
   const [title, setTitle]               = useState(defaultTitle);
   const [duration, setDuration]         = useState<number>(30);
   const [startDate, setStartDate]       = useState<string>(todayISODate());
@@ -66,7 +72,7 @@ export function AvailabilityPollComposer({
 
   useEffect(() => {
     if (visible) {
-      setStep('setup');
+      setStep('mark');
       setTitle(defaultTitle);
       setDuration(30);
       setStartDate(todayISODate());
@@ -290,6 +296,13 @@ export function AvailabilityPollComposer({
               <Text style={styles.markHintText}>
                 Tap the times you're free. Gray cells are blocked by events on your calendar.
               </Text>
+              <Pressable
+                onPress={() => setStep('setup')}
+                hitSlop={6}
+                accessibilityLabel="Adjust window"
+              >
+                <Text style={styles.markHintLink}>Window…</Text>
+              </Pressable>
             </View>
 
             {loadingBusy ? (
@@ -311,11 +324,11 @@ export function AvailabilityPollComposer({
 
             <View style={styles.footer}>
               <Pressable
-                onPress={() => setStep('setup')}
+                onPress={onClose}
                 disabled={posting}
                 style={styles.secondaryBtn}
               >
-                <Text style={styles.secondaryBtnText}>Back</Text>
+                <Text style={styles.secondaryBtnText}>Cancel</Text>
               </Pressable>
               <Pressable
                 onPress={post}
@@ -601,15 +614,26 @@ const styles = StyleSheet.create({
   },
 
   markHint: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
     paddingHorizontal: Space.lg,
     paddingTop: Space.md,
     paddingBottom: Space.sm,
   },
   markHintText: {
+    flex: 1,
     fontFamily: AmbitFont.body,
     fontSize: 13,
     color: Brand.inkMuted,
     lineHeight: 18,
+  },
+  markHintLink: {
+    fontFamily: AmbitFont.body,
+    fontSize: 13,
+    fontWeight: '600',
+    color: Brand.accent,
+    paddingTop: 0,
   },
   busyLoader: {
     paddingVertical: 6,

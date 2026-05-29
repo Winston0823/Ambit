@@ -65,6 +65,43 @@ export interface InboxItem {
   hired_at:                    string | null;
   hired_proposed_by:           string | null;
   auto_decline_at:             string | null;
+  /// Pinning — iMessage parity. Pinned conversations float above the
+  /// general list (after hired_pending, before everything else). Cap
+  /// is enforced server-side at 4 per user; the RPC raises
+  /// `pin_limit_reached` when exceeded.
+  is_pinned:                   boolean;
+  pinned_at:                   string | null;
+}
+
+/// Pin a conversation. Throws if the caller has already pinned 4
+/// conversations (server enforces the cap; we surface the message
+/// to the caller verbatim).
+export async function pinConversation(conversationId: string): Promise<void> {
+  const { error } = await supabase.rpc('pin_conversation', {
+    p_conversation_id: conversationId,
+  });
+  if (error) throw new Error(error.message);
+}
+
+export async function unpinConversation(conversationId: string): Promise<void> {
+  const { error } = await supabase.rpc('unpin_conversation', {
+    p_conversation_id: conversationId,
+  });
+  if (error) throw new Error(error.message);
+}
+
+/// "Reached out to you" derivation. Lives client-side because it's a
+/// view-state, not a stored status. True when the conversation is
+/// active AND the partner sent the latest message AND the viewer has
+/// never replied. Caller passes `meId` because InboxItem doesn't
+/// carry it.
+export function isReachedOutToYou(item: InboxItem, meId: string): boolean {
+  return (
+    item.status === 'active' &&
+    item.last_message_sender_id !== meId &&
+    item.last_message_sender_id !== null &&
+    item.unread_count > 0
+  );
 }
 
 export interface SearchHit {

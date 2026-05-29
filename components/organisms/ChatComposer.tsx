@@ -14,6 +14,7 @@ import * as ImagePicker from 'expo-image-picker';
 import {
   CalendarPlus,
   Camera,
+  Clock,
   FileText,
   ImageSquare,
   MapPin,
@@ -21,7 +22,6 @@ import {
   Paperclip,
   PencilSimple,
   Plus,
-  Users,
   X,
 } from 'phosphor-react-native';
 import type { MessageRow } from '../../lib/messaging';
@@ -287,28 +287,6 @@ export function ChatComposer({
           </Pressable>
         )}
 
-        {!editing && onOpenScheduling && (
-          <Pressable
-            onPress={onOpenScheduling}
-            hitSlop={10}
-            style={styles.iconBtn}
-            accessibilityLabel="Propose a meeting"
-          >
-            <CalendarPlus size={20} color={Brand.inkMuted} weight="regular" />
-          </Pressable>
-        )}
-
-        {!editing && onOpenAvailabilityPoll && (
-          <Pressable
-            onPress={onOpenAvailabilityPoll}
-            hitSlop={10}
-            style={styles.iconBtn}
-            accessibilityLabel="Run an availability poll"
-          >
-            <Users size={20} color={Brand.inkMuted} weight="regular" />
-          </Pressable>
-        )}
-
         <TextInput
           value={text}
           onChangeText={handleChange}
@@ -349,6 +327,28 @@ export function ChatComposer({
               tint={Brand.primary}
               onPress={pickImage}
             />
+            {onOpenScheduling && (
+              <AttachTile
+                Icon={CalendarPlus}
+                label="Meeting"
+                tint={Brand.primary}
+                onPress={() => {
+                  onCloseAttachMenu();
+                  onOpenScheduling();
+                }}
+              />
+            )}
+            {onOpenAvailabilityPoll && (
+              <AttachTile
+                Icon={Clock}
+                label="My times"
+                tint={Brand.primary}
+                onPress={() => {
+                  onCloseAttachMenu();
+                  onOpenAvailabilityPoll();
+                }}
+              />
+            )}
             <AttachTile
               Icon={Camera}
               label="Camera"
@@ -530,10 +530,15 @@ const styles = StyleSheet.create({
   },
   attachGridRow: {
     flexDirection: 'row',
-    gap: 12,
+    flexWrap: 'wrap',
+    rowGap: 14,
   },
+  // Fixed quarter-width so the grid is 4-up and wraps cleanly to a second
+  // row (a partial last row stays left-aligned). Horizontal spacing comes
+  // from the centered content inside each cell, not a row gap — combining
+  // 25% width with a gap would overflow the row.
   attachTile: {
-    flex: 1,
+    width: '25%',
     alignItems: 'center',
     gap: 6,
     paddingVertical: 8,

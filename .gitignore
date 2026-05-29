@@ -43,3 +43,6 @@ yarn-error.*
 # Editor swap files
 *.swp
 *.swo
+
+# Superpowers brainstorm companion
+.superpowers/

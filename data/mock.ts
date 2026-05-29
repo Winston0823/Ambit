@@ -66,6 +66,14 @@ export interface PortfolioItem {
   gradient: [string, string];
 }
 
+/// External links surfaced as icon buttons on the card's Portfolio
+/// Highlights screen (screen 2). All optional — only the present ones render.
+export interface SeekerLinks {
+  github?: string;
+  site?: string;
+  appStore?: string;
+}
+
 export interface SeekerCardData {
   kind: 'seeker';
   id: string;
@@ -77,6 +85,9 @@ export interface SeekerCardData {
   /// Ordered list of featured work. Empty array = hide the portfolio
   /// section in discovery; in profile, the "+ Add" affordance still shows.
   portfolio: PortfolioItem[];
+  /// Optional external links — GitHub / personal site / App Store. Rendered
+  /// as icon buttons on the Portfolio Highlights screen.
+  links?: SeekerLinks;
 }
 
 export interface ProjectCardData {
@@ -118,33 +129,38 @@ export const MOCK_SEEKERS: SeekerCardData[] = [
     kind: 'seeker',
     id: 'seeker-1',
     name: 'Alex Chen',
-    photoUri: null,
+    photoUri: 'https://i.pravatar.cc/800?img=12',
     campusId: 'usc',
     skills: ['React Native', 'TypeScript', 'iOS', 'Swift'],
     vibeBlurb: 'I like shipping things that feel calm and fast.',
     portfolio: [
       {
         id: 'p1-1',
-        imageUri: null,
+        imageUri: 'https://picsum.photos/seed/habittracker/600/600',
         title: 'Habit Tracker',
         description: 'A minimal habit-tracking app for iOS that focuses on streak-based motivation. Built in 3 weeks while studying for finals. Featured on r/sideproject with 4k stars.',
         gradient: PORTFOLIO_GRADIENTS[0],
       },
       {
         id: 'p1-2',
-        imageUri: null,
+        imageUri: 'https://picsum.photos/seed/todolite/600/600',
         title: 'ToDo Lite',
         description: 'A todo app that gets out of your way. No nesting, no projects, no tags — just a list and a way to clear it. 600 paying users in the first month.',
         gradient: PORTFOLIO_GRADIENTS[1],
       },
       {
         id: 'p1-3',
-        imageUri: null,
+        imageUri: 'https://picsum.photos/seed/recipebook/600/600',
         title: 'Recipe Book',
         description: 'iPad-first recipe organizer with handwriting-style fonts and a "what can I make right now" filter. Built for my parents; ended up shipping it.',
         gradient: PORTFOLIO_GRADIENTS[2],
       },
     ],
+    links: {
+      github: 'https://github.com/alexchen',
+      site: 'https://alexchen.dev',
+      appStore: 'https://apps.apple.com/app/habit-tracker',
+    },
   },
   {
     kind: 'seeker',
@@ -170,6 +186,10 @@ export const MOCK_SEEKERS: SeekerCardData[] = [
         gradient: PORTFOLIO_GRADIENTS[4],
       },
     ],
+    links: {
+      github: 'https://github.com/dariapark',
+      site: 'https://read.cv/dariapark',
+    },
   },
   {
     kind: 'seeker',
@@ -188,6 +208,9 @@ export const MOCK_SEEKERS: SeekerCardData[] = [
         gradient: PORTFOLIO_GRADIENTS[0],
       },
     ],
+    links: {
+      site: 'https://mayapatel.research.io',
+    },
   },
   {
     kind: 'seeker',

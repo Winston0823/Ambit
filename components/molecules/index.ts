@@ -6,6 +6,7 @@ export { TypingIndicator } from './TypingIndicator';
 export { MessageBubble } from './MessageBubble';
 export type { MessageStatus } from './MessageBubble';
 export { InboxRow } from './InboxRow';
+export { PinnedStrip } from './PinnedStrip';
 export { SocialAuthButtons } from './SocialAuthButtons';
 export { SpeechBubble } from './SpeechBubble';
 export { PortfolioBubble, AddPortfolioBubble } from './PortfolioBubble';

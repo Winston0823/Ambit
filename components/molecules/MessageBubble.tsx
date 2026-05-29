@@ -7,8 +7,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Check, Checks, Paperclip, PencilSimple, Warning } from 'phosphor-react-native';
+import { Paperclip, Warning } from 'phosphor-react-native';
 import type { MessageRow, ReactionRow } from '../../lib/messaging';
 import { getCachedAttachmentUrl } from '../../lib/messaging';
 import type { SchedulingRequestRow } from '../../lib/scheduling';
@@ -41,6 +40,10 @@ interface Props {
   /// Optimistic-send state for my own messages. Defaults to 'sent' if the
   /// message has been confirmed by the server.
   status?:       MessageStatus;
+  /// True when this is the most recent message from me — used to render
+  /// the iMessage-style "Delivered" / "Read" line directly under the bubble.
+  /// Earlier mine bubbles stay clean (no inline meta).
+  isLatestMine?: boolean;
   /// Avatar URL of the message sender. Rounded-square thumbnail rendered
   /// next to the bubble (left for partner, right for mine). Null falls
   /// back to a colored initial.
@@ -134,6 +137,7 @@ export function MessageBubble({
   status = 'sent',
   avatarUrl,
   senderName,
+  isLatestMine = false,
   onToggleReaction,
   onLongPress,
   onRetry,
@@ -219,18 +223,6 @@ export function MessageBubble({
             isMine && status === 'failed' && styles.bubbleFailed,
           ]}
         >
-        {/* Hearth: tan gradient fill on my own bubbles — vertical, lighter
-            tan at the top fading to deeper accent tan at the bottom. The
-            outer Pressable clips it via overflow:hidden + borderRadius. */}
-        {isMine && !isDeleted && status !== 'failed' && (
-          <LinearGradient
-            pointerEvents="none"
-            colors={[Brand.hearthBubbleMineTop, Brand.hearthBubbleMineBottom]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 0, y: 1 }}
-            style={StyleSheet.absoluteFillObject}
-          />
-        )}
         {/* Reply preview — small bar above the body that quotes the parent.
             For attachment-only parents, an inline Paperclip + "Photo" label
             stands in for the body. */}
@@ -276,7 +268,9 @@ export function MessageBubble({
           <Image source={{ uri: attachmentUrl }} style={styles.image} resizeMode="cover" />
         )}
 
-        {/* Body. */}
+        {/* Body. iMessage parity: no inline timestamp / checkmark — the
+            bubble is just the text. Status, read state, and edited badge
+            ride on a small external row under the bubble (see below). */}
         {isDeleted ? (
           <Text style={[styles.tombstone, isMine && styles.tombstoneMine]}>
             Message deleted
@@ -284,39 +278,42 @@ export function MessageBubble({
         ) : message.body ? (
           <Text style={[styles.body, isMine && styles.bodyMine]}>{message.body}</Text>
         ) : null}
-
-        {/* Meta row: timestamp + edited badge + read receipt. */}
-        <View style={styles.metaRow}>
-          {wasEdited && (
-            <View style={styles.editedPill}>
-              <PencilSimple
-                size={9}
-                color={isMine ? Brand.inkOnBrand : Brand.inkMuted}
-                weight="regular"
-              />
-              <Text style={[styles.editedText, isMine && styles.editedTextMine]}>
-                edited
-              </Text>
-            </View>
-          )}
-          <Text style={[styles.time, isMine && styles.timeMine]}>
-            {formatTime(message.created_at)}
-          </Text>
-          {isMine && !isDeleted && (
-            status === 'sending' ? (
-              <ActivityIndicator size="small" color={Brand.inkOnBrand} />
-            ) : status === 'failed' ? (
-              <Warning size={13} color={Brand.inkOnBrand} weight="fill" />
-            ) : readByPartner ? (
-              <Checks size={13} color={Brand.inkOnBrand} weight="bold" />
-            ) : (
-              <Check size={13} color={Brand.inkOnBrand} weight="bold" />
-            )
-          )}
-        </View>
       </Pressable>
         {isMine && <Avatar url={avatarUrl} name={senderName} />}
       </View>
+
+      {/* External status line — iMessage style. Only renders for the latest
+          mine bubble (Read / Delivered), or whenever a non-sent state needs
+          to surface (sending spinner / failed / edited). Earlier mine and
+          partner bubbles stay clean to keep the thread tight. */}
+      {isMine && !isDeleted && (isLatestMine || status !== 'sent' || wasEdited) && (
+        <View style={styles.statusRow}>
+          {status === 'sending' ? (
+            <>
+              <ActivityIndicator size="small" color={Brand.inkMuted} />
+              <Text style={styles.statusText}>Sending…</Text>
+            </>
+          ) : status === 'failed' ? (
+            <>
+              <Warning size={11} color="#C0392B" weight="fill" />
+              <Text style={[styles.statusText, { color: '#C0392B' }]}>
+                Not delivered · Tap to retry
+              </Text>
+            </>
+          ) : (
+            <>
+              {wasEdited && (
+                <Text style={[styles.statusText, { fontStyle: 'italic' }]}>
+                  edited ·
+                </Text>
+              )}
+              <Text style={styles.statusText}>
+                {readByPartner ? 'Read' : 'Delivered'} {formatTime(message.created_at)}
+              </Text>
+            </>
+          )}
+        </View>
+      )}
 
       {/* Reactions row sits under the bubble, on the same side. */}
       {Object.keys(groupedReactions).length > 0 && (
@@ -398,11 +395,14 @@ const styles = StyleSheet.create({
 
   // Rounded-square avatar. 32pt with 8pt radius — App-Store-icon shape,
   // distinct from the circular hero avatars elsewhere in the app.
+  // On a white chat surface the avatar is a quiet neutral chip so it
+  // doesn't compete with the colored bubbles — the visual emphasis
+  // belongs on the conversation, not the affordance.
   avatar: {
     width: 32,
     height: 32,
     borderRadius: 8,
-    backgroundColor: Brand.surface2,
+    backgroundColor: Brand.surface1,
     overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
@@ -445,32 +445,28 @@ const styles = StyleSheet.create({
   },
 
   bubble: {
-    // Reduced from 78% to 70% to make room for the side avatar without
-    // breaking the visual rhythm of multi-line messages.
-    maxWidth: '70%',
-    borderRadius: 20,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    // iMessage rhythm — tight padding, no shadow, no internal meta row.
+    maxWidth: '72%',
+    borderRadius: 18,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
     gap: 4,
-    overflow: 'hidden', // clips the LinearGradient fill on mine
+    overflow: 'hidden',
   },
   bubbleMine: {
-    backgroundColor: Brand.hearthBubbleMineBottom, // base in case gradient fails to mount
-    borderBottomRightRadius: 6,
-    shadowColor: Brand.hearthBubbleMineShadow,
-    shadowOpacity: 1,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 5,
+    // Flat warm tan — drops the previous gradient. Solid #B48045 reads
+    // cleaner against the white canvas and matches iMessage's flat
+    // outgoing bubble. Locked to hex so it doesn't drift if Brand.accent
+    // is retuned elsewhere.
+    backgroundColor: '#E09948',
+    borderBottomRightRadius: 4,
   },
   bubbleTheirs: {
-    backgroundColor: '#FFFFFF',
-    borderBottomLeftRadius: 6,
-    shadowColor: Brand.hearthBubbleTheirsShadow,
-    shadowOpacity: 1,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 2,
+    // Warm-tinted iMessage gray. Previous #FFFFFF disappeared on the
+    // white chat canvas — bumping to a soft warm gray gives the bubble
+    // a real edge without breaking the brand cream palette.
+    backgroundColor: '#ECE9E2',
+    borderBottomLeftRadius: 4,
   },
   bubbleDeleted: { opacity: 0.65 },
   // Optimistic-send tints: while in flight the bubble is slightly
@@ -481,11 +477,28 @@ const styles = StyleSheet.create({
 
   body: {
     fontFamily: AmbitFont.body,
-    fontSize: 15,
+    fontSize: 16,
     color: Brand.inkBody,
-    lineHeight: 20,
+    lineHeight: 21,
   },
   bodyMine: { color: Brand.inkOnBrand },
+
+  // External status line below the latest mine bubble — iMessage
+  // "Delivered" / "Read 3:36 PM". Tiny, right-aligned, muted.
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-end',
+    gap: 4,
+    marginTop: 2,
+    paddingRight: 40, // align with bubble edge, past the avatar gutter
+  },
+  statusText: {
+    fontFamily: AmbitFont.body,
+    fontSize: 11,
+    color: Brand.inkMuted,
+    letterSpacing: 0.1,
+  },
 
   tombstone: {
     fontFamily: AmbitFont.body,
@@ -528,33 +541,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 4,
   },
-
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    alignSelf: 'flex-end',
-    marginTop: 2,
-  },
-  time: {
-    fontFamily: AmbitFont.body,
-    fontSize: 10,
-    color: Brand.inkMuted,
-  },
-  timeMine: { color: 'rgba(255,255,255,0.85)' },
-
-  editedPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-  },
-  editedText: {
-    fontFamily: AmbitFont.body,
-    fontSize: 10,
-    color: Brand.inkMuted,
-    fontStyle: 'italic',
-  },
-  editedTextMine: { color: 'rgba(255,255,255,0.85)' },
 
   reactionRow: {
     flexDirection: 'row',

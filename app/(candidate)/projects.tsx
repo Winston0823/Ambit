@@ -8,6 +8,7 @@ import {
   View,
 } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Compass, Plus } from 'phosphor-react-native';
 import { useAuth } from '../../context/AuthContext';
 import { useProfileRole } from '../../hooks/useProfileRole';
@@ -36,6 +37,7 @@ export default function ProjectsTab() {
   /// flow. 'both' defaults to owner-mode here since they can already get
   /// to discovery via the nav bar.
   const isPureSeeker = role === 'seeker';
+  const insets = useSafeAreaInsets();
   const [projects, setProjects] = useState<ProjectRow[] | null>(null);
 
   const load = useCallback(async () => {
@@ -66,7 +68,10 @@ export default function ProjectsTab() {
   }
 
   return (
-    <ScrollView style={styles.root} contentContainerStyle={styles.content}>
+    <ScrollView
+      style={styles.root}
+      contentContainerStyle={[styles.content, { paddingTop: insets.top + 40 }]}
+    >
       <Text style={styles.eyebrow}>YOURS</Text>
       <Text style={styles.title}>Your projects</Text>
 

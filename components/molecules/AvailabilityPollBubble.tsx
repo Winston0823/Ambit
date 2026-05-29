@@ -73,15 +73,24 @@ const styles = StyleSheet.create({
   card: {
     width: 280,
     borderRadius: Radii.lg,
-    backgroundColor: Brand.surface1,
+    // Incoming (theirs) fill — matches incoming text bubbles (#ECE9E2) so
+    // the card is clearly a bubble on the white canvas; surface1 was too
+    // pale. `cardMine` overrides to tan.
+    backgroundColor: '#ECE9E2',
     padding: 12,
     gap: 6,
-    borderWidth: 1,
-    borderColor: Brand.borderDefault,
+    shadowColor: '#000',
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
   },
   cardMine: {
     backgroundColor: Brand.primary,
-    borderColor: Brand.primary,
+    shadowColor: Brand.accent,
+    shadowOpacity: 0.18,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 4 },
   },
 
   headerRow: {

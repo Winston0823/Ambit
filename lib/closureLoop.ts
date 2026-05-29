@@ -96,3 +96,51 @@ export function formatResponseRate(rate: number | null | undefined): string | nu
   if (rate == null) return null;
   return `${Math.round(rate * 100)}%`;
 }
+
+// ─── Countdown ──────────────────────────────────────────────────────
+
+export interface AutoCloseCountdown {
+  /// Whole minutes remaining until auto-close fires. Negative if past
+  /// the deadline (caller should treat as already auto-declined).
+  minutesLeft: number;
+  /// Display label, collapses units at human thresholds:
+  ///   ≥ 1 day  → "2d 14h left"
+  ///   < 1 day  → "21h to reply"
+  ///   < 1 hour → "14m to reply"
+  label:       string;
+  /// True when remaining is under 24h. UI uses this to flip the chip
+  /// from outline → solid ink (the "urgent" tier in the v4 mock).
+  urgent:      boolean;
+}
+
+/// Compute the time-to-auto-close for a conversation whose recipient
+/// has not yet replied. Returns null when the deadline has passed or
+/// the input timestamp is missing — both cases should render as
+/// "auto-closed" rather than a live countdown.
+export function getAutoCloseCountdown(
+  autoDeclineAt: string | null,
+  now: Date = new Date(),
+): AutoCloseCountdown | null {
+  if (!autoDeclineAt) return null;
+  const deadline = new Date(autoDeclineAt).getTime();
+  const minutesLeft = Math.floor((deadline - now.getTime()) / 60_000);
+  if (minutesLeft <= 0) return null;
+
+  let label: string;
+  if (minutesLeft >= 24 * 60) {
+    const days  = Math.floor(minutesLeft / (24 * 60));
+    const hours = Math.floor((minutesLeft - days * 24 * 60) / 60);
+    label = hours > 0 ? `${days}d ${hours}h left` : `${days}d left`;
+  } else if (minutesLeft >= 60) {
+    const hours = Math.floor(minutesLeft / 60);
+    label = `${hours}h to reply`;
+  } else {
+    label = `${minutesLeft}m to reply`;
+  }
+
+  return {
+    minutesLeft,
+    label,
+    urgent: minutesLeft < 24 * 60,
+  };
+}

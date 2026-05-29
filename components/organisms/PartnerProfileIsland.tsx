@@ -34,8 +34,8 @@ const { width: SCREEN_W } = Dimensions.get('window');
 /// inside — iMessage's contact-avatar look at the top of a thread. Tap
 /// to morph into the full profile card.
 // Hearth pill: wider glass pill with photo + name + presence row.
-const PILL_W = 200;
-const PILL_H = 44;
+const PILL_W = 140;
+const PILL_H = 78;
 const CARD_W = SCREEN_W - 24;
 const CARD_H = 560;
 const AVATAR_IN_PILL_SIZE = 36;
@@ -281,12 +281,10 @@ export function PartnerProfileIsland({
                 </Text>
               </View>
             )}
-            <View style={styles.pillWho}>
+            <View style={styles.pillNameRow}>
+              <Text style={styles.pillStatusDot}>●</Text>
               <Text style={styles.pillName} numberOfLines={1}>
                 {(partnerName ?? '').split(' ')[0] || 'Profile'}
-              </Text>
-              <Text style={styles.pillStatus} numberOfLines={1}>
-                ● Active now
               </Text>
             </View>
           </Pressable>
@@ -519,14 +517,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  // Vertical-stack pill: avatar centered on top, "● Name" centered below.
+  // Compact (140×78) so it reads as a contact chip rather than a header bar.
   collapsedHit: {
     width: '100%',
     height: '100%',
-    flexDirection: 'row',
+    flexDirection: 'column',
     alignItems: 'center',
-    paddingLeft: 4,
-    paddingRight: 14,
-    gap: 8,
+    justifyContent: 'center',
+    paddingTop: 8,
+    paddingBottom: 8,
+    gap: 4,
   },
   pillAvatar: {
     width: AVATAR_IN_PILL_SIZE,
@@ -543,24 +544,23 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: Brand.inkLabel,
   },
-  pillWho: {
-    flex: 1,
-    minWidth: 0,
+  pillNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  pillStatusDot: {
+    fontFamily: AmbitFont.body,
+    fontSize: 10,
+    color: Brand.hearthPresenceGreen,
+    lineHeight: 14,
   },
   pillName: {
     fontFamily: AmbitFont.body,
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '700',
     color: Brand.inkPrimary,
     letterSpacing: -0.1,
-  },
-  pillStatus: {
-    fontFamily: AmbitFont.body,
-    fontSize: 10.5,
-    fontWeight: '600',
-    color: Brand.hearthPresenceGreen,
-    letterSpacing: 0.05,
-    marginTop: 1,
   },
 
   // Expanded card content

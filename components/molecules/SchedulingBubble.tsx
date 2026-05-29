@@ -290,11 +290,19 @@ const styles = StyleSheet.create({
   card: {
     width: 280,
     borderRadius: Radii.lg,
-    backgroundColor: Brand.surface1,
+    // Incoming (theirs) fill — same warm gray as incoming text bubbles
+    // (#ECE9E2) so the card reads as a real bubble on the white canvas;
+    // surface1 (#F6F6F6) was too pale to see. `cardMine` overrides to tan.
+    backgroundColor: '#ECE9E2',
     padding: 12,
     gap: 8,
-    borderWidth: 1,
-    borderColor: Brand.borderDefault,
+    // Soft shadow instead of a hard hairline — sits cleanly on white
+    // without the boxed-in feel.
+    shadowColor: '#000',
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
   },
   cardMine: {
     backgroundColor: Brand.primary,

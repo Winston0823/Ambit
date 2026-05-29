@@ -35,9 +35,9 @@ const SMOOTH_LAYOUT: LayoutAnimationConfig = {
   delete: { type: 'easeInEaseOut', property: 'opacity' },
 };
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import * as Haptics from 'expo-haptics';
-import { LinearGradient } from 'expo-linear-gradient';
 import { CaretLeft, DotsThree } from 'phosphor-react-native';
 import {
   MessageBubble,
@@ -111,6 +111,7 @@ interface ConvoMeta {
 export default function ThreadScreen() {
   const { id: conversationId } = useLocalSearchParams<{ id: string }>();
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
 
   const [meta, setMeta] = useState<ConvoMeta | null>(null);
   /// Signed-in user's avatar URL, fetched once on screen mount and
@@ -508,6 +509,20 @@ export default function ThreadScreen() {
     return map;
   }, [reactions]);
 
+  // ── Latest mine message id ───────────────────────────────────
+  // Used to render the iMessage-style "Delivered" / "Read" line under
+  // only the most recent outgoing bubble. All earlier mine bubbles stay
+  // clean (no inline meta), which is what makes the thread feel light.
+  const lastMineId = useMemo(() => {
+    if (!user) return null;
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].sender_id === user.id && !messages[i].deleted_at) {
+        return messages[i].id;
+      }
+    }
+    return null;
+  }, [messages, user?.id]);
+
   // ── Handlers ─────────────────────────────────────────────────
 
   /// Move an id between the pending / failed sets atomically. Using
@@ -722,79 +737,80 @@ export default function ThreadScreen() {
   const isOwnSelected = selectedMessage?.sender_id === user?.id;
 
   return (
-    <View style={styles.root}>
-      {/* Hearth surface — two soft washes layered over the cream base
-          fake a warm radial glow at the top and bottom of the screen.
-          pointerEvents="none" so taps fall through to content above. */}
-      <LinearGradient
-        pointerEvents="none"
-        colors={[Brand.hearthBgTop, 'rgba(245,239,230,0)']}
-        locations={[0, 0.55]}
-        style={styles.washTop}
-      />
-      <LinearGradient
-        pointerEvents="none"
-        colors={['rgba(245,239,230,0)', Brand.hearthBgBottom]}
-        locations={[0.5, 1]}
-        style={styles.washBottom}
-      />
+    <View style={[styles.root, { paddingTop: insets.top, paddingBottom: Math.max(insets.bottom, 8) }]}>
+      {/* Hearth surface — single solid warm cream. The previous two-wash
+          gradient setup made a visible "lighter cream stripe" in the
+          middle where the washes faded out and the cool base canvas
+          showed through. Solid warm cream reads as one unified surface. */}
 
-      {/* Header row: circular back (left) + reserved center (the floating
-          PartnerProfileIsland sits over this space, absolutely
-          positioned) + circular overflow ⋯ (right). The island handles
-          its own animation/position; the row just sets the height
-          envelope and side actions. */}
-      <View style={styles.headerRow}>
-        <Pressable
-          onPress={() => {
-            if (Platform.OS !== 'web') Haptics.selectionAsync().catch(() => {});
-            router.back();
-          }}
-          hitSlop={8}
-          style={({ pressed }) => [styles.circleBtn, pressed && { opacity: 0.85 }]}
-          accessibilityRole="button"
-          accessibilityLabel="Back"
-        >
-          <CaretLeft size={18} color={Brand.inkPrimary} weight="bold" />
-        </Pressable>
+      {/* Floating transparent header — iMessage parity. The overlay is
+          absolutely positioned at the top of the root and is FULLY
+          transparent: no blur/tint fill, so messages scroll cleanly
+          behind it. Only the circular back / overflow buttons (and the
+          profile island below) float over the thread. The FlatList
+          compensates via paddingTop in listContent so the first message
+          doesn't start under the buttons.
 
-        <View style={styles.headerSpacer} />
+          Top inset is applied inline because absolute children inside
+          a parent with `paddingTop` reference the parent's padding-box
+          edge (y=0), not the content edge — so we have to offset by
+          the safe-area inset ourselves to clear the Dynamic Island. */}
+      <View pointerEvents="box-none" style={[styles.headerOverlay, { top: insets.top }]}>
+        <View style={styles.headerRow}>
+          <Pressable
+            onPress={() => {
+              if (Platform.OS !== 'web') Haptics.selectionAsync().catch(() => {});
+              router.back();
+            }}
+            hitSlop={8}
+            style={({ pressed }) => [styles.circleBtn, pressed && { opacity: 0.85 }]}
+            accessibilityRole="button"
+            accessibilityLabel="Back"
+          >
+            <CaretLeft size={18} color={Brand.inkPrimary} weight="bold" />
+          </Pressable>
 
-        <Pressable
-          onPress={() => setOverflowOpen(true)}
-          hitSlop={8}
-          style={({ pressed }) => [styles.circleBtn, pressed && { opacity: 0.85 }]}
-          accessibilityRole="button"
-          accessibilityLabel="More options"
-        >
-          <DotsThree size={18} color={Brand.inkPrimary} weight="bold" />
-        </Pressable>
+          <View style={styles.headerSpacer} />
+
+          <Pressable
+            onPress={() => setOverflowOpen(true)}
+            hitSlop={8}
+            style={({ pressed }) => [styles.circleBtn, pressed && { opacity: 0.85 }]}
+            accessibilityRole="button"
+            accessibilityLabel="More options"
+          >
+            <DotsThree size={18} color={Brand.inkPrimary} weight="bold" />
+          </Pressable>
+        </View>
+
+        {/* Closure-loop status banner — sits just below the header row
+            whenever the conversation isn't 'active'. Lives inside the
+            transparent header overlay. */}
+        {meta && meta.status !== 'active' && (
+          <StatusBanner
+            status={meta.status}
+            passReason={meta.pass_reason}
+            hiredProposedBy={meta.hired_proposed_by}
+            partnerName={meta.partner_name}
+            meId={user?.id ?? ''}
+            onConfirmHire={handleConfirmHire}
+          />
+        )}
       </View>
 
       {/* Dynamic-Island-style name pill — absolutely positioned, morphs
-          into the partner's profile card on tap. Sits above the header
-          via zIndex so taps land before the row's side buttons. */}
+          into the partner's profile card on tap. Rendered after the
+          header overlay so it sits visually on top. The `top` prop
+          accounts for the safe-area inset (same reason as the overlay
+          above). */}
       {meta && (
         <PartnerProfileIsland
           partnerId={meta.partner_id}
           partnerName={meta.partner_name}
           partnerPhotoUrl={meta.partner_photo_url}
-          top={6}
+          top={insets.top + 6}
           currentConversationId={meta.id}
           meUserId={user?.id}
-        />
-      )}
-
-      {/* Closure-loop status banner — sits just below the header row
-          whenever the conversation isn't 'active'. */}
-      {meta && meta.status !== 'active' && (
-        <StatusBanner
-          status={meta.status}
-          passReason={meta.pass_reason}
-          hiredProposedBy={meta.hired_proposed_by}
-          partnerName={meta.partner_name}
-          meId={user?.id ?? ''}
-          onConfirmHire={handleConfirmHire}
         />
       )}
 
@@ -849,6 +865,7 @@ export default function ThreadScreen() {
                 status={status}
                 avatarUrl={avatarUrl}
                 senderName={senderName}
+                isLatestMine={isMine && item.id === lastMineId}
                 schedulingRequest={schedRequest}
                 availabilityPoll={availPoll}
                 onOpenAvailabilityPoll={setOpenPollId}
@@ -1099,21 +1116,6 @@ function StatusBanner({
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Brand.hearthBgBase },
-
-  // Hearth washes — absolutely positioned so they sit behind everything
-  // else in the screen but in front of the cream root canvas.
-  washTop: {
-    position: 'absolute',
-    top: 0, left: 0, right: 0,
-    height: 360,
-    zIndex: 0,
-  },
-  washBottom: {
-    position: 'absolute',
-    bottom: 0, left: 0, right: 0,
-    height: 360,
-    zIndex: 0,
-  },
   // Loading body — sits below the header row and fills the remaining
   // vertical space so the spinner is centered in what would otherwise
   // be the messages-list area. Keeps the header pinned at its final
@@ -1124,6 +1126,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
+  // Floating transparent header — absolute-positioned wrapper that hosts
+  // the headerRow and optional StatusBanner. No fill, so messages scroll
+  // cleanly behind it; only the circle buttons + island read as chrome.
+  headerOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 5,
+  },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1241,7 +1253,11 @@ const styles = StyleSheet.create({
   },
 
   listContent: {
-    paddingVertical: Space.md,
+    // Top inset clears the floating blur header AND the partner pill
+    // that hangs below it (pill is 78pt tall at top:6, so bottom ≈ 84pt).
+    // Extra breathing room keeps the first message off the pill's edge.
+    paddingTop: 96,
+    paddingBottom: Space.md,
   },
 
   modalBackdrop: {

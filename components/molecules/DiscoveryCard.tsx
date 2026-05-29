@@ -1,17 +1,25 @@
-import React, { useLayoutEffect, useRef } from 'react';
+import React, { useLayoutEffect, useRef, useState } from 'react';
 import {
   Animated,
   Easing,
   Image,
+  Linking,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
-import { PaperPlaneTilt } from 'phosphor-react-native';
+import {
+  AppStoreLogo,
+  GithubLogo,
+  Globe,
+  PaperPlaneTilt,
+  type IconProps,
+} from 'phosphor-react-native';
 import * as Haptics from 'expo-haptics';
 import {
   Brand,
@@ -73,6 +81,14 @@ export function DiscoveryCard({
     ]).start();
   }, [card.id, cardOpacity, cardTranslateY]);
 
+  // Seeker cards are a vertical 2-page pager: screen 1 = overview (the
+  // photo card), screen 2 = portfolio highlights. We measure the card
+  // height so each page snaps to exactly one viewport. The deck's
+  // PanResponder only claims horizontal pans, so vertical drags fall
+  // through to this ScrollView. Project cards stay single-page.
+  const [cardH, setCardH] = useState(0);
+  const [page, setPage] = useState(0);
+
   return (
     <Animated.View
       style={[
@@ -82,14 +98,41 @@ export function DiscoveryCard({
           transform: [{ translateY: cardTranslateY }],
         },
       ]}
+      onLayout={(e) => {
+        const h = e.nativeEvent.layout.height;
+        if (h > 0 && Math.abs(h - cardH) > 0.5) setCardH(h);
+      }}
     >
       {card.kind === 'seeker' ? (
-        <SeekerContent
-          card={card}
-          matchedSkills={matchedSkills}
-          onPortfolioPress={onPortfolioPress}
-          activePortfolioId={activePortfolioId}
-        />
+        <>
+          <ScrollView
+            style={StyleSheet.absoluteFill}
+            pagingEnabled
+            showsVerticalScrollIndicator={false}
+            scrollEventThrottle={16}
+            onScroll={(e) => {
+              if (cardH <= 0) return;
+              const i = Math.round(e.nativeEvent.contentOffset.y / cardH);
+              if (i !== page) setPage(i);
+            }}
+          >
+            <View style={{ height: cardH }}>
+              <SeekerContent
+                card={card}
+                matchedSkills={matchedSkills}
+                onPortfolioPress={onPortfolioPress}
+                activePortfolioId={activePortfolioId}
+              />
+            </View>
+            <View style={{ height: cardH }}>
+              <PortfolioHighlights
+                card={card}
+                onPortfolioPress={onPortfolioPress}
+              />
+            </View>
+          </ScrollView>
+          {cardH > 0 && <PageDots count={2} index={page} />}
+        </>
       ) : (
         <ProjectContent card={card} matchedSkills={matchedSkills} />
       )}
@@ -99,6 +142,20 @@ export function DiscoveryCard({
         onPress={() => onReachOut?.(card)}
       />
     </Animated.View>
+  );
+}
+
+// ─── Page dots (vertical depth indicator) ──────────────────────────────────
+// Sits on the right edge, vertically centered. Active page is a taller,
+// brighter pill. Non-interactive — purely a discoverability cue.
+
+function PageDots({ count, index }: { count: number; index: number }) {
+  return (
+    <View style={styles.dots} pointerEvents="none">
+      {Array.from({ length: count }).map((_, i) => (
+        <View key={i} style={[styles.dot, i === index && styles.dotOn]} />
+      ))}
+    </View>
   );
 }
 
@@ -195,12 +252,12 @@ function Scrim() {
   return (
     <LinearGradient
       colors={[
-        'rgba(26, 22, 18, 0.00)',
-        'rgba(26, 22, 18, 0.05)',
-        'rgba(26, 22, 18, 0.45)',
-        'rgba(26, 22, 18, 0.88)',
+        'rgba(0, 0, 0, 0.00)',
+        'rgba(0, 0, 0, 0.05)',
+        'rgba(0, 0, 0, 0.55)',
+        'rgba(0, 0, 0, 1)',
       ]}
-      locations={[0, 0.38, 0.62, 1]}
+      locations={[0, 0.4, 0.66, 1]}
       start={{ x: 0.5, y: 0 }}
       end={{ x: 0.5, y: 1 }}
       style={styles.scrim}
@@ -241,7 +298,9 @@ function SkillChip({
   );
 }
 
-// ─── Currently shipping mini-tile ─────────────────────────────────────────
+// ─── Portfolio-highlights mini-tile ───────────────────────────────────────
+// Teaser on screen 1 for the featured portfolio piece; doubles as the cue to
+// swipe up for the full Portfolio Highlights screen.
 
 function ShippingTile({
   item,
@@ -276,16 +335,20 @@ function ShippingTile({
           { transform: [{ scale }] },
         ]}
       >
-        <LinearGradient
-          colors={item.gradient}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.shipCover}
-        >
-          <View style={styles.shipCoverOutline} pointerEvents="none" />
-        </LinearGradient>
+        {item.imageUri ? (
+          <Image source={{ uri: item.imageUri }} style={styles.shipCover} resizeMode="cover" />
+        ) : (
+          <LinearGradient
+            colors={item.gradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.shipCover}
+          >
+            <View style={styles.shipCoverOutline} pointerEvents="none" />
+          </LinearGradient>
+        )}
         <View style={styles.shipBody}>
-          <Text style={styles.shipEyebrow}>CURRENTLY SHIPPING</Text>
+          <Text style={styles.shipEyebrow} numberOfLines={1}>PORTFOLIO HIGHLIGHTS</Text>
           <Text style={styles.shipTitle} numberOfLines={1}>{item.title}</Text>
         </View>
       </Animated.View>
@@ -449,6 +512,110 @@ function ProjectContent({ card, matchedSkills }: ProjectContentProps) {
   );
 }
 
+// ─── Portfolio Highlights (screen 2) ───────────────────────────────────────
+// The swipe-up deep dive: same identity header as screen 1 (eyebrow + big
+// name), then the candidate's work as thumbnail + title + caption rows, and
+// optional external links as icon buttons. Reach-out + page dots float on
+// top from the parent, so this screen owns no chrome of its own.
+
+interface PortfolioHighlightsProps {
+  card: Extract<DiscoveryCardData, { kind: 'seeker' }>;
+  onPortfolioPress?: (item: PortfolioItem) => void;
+}
+
+function PortfolioHighlights({ card, onPortfolioPress }: PortfolioHighlightsProps) {
+  const campus = CAMPUSES.find((c) => c.id === card.campusId);
+  const eyebrowText = campus
+    ? `COMPUTER SCIENCE · ${campus.name.toUpperCase()} ’${'26'}`
+    : '';
+  const links = card.links;
+  const hasLinks = !!(links && (links.github || links.site || links.appStore));
+
+  return (
+    <View style={styles.page2}>
+      <View style={styles.page2Pad}>
+        {eyebrowText !== '' && (
+          <Text style={styles.eyebrow} numberOfLines={1}>{eyebrowText}</Text>
+        )}
+        <Text style={[styles.name, styles.page2Name]} numberOfLines={1}>{card.name}</Text>
+
+        <Text style={styles.hlSection}>PORTFOLIO HIGHLIGHTS</Text>
+        {card.portfolio.slice(0, 3).map((item) => (
+          <HighlightRow
+            key={item.id}
+            item={item}
+            onPress={() => onPortfolioPress?.(item)}
+          />
+        ))}
+
+        {hasLinks && (
+          <>
+            <Text style={styles.hlSection}>LINKS</Text>
+            <View style={styles.linkRow}>
+              {links!.github && <LinkIcon Icon={GithubLogo} url={links!.github} label="GitHub" />}
+              {links!.site && <LinkIcon Icon={Globe} url={links!.site} label="Website" />}
+              {links!.appStore && <LinkIcon Icon={AppStoreLogo} url={links!.appStore} label="App Store" />}
+            </View>
+          </>
+        )}
+      </View>
+    </View>
+  );
+}
+
+function HighlightRow({
+  item,
+  onPress,
+}: {
+  item: PortfolioItem;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [styles.hlRow, pressed && { opacity: 0.78 }]}
+      accessibilityRole="button"
+      accessibilityLabel={`Open ${item.title}`}
+    >
+      {item.imageUri ? (
+        <Image source={{ uri: item.imageUri }} style={styles.hlThumb} resizeMode="cover" />
+      ) : (
+        <LinearGradient
+          colors={item.gradient}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.hlThumb}
+        />
+      )}
+      <View style={styles.hlMeta}>
+        <Text style={styles.hlTitle} numberOfLines={1}>{item.title}</Text>
+        <Text style={styles.hlCap} numberOfLines={2}>{item.description}</Text>
+      </View>
+    </Pressable>
+  );
+}
+
+function LinkIcon({
+  Icon,
+  url,
+  label,
+}: {
+  Icon: React.ComponentType<IconProps>;
+  url: string;
+  label: string;
+}) {
+  return (
+    <Pressable
+      onPress={() => Linking.openURL(url).catch(() => {})}
+      style={({ pressed }) => [styles.linkIcon, pressed && { opacity: 0.7 }]}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+    >
+      <Icon size={20} color="#F5E9D8" weight="regular" />
+    </Pressable>
+  );
+}
+
 // ─── Styles ────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
@@ -536,6 +703,9 @@ const styles = StyleSheet.create({
     color: '#F5E9D8',
     letterSpacing: -0.6,
     lineHeight: 38,
+    // Nudge the name up a touch, tightening it toward the eyebrow and
+    // opening room for the quote glyph to drop down onto the blurb.
+    marginTop: -8,
   },
 
   // ── Vibe block (italic body + decorative glyph behind) ─────────────────
@@ -546,7 +716,9 @@ const styles = StyleSheet.create({
   },
   vibeGlyph: {
     position: 'absolute',
-    top: -54,
+    // Dropped from -54 → -40 so the glyph sits lower and overlaps the start
+    // of the vibe blurb instead of floating up by the name.
+    top: -40,
     left: -14,
     width: 240,
     fontSize: 120,
@@ -648,6 +820,102 @@ const styles = StyleSheet.create({
     color: '#F5E9D8',
     letterSpacing: -0.1,
     marginTop: 1,
+  },
+
+  // ── Portfolio Highlights (screen 2) ────────────────────────────────────
+  page2: {
+    flex: 1,
+    backgroundColor: '#000000',
+  },
+  // Screen 1's name carries marginTop:-8 (it tucks under the eyebrow over
+  // the photo). Screen 2 has no stack gap, so override to a positive margin
+  // so the name clears the eyebrow instead of colliding with it.
+  page2Name: {
+    marginTop: 6,
+  },
+  page2Pad: {
+    flex: 1,
+    paddingTop: 30,
+    paddingHorizontal: 22,
+    // leave room at the bottom so the last row / links clear the floating
+    // reach-out button.
+    paddingBottom: 88,
+  },
+  hlSection: {
+    fontFamily: AmbitFont.body,
+    fontSize: 9,
+    fontWeight: '700',
+    color: 'rgba(245, 233, 216, 0.6)',
+    letterSpacing: 1.8,
+    marginTop: 18,
+    marginBottom: 12,
+  },
+  hlRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 14,
+  },
+  hlThumb: {
+    width: 78,
+    height: 78,
+    borderRadius: 12,
+    backgroundColor: 'rgba(245, 233, 216, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(245, 233, 216, 0.14)',
+  },
+  hlMeta: {
+    flex: 1,
+    minWidth: 0,
+  },
+  hlTitle: {
+    fontFamily: AmbitFont.display,
+    fontSize: 17,
+    color: '#F5E9D8',
+    letterSpacing: -0.2,
+  },
+  hlCap: {
+    fontFamily: AmbitFont.body,
+    fontSize: 12,
+    lineHeight: 17,
+    color: 'rgba(245, 233, 216, 0.82)',
+    marginTop: 5,
+  },
+  linkRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  linkIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(245, 233, 216, 0.32)',
+    backgroundColor: 'rgba(245, 233, 216, 0.07)',
+  },
+
+  // ── Page dots (vertical depth indicator, right edge) ───────────────────
+  dots: {
+    position: 'absolute',
+    right: 10,
+    top: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 7,
+    zIndex: 4,
+  },
+  dot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'rgba(245, 233, 216, 0.4)',
+  },
+  dotOn: {
+    height: 16,
+    backgroundColor: '#F5E9D8',
   },
 
   // ── Reach Out circle (bottom-right liquid glass) ───────────────────────

@@ -50,18 +50,37 @@ export const Brand = {
 
   // Hearth surface — chat thread direction. Warm radial-style washes layered
   // over the canvas, glass icon buttons, tactile bubbles with gradient + rim.
-  hearthBgTop:        '#FAEAD0', // top wash stop (warm peach)
-  hearthBgBottom:     '#F1DDB6', // bottom wash stop (warm tan)
-  hearthBgBase:       '#F5EFE6', // canvas underneath the washes
+  hearthBgTop:        '#FAEAD0', // (legacy) top wash stop — kept for reference; no longer used
+  hearthBgBottom:     '#F1DDB6', // (legacy) bottom wash stop — kept for reference; no longer used
+  hearthBgBase:       '#FFFFFF', // clean white — colored bubbles do all the warm work
   hearthGlassBg:      'rgba(255,255,255,0.7)',
   hearthGlassEdge:    'rgba(255,255,255,0.95)',
   hearthGlassShadow:  'rgba(120,80,40,0.18)',
   hearthBubbleMineTop:    '#C68F58', // mine bubble gradient — top stop (lighter tan)
   hearthBubbleMineBottom: '#B48045', // mine bubble gradient — bottom stop (deeper accent tan)
   hearthBubbleMineShadow: 'rgba(180,128,69,0.32)',
-  hearthBubbleTheirsShadow: 'rgba(120,80,40,0.08)',
+  hearthBubbleTheirsShadow: 'rgba(60,40,20,0.13)', // bumped for white-on-white separation
   hearthInkOnTan:     '#FFFFFF',
   hearthPresenceGreen:'#6E8C3F',
+
+  // Inbox v5 — Stitch's "Clean Warm Chat Interface" direction. Warm
+  // cream canvas, flat active rows divided by hairlines, pending
+  // reach-outs are the only cards (soft golden cream), avatars are
+  // rounded-square pale gray tiles with italic bronze monograms.
+  // Source: `_design/Stitch — Refined Design.html`.
+  inboxCanvas:       '#FBF9F4', // warm cream — matches the Stitch direction
+  inboxCardActive:   'transparent', // active rows are flat — no card fill
+  inboxCardPending:  'rgba(254,215,151,0.30)', // soft golden cream
+  inboxAvatarBg:     '#F0EEE9', // pale surface-container — same for pinned + row
+  inboxHairline:     'rgba(116,120,120,0.10)',
+  inboxBorderTan:    'rgba(254,215,151,0.30)',
+  inboxBronze:       '#765A26', // secondary — italic monogram + active dot + bylines
+  inboxBronzeDim:    '#E6C183', // secondary-fixed-dim — initial color (warmer)
+  inboxChipHired:    '#E4E2DD', // surface-container-highest — pale "Hired" pill
+  inboxInkPrimary:   '#1B1C19',
+  inboxInkBody:      '#444748',
+  inboxInkMute:      'rgba(68,71,72,0.6)',
+  inboxInkSoft:      '#C4C7C7',
 } as const;
 
 // ---------- Typography ----------

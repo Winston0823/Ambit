@@ -1,5 +1,5 @@
 import React from 'react';
-import { Tabs } from 'expo-router';
+import { Tabs, useSegments } from 'expo-router';
 import { LiquidNavBar, NavTabKey } from '../../components/organisms';
 
 const TAB_TO_ROUTE: Record<NavTabKey, string> = {
@@ -21,6 +21,13 @@ const ROUTE_TO_TAB: Record<string, NavTabKey> = {
 };
 
 export default function CandidateLayout() {
+  // Hide the nav bar while a conversation thread (chat/[id]) is the focused
+  // route so the chat gets the full canvas. `useSegments` reports the active
+  // route's file segments — the thread's deepest segment is the literal
+  // `[id]`. The chat list (`chat`) and search (`chat/search`) keep the bar.
+  const segments = useSegments();
+  const inThread = segments[segments.length - 1] === '[id]';
+
   return (
     <Tabs
       screenOptions={{ headerShown: false }}
@@ -30,6 +37,7 @@ export default function CandidateLayout() {
         return (
           <LiquidNavBar
             activeKey={activeKey}
+            hidden={inThread}
             onChange={(key) => navigation.navigate(TAB_TO_ROUTE[key] as never)}
           />
         );

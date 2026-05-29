@@ -8,6 +8,7 @@ import {
   View,
 } from 'react-native';
 import { router } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowsClockwise, BookmarkSimple } from 'phosphor-react-native';
 import * as Haptics from 'expo-haptics';
 import { DiscoveryOverview, SwipeDeck } from '../../components/organisms';
@@ -191,6 +192,7 @@ export default function DiscoveryFeed() {
   const { role, loading: roleLoading } = useProfileRole();
   const { save } = useSavedDeck();
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
 
   const [liveDeck, setLiveDeck] = useState<DiscoveryCardData[] | null>(null);
   const [deckLoading, setDeckLoading] = useState(false);
@@ -422,7 +424,7 @@ export default function DiscoveryFeed() {
   const loading = roleLoading || deckLoading;
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { paddingTop: insets.top }]}>
       <View style={styles.topBar}>
         <Pressable
           onPress={handleRefresh}
