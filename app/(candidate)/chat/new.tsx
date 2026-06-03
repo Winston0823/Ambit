@@ -4,9 +4,7 @@ import {
   Alert,
   FlatList,
   Image,
-  Modal,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -16,7 +14,7 @@ import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MagnifyingGlass, X, CaretRight } from 'phosphor-react-native';
 import { BackChevron, Chip } from '../../../components/atoms';
-import { ReachOutComposer } from '../../../components/molecules';
+import { BottomSheet, ReachOutComposer } from '../../../components/molecules';
 import { supabase } from '../../../lib/supabase';
 import { startConversationWithMessage } from '../../../lib/messaging';
 import { useAuth } from '../../../context/AuthContext';
@@ -111,7 +109,7 @@ export default function NewChatScreen() {
         'Create a project before reaching out — every chat is about a project.',
         [
           { text: 'Not now', style: 'cancel' },
-          { text: 'New project', onPress: () => router.push('/(candidate)/project-new') },
+          { text: 'New project', onPress: () => router.push('/project-new') },
         ],
       );
       return;
@@ -173,7 +171,9 @@ export default function NewChatScreen() {
     <View style={styles.root}>
       <BackChevron onPress={() => router.back()} />
 
-      <View style={[styles.searchBar, { marginTop: insets.top + 40 }]}>
+      <Text style={[styles.headerTitle, { marginTop: insets.top + 14 }]}>New chat</Text>
+
+      <View style={[styles.searchBar, { marginTop: 18 }]}>
         <MagnifyingGlass size={18} color={Brand.inkMuted} weight="regular" />
         <TextInput
           autoFocus
@@ -243,79 +243,61 @@ export default function NewChatScreen() {
         />
       )}
 
-      {/* Profile card preview */}
-      <Modal
-        visible={!!selected}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setSelected(null)}
-      >
-        <Pressable style={styles.cardScrim} onPress={() => setSelected(null)}>
-          <Pressable style={styles.card} onPress={() => {}}>
-            {selected && (
-              <ScrollView contentContainerStyle={styles.cardContent} showsVerticalScrollIndicator={false}>
-                {selected.photo_url ? (
-                  <Image source={{ uri: selected.photo_url }} style={styles.cardAvatar} />
-                ) : (
-                  <View style={[styles.cardAvatar, styles.rowAvatarFallback]}>
-                    <Text style={styles.cardAvatarInitial}>
-                      {(selected.name ?? '?').slice(0, 1).toUpperCase()}
-                    </Text>
-                  </View>
-                )}
-                <Text style={styles.cardName}>{selected.name}</Text>
-                {campusName(selected.campus_id) && (
-                  <Text style={styles.cardCampus}>{campusName(selected.campus_id)}</Text>
-                )}
-                {selected.vibe_blurb ? (
-                  <Text style={styles.cardVibe}>{selected.vibe_blurb}</Text>
-                ) : null}
-                {selected.skills && selected.skills.length > 0 && (
-                  <View style={styles.chipRow}>
-                    {selected.skills.map((s) => (
-                      <Chip key={s} label={s} selected={false} onPress={() => {}} />
-                    ))}
-                  </View>
-                )}
-                <Pressable
-                  style={({ pressed }) => [styles.reachBtn, pressed && { opacity: 0.9 }]}
-                  onPress={() => beginReachOut(selected)}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Reach out to ${selected.name}`}
-                >
-                  <Text style={styles.reachBtnLabel}>Reach out</Text>
-                </Pressable>
-              </ScrollView>
+      {/* Profile preview — bottom sheet (Luma-style). */}
+      <BottomSheet visible={!!selected} onClose={() => setSelected(null)}>
+        {selected && (
+          <View style={styles.cardContent}>
+            {selected.photo_url ? (
+              <Image source={{ uri: selected.photo_url }} style={styles.cardAvatar} />
+            ) : (
+              <View style={[styles.cardAvatar, styles.rowAvatarFallback]}>
+                <Text style={styles.cardAvatarInitial}>
+                  {(selected.name ?? '?').slice(0, 1).toUpperCase()}
+                </Text>
+              </View>
             )}
-          </Pressable>
-        </Pressable>
-      </Modal>
+            <Text style={styles.cardName}>{selected.name}</Text>
+            {campusName(selected.campus_id) && (
+              <Text style={styles.cardCampus}>{campusName(selected.campus_id)}</Text>
+            )}
+            {selected.vibe_blurb ? (
+              <Text style={styles.cardVibe}>{selected.vibe_blurb}</Text>
+            ) : null}
+            {selected.skills && selected.skills.length > 0 && (
+              <View style={styles.chipRow}>
+                {selected.skills.map((s) => (
+                  <Chip key={s} label={s} selected={false} onPress={() => {}} />
+                ))}
+              </View>
+            )}
+            <Pressable
+              style={({ pressed }) => [styles.reachBtn, pressed && { opacity: 0.9 }]}
+              onPress={() => beginReachOut(selected)}
+              accessibilityRole="button"
+              accessibilityLabel={`Reach out to ${selected.name}`}
+            >
+              <Text style={styles.reachBtnLabel}>Reach out</Text>
+            </Pressable>
+          </View>
+        )}
+      </BottomSheet>
 
-      {/* Project picker — only when the user has more than one active project */}
-      <Modal
-        visible={!!pickerProjects}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setPickerProjects(null)}
-      >
-        <Pressable style={styles.cardScrim} onPress={() => setPickerProjects(null)}>
-          <Pressable style={styles.picker} onPress={() => {}}>
-            <Text style={styles.pickerTitle}>Reach out about…</Text>
-            {(pickerProjects ?? []).map((p) => (
-              <Pressable
-                key={p.id}
-                style={({ pressed }) => [styles.pickerRow, pressed && { opacity: 0.7 }]}
-                onPress={() => selected && openComposer(selected, p.id)}
-                accessibilityRole="button"
-                accessibilityLabel={`Reach out about ${p.title}`}
-              >
-                <Text style={styles.pickerRowText} numberOfLines={1}>{p.title}</Text>
-                <CaretRight size={15} color={Brand.inkLabel} weight="regular" />
-              </Pressable>
-            ))}
+      {/* Project picker — bottom sheet, only when the user has >1 active project */}
+      <BottomSheet visible={!!pickerProjects} onClose={() => setPickerProjects(null)}>
+        <Text style={styles.pickerTitle}>Reach out about…</Text>
+        {(pickerProjects ?? []).map((p) => (
+          <Pressable
+            key={p.id}
+            style={({ pressed }) => [styles.pickerRow, pressed && { opacity: 0.7 }]}
+            onPress={() => selected && openComposer(selected, p.id)}
+            accessibilityRole="button"
+            accessibilityLabel={`Reach out about ${p.title}`}
+          >
+            <Text style={styles.pickerRowText} numberOfLines={1}>{p.title}</Text>
+            <CaretRight size={15} color={Brand.inkLabel} weight="regular" />
           </Pressable>
-        </Pressable>
-      </Modal>
+        ))}
+      </BottomSheet>
 
       <ReachOutComposer
         card={reachCard}
@@ -330,6 +312,13 @@ export default function NewChatScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Brand.canvas },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  headerTitle: {
+    textAlign: 'center',
+    fontFamily: AmbitFont.display,
+    fontSize: 17,
+    color: Brand.inkPrimary,
+    letterSpacing: -0.2,
+  },
 
   searchBar: {
     marginHorizontal: Space.lg,
@@ -392,22 +381,8 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 
-  // ── Profile card preview ──────────────────────────────────────
-  cardScrim: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: Space.lg,
-  },
-  card: {
-    width: '100%',
-    maxHeight: '80%',
-    backgroundColor: Brand.cardCream,
-    borderRadius: 24,
-    overflow: 'hidden',
-  },
-  cardContent: { alignItems: 'center', padding: Space.lg, gap: 10 },
+  // ── Profile preview (bottom sheet content) ────────────────────
+  cardContent: { alignItems: 'center', gap: 10, paddingTop: 4, paddingBottom: Space.md },
   cardAvatar: { width: 96, height: 96, borderRadius: 24 },
   cardAvatarInitial: { fontFamily: AmbitFont.display, fontSize: 36, color: Brand.inkLabel },
   cardName: {
@@ -446,14 +421,7 @@ const styles = StyleSheet.create({
     color: Brand.inkOnBrand,
   },
 
-  // ── Project picker ────────────────────────────────────────────
-  picker: {
-    width: '100%',
-    backgroundColor: Brand.cardCream,
-    borderRadius: 24,
-    padding: Space.lg,
-    gap: 6,
-  },
+  // ── Project picker (bottom sheet content) ─────────────────────
   pickerTitle: {
     fontFamily: AmbitFont.display,
     fontSize: 18,

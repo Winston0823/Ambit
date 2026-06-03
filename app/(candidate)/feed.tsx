@@ -158,11 +158,15 @@ async function fetchSeekerDeck(userId: string): Promise<SeekerCardData[]> {
     skills: string[];
     vibe_blurb: string;
   }[])
+    // Skip incomplete profiles — a seeker with no usable name hasn't finished
+    // onboarding, and rendered a blank discovery card (`?? 'Unknown'` only
+    // caught null, not the empty string these rows actually carry).
+    .filter((s) => !!s.name?.trim())
     .sort((a, b) => (scoreMap[b.id] ?? 0) - (scoreMap[a.id] ?? 0))
     .map((s): SeekerCardData => ({
       kind: 'seeker',
       id: s.id,
-      name: s.name ?? 'Unknown',
+      name: s.name.trim(),
       photoUri: s.photo_url,
       campusId: s.campus_id ?? '',
       skills: s.skills ?? [],
@@ -190,7 +194,7 @@ async function fetchSeekerDeck(userId: string): Promise<SeekerCardData[]> {
 ///   - consecutiveSkips reaches 5 → overlay DiscoveryOverview
 export default function DiscoveryFeed() {
   const { role, loading: roleLoading } = useProfileRole();
-  const { save } = useSavedDeck();
+  const { save, unsave } = useSavedDeck();
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
   const segments = useSegments();
@@ -297,6 +301,26 @@ export default function DiscoveryFeed() {
         { seeker_id: user.id, project_id: card.id, outcome: 'saved' },
         { onConflict: 'seeker_id,project_id' }
       ).then(() => {});
+    }
+  };
+
+  /// Undo the last pass/save from the deck's rewind button. Reverses the
+  /// side-effects: clears the match row, un-saves, and (for a pass) rolls
+  /// back the skip counter so the recovery overlay logic stays consistent.
+  const handleRewind = (card: DiscoveryCardData, action: 'pass' | 'save') => {
+    if (action === 'pass') {
+      setConsecutiveSkips((n) => Math.max(0, n - 1));
+      setLastFiveSeen((prev) => prev.slice(0, -1));
+    } else {
+      unsave(card.id);
+    }
+    if (card.kind === 'project' && user) {
+      supabase
+        .from('matches')
+        .delete()
+        .eq('seeker_id', user.id)
+        .eq('project_id', card.id)
+        .then(() => {});
     }
   };
 
@@ -476,6 +500,7 @@ export default function DiscoveryFeed() {
           matchedSkills={viewerSkills}
           onPass={handlePass}
           onSave={handleSave}
+          onRewind={handleRewind}
           onReachOut={setReachOutCard}
           onPortfolioPress={setActivePortfolio}
           activePortfolioId={activePortfolio?.id ?? null}

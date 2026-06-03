@@ -39,6 +39,9 @@ interface Props {
   onPortfolioPress?: (item: PortfolioItem) => void;
   activePortfolioId?: string | null;
   onReachOut?: (card: DiscoveryCardData) => void;
+  /// The swipe deck handles reach via its action row, so it hides the card's
+  /// own floating button. Other contexts (saved preview) keep it (default).
+  showReachButton?: boolean;
 }
 
 /// Discovery card — H-overlay redesign. Photo fills the card edge-to-edge,
@@ -54,6 +57,7 @@ export function DiscoveryCard({
   onPortfolioPress,
   activePortfolioId,
   onReachOut,
+  showReachButton = true,
 }: Props) {
   const firstName = card.kind === 'seeker'
     ? card.name.split(' ')[0]
@@ -137,10 +141,12 @@ export function DiscoveryCard({
         <ProjectContent card={card} matchedSkills={matchedSkills} />
       )}
 
-      <ReachOutCircle
-        firstName={firstName}
-        onPress={() => onReachOut?.(card)}
-      />
+      {showReachButton && (
+        <ReachOutCircle
+          firstName={firstName}
+          onPress={() => onReachOut?.(card)}
+        />
+      )}
     </Animated.View>
   );
 }
@@ -431,7 +437,7 @@ function SeekerContent({
         {eyebrowText !== '' && (
           <Text style={styles.eyebrow} numberOfLines={1}>{eyebrowText}</Text>
         )}
-        <Text style={styles.name} numberOfLines={1}>{card.name}</Text>
+        <Text style={styles.name} numberOfLines={1}>{card.name.trim() || 'Someone on Ambit'}</Text>
         {card.vibeBlurb !== '' && <VibeBlock text={card.vibeBlurb} />}
         <View style={styles.skillsRow}>
           {ordered.slice(0, 4).map((s) => (

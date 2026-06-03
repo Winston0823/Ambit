@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   Animated,
   Easing,
+  Image,
   Keyboard,
   KeyboardAvoidingView,
   Modal,
@@ -12,7 +13,8 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { PaperPlaneTilt, X } from 'phosphor-react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Images, PaperPlaneTilt, Stack, X } from 'phosphor-react-native';
 import * as Haptics from 'expo-haptics';
 import {
   AmbitFont,
@@ -21,7 +23,28 @@ import {
   Space,
   TypeScale,
 } from '../../constants/theme';
+import { useAuth } from '../../context/AuthContext';
+import { supabase } from '../../lib/supabase';
+import { fetchPortfolioForUser } from '../../lib/portfolio';
 import type { DiscoveryCardData } from '../../data/mock';
+
+/// One pickable attachment — a project (owner) or a portfolio piece (seeker).
+interface AttachOption {
+  id: string;
+  label: string;
+  imageUrl?: string | null;
+  gradient: [string, string];
+}
+
+/// Colorful tile gradients for the attach tray — deliberately includes a
+/// blue and an orange so the fan echoes the reference's media icons.
+const ATTACH_GRADIENTS: [string, string][] = [
+  [Brand.primary, Brand.accent],
+  ['#7FB2E5', '#3E6FB0'],
+  ['#E8945A', '#C2451F'],
+  ['#C9A57A', Brand.seekerInk],
+  ['#9FD0A8', '#3E8A5B'],
+];
 
 interface Props {
   /// The card the composer is targeting. Null = closed. The composer uses
@@ -49,8 +72,18 @@ interface Props {
 /// card stays still while the user types. Solves the conflict between
 /// card-internal scroll and the swipe-up gesture.
 export function ReachOutComposer({ card, onDismiss, onSend, onSent }: Props) {
+  const { user } = useAuth();
   const [text, setText] = useState('');
   const [error, setError] = useState('');
+
+  // Attachment — role-aware. Reaching out to a seeker card means I'm an
+  // owner (attach one of my projects); reaching out to a project card means
+  // I'm a seeker (attach a portfolio highlight).
+  const attachMode: 'project' | 'portfolio' | null =
+    card ? (card.kind === 'seeker' ? 'project' : 'portfolio') : null;
+  const [attachItems, setAttachItems] = useState<AttachOption[] | null>(null);
+  const [selectedAttach, setSelectedAttach] = useState<AttachOption | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
   /// 'compose' = normal form. 'sending' = the user just hit Send and we're
   /// running the celebration choreography. After ~1200ms in 'sending' we
   /// fire `onSend` (parent then dismisses), so the user sees the paper
@@ -102,6 +135,53 @@ export function ReachOutComposer({ card, onDismiss, onSend, onSent }: Props) {
       planeX, planeY, planeRotate, planeOpacity,
       formOpacity, successOpacity, tintOpacity]);
 
+  // Load the sender's attachable items (their projects or portfolio) when
+  // the composer opens. Graceful empty on any failure (e.g. portfolio table
+  // not yet migrated).
+  useEffect(() => {
+    if (!card || !user) {
+      setAttachItems(null);
+      setSelectedAttach(null);
+      setPickerOpen(false);
+      return;
+    }
+    setSelectedAttach(null);
+    setPickerOpen(false);
+    setAttachItems(null);
+    let cancelled = false;
+    (async () => {
+      if (card.kind === 'seeker') {
+        const { data } = await supabase
+          .from('projects')
+          .select('id, title')
+          .eq('owner_id', user.id)
+          .order('created_at', { ascending: false });
+        if (!cancelled) {
+          setAttachItems(
+            ((data ?? []) as { id: string; title: string }[]).map((p, idx) => ({
+              id: p.id,
+              label: p.title,
+              gradient: ATTACH_GRADIENTS[idx % ATTACH_GRADIENTS.length],
+            })),
+          );
+        }
+      } else {
+        const items = await fetchPortfolioForUser(user.id).catch(() => []);
+        if (!cancelled) {
+          setAttachItems(
+            items.map((it, idx) => ({
+              id: it.id,
+              label: it.title,
+              imageUrl: it.imageUri,
+              gradient: it.gradient ?? ATTACH_GRADIENTS[idx % ATTACH_GRADIENTS.length],
+            })),
+          );
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [card, user?.id]);
+
   if (!card) return null;
 
   // Personalized placeholder. Same logic as the prior inline composer —
@@ -145,9 +225,16 @@ export function ReachOutComposer({ card, onDismiss, onSend, onSent }: Props) {
       ]),
     ]).start();
 
+    // Fold the attachment into the first message as a titled reference line.
+    const refLine = selectedAttach
+      ? attachMode === 'project'
+        ? `\n\n📎 About my project: ${selectedAttach.label}`
+        : `\n\n📎 Sharing my work: ${selectedAttach.label}`
+      : '';
+
     let ok = false;
     try {
-      ok = (await onSend(card, text.trim())) !== false;
+      ok = (await onSend(card, text.trim() + refLine)) !== false;
     } catch {
       ok = false;
     }
@@ -240,6 +327,65 @@ export function ReachOutComposer({ card, onDismiss, onSend, onSent }: Props) {
 
             {error !== '' && <Text style={styles.errorNote}>{error}</Text>}
 
+            {/* Attachment — owner attaches a project, seeker attaches a
+                portfolio highlight. Styled after the floating-chip "add
+                media" pattern, compact for the sheet. */}
+            {attachMode && (
+              <View style={styles.attachSection}>
+                {selectedAttach ? (
+                  <View style={styles.attachChip}>
+                    {selectedAttach.imageUrl ? (
+                      <Image source={{ uri: selectedAttach.imageUrl }} style={styles.attachThumb} />
+                    ) : (
+                      <View style={[styles.attachThumb, styles.attachThumbFallback]}>
+                        {attachMode === 'project'
+                          ? <Stack size={16} color={Brand.accent} weight="fill" />
+                          : <Images size={16} color={Brand.accent} weight="fill" />}
+                      </View>
+                    )}
+                    <Text style={styles.attachChipLabel} numberOfLines={1}>{selectedAttach.label}</Text>
+                    <Pressable onPress={() => setSelectedAttach(null)} hitSlop={8} accessibilityLabel="Remove attachment">
+                      <X size={14} color={Brand.inkMuted} weight="bold" />
+                    </Pressable>
+                  </View>
+                ) : (
+                  <>
+                    <Pressable
+                      onPress={() => setPickerOpen((o) => !o)}
+                      style={styles.attachPill}
+                      accessibilityRole="button"
+                      accessibilityLabel={attachMode === 'project' ? 'Attach a project' : 'Add a portfolio highlight'}
+                    >
+                      <View style={styles.attachIconTile}>
+                        {attachMode === 'project'
+                          ? <Stack size={15} color={Brand.inkOnBrand} weight="fill" />
+                          : <Images size={15} color={Brand.inkOnBrand} weight="fill" />}
+                      </View>
+                      <Text style={styles.attachPillLabel}>
+                        {attachMode === 'project' ? 'Attach project' : 'Add portfolio highlight'}
+                      </Text>
+                    </Pressable>
+
+                    {pickerOpen && (
+                      attachItems === null ? (
+                        <Text style={styles.attachHint}>Loading…</Text>
+                      ) : attachItems.length === 0 ? (
+                        <Text style={styles.attachHint}>
+                          {attachMode === 'project' ? 'No projects yet.' : 'No portfolio pieces yet.'}
+                        </Text>
+                      ) : (
+                        <AttachTray
+                          items={attachItems}
+                          mode={attachMode}
+                          onPick={(it) => { setSelectedAttach(it); setPickerOpen(false); }}
+                        />
+                      )
+                    )}
+                  </>
+                )}
+              </View>
+            )}
+
             <View style={styles.actions}>
               <Pressable
                 onPress={handleSend}
@@ -304,6 +450,67 @@ export function ReachOutComposer({ card, onDismiss, onSend, onSent }: Props) {
         </Animated.View>
       </KeyboardAvoidingView>
     </Modal>
+  );
+}
+
+/// The "add media"-style tray: up to three of the user's items fanned as
+/// colorful overlapping tiles, each with a floating black label pill, and a
+/// bold caption below — mirroring the reference composition.
+function AttachTray({
+  items,
+  mode,
+  onPick,
+}: {
+  items: AttachOption[];
+  mode: 'project' | 'portfolio';
+  onPick: (it: AttachOption) => void;
+}) {
+  const shown = items.slice(0, 3);
+  const rotations = shown.length === 1 ? [0] : shown.length === 2 ? [-7, 7] : [-12, 0, 12];
+  // Stagger the floating labels at slightly different heights, like the ref.
+  const labelLift = shown.length === 3 ? [14, 0, 8] : shown.map(() => 0);
+
+  return (
+    <View style={styles.tray}>
+      <View style={styles.fan}>
+        {shown.map((it, i) => (
+          <Pressable
+            key={it.id}
+            onPress={() => onPick(it)}
+            style={[
+              styles.fanItem,
+              { transform: [{ rotate: `${rotations[i]}deg` }], zIndex: rotations[i] === 0 ? 3 : 1 },
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel={`Attach ${it.label}`}
+          >
+            <View style={[styles.fanLabel, { marginBottom: 8 + labelLift[i] }]}>
+              <Text style={styles.fanLabelText} numberOfLines={1}>{it.label}</Text>
+            </View>
+            {it.imageUrl ? (
+              <Image source={{ uri: it.imageUrl }} style={styles.fanTile} />
+            ) : (
+              <LinearGradient
+                colors={it.gradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.fanTile}
+              >
+                {mode === 'project' ? (
+                  <Stack size={30} color="rgba(255,255,255,0.92)" weight="fill" />
+                ) : (
+                  <Images size={30} color="rgba(255,255,255,0.92)" weight="fill" />
+                )}
+              </LinearGradient>
+            )}
+          </Pressable>
+        ))}
+      </View>
+      <Text style={styles.trayCaption}>
+        {mode === 'project' ? 'Attach a project' : 'Share a portfolio highlight'}
+      </Text>
+      {items.length > 3 && <Text style={styles.trayMore}>+{items.length - 3} more</Text>}
+    </View>
   );
 }
 
@@ -380,6 +587,119 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#C0392B',
     marginTop: -4,
+  },
+
+  // ── Attachment ─────────────────────────────────────────────────────────
+  attachSection: { gap: 8 },
+  attachPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    alignSelf: 'flex-start',
+    paddingVertical: 6,
+    paddingRight: 14,
+    paddingLeft: 6,
+    borderRadius: 999,
+    backgroundColor: Brand.surface1,
+  },
+  attachIconTile: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: Brand.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  attachPillLabel: {
+    fontFamily: AmbitFont.body,
+    fontSize: 13,
+    fontWeight: '600',
+    color: Brand.inkBody,
+  },
+  attachChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    alignSelf: 'flex-start',
+    maxWidth: '100%',
+    paddingVertical: 6,
+    paddingRight: 12,
+    paddingLeft: 6,
+    borderRadius: 999,
+    backgroundColor: Brand.seekerSurface,
+  },
+  attachThumb: { width: 28, height: 28, borderRadius: 9 },
+  attachThumbFallback: {
+    backgroundColor: Brand.surface2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  attachChipLabel: {
+    fontFamily: AmbitFont.body,
+    fontSize: 13,
+    fontWeight: '600',
+    color: Brand.seekerInk,
+    flexShrink: 1,
+  },
+  attachHint: {
+    fontFamily: AmbitFont.body,
+    fontSize: 12,
+    color: Brand.inkMuted,
+    marginTop: 2,
+  },
+
+  // ── "Add media"-style fanned tray ──────────────────────────────────────
+  tray: {
+    alignItems: 'center',
+    paddingTop: 14,
+    paddingBottom: 6,
+    gap: 4,
+  },
+  fan: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+  },
+  fanItem: {
+    alignItems: 'center',
+    marginHorizontal: -8,
+  },
+  fanLabel: {
+    paddingHorizontal: 11,
+    paddingVertical: 5,
+    borderRadius: 14,
+    backgroundColor: '#1A1A1A',
+    maxWidth: 130,
+  },
+  fanLabelText: {
+    fontFamily: AmbitFont.body,
+    fontSize: 12.5,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  fanTile: {
+    width: 86,
+    height: 102,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    shadowColor: '#281810',
+    shadowOpacity: 0.28,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 8,
+  },
+  trayCaption: {
+    fontFamily: AmbitFont.display,
+    fontSize: 18,
+    color: Brand.inkLabel,
+    marginTop: 10,
+  },
+  trayMore: {
+    fontFamily: AmbitFont.body,
+    fontSize: 12,
+    color: Brand.inkMuted,
   },
 
   // ── Celebration overlays (phase === 'sending') ────────────────────────
