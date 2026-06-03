@@ -7,7 +7,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, useSegments } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowsClockwise, BookmarkSimple } from 'phosphor-react-native';
 import * as Haptics from 'expo-haptics';
@@ -193,6 +193,13 @@ export default function DiscoveryFeed() {
   const { save } = useSavedDeck();
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
+  const segments = useSegments();
+
+  // In the (founder) group, 'both' users recruit — treat them as 'owner'
+  // so they see the seeker deck. In the (candidate) group, 'both' users
+  // discover projects — keep their role as-is.
+  const isFounderGroup = segments[0] === '(founder)';
+  const effectiveRole = (isFounderGroup && role === 'both') ? 'owner' : role;
 
   const [liveDeck, setLiveDeck] = useState<DiscoveryCardData[] | null>(null);
   const [deckLoading, setDeckLoading] = useState(false);
@@ -224,22 +231,22 @@ export default function DiscoveryFeed() {
     setDeckLoading(true);
     try {
       const data =
-        role === 'owner'
+        effectiveRole === 'owner'
           ? await fetchSeekerDeck(user.id)
           : await fetchProjectDeck(user.id);
       setLiveDeck(data);
     } finally {
       setDeckLoading(false);
     }
-  }, [user, role, roleLoading]);
+  }, [user, effectiveRole, roleLoading]);
 
   useEffect(() => {
     fetchDeck();
   }, [fetchDeck]);
 
   const deck = useMemo<DiscoveryCardData[]>(
-    () => liveDeck ?? (role === 'owner' ? MOCK_SEEKERS : MOCK_PROJECTS),
-    [liveDeck, role]
+    () => liveDeck ?? (effectiveRole === 'owner' ? MOCK_SEEKERS : MOCK_PROJECTS),
+    [liveDeck, effectiveRole]
   );
 
   const [consecutiveSkips, setConsecutiveSkips] = useState(0);
@@ -466,7 +473,7 @@ export default function DiscoveryFeed() {
           onPortfolioPress={setActivePortfolio}
           activePortfolioId={activePortfolio?.id ?? null}
           gesturesDisabled={!!reachOutCard || !!activePortfolio}
-          emptyState={<DeckExhausted onRefresh={handleRefresh} />}
+          emptyState={<DeckExhausted onRefresh={handleRefresh} isOwner={effectiveRole === 'owner'} />}
         />
       )}
 
@@ -502,12 +509,14 @@ function Skeleton() {
 /// Empty-state shown by SwipeDeck once the deck is exhausted. The
 /// "Start over" CTA wires into feed.tsx's handleRefresh — clears the
 /// user's skipped matches so the RPC re-surfaces them.
-function DeckExhausted({ onRefresh }: { onRefresh: () => void }) {
+function DeckExhausted({ onRefresh, isOwner }: { onRefresh: () => void; isOwner: boolean }) {
   return (
     <View style={styles.emptyWrap}>
       <Text style={styles.emptyTitle}>You're all caught up.</Text>
       <Text style={styles.emptySub}>
-        Want another look? Bring back the projects you skipped and start fresh.
+        {isOwner
+          ? "Want to see more candidates? Bring back the people you passed on and start fresh."
+          : "Want another look? Bring back the projects you skipped and start fresh."}
       </Text>
       <Pressable onPress={onRefresh} style={styles.refreshCta}>
         <ArrowsClockwise size={18} color={Brand.inkOnBrand} weight="bold" />
