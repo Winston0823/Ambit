@@ -7,7 +7,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { router, useSegments } from 'expo-router';
+import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowsClockwise, BookmarkSimple } from 'phosphor-react-native';
 import * as Haptics from 'expo-haptics';
@@ -70,6 +70,7 @@ async function fetchProjectDeck(userId: string): Promise<ProjectCardData[]> {
     title: string;
     vibe_blurb: string;
     required_skills: string[];
+    roles_sought: string[];
     campus_id: string | null;
     owner_id: string;
     score: number;
@@ -107,6 +108,7 @@ async function fetchProjectDeck(userId: string): Promise<ProjectCardData[]> {
       ownerCampusId: r.campus_id ?? '',
       whyMatched,
       skillsSought: r.required_skills.slice(0, 5),
+      rolesSought: r.roles_sought ?? [],
       gradient: CARD_GRADIENTS[i % CARD_GRADIENTS.length],
     };
   });
@@ -197,13 +199,6 @@ export default function DiscoveryFeed() {
   const { save, unsave } = useSavedDeck();
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
-  const segments = useSegments();
-
-  // In the (founder) group, 'both' users recruit — treat them as 'owner'
-  // so they see the seeker deck. In the (candidate) group, 'both' users
-  // discover projects — keep their role as-is.
-  const isFounderGroup = segments[0] === '(founder)';
-  const effectiveRole = (isFounderGroup && role === 'both') ? 'owner' : role;
 
   const [liveDeck, setLiveDeck] = useState<DiscoveryCardData[] | null>(null);
   const [deckLoading, setDeckLoading] = useState(false);
@@ -235,22 +230,22 @@ export default function DiscoveryFeed() {
     setDeckLoading(true);
     try {
       const data =
-        effectiveRole === 'owner'
+        role === 'owner'
           ? await fetchSeekerDeck(user.id)
           : await fetchProjectDeck(user.id);
       setLiveDeck(data);
     } finally {
       setDeckLoading(false);
     }
-  }, [user, effectiveRole, roleLoading]);
+  }, [user, role, roleLoading]);
 
   useEffect(() => {
     fetchDeck();
   }, [fetchDeck]);
 
   const deck = useMemo<DiscoveryCardData[]>(
-    () => liveDeck ?? (effectiveRole === 'owner' ? MOCK_SEEKERS : MOCK_PROJECTS),
-    [liveDeck, effectiveRole]
+    () => liveDeck ?? (role === 'owner' ? MOCK_SEEKERS : MOCK_PROJECTS),
+    [liveDeck, role]
   );
 
   const [consecutiveSkips, setConsecutiveSkips] = useState(0);
@@ -505,7 +500,7 @@ export default function DiscoveryFeed() {
           onPortfolioPress={setActivePortfolio}
           activePortfolioId={activePortfolio?.id ?? null}
           gesturesDisabled={!!reachOutCard || !!activePortfolio}
-          emptyState={<DeckExhausted onRefresh={handleRefresh} isOwner={effectiveRole === 'owner'} />}
+          emptyState={<DeckExhausted onRefresh={handleRefresh} isOwner={role === 'owner'} />}
         />
       )}
 

@@ -56,7 +56,7 @@ interface ProfileRow {
   name: string | null;
   vibe_blurb: string | null;
   skills: string[] | null;
-  role: 'owner' | 'seeker' | 'both' | null;
+  role: 'owner' | 'seeker' | null;
   campus_id: string | null;
   photo_url: string | null;
   /// Closure-loop cache: fraction of reach-outs acted on within 72h.
@@ -65,16 +65,11 @@ interface ProfileRow {
   avg_response_minutes: number | null;
 }
 
-/// Display copy for the role pill. 'both' is the catch-all for people
-/// who actively recruit AND search; we name it explicitly rather than
-/// hiding it under one of the others so the user knows what they
-/// picked.
 const ROLE_LABEL: Record<NonNullable<ProfileRow['role']>, string> = {
   seeker: 'Looking to join a project',
   owner:  'Recruiting for my project',
-  both:   'Both',
 };
-const ROLE_OPTIONS: NonNullable<ProfileRow['role']>[] = ['seeker', 'owner', 'both'];
+const ROLE_OPTIONS: NonNullable<ProfileRow['role']>[] = ['seeker', 'owner'];
 
 const PORTFOLIO_GRADIENTS: [string, string][] = [
   [Brand.primary, Brand.accent],

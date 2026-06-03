@@ -41,6 +41,33 @@ export const SKILL_CATEGORIES: SkillCategory[] = [
   },
 ];
 
+/// Role categories for project hiring. Founders pick which positions they're
+/// actively recruiting for — displayed on discovery cards so seekers know
+/// exactly what kind of team member is wanted before they reach out.
+export interface RoleCategory {
+  label: string;
+  roles: string[];
+}
+
+export const ROLE_CATEGORIES: RoleCategory[] = [
+  {
+    label: 'ENGINEERING',
+    roles: ['Software Engineer', 'Frontend', 'Backend', 'Full Stack', 'Mobile', 'ML / AI', 'Data Science', 'DevOps / Infra'],
+  },
+  {
+    label: 'DESIGN',
+    roles: ['Product Design', 'UX Research', 'Brand / Visual'],
+  },
+  {
+    label: 'PRODUCT & OPS',
+    roles: ['Product Manager', 'Operations', 'Finance'],
+  },
+  {
+    label: 'GROWTH',
+    roles: ['Marketing', 'Sales / BD', 'Content / Social'],
+  },
+];
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Discovery deck — owner view sees Seeker cards, seeker view sees Project cards.
 // Shape designed so the real matching API can swap in via one prop change:
@@ -112,6 +139,8 @@ export interface ProjectCardData {
   /// `{ reasons: string[]; score: number }` — only DiscoveryCard.tsx reads it.
   whyMatched: string;
   skillsSought: string[];
+  /// Open positions the founder is recruiting for. Empty = not set / any role.
+  rolesSought: string[];
   /// Two-stop gradient drawn from the warm-tan palette family. Each project
   /// gets a unique fingerprint until real banner uploads land.
   gradient: [string, string];
@@ -311,6 +340,7 @@ export const MOCK_PROJECTS: ProjectCardData[] = [
     ownerCampusId: 'usc',
     whyMatched: '3 shared skills · same campus',
     skillsSought: ['Designer', 'iOS', 'User Research'],
+    rolesSought: ['Mobile', 'Product Design', 'UX Research'],
     gradient: [Brand.primary, Brand.accent],
   },
   {
@@ -324,6 +354,7 @@ export const MOCK_PROJECTS: ProjectCardData[] = [
     ownerCampusId: 'caltech',
     whyMatched: 'Both into prototyping · 12 mi away',
     skillsSought: ['Mechanical', 'Firmware', 'Industrial Design'],
+    rolesSought: ['Software Engineer', 'DevOps / Infra'],
     gradient: ['#C9A57A', Brand.seekerInk],
   },
   {
@@ -337,6 +368,7 @@ export const MOCK_PROJECTS: ProjectCardData[] = [
     ownerCampusId: 'ucla',
     whyMatched: 'Skills you listed match 4 of their needs',
     skillsSought: ['Design', 'iOS', 'Research', 'Brand'],
+    rolesSought: ['Mobile', 'Product Design', 'Marketing'],
     gradient: [Brand.seekerSurface, Brand.accent],
   },
   {
@@ -350,6 +382,7 @@ export const MOCK_PROJECTS: ProjectCardData[] = [
     ownerCampusId: 'usc',
     whyMatched: 'Both at USC · same vibe (calm + fast)',
     skillsSought: ['Web', 'Growth Strategy', 'Brand'],
+    rolesSought: ['Full Stack', 'Marketing'],
     gradient: ['#E8C9A0', Brand.primary],
   },
   {
@@ -363,6 +396,7 @@ export const MOCK_PROJECTS: ProjectCardData[] = [
     ownerCampusId: 'ucla',
     whyMatched: '2 shared skills · same campus radius',
     skillsSought: ['React Native', 'Marketing', 'Operations'],
+    rolesSought: ['Mobile', 'Marketing', 'Operations'],
     gradient: [Brand.accent, '#7A5A38'],
   },
   {
@@ -376,6 +410,7 @@ export const MOCK_PROJECTS: ProjectCardData[] = [
     ownerCampusId: 'lmu',
     whyMatched: 'Both like motion · adjacent campus',
     skillsSought: ['Motion', 'Sound', 'Game Dev'],
+    rolesSought: ['Software Engineer', 'Brand / Visual'],
     gradient: ['#D4B490', '#4D361D'],
   },
   {
@@ -389,6 +424,7 @@ export const MOCK_PROJECTS: ProjectCardData[] = [
     ownerCampusId: 'usc',
     whyMatched: '4 shared skills · same campus',
     skillsSought: ['Python', 'iOS', 'Growth Strategy'],
+    rolesSought: ['ML / AI', 'Mobile', 'Marketing'],
     gradient: [Brand.seekerSurface, '#B48045'],
   },
 ];

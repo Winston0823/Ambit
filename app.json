@@ -40,6 +40,15 @@
         {
           "calendarPermission": "Ambit uses your calendar to add scheduled meetings."
         }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#D4B490",
+          "androidMode": "default",
+          "androidCollapsedTitle": "New messages on Ambit"
+        }
       ]
     ]
   }

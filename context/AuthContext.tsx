@@ -5,7 +5,7 @@ import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { supabase } from '../lib/supabase';
-import { registerForPushNotifications } from '../lib/pushNotifications';
+import { clearBadge, registerForPushNotifications, unregisterAllPushTokens } from '../lib/pushNotifications';
 
 interface AuthContextValue {
   session: Session | null;
@@ -192,6 +192,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
+    const uid = session?.user?.id;
+    if (uid) {
+      // Remove all device tokens before signing out so this device stops
+      // receiving push notifications once the session ends.
+      await unregisterAllPushTokens(uid).catch(() => {});
+      await clearBadge();
+    }
     await supabase.auth.signOut();
   };
 

@@ -22,14 +22,8 @@ Notifications.setNotificationHandler({
 /// (`eas build --profile development`). This function still runs safely
 /// in Expo Go — it just returns null without registering.
 export async function registerForPushNotifications(userId: string): Promise<string | null> {
-  // Expo Go heuristic: Constants.appOwnership === 'expo'. In that case
-  // skip the registration entirely so we don't pollute the DB with
-  // useless tokens that the push API will reject.
-  if (Constants.appOwnership === 'expo') {
-    console.log('Push registration skipped: running in Expo Go.');
-    return null;
-  }
-
+  // Always request notification permissions first — local notifications
+  // (the realtime fallback used in Expo Go / Simulator) need them too.
   const existing = await Notifications.getPermissionsAsync();
   let status = existing.status;
   if (status !== 'granted') {
@@ -37,6 +31,13 @@ export async function registerForPushNotifications(userId: string): Promise<stri
     status = req.status;
   }
   if (status !== 'granted') return null;
+
+  // Expo Go can't register for remote APNs/FCM tokens (SDK 53+).
+  // Permissions are still granted above for local notification fallback.
+  if (Constants.appOwnership === 'expo') {
+    console.log('Push token skipped: running in Expo Go (local notification fallback active).');
+    return null;
+  }
 
   const projectId =
     Constants.expoConfig?.extra?.eas?.projectId ??
@@ -70,4 +71,21 @@ export async function unregisterPushToken(userId: string, token: string): Promis
     .delete()
     .eq('user_id', userId)
     .eq('token', token);
+}
+
+/// Removes ALL push tokens for a user. Call on sign-out so the device
+/// stops receiving notifications after the session ends.
+export async function unregisterAllPushTokens(userId: string): Promise<void> {
+  await supabase.from('push_tokens').delete().eq('user_id', userId);
+}
+
+/// Sets the app icon badge to the given count. No-ops on platforms that
+/// don't support badging (Android < 8 without a launcher that supports it).
+export async function setBadgeCount(count: number): Promise<void> {
+  await Notifications.setBadgeCountAsync(count).catch(() => {});
+}
+
+/// Clears the app icon badge to zero. Safe to call at any time.
+export async function clearBadge(): Promise<void> {
+  await Notifications.setBadgeCountAsync(0).catch(() => {});
 }

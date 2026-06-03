@@ -11,13 +11,14 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MapPin } from 'phosphor-react-native';
 import { Button, Chip, KeyboardDismiss } from '../atoms';
-import { CAMPUSES, SKILL_CATEGORIES } from '../../data/mock';
+import { CAMPUSES, ROLE_CATEGORIES, SKILL_CATEGORIES } from '../../data/mock';
 import { AmbitFont, Brand, Radii, Space } from '../../constants/theme';
 
 export interface ProjectFormValues {
   title: string;
   vibeBlurb: string;
   requiredSkills: string[];
+  rolesSought: string[];
   campusId: string | null;
 }
 
@@ -36,6 +37,7 @@ const BLURB_MIN = 50;
 const BLURB_MAX = 280;
 const SKILLS_MIN = 1;
 const SKILLS_MAX = 8;
+const ROLES_MAX = 5;
 
 /// Shared form used by project-new and project-edit. Validation lives here
 /// because it's identical in both flows; the screens own data fetching,
@@ -51,6 +53,9 @@ export function ProjectForm({
   const [vibeBlurb, setVibeBlurb] = useState(initialValues?.vibeBlurb ?? '');
   const [requiredSkills, setRequiredSkills] = useState<string[]>(
     initialValues?.requiredSkills ?? [],
+  );
+  const [rolesSought, setRolesSought] = useState<string[]>(
+    initialValues?.rolesSought ?? [],
   );
   const [campusId, setCampusId] = useState<string | null>(
     initialValues?.campusId ?? null,
@@ -73,6 +78,16 @@ export function ProjectForm({
     );
   };
 
+  const toggleRole = (role: string) => {
+    setRolesSought((prev) =>
+      prev.includes(role)
+        ? prev.filter((r) => r !== role)
+        : prev.length < ROLES_MAX
+          ? [...prev, role]
+          : prev,
+    );
+  };
+
   const submit = async () => {
     if (!isValid || submitting) return;
     setSubmitting(true);
@@ -81,6 +96,7 @@ export function ProjectForm({
         title: title.trim(),
         vibeBlurb: vibeBlurb.trim(),
         requiredSkills,
+        rolesSought,
         campusId,
       });
     } catch (e: any) {
@@ -146,6 +162,26 @@ export function ProjectForm({
                     label={tag}
                     selected={requiredSkills.includes(tag)}
                     onPress={() => toggleSkill(tag)}
+                  />
+                ))}
+              </View>
+            </View>
+          ))}
+        </Section>
+
+        <Section
+          eyebrow={`ROLES YOU'RE HIRING  ·  ${rolesSought.length} / ${ROLES_MAX}  ·  OPTIONAL`}
+        >
+          {ROLE_CATEGORIES.map((cat) => (
+            <View key={cat.label} style={styles.category}>
+              <Text style={styles.categoryLabel}>{cat.label}</Text>
+              <View style={styles.chipRow}>
+                {cat.roles.map((role) => (
+                  <Chip
+                    key={role}
+                    label={role}
+                    selected={rolesSought.includes(role)}
+                    onPress={() => toggleRole(role)}
                   />
                 ))}
               </View>
