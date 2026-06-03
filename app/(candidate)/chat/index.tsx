@@ -9,7 +9,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { router, useFocusEffect } from 'expo-router';
+import { router, useFocusEffect, useSegments } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MagnifyingGlass, Plus } from 'phosphor-react-native';
 import * as Haptics from 'expo-haptics';
@@ -35,9 +35,14 @@ import { Brand, Space } from '../../../constants/theme';
 export default function ChatTab() {
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
+  const segments = useSegments();
   const [items, setItems] = useState<InboxItem[] | null>(null);
   const [passTargetId, setPassTargetId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+
+  // The "+" button opens the discovery feed to find new people to reach out
+  // to. Route to the correct group so the user stays in their context.
+  const discoveryPath = segments[0] === '(founder)' ? '/(founder)/feed' : '/(candidate)/feed';
 
   const load = useCallback(async () => {
     if (!user) {
@@ -191,6 +196,7 @@ export default function ChatTab() {
             pinned={pinned}
             onOpen={openConversation}
             onUnpin={handleTogglePin}
+            discoveryPath={discoveryPath}
           />
         }
         ListEmptyComponent={
@@ -198,7 +204,9 @@ export default function ChatTab() {
             <View style={styles.empty}>
               <Text style={styles.emptyTitle}>Nothing here yet</Text>
               <Text style={styles.emptyBody}>
-                Swipe up on a project in Discovery and send a hello. Replies land here.
+                {segments[0] === '(founder)'
+                  ? 'Reach out to a candidate in Discovery and start a conversation. Replies land here.'
+                  : 'Swipe up on a project in Discovery and send a hello. Replies land here.'}
               </Text>
             </View>
           ) : null
@@ -230,11 +238,13 @@ function ListHeader({
   pinned,
   onOpen,
   onUnpin,
+  discoveryPath,
 }: {
   user:   { id: string } | null;
   pinned: InboxItem[];
   onOpen: (conversationId: string) => void;
   onUnpin: (item: InboxItem) => void;
+  discoveryPath: string;
 }) {
   return (
     <View>
