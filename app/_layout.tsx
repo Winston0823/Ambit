@@ -12,8 +12,10 @@ import { AuthProvider, useAuth } from '../context/AuthContext';
 import { SavedDeckProvider } from '../context/SavedDeckContext';
 import { Brand } from '../constants/theme';
 import { OnboardingInline } from '../components/organisms';
+import Constants from 'expo-constants';
 import { useProfileRole } from '../hooks/useProfileRole';
 import { clearBadge } from '../lib/pushNotifications';
+import { supabase } from '../lib/supabase';
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
@@ -91,6 +93,7 @@ function Gate() {
 /// Navigation defers until `useProfileRole` resolves so the push lands
 /// in the correct route group (founder vs. candidate).
 function NotificationHandler() {
+  const { user } = useAuth();
   const { role, loading: roleLoading } = useProfileRole();
   const [pendingConvId, setPendingConvId] = useState<string | null>(null);
   // Track whether we already handled the cold-start response so we don't
@@ -149,6 +152,74 @@ function NotificationHandler() {
     });
     return () => sub.remove();
   }, []);
+
+  // ── Realtime local-notification fallback ────────────────────────────
+  // iOS Simulator and Expo Go can't receive remote APNs push notifications.
+  // Subscribe to message inserts via Supabase Realtime and schedule a local
+  // notification instead. Local notifications display as full banners,
+  // and tapping them routes through the existing navigateToConversation path.
+  //
+  // Skipped on native builds (appOwnership !== 'expo') because the Edge
+  // Function handles delivery there — running both would double-notify.
+  useEffect(() => {
+    if (!user || Constants.appOwnership !== 'expo') return;
+
+    const ch = supabase
+      .channel('notification-local-fallback')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: `sender_id=neq.${user.id}`,
+        },
+        async (payload) => {
+          const msg = payload.new as {
+            id: string;
+            conversation_id: string;
+            sender_id: string;
+            body: string | null;
+            attachment_url: string | null;
+            kind: string | null;
+            deleted_at: string | null;
+          };
+          if (msg.deleted_at || msg.kind === 'system') return;
+
+          // Fetch sender name + project title in parallel for the banner copy.
+          const [{ data: sender }, { data: convo }] = await Promise.all([
+            supabase.from('profiles').select('name').eq('id', msg.sender_id).maybeSingle(),
+            supabase
+              .from('conversations')
+              .select('projects(title)')
+              .eq('id', msg.conversation_id)
+              .maybeSingle(),
+          ]);
+
+          const preview = msg.body
+            ? (msg.body.length > 100 ? msg.body.slice(0, 97) + '…' : msg.body)
+            : msg.attachment_url ? '📎 Photo' : 'New message';
+          // Supabase joins can return an object or an array depending on the
+          // schema introspection — normalise both shapes.
+          const pr = convo?.projects as any;
+          const projectTitle = (pr?.title ?? pr?.[0]?.title) as string | undefined;
+          const body = projectTitle ? `re: ${projectTitle} — ${preview}` : preview;
+
+          await Notifications.scheduleNotificationAsync({
+            content: {
+              title: sender?.name ?? 'New message',
+              body,
+              data: { conversationId: msg.conversation_id, messageId: msg.id },
+              sound: 'default',
+            },
+            trigger: null, // fire immediately
+          });
+        },
+      )
+      .subscribe();
+
+    return () => { ch.unsubscribe(); };
+  }, [user?.id]);
 
   return null;
 }

@@ -22,14 +22,8 @@ Notifications.setNotificationHandler({
 /// (`eas build --profile development`). This function still runs safely
 /// in Expo Go — it just returns null without registering.
 export async function registerForPushNotifications(userId: string): Promise<string | null> {
-  // Expo Go heuristic: Constants.appOwnership === 'expo'. In that case
-  // skip the registration entirely so we don't pollute the DB with
-  // useless tokens that the push API will reject.
-  if (Constants.appOwnership === 'expo') {
-    console.log('Push registration skipped: running in Expo Go.');
-    return null;
-  }
-
+  // Always request notification permissions first — local notifications
+  // (the realtime fallback used in Expo Go / Simulator) need them too.
   const existing = await Notifications.getPermissionsAsync();
   let status = existing.status;
   if (status !== 'granted') {
@@ -37,6 +31,13 @@ export async function registerForPushNotifications(userId: string): Promise<stri
     status = req.status;
   }
   if (status !== 'granted') return null;
+
+  // Expo Go can't register for remote APNs/FCM tokens (SDK 53+).
+  // Permissions are still granted above for local notification fallback.
+  if (Constants.appOwnership === 'expo') {
+    console.log('Push token skipped: running in Expo Go (local notification fallback active).');
+    return null;
+  }
 
   const projectId =
     Constants.expoConfig?.extra?.eas?.projectId ??
