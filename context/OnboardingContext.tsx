@@ -2,7 +2,7 @@ import React, { createContext, ReactNode, useContext, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { readLocalFileAsArrayBuffer } from '../lib/messaging';
 
-export type Role = 'owner' | 'seeker' | 'both';
+export type Role = 'owner' | 'seeker';
 
 /// Who is on the platform. Students are the primary v1 audience; professors
 /// join to recruit students into research projects, so they live alongside.

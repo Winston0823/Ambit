@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
-import { ArrowsLeftRight, Megaphone, MagnifyingGlass } from 'phosphor-react-native';
+import { Megaphone, MagnifyingGlass } from 'phosphor-react-native';
 import { OptionCard } from '../../atoms';
 import { Entrance } from '../../atoms/Entrance';
 import { OnboardingContinue } from '../../molecules';
@@ -10,7 +10,7 @@ import { Compass } from 'phosphor-react-native';
 
 interface Props { onBack: () => void; onContinue: () => void; }
 
-/// S-009 Role Declaration. Three cards: Owner / Seeker / Both.
+/// S-009 Role Declaration. Two cards: Owner / Seeker.
 export function RoleDeclarationScreen({ onBack, onContinue }: Props) {
   const { profile, update } = useOnboarding();
 
@@ -42,15 +42,6 @@ export function RoleDeclarationScreen({ onBack, onContinue }: Props) {
             subtitle={`I want to find a project and\ncontribute my skills`}
             selected={profile.role === 'seeker'}
             onPress={() => pick('seeker')}
-          />
-        </Entrance>
-        <Entrance index={5}>
-          <OptionCard
-            icon={ArrowsLeftRight}
-            title="Both"
-            subtitle={`I'm running a project and open\nto joining others too`}
-            selected={profile.role === 'both'}
-            onPress={() => pick('both')}
           />
         </Entrance>
       </View>

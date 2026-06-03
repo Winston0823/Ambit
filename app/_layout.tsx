@@ -106,7 +106,7 @@ function NotificationHandler() {
       setPendingConvId(conversationId);
       return;
     }
-    const isOwner = role === 'owner' || role === 'both';
+    const isOwner = role === 'owner';
     router.push({
       pathname: isOwner ? '/(founder)/chat/[id]' : '/(candidate)/chat/[id]',
       params: { id: conversationId },
