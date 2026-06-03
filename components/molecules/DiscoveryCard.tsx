@@ -502,6 +502,15 @@ function ProjectContent({ card, matchedSkills }: ProjectContentProps) {
 
       <View style={styles.stack}>
         <Text style={styles.eyebrow} numberOfLines={1}>{eyebrowText}</Text>
+        {card.rolesSought && card.rolesSought.length > 0 && (
+          <View style={styles.rolesRow}>
+            {card.rolesSought.slice(0, 3).map((r) => (
+              <View key={r} style={styles.roleChip}>
+                <Text style={styles.roleChipText}>{r}</Text>
+              </View>
+            ))}
+          </View>
+        )}
         <Text style={styles.name} numberOfLines={2}>{card.title}</Text>
         {card.pitch !== '' && <VibeBlock text={card.pitch} />}
         <View style={styles.skillsRow}>
@@ -751,6 +760,29 @@ const styles = StyleSheet.create({
     color: '#F5E9D8',
     lineHeight: 26,
     letterSpacing: -0.1,
+  },
+
+  // ── Role pills — open positions (above project title) ──────────────────
+  rolesRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 2,
+  },
+  roleChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: 'rgba(212, 180, 144, 0.28)',
+    borderWidth: 1,
+    borderColor: 'rgba(212, 180, 144, 0.55)',
+  },
+  roleChipText: {
+    fontFamily: AmbitFont.body,
+    fontSize: 10.5,
+    fontWeight: '600',
+    color: '#F5E9D8',
+    letterSpacing: 0.3,
   },
 
   // ── Skill chips row ────────────────────────────────────────────────────

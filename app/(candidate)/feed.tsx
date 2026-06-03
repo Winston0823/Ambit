@@ -70,6 +70,7 @@ async function fetchProjectDeck(userId: string): Promise<ProjectCardData[]> {
     title: string;
     vibe_blurb: string;
     required_skills: string[];
+    roles_sought: string[];
     campus_id: string | null;
     owner_id: string;
     score: number;
@@ -107,6 +108,7 @@ async function fetchProjectDeck(userId: string): Promise<ProjectCardData[]> {
       ownerCampusId: r.campus_id ?? '',
       whyMatched,
       skillsSought: r.required_skills.slice(0, 5),
+      rolesSought: r.roles_sought ?? [],
       gradient: CARD_GRADIENTS[i % CARD_GRADIENTS.length],
     };
   });
