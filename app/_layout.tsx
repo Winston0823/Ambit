@@ -1,8 +1,9 @@
-import React, { useEffect } from 'react';
-import { StyleSheet } from 'react-native';
-import { Slot } from 'expo-router';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { AppState, StyleSheet } from 'react-native';
+import { router, Slot } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SystemUI from 'expo-system-ui';
+import * as Notifications from 'expo-notifications';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { useFonts } from 'expo-font';
@@ -11,6 +12,8 @@ import { AuthProvider, useAuth } from '../context/AuthContext';
 import { SavedDeckProvider } from '../context/SavedDeckContext';
 import { Brand } from '../constants/theme';
 import { OnboardingInline } from '../components/organisms';
+import { useProfileRole } from '../hooks/useProfileRole';
+import { clearBadge } from '../lib/pushNotifications';
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
@@ -68,11 +71,86 @@ function Gate() {
     // whatever that screen needs (cream for chat, white for feed, etc.)
     // and there's never an extra white sliver above a colored canvas.
     <SafeAreaView style={styles.safe} edges={[]}>
+      <NotificationHandler />
       <Slot />
     </SafeAreaView>
   ) : (
     <OnboardingInline onComplete={() => { /* AuthContext re-route handles it */ }} />
   );
+}
+
+/// Mounts inside Gate (only when user is authenticated + has profile).
+/// Handles three notification scenarios:
+///   1. Cold start — app was launched by tapping a notification banner.
+///      `getLastNotificationResponseAsync` returns the triggering response.
+///   2. Background tap — user taps a banner while app is backgrounded.
+///      `addNotificationResponseReceivedListener` fires immediately.
+///   3. App foregrounded — clear the badge regardless of how the user
+///      opened the app, so iOS/Android badges stay honest.
+///
+/// Navigation defers until `useProfileRole` resolves so the push lands
+/// in the correct route group (founder vs. candidate).
+function NotificationHandler() {
+  const { role, loading: roleLoading } = useProfileRole();
+  const [pendingConvId, setPendingConvId] = useState<string | null>(null);
+  // Track whether we already handled the cold-start response so we don't
+  // re-navigate on every re-render while role is still loading.
+  const coldStartHandled = useRef(false);
+
+  const navigateToConversation = useCallback((conversationId: string) => {
+    // Defer if role hasn't resolved yet — store and retry in the effect below.
+    if (roleLoading) {
+      setPendingConvId(conversationId);
+      return;
+    }
+    const isOwner = role === 'owner' || role === 'both';
+    router.push({
+      pathname: isOwner ? '/(founder)/chat/[id]' : '/(candidate)/chat/[id]',
+      params: { id: conversationId },
+    });
+    clearBadge();
+  }, [role, roleLoading]);
+
+  // Once role loads, drain any pending cold-start navigation.
+  useEffect(() => {
+    if (!roleLoading && pendingConvId) {
+      navigateToConversation(pendingConvId);
+      setPendingConvId(null);
+    }
+  }, [roleLoading, pendingConvId, navigateToConversation]);
+
+  // Cold start: app launched by tapping a notification.
+  useEffect(() => {
+    if (coldStartHandled.current) return;
+    coldStartHandled.current = true;
+    Notifications.getLastNotificationResponseAsync().then((response) => {
+      if (!response) return;
+      const convId = (response.notification.request.content.data as Record<string, unknown>)
+        ?.conversationId as string | undefined;
+      if (convId) navigateToConversation(convId);
+    });
+  }, [navigateToConversation]);
+
+  // Background/foreground tap: fired while the app is already running.
+  useEffect(() => {
+    const sub = Notifications.addNotificationResponseReceivedListener((response) => {
+      const convId = (response.notification.request.content.data as Record<string, unknown>)
+        ?.conversationId as string | undefined;
+      if (convId) navigateToConversation(convId);
+    });
+    return () => sub.remove();
+  }, [navigateToConversation]);
+
+  // Clear badge whenever the app comes back to the foreground — the user
+  // has opened the app so the "unread" signal is no longer needed.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') clearBadge();
+    });
+    return () => sub.remove();
+  }, []);
+
+  return null;
 }
 
 const styles = StyleSheet.create({

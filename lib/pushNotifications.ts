@@ -71,3 +71,20 @@ export async function unregisterPushToken(userId: string, token: string): Promis
     .eq('user_id', userId)
     .eq('token', token);
 }
+
+/// Removes ALL push tokens for a user. Call on sign-out so the device
+/// stops receiving notifications after the session ends.
+export async function unregisterAllPushTokens(userId: string): Promise<void> {
+  await supabase.from('push_tokens').delete().eq('user_id', userId);
+}
+
+/// Sets the app icon badge to the given count. No-ops on platforms that
+/// don't support badging (Android < 8 without a launcher that supports it).
+export async function setBadgeCount(count: number): Promise<void> {
+  await Notifications.setBadgeCountAsync(count).catch(() => {});
+}
+
+/// Clears the app icon badge to zero. Safe to call at any time.
+export async function clearBadge(): Promise<void> {
+  await Notifications.setBadgeCountAsync(0).catch(() => {});
+}

@@ -25,6 +25,8 @@ interface WebhookPayload {
     sender_id:        string;
     body:             string | null;
     attachment_url:   string | null;
+    kind:             string | null;
+    deleted_at:       string | null;
     created_at:       string;
   };
 }
@@ -35,6 +37,7 @@ interface ExpoMessage {
   body:  string;
   data:  Record<string, unknown>;
   sound: 'default';
+  badge: number;
 }
 
 async function sendExpoPush(messages: ExpoMessage[]): Promise<void> {
@@ -70,9 +73,16 @@ Deno.serve(async (req) => {
   }
 
   const msg = payload.record;
+
+  // Skip soft-deleted or non-user messages (system messages like
+  // scheduling confirmations don't need a push).
+  if (msg.deleted_at || msg.kind === 'system') {
+    return new Response('ok (skipped)', { status: 200 });
+  }
+
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-  // Resolve conversation participants + project title for the notification body.
+  // Resolve conversation participants + project title for the notification.
   const { data: convo, error: convoErr } = await supabase
     .from('conversations')
     .select('owner_id, seeker_id, project_id, projects(title)')
@@ -87,32 +97,48 @@ Deno.serve(async (req) => {
   const recipientId =
     convo.owner_id === msg.sender_id ? convo.seeker_id : convo.owner_id;
 
-  const { data: sender } = await supabase
-    .from('profiles')
-    .select('name')
-    .eq('id', msg.sender_id)
-    .maybeSingle();
-
-  const { data: tokens } = await supabase
-    .from('push_tokens')
-    .select('token')
-    .eq('user_id', recipientId);
+  // Fetch sender name and recipient tokens in parallel.
+  const [{ data: sender }, { data: tokens }, { count: unreadCount }] = await Promise.all([
+    supabase.from('profiles').select('name').eq('id', msg.sender_id).maybeSingle(),
+    supabase.from('push_tokens').select('token').eq('user_id', recipientId),
+    // Count total unread messages for the recipient across all conversations
+    // so the badge reflects real unread rather than always showing 1.
+    supabase
+      .from('messages')
+      .select('id', { count: 'exact', head: true })
+      .neq('sender_id', recipientId)
+      .is('deleted_at', null)
+      .in(
+        'conversation_id',
+        supabase
+          .from('conversations')
+          .select('id')
+          .or(`owner_id.eq.${recipientId},seeker_id.eq.${recipientId}`),
+      ),
+  ]);
 
   if (!tokens || tokens.length === 0) {
     return new Response('ok (no tokens)', { status: 200 });
   }
 
   const senderName = sender?.name ?? 'Someone';
-  // Truncate so iOS doesn't blow out the notification line.
+  const projectTitle = (convo.projects as { title: string } | null)?.title;
+
+  // Notification title: sender name. Body: project context + message preview.
+  // e.g. "Alex Chen" / "re: Ambit App — sounds great, when are you free?"
   const preview = msg.body
-    ? msg.body.length > 140 ? msg.body.slice(0, 137) + '…' : msg.body
-    : msg.attachment_url ? 'Sent a photo' : 'New message';
+    ? msg.body.length > 100 ? msg.body.slice(0, 97) + '…' : msg.body
+    : msg.attachment_url ? '📎 Sent a photo' : 'New message';
+
+  const body = projectTitle ? `re: ${projectTitle} — ${preview}` : preview;
+  const badge = Math.max(unreadCount ?? 1, 1);
 
   const expoMessages: ExpoMessage[] = tokens.map((t: { token: string }) => ({
     to:    t.token,
     title: senderName,
-    body:  preview,
+    body,
     sound: 'default',
+    badge,
     data: {
       conversationId: msg.conversation_id,
       messageId:      msg.id,
