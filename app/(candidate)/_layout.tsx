@@ -30,6 +30,11 @@ export default function CandidateLayout() {
 
   return (
     <Tabs
+      // `history` so going back from a pushed tab route (project-manage,
+      // project-edit, project-new, saved) returns to the route you came
+      // from — not the first tab. Default `firstRoute` was sending back
+      // taps to Discovery instead of the Projects list.
+      backBehavior="history"
       screenOptions={{ headerShown: false }}
       tabBar={({ state, navigation }) => {
         const currentRoute = state.routes[state.index].name;
@@ -50,10 +55,11 @@ export default function CandidateLayout() {
       {/* Saved exists as a route but never appears in the nav bar — it's
           pushed via router.push('/saved') from the feed's bookmark icon. */}
       <Tabs.Screen name="saved" options={{ href: null }} />
-      {/* Project create / edit screens — reached from the projects tab.
-          Hidden from the nav bar via href:null. */}
+      {/* Project create / edit / manage screens — reached from the projects
+          tab. Hidden from the nav bar via href:null. */}
       <Tabs.Screen name="project-new" options={{ href: null }} />
       <Tabs.Screen name="project-edit" options={{ href: null }} />
+      <Tabs.Screen name="project-manage" options={{ href: null }} />
     </Tabs>
   );
 }

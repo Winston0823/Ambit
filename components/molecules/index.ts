@@ -16,3 +16,4 @@ export { PassReasonSheet } from './PassReasonSheet';
 export { SchedulingBubble } from './SchedulingBubble';
 export { AvailabilityGrid } from './AvailabilityGrid';
 export { AvailabilityPollBubble } from './AvailabilityPollBubble';
+export { BottomSheet } from './BottomSheet';

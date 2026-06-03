@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Sparkle } from 'phosphor-react-native';
 import { BackChevron, Chip } from '../../atoms';
 import { OnboardingContinue } from '../../molecules';
 import { useOnboarding } from '../../../context/OnboardingContext';
@@ -74,8 +75,13 @@ export function SkillTagsScreen({ onBack, onContinue }: Props) {
 
   return (
     <SafeAreaView style={styles.root}>
+      <View style={styles.watermark} pointerEvents="none">
+        <Sparkle size={360} color={Brand.accent} weight="duotone" />
+      </View>
+
       <BackChevron onPress={onBack} />
 
+      <Text style={styles.kicker}>Skills</Text>
       <View style={styles.titleRow}>
         <Text style={styles.headline}>What are you{'\n'}good at?</Text>
         <View style={styles.counter}>
@@ -145,17 +151,35 @@ export function SkillTagsScreen({ onBack, onContinue }: Props) {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Brand.canvas },
+  watermark: {
+    position: 'absolute',
+    top: 110,
+    right: -90,
+    opacity: 0.08,
+  },
+  kicker: {
+    fontFamily: AmbitFont.body,
+    fontSize: 12,
+    fontWeight: '600',
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
+    color: Brand.accent,
+    paddingHorizontal: Space.lg,
+    marginTop: 40,
+    marginBottom: 4,
+  },
   titleRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
     paddingHorizontal: Space.lg,
-    marginTop: 40,
+    marginTop: 6,
   },
   headline: {
     fontFamily: AmbitFont.display,
-    fontSize: 30,
+    fontSize: 34,
     color: Brand.inkPrimary,
+    lineHeight: 40,
     flex: 1,
   },
   counter: {

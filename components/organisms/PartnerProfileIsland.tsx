@@ -11,6 +11,7 @@ import {
   View,
 } from 'react-native';
 import { router } from 'expo-router';
+import { BlurView } from 'expo-blur';
 import {
   CaretRight,
   CaretUp,
@@ -203,9 +204,13 @@ export function PartnerProfileIsland({
     outputRange: [(SCREEN_W - PILL_W) / 2, (SCREEN_W - CARD_W) / 2],
   });
   const radius = progress.interpolate({ inputRange: [0, 1], outputRange: [22, 24] });
+  // Tint laid OVER the BlurView. Collapsed: a light, mostly-transparent
+  // wash so the blur dominates (frosted-glass / iMessage top-bar feel).
+  // Expanded: near-opaque warm cream so the profile card stays readable
+  // and the blurred thread behind it doesn't bleed through the content.
   const bgColor = progress.interpolate({
     inputRange:  [0, 1],
-    outputRange: [Brand.hearthGlassBg, Brand.cardCream],
+    outputRange: ['rgba(255,255,255,0.35)', 'rgba(250,246,240,0.97)'],
   });
   const backdropOpacity = progress.interpolate({
     inputRange:  [0, 1],
@@ -253,10 +258,28 @@ export function PartnerProfileIsland({
             width,
             height,
             borderRadius: radius,
-            backgroundColor: bgColor,
           },
         ]}
       >
+        {/* Frosted-glass backing. The BlurView blurs whatever is behind the
+            island in the native view tree — i.e. the chat messages now
+            scrolling under it — then the animated tint sits on top to warm
+            it (light wash collapsed, opaque cream expanded). Both are
+            non-interactive and clipped to the island's rounded shape via
+            the parent's overflow:hidden. experimentalBlurMethod is required
+            for the blur to actually render on Android. */}
+        <BlurView
+          tint="light"
+          intensity={28}
+          experimentalBlurMethod="dimezisBlurView"
+          pointerEvents="none"
+          style={StyleSheet.absoluteFill}
+        />
+        <Animated.View
+          pointerEvents="none"
+          style={[StyleSheet.absoluteFill, { backgroundColor: bgColor }]}
+        />
+
         {/* Collapsed layer — pfp inside the dark bubble. iMessage-style
             contact avatar at the top of the thread; tap to morph into
             the full profile card. No text/caret to keep the bubble

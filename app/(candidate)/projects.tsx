@@ -1,6 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -9,10 +10,19 @@ import {
 } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Compass, Plus } from 'phosphor-react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import {
+  ChatCircle,
+  Compass,
+  Handshake,
+  PencilSimple,
+  Plus,
+} from 'phosphor-react-native';
 import { useAuth } from '../../context/AuthContext';
 import { useProfileRole } from '../../hooks/useProfileRole';
 import { supabase } from '../../lib/supabase';
+import { getInbox, type InboxItem } from '../../lib/messaging';
+import { SwipeRevealRow } from '../../components/molecules/SwipeRevealRow';
 import { AmbitFont, Brand, Radii, Space } from '../../constants/theme';
 
 interface ProjectRow {
@@ -24,40 +34,59 @@ interface ProjectRow {
   created_at: string;
 }
 
-/// S-024 Your Projects. Lists projects owned by the signed-in user
-/// (including paused ones — that requires the 002_project_owner_read
-/// RLS policy). Re-loads on focus so a fresh insert/edit/delete from
-/// the form screens shows up without a manual pull-to-refresh.
+/// Per-project accent rails — gives each card a distinct identity instead of
+/// a uniform grey ledger. Keyed by index so order is stable per render.
+const RAILS: [string, string][] = [
+  [Brand.primary, Brand.accent],
+  ['#C9A57A', Brand.seekerInk],
+  ['#E8C9A0', Brand.primary],
+  [Brand.accent, '#7A5A38'],
+  ['#D4B490', '#4D361D'],
+];
+
+const engagementLabel = (status: InboxItem['status']): string => {
+  switch (status) {
+    case 'active':        return 'In conversation';
+    case 'hired':         return 'Hired';
+    case 'hired_pending': return 'Decision pending';
+    case 'passed':        return 'Closed';
+    case 'auto_declined': return 'Closed';
+    default:              return '';
+  }
+};
+
+/// S-024 Your Projects — owner command center. Each owned project is a
+/// dashboard card (live-in-Discovery marker + pipeline stats + interested
+/// faces); tapping opens the candidate pipeline, swiping left reveals Edit.
+/// Role-aware: pure seekers instead see the projects they're engaging with.
 export default function ProjectsTab() {
   const { user } = useAuth();
   const { role } = useProfileRole();
-  /// Pure seekers don't create projects — they join them. The CTA on this
-  /// tab redirects them to the discovery feed instead of the project-new
-  /// form. Owners and 'both' users still see the "New project" creation
-  /// flow. 'both' defaults to owner-mode here since they can already get
-  /// to discovery via the nav bar.
   const isPureSeeker = role === 'seeker';
   const insets = useSafeAreaInsets();
+
   const [projects, setProjects] = useState<ProjectRow[] | null>(null);
+  const [inbox, setInbox] = useState<InboxItem[]>([]);
 
   const load = useCallback(async () => {
     if (!user) {
       setProjects([]);
+      setInbox([]);
       return;
     }
-    const { data } = await supabase
-      .from('projects')
-      .select('id, title, vibe_blurb, required_skills, active, created_at')
-      .eq('owner_id', user.id)
-      .order('created_at', { ascending: false });
+    const [{ data }, ib] = await Promise.all([
+      supabase
+        .from('projects')
+        .select('id, title, vibe_blurb, required_skills, active, created_at')
+        .eq('owner_id', user.id)
+        .order('created_at', { ascending: false }),
+      getInbox().catch(() => [] as InboxItem[]),
+    ]);
     setProjects((data ?? []) as ProjectRow[]);
+    setInbox(ib);
   }, [user?.id]);
 
-  useFocusEffect(
-    useCallback(() => {
-      load();
-    }, [load]),
-  );
+  useFocusEffect(useCallback(() => { load(); }, [load]));
 
   if (projects === null) {
     return (
@@ -67,76 +96,186 @@ export default function ProjectsTab() {
     );
   }
 
+  const myProjectIds = new Set(projects.map((p) => p.id));
+  // Conversations where I'm the seeker on someone else's project.
+  const exploring = inbox.filter((i) => !myProjectIds.has(i.project_id));
+
+  const ownerInbox = inbox.filter((i) => myProjectIds.has(i.project_id));
+  const activeCount = projects.filter((p) => p.active).length;
+  const interested = ownerInbox.length;
+  const unreadTotal = ownerInbox.reduce((n, i) => n + i.unread_count, 0);
+
+  const statsFor = (projectId: string) => {
+    const items = ownerInbox.filter((i) => i.project_id === projectId);
+    return {
+      total: items.length,
+      talking: items.filter((i) => i.status === 'active').length,
+      hired: items.filter((i) => i.status === 'hired' || i.status === 'hired_pending').length,
+      unread: items.reduce((n, i) => n + i.unread_count, 0),
+      avatars: items.slice(0, 4).map((i) => i.partner_photo_url),
+    };
+  };
+
+  const summary = isPureSeeker
+    ? `${exploring.length} ${exploring.length === 1 ? 'project' : 'projects'} in motion`
+    : [
+        `${activeCount} ${activeCount === 1 ? 'active' : 'active'}`,
+        `${interested} interested`,
+        unreadTotal > 0 ? `${unreadTotal} unread` : null,
+      ].filter(Boolean).join(' · ');
+
   return (
     <ScrollView
       style={styles.root}
       contentContainerStyle={[styles.content, { paddingTop: insets.top + 40 }]}
     >
-      <Text style={styles.eyebrow}>YOURS</Text>
-      <Text style={styles.title}>Your projects</Text>
+      <Text style={styles.kicker}>{isPureSeeker ? 'YOUR HUSTLE' : 'YOURS'}</Text>
+      <Text style={styles.title}>{isPureSeeker ? 'Projects you’re in' : 'Your projects'}</Text>
+      {summary !== '' && <Text style={styles.summary}>{summary}</Text>}
 
       <Pressable
         onPress={() => router.push(isPureSeeker ? '/feed' : '/project-new')}
         style={styles.newBtn}
         accessibilityRole="button"
+        accessibilityLabel={isPureSeeker ? 'Find a new project' : 'New project'}
       >
         {isPureSeeker ? (
           <Compass size={18} color={Brand.inkOnBrand} weight="bold" />
         ) : (
           <Plus size={18} color={Brand.inkOnBrand} weight="bold" />
         )}
-        <Text style={styles.newBtnLabel}>
-          {isPureSeeker ? 'Find new project' : 'New project'}
-        </Text>
+        <Text style={styles.newBtnLabel}>{isPureSeeker ? 'Find new project' : 'New project'}</Text>
       </Pressable>
 
-      {projects.length === 0 ? (
-        <View style={styles.empty}>
-          <Text style={styles.emptyTitle}>Nothing here yet</Text>
-          <Text style={styles.emptyBody}>
-            Start a project to share what you're building. Seekers with the right skills surface in your discovery feed.
-          </Text>
-        </View>
-      ) : (
-        projects.map((p) => (
-          <Pressable
-            key={p.id}
-            onPress={() =>
-              router.push({ pathname: '/project-edit', params: { id: p.id } })
-            }
-            style={styles.card}
-          >
-            <View style={styles.cardHeader}>
-              <Text style={styles.cardTitle} numberOfLines={1}>
-                {p.title}
-              </Text>
-              <View style={[styles.statusPill, !p.active && styles.statusPillPaused]}>
-                <Text
-                  style={[styles.statusText, !p.active && styles.statusTextPaused]}
-                >
-                  {p.active ? 'Active' : 'Paused'}
-                </Text>
-              </View>
-            </View>
-            <Text style={styles.cardBody} numberOfLines={2}>
-              {p.vibe_blurb}
+      {/* ── Owner dashboard ────────────────────────────────────── */}
+      {!isPureSeeker && (
+        projects.length === 0 ? (
+          <View style={styles.empty}>
+            <Text style={styles.emptyTitle}>Nothing here yet</Text>
+            <Text style={styles.emptyBody}>
+              Start a project to share what you&apos;re building. Seekers with the right skills surface in your discovery feed.
             </Text>
-            {p.required_skills.length > 0 && (
-              <View style={styles.chipRow}>
-                {p.required_skills.slice(0, 5).map((s) => (
-                  <View key={s} style={styles.chip}>
-                    <Text style={styles.chipText}>{s}</Text>
-                  </View>
-                ))}
-                {p.required_skills.length > 5 && (
-                  <Text style={styles.moreText}>
-                    +{p.required_skills.length - 5}
-                  </Text>
+          </View>
+        ) : (
+          projects.map((p, idx) => {
+            const s = statsFor(p.id);
+            return (
+              <SwipeRevealRow
+                key={p.id}
+                radius={Radii.lg}
+                onPress={() => router.push({ pathname: '/project-manage', params: { id: p.id } })}
+                renderReveal={(close) => (
+                  <Pressable
+                    onPress={() => { close(); router.push({ pathname: '/project-edit', params: { id: p.id } }); }}
+                    style={styles.editReveal}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Edit ${p.title}`}
+                  >
+                    <PencilSimple size={20} color={Brand.inkOnBrand} weight="bold" />
+                    <Text style={styles.editRevealText}>Edit</Text>
+                  </Pressable>
                 )}
-              </View>
-            )}
-          </Pressable>
-        ))
+              >
+                <View style={styles.card}>
+                  <LinearGradient
+                    colors={RAILS[idx % RAILS.length]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 0, y: 1 }}
+                    style={styles.rail}
+                  />
+                  <View style={styles.cardBody}>
+                    <View style={styles.cardHeader}>
+                      <Text style={styles.cardTitle} numberOfLines={1}>{p.title}</Text>
+                      {p.active ? (
+                        <View style={styles.liveBadge}>
+                          <View style={styles.liveDot} />
+                          <Text style={styles.liveText}>LIVE</Text>
+                        </View>
+                      ) : (
+                        <View style={[styles.statusPill, styles.statusPillPaused]}>
+                          <Text style={[styles.statusText, styles.statusTextPaused]}>
+                            Paused
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+
+                    {/* Pipeline stat row */}
+                    <View style={styles.statRow}>
+                      <View style={styles.stat}>
+                        <ChatCircle size={15} color={Brand.accent} weight="fill" />
+                        <Text style={styles.statText}>{s.talking} talking</Text>
+                      </View>
+                      <View style={styles.stat}>
+                        <Handshake size={15} color={Brand.accent} weight="fill" />
+                        <Text style={styles.statText}>{s.hired} hired</Text>
+                      </View>
+                      {s.unread > 0 && (
+                        <View style={styles.unreadPill}>
+                          <Text style={styles.unreadPillText}>{s.unread} new</Text>
+                        </View>
+                      )}
+                    </View>
+
+                    {/* Interested faces */}
+                    {s.total > 0 ? (
+                      <View style={styles.facesRow}>
+                        <AvatarStack uris={s.avatars} />
+                        <Text style={styles.facesText}>
+                          {s.total} {s.total === 1 ? 'person' : 'people'} interested
+                        </Text>
+                      </View>
+                    ) : (
+                      <Text style={styles.facesEmpty}>
+                        {p.active ? 'No one yet — it’s live and matching.' : 'Paused — flip it live to match.'}
+                      </Text>
+                    )}
+                  </View>
+                </View>
+              </SwipeRevealRow>
+            );
+          })
+        )
+      )}
+
+      {/* ── Seeker engagements (their side of the funnel) ─────────── */}
+      {(isPureSeeker || exploring.length > 0) && (
+        <View style={styles.exploreSection}>
+          {!isPureSeeker && <Text style={styles.sectionLabel}>ALSO EXPLORING</Text>}
+          {exploring.length === 0 ? (
+            <View style={styles.empty}>
+              <Text style={styles.emptyTitle}>No projects yet</Text>
+              <Text style={styles.emptyBody}>
+                Swipe through Discovery and reach out — projects you start a conversation about show up here.
+              </Text>
+            </View>
+          ) : (
+            exploring.map((item) => (
+              <Pressable
+                key={item.conversation_id}
+                onPress={() => router.push({ pathname: '/chat/[id]', params: { id: item.conversation_id } })}
+                style={({ pressed }) => [styles.engRow, pressed && { opacity: 0.7 }]}
+                accessibilityRole="button"
+                accessibilityLabel={`Open ${item.project_title}`}
+              >
+                {item.partner_photo_url ? (
+                  <Image source={{ uri: item.partner_photo_url }} style={styles.engAvatar} />
+                ) : (
+                  <View style={[styles.engAvatar, styles.engAvatarFallback]}>
+                    <Text style={styles.engInitial}>{(item.partner_name ?? '?').slice(0, 1).toUpperCase()}</Text>
+                  </View>
+                )}
+                <View style={styles.engText}>
+                  <Text style={styles.engTitle} numberOfLines={1}>{item.project_title}</Text>
+                  <Text style={styles.engSub} numberOfLines={1}>
+                    {engagementLabel(item.status)} · {item.partner_name}
+                  </Text>
+                </View>
+                {item.unread_count > 0 && <View style={styles.engUnread} />}
+              </Pressable>
+            ))
+          )}
+        </View>
       )}
 
       <View style={{ height: 100 }} />
@@ -144,25 +283,46 @@ export default function ProjectsTab() {
   );
 }
 
+/// Overlapping avatar stack for "who's interested."
+function AvatarStack({ uris }: { uris: (string | null)[] }) {
+  return (
+    <View style={styles.stack}>
+      {uris.map((uri, i) => (
+        <View key={i} style={[styles.stackAvatarWrap, { marginLeft: i === 0 ? 0 : -10, zIndex: 10 - i }]}>
+          {uri ? (
+            <Image source={{ uri }} style={styles.stackAvatar} />
+          ) : (
+            <View style={[styles.stackAvatar, styles.engAvatarFallback]} />
+          )}
+        </View>
+      ))}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Brand.canvas },
   center: { alignItems: 'center', justifyContent: 'center' },
-  content: {
-    paddingHorizontal: Space.lg,
-    paddingTop: Space.lg,
-    gap: Space.md,
-  },
-  eyebrow: {
+  content: { paddingHorizontal: Space.lg, paddingTop: Space.lg, gap: Space.md },
+
+  kicker: {
     fontFamily: AmbitFont.body,
     fontSize: 11,
-    letterSpacing: 1.2,
-    color: Brand.inkLabel,
+    fontWeight: '600',
+    letterSpacing: 1.5,
+    color: Brand.accent,
   },
   title: {
     fontFamily: AmbitFont.display,
-    fontSize: 30,
+    fontSize: 34,
     color: Brand.inkPrimary,
-    marginTop: -16,
+    marginTop: -12,
+  },
+  summary: {
+    fontFamily: AmbitFont.body,
+    fontSize: 13,
+    color: Brand.inkMuted,
+    marginTop: -8,
   },
 
   newBtn: {
@@ -173,6 +333,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     backgroundColor: Brand.primary,
     borderRadius: Radii.md,
+    marginTop: 4,
   },
   newBtnLabel: {
     fontFamily: AmbitFont.body,
@@ -187,37 +348,61 @@ const styles = StyleSheet.create({
     padding: Space.lg,
     marginTop: Space.sm,
   },
-  emptyTitle: {
-    fontFamily: AmbitFont.body,
-    fontSize: 16,
-    fontWeight: '600',
-    color: Brand.inkHigh,
+  emptyTitle: { fontFamily: AmbitFont.body, fontSize: 16, fontWeight: '600', color: Brand.inkHigh },
+  emptyBody: { fontFamily: AmbitFont.body, fontSize: 13, color: Brand.inkMuted, marginTop: 6, lineHeight: 19 },
+
+  // ── Edit reveal (behind a swiped card) ─────────────────────────
+  editReveal: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+    backgroundColor: Brand.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
   },
-  emptyBody: {
+  editRevealText: {
     fontFamily: AmbitFont.body,
-    fontSize: 13,
-    color: Brand.inkMuted,
-    marginTop: 6,
-    lineHeight: 19,
+    fontSize: 12,
+    fontWeight: '700',
+    color: Brand.inkOnBrand,
   },
 
+  // ── Project card ───────────────────────────────────────────────
   card: {
-    backgroundColor: Brand.surface1,
-    borderRadius: Radii.lg,
-    padding: Space.md,
-    gap: 8,
-  },
-  cardHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
+    backgroundColor: Brand.cardCream,
+    borderRadius: Radii.lg,
+    borderWidth: 1,
+    borderColor: Brand.borderSoft,
+    overflow: 'hidden',
   },
+  rail: { width: 5 },
+  cardBody: { flex: 1, padding: Space.md, gap: 10 },
+  cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   cardTitle: {
     flex: 1,
     fontFamily: AmbitFont.body,
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
     color: Brand.inkHigh,
+  },
+  liveBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: Radii.sm,
+    backgroundColor: Brand.seekerSurface,
+  },
+  liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: Brand.sage },
+  liveText: {
+    fontFamily: AmbitFont.body,
+    fontSize: 10,
+    fontWeight: '700',
+    color: Brand.seekerInk,
+    letterSpacing: 0.6,
   },
   statusPill: {
     paddingHorizontal: 8,
@@ -234,36 +419,55 @@ const styles = StyleSheet.create({
     letterSpacing: 0.4,
   },
   statusTextPaused: { color: Brand.inkLabel },
-  cardBody: {
-    fontFamily: AmbitFont.body,
-    fontSize: 13,
-    color: Brand.inkBody,
-    lineHeight: 18,
-  },
-  chipRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    gap: 6,
-    marginTop: 4,
-  },
-  chip: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    backgroundColor: Brand.canvas,
+
+  statRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  stat: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  statText: { fontFamily: AmbitFont.body, fontSize: 13, color: Brand.inkBody, fontWeight: '600' },
+  unreadPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
     borderRadius: 999,
+    backgroundColor: Brand.accent,
+  },
+  unreadPillText: {
+    fontFamily: AmbitFont.body,
+    fontSize: 11,
+    fontWeight: '700',
+    color: Brand.inkOnBrand,
+  },
+
+  facesRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  facesText: { fontFamily: AmbitFont.body, fontSize: 12, color: Brand.inkMuted },
+  facesEmpty: { fontFamily: AmbitFont.body, fontSize: 12, color: Brand.inkPlaceholder },
+
+  stack: { flexDirection: 'row' },
+  stackAvatarWrap: { borderRadius: 13, borderWidth: 2, borderColor: Brand.cardCream },
+  stackAvatar: { width: 22, height: 22, borderRadius: 11, backgroundColor: Brand.surface2 },
+
+  // ── Seeker engagements ─────────────────────────────────────────
+  exploreSection: { gap: 10, marginTop: Space.sm },
+  sectionLabel: {
+    fontFamily: AmbitFont.body,
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 1.2,
+    color: Brand.inkLabel,
+  },
+  engRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 12,
+    backgroundColor: Brand.cardCream,
+    borderRadius: Radii.lg,
     borderWidth: 1,
-    borderColor: Brand.borderDefault,
+    borderColor: Brand.borderSoft,
   },
-  chipText: {
-    fontFamily: AmbitFont.body,
-    fontSize: 11,
-    color: Brand.inkBody,
-  },
-  moreText: {
-    fontFamily: AmbitFont.body,
-    fontSize: 11,
-    color: Brand.inkMuted,
-    paddingHorizontal: 4,
-  },
+  engAvatar: { width: 44, height: 44, borderRadius: 14 },
+  engAvatarFallback: { backgroundColor: Brand.surface2, alignItems: 'center', justifyContent: 'center' },
+  engInitial: { fontFamily: AmbitFont.display, fontSize: 18, color: Brand.inkLabel },
+  engText: { flex: 1 },
+  engTitle: { fontFamily: AmbitFont.body, fontSize: 15, fontWeight: '600', color: Brand.inkHigh },
+  engSub: { fontFamily: AmbitFont.body, fontSize: 13, color: Brand.inkMuted, marginTop: 2 },
+  engUnread: { width: 10, height: 10, borderRadius: 5, backgroundColor: Brand.accent },
 });

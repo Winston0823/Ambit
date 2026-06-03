@@ -369,7 +369,7 @@ function VibeBlock({ text }: { text: string }) {
       >
         {'“'}
       </Text>
-      <Text style={styles.vibeText}>{text}</Text>
+      <Text style={styles.vibeText} numberOfLines={2}>{text}</Text>
     </View>
   );
 }
@@ -401,14 +401,20 @@ function SeekerContent({
 
   // Top-right badge text — synthesized from match data
   const badgeParts: string[] = [];
-  if (sharedCount > 0) badgeParts.push(`${sharedCount} SHARED`);
+  if (sharedCount > 0) badgeParts.push(`${sharedCount} shared`);
   if (campus) badgeParts.push(campus.name.toUpperCase());
   const badgeText = badgeParts.join(' · ');
 
-  // Eyebrow — campus + role
-  const eyebrowText = campus
-    ? `COMPUTER SCIENCE · ${campus.name.toUpperCase()} ’${'26'}`
-    : '';
+  // Eyebrow — built only from data we actually have (major / campus / grad
+  // year). Anything missing is simply omitted; no fabricated "Computer
+  // Science '26" for everyone.
+  const eyebrowText = [
+    card.major?.toUpperCase(),
+    campus?.name.toUpperCase(),
+    card.gradYear ? `’${card.gradYear.replace(/^’/, '')}` : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
 
   return (
     <>
@@ -471,7 +477,7 @@ function ProjectContent({ card, matchedSkills }: ProjectContentProps) {
   });
 
   const badgeParts: string[] = [];
-  if (sharedCount > 0) badgeParts.push(`${sharedCount} SHARED`);
+  if (sharedCount > 0) badgeParts.push(`${sharedCount} shared`);
   if (campus) badgeParts.push(campus.name.toUpperCase());
   const badgeText = badgeParts.join(' · ');
 
@@ -525,9 +531,13 @@ interface PortfolioHighlightsProps {
 
 function PortfolioHighlights({ card, onPortfolioPress }: PortfolioHighlightsProps) {
   const campus = CAMPUSES.find((c) => c.id === card.campusId);
-  const eyebrowText = campus
-    ? `COMPUTER SCIENCE · ${campus.name.toUpperCase()} ’${'26'}`
-    : '';
+  const eyebrowText = [
+    card.major?.toUpperCase(),
+    campus?.name.toUpperCase(),
+    card.gradYear ? `’${card.gradYear.replace(/^’/, '')}` : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
   const links = card.links;
   const hasLinks = !!(links && (links.github || links.site || links.appStore));
 
@@ -664,7 +674,7 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
     paddingLeft: 9,
     borderRadius: 999,
-    backgroundColor: 'rgba(245, 233, 216, 0.92)',
+    backgroundColor: 'rgba(255, 255, 255, 0.92)',
   },
   badgeDot: {
     width: 6,
@@ -674,10 +684,10 @@ const styles = StyleSheet.create({
   },
   badgeText: {
     fontFamily: AmbitFont.body,
-    fontSize: 10,
-    fontWeight: '700',
-    color: Brand.seekerInk,
-    letterSpacing: 1.6,
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#3A332A',
+    letterSpacing: 0.2,
   },
 
   // ── Bottom content stack ───────────────────────────────────────────────
@@ -686,6 +696,9 @@ const styles = StyleSheet.create({
     left: 22,
     right: 22,
     bottom: 22,
+    // Reserve the bottom-right gutter so content never slides under the
+    // floating reach-out button + its label.
+    paddingRight: 72,
     gap: 14,
     zIndex: 3,
   },
@@ -746,30 +759,30 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 6,
   },
+  // Modern frosted pills — no border. Matched skills get a warm-tan wash,
+  // the rest a neutral frosted white; both read on the dark scrim.
   chip: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingHorizontal: 11,
+    paddingVertical: 6,
     borderRadius: 999,
-    borderWidth: 1,
-    borderColor: 'rgba(245, 233, 216, 0.16)',
-    backgroundColor: 'rgba(245, 233, 216, 0.10)',
+    backgroundColor: 'rgba(255, 255, 255, 0.16)',
   },
   chipMatched: {
-    borderColor: 'rgba(199, 111, 74, 0.55)',
-    backgroundColor: 'rgba(199, 111, 74, 0.36)',
+    backgroundColor: 'rgba(201, 164, 122, 0.34)',
   },
   chipText: {
     fontFamily: AmbitFont.body,
     fontSize: 11.5,
     fontWeight: '600',
-    color: 'rgba(245, 233, 216, 0.92)',
+    color: '#FFFFFF',
     letterSpacing: 0.1,
   },
   chipTextMatched: {
-    color: '#FFE7D5',
+    color: '#FFFFFF',
   },
 
   // ── Shipping mini-tile ─────────────────────────────────────────────────
+  // Frosted-white portfolio teaser — soft, borderless, on the dark scrim.
   shipTile: {
     marginTop: 4,
     flexDirection: 'row',
@@ -778,20 +791,18 @@ const styles = StyleSheet.create({
     paddingLeft: 10,
     paddingRight: 14,
     paddingVertical: 10,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(245, 233, 216, 0.18)',
-    backgroundColor: 'rgba(245, 233, 216, 0.10)',
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.16)',
     alignSelf: 'flex-start',
     maxWidth: '80%',
   },
   shipTileActive: {
-    borderColor: Brand.accent,
+    backgroundColor: 'rgba(255, 255, 255, 0.24)',
   },
   shipCover: {
-    width: 32,
-    height: 32,
-    borderRadius: 6,
+    width: 34,
+    height: 34,
+    borderRadius: 9,
     overflow: 'hidden',
   },
   shipCoverOutline: {
@@ -811,13 +822,13 @@ const styles = StyleSheet.create({
     fontFamily: AmbitFont.body,
     fontSize: 8.5,
     fontWeight: '700',
-    color: 'rgba(245, 233, 216, 0.6)',
+    color: 'rgba(255, 255, 255, 0.66)',
     letterSpacing: 1.5,
   },
   shipTitle: {
     fontFamily: AmbitFont.display,
     fontSize: 14,
-    color: '#F5E9D8',
+    color: '#FFFFFF',
     letterSpacing: -0.1,
     marginTop: 1,
   },
@@ -838,8 +849,8 @@ const styles = StyleSheet.create({
     paddingTop: 30,
     paddingHorizontal: 22,
     // leave room at the bottom so the last row / links clear the floating
-    // reach-out button.
-    paddingBottom: 88,
+    // reach-out button + its label.
+    paddingBottom: 112,
   },
   hlSection: {
     fontFamily: AmbitFont.body,

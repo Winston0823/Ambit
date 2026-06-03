@@ -22,14 +22,12 @@ import {
 } from '../molecules/OnboardingContinue';
 import { SplashScreen } from './onboarding/SplashScreen';
 import { WelcomeScreen } from './onboarding/WelcomeScreen';
+import { PathPreviewScreen } from './onboarding/PathPreviewScreen';
 import { SignInScreen } from './onboarding/SignInScreen';
 import { EduEmailScreen } from './onboarding/EduEmailScreen';
 import { DemographicScreen } from './onboarding/DemographicScreen';
-import { VibeBlurbScreen } from './onboarding/VibeBlurbScreen';
-import { PhotoScreen } from './onboarding/PhotoScreen';
 import { CampusScreen } from './onboarding/CampusScreen';
 import { SkillTagsScreen } from './onboarding/SkillTagsScreen';
-import { ProofLinksScreen } from './onboarding/ProofLinksScreen';
 import { RoleDeclarationScreen } from './onboarding/RoleDeclarationScreen';
 import { CompleteScreen } from './onboarding/CompleteScreen';
 
@@ -45,21 +43,28 @@ interface InlineProps {
   onComplete: () => void;
 }
 
-/// Canonical step order. The user's branch (student vs. professor + the
-/// student's role pick) determines which of these actually render — see
-/// shouldShow + activeSteps below. Order here is the narrative spine; the
-/// branching is purely subtractive.
+/// Canonical step order — the ENTRY GATE only. This is the minimum a user
+/// completes to get into the app and receive a real deck: identity (.edu +
+/// student/professor), the role branch, campus, and (for seekers) skills.
+///
+/// `vibe`, `photo`, and `proof` are intentionally NOT in this spine — they
+/// only matter once other people see the user's card, so they're deferred
+/// to in-app progressive completion (the Profile tab is already a fully
+/// editable surface for them) rather than gating first launch.
+///
+/// The user's branch (student vs. professor + the student's role pick)
+/// determines which of these actually render — see shouldShow + activeSteps
+/// below. Order here is the narrative spine; the branching is purely
+/// subtractive.
 const STEPS = [
   'splash',
   'welcome',
+  'preview',
   'eduEmail',
   'demographic',
-  'vibe',
-  'photo',
-  'campus',
   'role',
+  'campus',
   'skills',
-  'proof',
   'complete',
 ] as const;
 type LinearStep = typeof STEPS[number];
@@ -73,12 +78,9 @@ type Step = LinearStep | 'signIn';
 const PROGRESS_STEPS_ALL: LinearStep[] = [
   'eduEmail',
   'demographic',
-  'vibe',
-  'photo',
-  'campus',
   'role',
+  'campus',
   'skills',
-  'proof',
 ];
 
 /// Whether a step should render for a given profile.
@@ -110,15 +112,13 @@ function isComplete(step: LinearStep, profile: OnboardingProfile): boolean {
   switch (step) {
     case 'eduEmail':    return profile.eduEmail.toLowerCase().endsWith('.edu') && profile.eduEmail.includes('@');
     case 'demographic': return profile.demographic !== null;
-    case 'vibe':        return profile.vibeBlurb.length >= 50;
-    case 'photo':       return !!profile.photoUri;
     case 'campus':      return profile.campusId !== null;
     case 'role':        return profile.role !== null;
     case 'skills':      return profile.skills.length >= 2;
-    case 'proof':       return Object.values(profile.proofLinks).some((v) => v.trim().length > 0);
-    // splash/welcome/complete have no "field" — they're transitions.
+    // splash/welcome/preview/complete have no "field" — they're transitions.
     case 'splash':
     case 'welcome':
+    case 'preview':
     case 'complete':    return true;
   }
 }
@@ -278,20 +278,16 @@ function Steps({ onDismiss }: { onDismiss: () => void }) {
         );
       case 'signIn':
         return <SignInScreen onBack={back} onSignedIn={dismiss} />;
+      case 'preview':
+        return <PathPreviewScreen onBack={back} onContinue={advance} />;
       case 'eduEmail':
         return <EduEmailScreen onBack={back} onContinue={advance} />;
       case 'demographic':
         return <DemographicScreen onBack={back} onContinue={advance} />;
-      case 'vibe':
-        return <VibeBlurbScreen onBack={back} onContinue={advance} />;
-      case 'photo':
-        return <PhotoScreen onBack={back} onContinue={advance} />;
       case 'campus':
         return <CampusScreen onBack={back} onContinue={advance} />;
       case 'skills':
         return <SkillTagsScreen onBack={back} onContinue={advance} />;
-      case 'proof':
-        return <ProofLinksScreen onBack={back} onContinue={advance} />;
       case 'role':
         return <RoleDeclarationScreen onBack={back} onContinue={advance} />;
       case 'complete':

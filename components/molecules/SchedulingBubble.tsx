@@ -144,7 +144,7 @@ export function SchedulingBubble({ request, meId, isMine }: Props) {
         <View style={styles.confirmedRow}>
           <CheckCircle
             size={18}
-            color={isMine ? Brand.canvas : Brand.accent}
+            color={isMine ? Brand.primary : Brand.accent}
             weight="fill"
           />
           <Text style={[styles.confirmedText, isMine && styles.textOnBrand]}>
@@ -170,15 +170,15 @@ export function SchedulingBubble({ request, meId, isMine }: Props) {
             style={[styles.addBtn, isMine && styles.addBtnMine, busy && { opacity: 0.5 }]}
           >
             {busy ? (
-              <ActivityIndicator color={isMine ? Brand.canvas : Brand.accent} />
+              <ActivityIndicator color={isMine ? Brand.primary : Brand.accent} />
             ) : (
               <>
                 <CalendarBlank
                   size={14}
-                  color={isMine ? Brand.canvas : Brand.accent}
+                  color={isMine ? Brand.primary : Brand.accent}
                   weight="bold"
                 />
-                <Text style={[styles.addBtnText, isMine && styles.textOnBrand]}>
+                <Text style={[styles.addBtnText, isMine && styles.addBtnTextMine]}>
                   Add to my calendar
                 </Text>
               </>
@@ -245,7 +245,7 @@ export function SchedulingBubble({ request, meId, isMine }: Props) {
 
       <View style={styles.actionRow}>
         {busy ? (
-          <ActivityIndicator color={isMine ? Brand.canvas : Brand.accent} />
+          <ActivityIndicator color={isMine ? Brand.primary : Brand.accent} />
         ) : isProposer ? (
           <Pressable onPress={handleCancel}>
             <Text style={[styles.linkBtnMine]}>Cancel request</Text>
@@ -265,10 +265,10 @@ function Header({ title, isMine }: { title: string; isMine: boolean }) {
     <View style={styles.headerRow}>
       <CalendarBlank
         size={16}
-        color={isMine ? Brand.canvas : Brand.accent}
+        color={isMine ? Brand.primary : Brand.accent}
         weight="bold"
       />
-      <Text style={[styles.headerText, isMine && styles.textOnBrand]} numberOfLines={1}>
+      <Text style={[styles.headerText, isMine && styles.headerTextMine]} numberOfLines={1}>
         {title}
       </Text>
     </View>
@@ -304,10 +304,14 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     elevation: 2,
   },
+  // Outgoing (mine) — dark nav-bar surface to match my message bubbles,
+  // with warm-tan accents (icon / eyebrow / checkmark / CTA) carrying the
+  // brand. Body text stays white via textOnBrand.
   cardMine: {
-    backgroundColor: Brand.primary,
-    borderColor: Brand.primary,
+    backgroundColor: Brand.navBarBg,
+    borderColor: Brand.navBarBg,
   },
+  headerTextMine: { color: Brand.primary },
   cardTombstone: { opacity: 0.85 },
 
   headerRow: {
@@ -405,8 +409,8 @@ const styles = StyleSheet.create({
     borderColor: Brand.borderDefault,
   },
   addBtnMine: {
-    backgroundColor: 'rgba(255,255,255,0.16)',
-    borderColor: 'rgba(255,255,255,0.3)',
+    backgroundColor: 'rgba(212,180,144,0.18)',
+    borderColor: 'rgba(212,180,144,0.45)',
   },
   addBtnText: {
     fontFamily: AmbitFont.body,
@@ -414,6 +418,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: Brand.accent,
   },
+  addBtnTextMine: { color: Brand.primary },
 
   actionRow: {
     marginTop: 2,
@@ -429,6 +434,6 @@ const styles = StyleSheet.create({
     fontFamily: AmbitFont.body,
     fontSize: 13,
     fontWeight: '600',
-    color: Brand.canvas,
+    color: 'rgba(255,255,255,0.7)',
   },
 });

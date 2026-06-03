@@ -47,7 +47,7 @@ const TABS: NavTab[] = [
   { key: 'discovery', label: 'Discovery', inactiveIcon: Sailboat,         activeIcon: Sailboat    },
   { key: 'chat',      label: 'Chat',      inactiveIcon: ChatCircle,       activeIcon: ChatCircleDots },
   { key: 'projects',  label: 'Projects',  inactiveIcon: Stack,            activeIcon: Stack       },
-  { key: 'profile',   label: 'Profile',   inactiveIcon: UserCircleDashed, activeIcon: UserCircle  },
+  { key: 'profile',   label: 'Me!',       inactiveIcon: UserCircleDashed, activeIcon: UserCircle  },
 ];
 
 interface Props {
@@ -62,6 +62,11 @@ interface Props {
 
 const ACTIVE_COLOR   = Brand.inkOnBrand;                  // white icon on dark nav
 const INACTIVE_COLOR = 'rgba(255, 255, 255, 0.55)';
+
+/// Icon glyph size. Bumped from 26 → 28 to sit closer to Instagram's
+/// chunkier bottom-bar weight. Paired with taller tab padding below so the
+/// whole bar reads larger, not just the icons.
+const ICON_SIZE = 28;
 
 // LayoutAnimation opt-in for Android (iOS is on by default). Safe to call
 // repeatedly — RN no-ops after the first.
@@ -183,7 +188,7 @@ export function LiquidNavBar({ activeKey, onChange, hidden = false }: Props) {
               accessibilityState={{ selected: active }}
             >
               <Icon
-                size={26}
+                size={ICON_SIZE}
                 color={active ? ACTIVE_COLOR : INACTIVE_COLOR}
                 weight={active ? 'fill' : 'regular'}
               />
@@ -207,7 +212,7 @@ const styles = StyleSheet.create({
     backgroundColor: Brand.navBarBg,
     borderTopLeftRadius: 10,
     borderTopRightRadius: 10,
-    paddingTop: 8,
+    paddingTop: 14,
     paddingHorizontal: 8,
     borderTopWidth: 0.5,
     borderTopColor: Brand.navBarHairline,
@@ -225,5 +230,8 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    // Taller tap targets so the bar's overall height grows toward
+    // Instagram's, not just the icon glyphs.
+    paddingVertical: 8,
   },
 });

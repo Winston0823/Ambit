@@ -1,74 +1,64 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { BackChevron, OptionCard } from '../../atoms';
+import { StyleSheet, View } from 'react-native';
+import { ArrowsLeftRight, Megaphone, MagnifyingGlass } from 'phosphor-react-native';
+import { OptionCard } from '../../atoms';
+import { Entrance } from '../../atoms/Entrance';
 import { OnboardingContinue } from '../../molecules';
+import { OnboardingScaffold } from './OnboardingScaffold';
 import { useOnboarding, Role } from '../../../context/OnboardingContext';
-import { Brand, AmbitFont, Space } from '../../../constants/theme';
+import { Compass } from 'phosphor-react-native';
 
 interface Props { onBack: () => void; onContinue: () => void; }
 
-/// S-009 Role Declaration. Three cards: Owner / Seeker (themed) / Both.
-/// Selected card uses warm-tan fill (matches Figma "yellow tint = selection").
+/// S-009 Role Declaration. Three cards: Owner / Seeker / Both.
 export function RoleDeclarationScreen({ onBack, onContinue }: Props) {
   const { profile, update } = useOnboarding();
 
   const pick = (r: Role) => update('role', r);
 
   return (
-    <SafeAreaView style={styles.root}>
-      <BackChevron onPress={onBack} />
-
-      <View style={styles.header}>
-        <Text style={styles.headline}>How do you want{'\n'}to show up?</Text>
-        <Text style={styles.subtitle}>You can flip this anytime in your profile.</Text>
-      </View>
-
+    <OnboardingScaffold
+      onBack={onBack}
+      watermarkIcon={Compass}
+      kicker="Your role"
+      headline={`How do you want\nto show up?`}
+      subtitle="You can flip this anytime in your profile."
+      footer={<OnboardingContinue onPress={onContinue} disabled={profile.role === null} />}
+    >
       <View style={styles.cards}>
-        <OptionCard
-          title="Project Owner"
-          subtitle={`I have an idea and I'm building\na team around it`}
-          selected={profile.role === 'owner'}
-          onPress={() => pick('owner')}
-        />
-        <OptionCard
-          title="Project Seeker"
-          subtitle={`I want to find a project and\ncontribute my skills`}
-          selected={profile.role === 'seeker'}
-          onPress={() => pick('seeker')}
-        />
-        <OptionCard
-          title="Both"
-          subtitle={`I'm running a project and open\nto joining others too`}
-          selected={profile.role === 'both'}
-          onPress={() => pick('both')}
-        />
+        <Entrance index={3}>
+          <OptionCard
+            icon={Megaphone}
+            title="Project Owner"
+            subtitle={`I have an idea and I'm building\na team around it`}
+            selected={profile.role === 'owner'}
+            onPress={() => pick('owner')}
+          />
+        </Entrance>
+        <Entrance index={4}>
+          <OptionCard
+            icon={MagnifyingGlass}
+            title="Project Seeker"
+            subtitle={`I want to find a project and\ncontribute my skills`}
+            selected={profile.role === 'seeker'}
+            onPress={() => pick('seeker')}
+          />
+        </Entrance>
+        <Entrance index={5}>
+          <OptionCard
+            icon={ArrowsLeftRight}
+            title="Both"
+            subtitle={`I'm running a project and open\nto joining others too`}
+            selected={profile.role === 'both'}
+            onPress={() => pick('both')}
+          />
+        </Entrance>
       </View>
-
-      <OnboardingContinue onPress={onContinue} disabled={profile.role === null} />
-    </SafeAreaView>
+    </OnboardingScaffold>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: Brand.canvas },
-  header: {
-    paddingHorizontal: Space.lg,
-    marginTop: 40,
-    marginBottom: Space.lg,
-  },
-  headline: {
-    fontFamily: AmbitFont.display,
-    fontSize: 30,
-    color: Brand.inkPrimary,
-    lineHeight: 36,
-  },
-  subtitle: {
-    fontFamily: AmbitFont.body,
-    fontSize: 13,
-    color: Brand.inkMuted,
-    marginTop: 12,
-  },
   cards: {
     paddingHorizontal: 16,
     gap: 16,

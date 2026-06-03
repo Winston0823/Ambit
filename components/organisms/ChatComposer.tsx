@@ -92,22 +92,9 @@ export function ChatComposer({
   const [pendingAttachment, setPendingAttachment] = useState<{ uri: string } | null>(null);
   const lastPingRef = useRef(0);
 
-  /// Micro-animations: the plus button's background tweens between the
-  /// closed-state surface tint and the open-state primary tint, and the
-  /// send button's opacity tweens between disabled (no text) and active.
-  /// Both fade over ~150ms so the state changes don't snap.
-  const plusTint = useRef(new Animated.Value(0)).current;
+  /// Send button opacity tweens between disabled (no text) and active over
+  /// ~150ms so the state change doesn't snap.
   const sendActivation = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    Animated.timing(plusTint, {
-      toValue: attachMenuOpen ? 1 : 0,
-      duration: 180,
-      easing: Easing.inOut(Easing.cubic),
-      // backgroundColor / borderColor can't use the native driver.
-      useNativeDriver: false,
-    }).start();
-  }, [attachMenuOpen, plusTint]);
 
   const sendEnabled = (!!text.trim() || !!pendingAttachment) && !sending;
   useEffect(() => {
@@ -119,14 +106,6 @@ export function ChatComposer({
     }).start();
   }, [sendEnabled, sendActivation]);
 
-  const plusBg = plusTint.interpolate({
-    inputRange:  [0, 1],
-    outputRange: [Brand.surface1, Brand.primary],
-  });
-  const plusBorder = plusTint.interpolate({
-    inputRange:  [0, 1],
-    outputRange: [Brand.borderDefault, Brand.primary],
-  });
   const sendOpacity = sendActivation.interpolate({
     inputRange:  [0, 1],
     outputRange: [0.4, 1],
@@ -269,21 +248,14 @@ export function ChatComposer({
           <Pressable
             onPress={handlePlusPress}
             hitSlop={10}
+            style={styles.plusBtn}
             accessibilityLabel={attachMenuOpen ? 'Close attachments' : 'Open attachments'}
           >
-            <Animated.View
-              style={[
-                styles.iconBtn,
-                styles.plusBtn,
-                { backgroundColor: plusBg, borderColor: plusBorder },
-              ]}
-            >
-              <Plus
-                size={18}
-                color={attachMenuOpen ? Brand.inkOnBrand : Brand.inkMuted}
-                weight="bold"
-              />
-            </Animated.View>
+            <Plus
+              size={22}
+              color={attachMenuOpen ? Brand.inkPrimary : Brand.accent}
+              weight="bold"
+            />
           </Pressable>
         )}
 
@@ -492,29 +464,33 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
 
+  // Floating white pill that holds the +, input, and send. Soft shadow on
+  // the white canvas (modern, no hairlines) instead of a bordered bar.
   inputRow: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    gap: 8,
-    paddingHorizontal: Space.md,
-    paddingVertical: 8,
+    gap: 6,
+    marginHorizontal: Space.md,
+    marginBottom: 8,
+    paddingLeft: 12,
+    paddingRight: 6,
+    paddingVertical: 6,
+    backgroundColor: Brand.canvas,
+    borderRadius: 26,
+    shadowColor: '#3A2A1A',
+    shadowOpacity: 0.12,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 6,
   },
-  iconBtn: {
+  // Bare + tap target (no chip) — a clean tan glyph that darkens when the
+  // attachment grid is open.
+  plusBtn: {
     width: 36,
     height: 36,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 2,
-  },
-  // The + toggle pill. backgroundColor + borderColor are driven by an
-  // Animated.Value at the JSX site so the open/close transition tweens
-  // smoothly between surface1/borderDefault and primary/primary.
-  plusBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    borderWidth: 1,
-    marginBottom: 4,
   },
 
   // Attachment grid panel — sits BELOW the input row in the keyboard's
@@ -558,28 +534,25 @@ const styles = StyleSheet.create({
     color: Brand.inkPrimary,
   },
   attachTileLabelDisabled: { color: Brand.inkMuted },
+  // Transparent — the surrounding pill provides the surface now.
   input: {
     flex: 1,
-    minHeight: 40,
+    minHeight: 38,
     maxHeight: 120,
-    backgroundColor: Brand.hearthGlassBg,
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: Brand.hearthGlassEdge,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 9,
     fontFamily: AmbitFont.body,
     fontSize: 15,
     color: Brand.inkBody,
   },
+  // Solid espresso send — the one dark action in the pill.
   sendBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: Brand.accent,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#211D18',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 0,
   },
   // sendBtn opacity tweens via Animated.Value driven by `sendEnabled`.
 });

@@ -62,9 +62,14 @@ export function CampusScreen({ onBack, onContinue }: Props) {
 
   return (
     <SafeAreaView style={styles.root}>
+      <View style={styles.watermark} pointerEvents="none">
+        <MapPin size={360} color={Brand.accent} weight="duotone" />
+      </View>
+
       <BackChevron onPress={onBack} />
 
       <View style={styles.header}>
+        <Text style={styles.kicker}>Campus</Text>
         <Text style={styles.headline}>Where do you go?</Text>
         <Text style={styles.subtitle}>
           Your campus shapes who you see first.
@@ -150,16 +155,31 @@ export function CampusScreen({ onBack, onContinue }: Props) {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Brand.canvas },
+  watermark: {
+    position: 'absolute',
+    top: 110,
+    right: -90,
+    opacity: 0.08,
+  },
   header: {
     paddingHorizontal: Space.lg,
     marginTop: 40,
     marginBottom: Space.lg,
   },
+  kicker: {
+    fontFamily: AmbitFont.body,
+    fontSize: 12,
+    fontWeight: '600',
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
+    color: Brand.accent,
+    marginBottom: 10,
+  },
   headline: {
     fontFamily: AmbitFont.display,
-    fontSize: 30,
+    fontSize: 34,
     color: Brand.inkPrimary,
-    lineHeight: 36,
+    lineHeight: 40,
   },
   subtitle: {
     fontFamily: AmbitFont.body,

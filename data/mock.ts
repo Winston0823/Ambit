@@ -82,6 +82,12 @@ export interface SeekerCardData {
   campusId: string;
   skills: string[];
   vibeBlurb: string;
+  /// Field of study, e.g. "Computer Science". Optional — the discovery card
+  /// eyebrow shows it when present and falls back to campus-only otherwise,
+  /// so we never fabricate a major the user didn't give us.
+  major?: string;
+  /// Graduation year, e.g. "26" or "2026". Optional, same rationale.
+  gradYear?: string;
   /// Ordered list of featured work. Empty array = hide the portfolio
   /// section in discovery; in profile, the "+ Add" affordance still shows.
   portfolio: PortfolioItem[];

@@ -29,10 +29,10 @@ export function AvailabilityPollBubble({ poll, isMine, onOpen }: Props) {
       <View style={styles.headerRow}>
         <HeaderIcon
           size={16}
-          color={isMine ? Brand.canvas : Brand.accent}
+          color={isMine ? Brand.primary : Brand.accent}
           weight="bold"
         />
-        <Text style={[styles.headerText, isMine && styles.textOnBrand]} numberOfLines={1}>
+        <Text style={[styles.headerText, isMine && styles.accentMine]} numberOfLines={1}>
           {poll.title}
         </Text>
       </View>
@@ -46,7 +46,7 @@ export function AvailabilityPollBubble({ poll, isMine, onOpen }: Props) {
           onPress={onOpen}
           style={[styles.openBtn, isMine && styles.openBtnMine]}
         >
-          <Text style={[styles.openBtnText, isMine && styles.textOnBrand]}>
+          <Text style={[styles.openBtnText, isMine && styles.accentMine]}>
             Open availability poll
           </Text>
         </Pressable>
@@ -85,13 +85,17 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     elevation: 2,
   },
+  // Outgoing (mine) — dark nav-bar surface matching my message bubbles,
+  // tan accents on icon / eyebrow / CTA; body lines stay light via
+  // subTextOnBrand. Keeps a faint warm-tan lift shadow.
   cardMine: {
-    backgroundColor: Brand.primary,
+    backgroundColor: Brand.navBarBg,
     shadowColor: Brand.accent,
     shadowOpacity: 0.18,
     shadowRadius: 14,
     shadowOffset: { width: 0, height: 4 },
   },
+  accentMine: { color: Brand.primary },
 
   headerRow: {
     flexDirection: 'row',
@@ -126,8 +130,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   openBtnMine: {
-    backgroundColor: 'rgba(255,255,255,0.16)',
-    borderColor: 'rgba(255,255,255,0.3)',
+    backgroundColor: 'rgba(212,180,144,0.18)',
+    borderColor: 'rgba(212,180,144,0.45)',
   },
   openBtnText: {
     fontFamily: AmbitFont.body,

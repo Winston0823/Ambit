@@ -30,8 +30,15 @@ interface Props {
   card: DiscoveryCardData | null;
   /// Dismiss without sending. Fires when the user taps the scrim or the X.
   onDismiss: () => void;
-  /// Send the message. Parent owns the actual conversation creation flow.
-  onSend: (card: DiscoveryCardData, text: string) => void;
+  /// Perform the send. Returns true on success, false on failure. The
+  /// composer withholds the "on its way" affirmation until this resolves,
+  /// so the celebration can never claim success for a send that failed.
+  /// Should NOT dismiss/navigate — do that in onSent.
+  onSend: (card: DiscoveryCardData, text: string) => boolean | Promise<boolean>;
+  /// Fired once a send has SUCCEEDED and its affirmation has shown. Parent
+  /// dismisses or navigates here (kept separate from onSend so commitment
+  /// to "sent" only happens after the network confirms).
+  onSent?: () => void;
 }
 
 /// Modal composer that replaces the swipe-up gesture. Triggered by the
@@ -41,8 +48,9 @@ interface Props {
 /// warm-tan send pill), now rendered as a bottom sheet so the underlying
 /// card stays still while the user types. Solves the conflict between
 /// card-internal scroll and the swipe-up gesture.
-export function ReachOutComposer({ card, onDismiss, onSend }: Props) {
+export function ReachOutComposer({ card, onDismiss, onSend, onSent }: Props) {
   const [text, setText] = useState('');
+  const [error, setError] = useState('');
   /// 'compose' = normal form. 'sending' = the user just hit Send and we're
   /// running the celebration choreography. After ~1200ms in 'sending' we
   /// fire `onSend` (parent then dismisses), so the user sees the paper
@@ -69,6 +77,7 @@ export function ReachOutComposer({ card, onDismiss, onSend }: Props) {
   useEffect(() => {
     if (card) {
       setText('');
+      setError('');
       setPhase('compose');
       // Reset all celebration values so reopening the composer is clean.
       planeX.setValue(0);
@@ -113,82 +122,67 @@ export function ReachOutComposer({ card, onDismiss, onSend }: Props) {
     onDismiss();
   };
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!canSend || phase === 'sending') return;
-    if (Platform.OS !== 'web') {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-    }
+    setError('');
     setPhase('sending');
     Keyboard.dismiss();
 
-    // ── Celebration choreography (~1200ms before firing onSend) ──
-    // Paper plane detaches from the send button and flies up-right off
-    // the screen. Form fades to a soft memory. A brand-tan tint sweeps
-    // across the sheet (peak ~360ms in). The italic "on its way" line
-    // settles in at the form's center after the plane has launched.
+    // ── Optimistic "launch" — reads as *sending*, not *sent* ──
+    // Paper plane lifts off the button, the form recedes, and a brand-tan
+    // tint sweeps the sheet. The italic "on its way" affirmation below is
+    // deliberately withheld until the network confirms (see the await), so
+    // the celebration can never claim success for a send that failed.
     Animated.parallel([
-      // Plane flight — fast acceleration, smooth tail-off. Ease-out cubic
-      // so the plane really takes off rather than drifting evenly.
-      Animated.timing(planeX, {
-        toValue: 220,
-        duration: 720,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }),
-      Animated.timing(planeY, {
-        toValue: -260,
-        duration: 720,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }),
-      Animated.timing(planeRotate, {
-        toValue: 1,
-        duration: 720,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }),
-      Animated.timing(planeOpacity, {
-        toValue: 0,
-        duration: 720,
-        delay: 280,
-        easing: Easing.in(Easing.cubic),
-        useNativeDriver: true,
-      }),
-      // Form fades back so the success line can read uncontested.
-      Animated.timing(formOpacity, {
-        toValue: 0.12,
-        duration: 380,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }),
-      // Tan tint sweeps — comes up, peaks, dissolves.
+      Animated.timing(planeX, { toValue: 220, duration: 720, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+      Animated.timing(planeY, { toValue: -260, duration: 720, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+      Animated.timing(planeRotate, { toValue: 1, duration: 720, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+      Animated.timing(planeOpacity, { toValue: 0, duration: 720, delay: 280, easing: Easing.in(Easing.cubic), useNativeDriver: true }),
+      Animated.timing(formOpacity, { toValue: 0.12, duration: 380, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
       Animated.sequence([
-        Animated.timing(tintOpacity, {
-          toValue: 0.22,
-          duration: 280,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
-        }),
-        Animated.timing(tintOpacity, {
-          toValue: 0,
-          duration: 540,
-          easing: Easing.in(Easing.cubic),
-          useNativeDriver: true,
-        }),
+        Animated.timing(tintOpacity, { toValue: 0.22, duration: 280, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+        Animated.timing(tintOpacity, { toValue: 0, duration: 540, easing: Easing.in(Easing.cubic), useNativeDriver: true }),
       ]),
-      // "On its way" line — fades in after the plane has launched.
+    ]).start();
+
+    let ok = false;
+    try {
+      ok = (await onSend(card, text.trim())) !== false;
+    } catch {
+      ok = false;
+    }
+
+    if (ok) {
+      if (Platform.OS !== 'web') {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      }
+      // Network confirmed — now show the affirmation, then hand off so the
+      // parent dismisses or navigates into the new thread.
       Animated.timing(successOpacity, {
         toValue: 1,
         duration: 380,
-        delay: 360,
         easing: Easing.out(Easing.cubic),
         useNativeDriver: true,
-      }),
-    ]).start();
-
-    // Hand off to the parent slightly after the success line has settled.
-    // Parent will set card=null which triggers our exit animation.
-    setTimeout(() => onSend(card, text.trim()), 1200);
+      }).start();
+      setTimeout(() => onSent?.(), 850);
+    } else {
+      if (Platform.OS !== 'web') {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
+      }
+      // Send failed — reverse the launch and return to the form with an
+      // inline error so the user can edit and retry.
+      planeX.setValue(0);
+      planeY.setValue(0);
+      planeRotate.setValue(0);
+      planeOpacity.setValue(1);
+      successOpacity.setValue(0);
+      Animated.parallel([
+        Animated.timing(formOpacity, { toValue: 1, duration: 220, useNativeDriver: true }),
+        Animated.timing(tintOpacity, { toValue: 0, duration: 220, useNativeDriver: true }),
+      ]).start();
+      setPhase('compose');
+      setError("Couldn't send — check your connection and try again.");
+    }
   };
 
   // Convert the planeRotate 0→1 driver into a degree value for the icon.
@@ -234,7 +228,7 @@ export function ReachOutComposer({ card, onDismiss, onSend }: Props) {
 
             <TextInput
               value={text}
-              onChangeText={setText}
+              onChangeText={(t) => { setText(t); if (error) setError(''); }}
               placeholder={placeholder}
               placeholderTextColor={Brand.inkPlaceholder}
               multiline
@@ -243,6 +237,8 @@ export function ReachOutComposer({ card, onDismiss, onSend }: Props) {
               maxLength={400}
               editable={phase === 'compose'}
             />
+
+            {error !== '' && <Text style={styles.errorNote}>{error}</Text>}
 
             <View style={styles.actions}>
               <Pressable
@@ -378,6 +374,12 @@ const styles = StyleSheet.create({
     ...TypeScale.title,
     fontSize: 15,
     color: Brand.inkOnBrand,
+  },
+  errorNote: {
+    fontFamily: AmbitFont.body,
+    fontSize: 13,
+    color: '#C0392B',
+    marginTop: -4,
   },
 
   // ── Celebration overlays (phase === 'sending') ────────────────────────

@@ -5,3 +5,4 @@ export { BackChevron } from './BackChevron';
 export { OptionCard } from './OptionCard';
 export { KeyboardDismiss } from './KeyboardDismiss';
 export { OnboardingProgress } from './OnboardingProgress';
+export { Entrance } from './Entrance';

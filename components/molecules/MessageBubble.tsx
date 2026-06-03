@@ -1,13 +1,29 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Animated,
+  Dimensions,
   Image,
   Pressable,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Paperclip, Warning } from 'phosphor-react-native';
+
+const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
+
+// Screen-anchored gradient revealed through my (outgoing) bubbles. The
+// gradient is the size of the whole screen and stays pinned to the viewport;
+// each bubble clips it to its own rect, so a bubble shows whatever slice it
+// currently sits over — and that slice shifts as you scroll. Tweak the
+// colors / direction freely; everything else is positioning math.
+// Tonal warm-brown → espresso. Single hue family (no olive-gold), so the
+// windowed effect reads cleanly instead of muddy.
+const MINE_GRADIENT = ['#6E5A44', '#3D332B', '#1E1A16'] as const;
+const MINE_GRADIENT_START = { x: 0.4, y: 0 };
+const MINE_GRADIENT_END = { x: 0.6, y: 1 };
 import type { MessageRow, ReactionRow } from '../../lib/messaging';
 import { getCachedAttachmentUrl } from '../../lib/messaging';
 import type { SchedulingRequestRow } from '../../lib/scheduling';
@@ -65,6 +81,12 @@ interface Props {
   /// AvailabilityPollBubble. Tap on "Open" propagates up.
   availabilityPoll?: AvailabilityPollRow | null;
   onOpenAvailabilityPoll?: (pollId: string) => void;
+  /// Native-driven scroll offset of the message list + a plain ref mirror of
+  /// its current value. Used by my own bubbles to keep their screen-anchored
+  /// gradient pinned to the viewport as the list scrolls. Optional — when
+  /// absent, mine bubbles just use their solid fallback fill.
+  scrollY?:    Animated.Value;
+  scrollYRef?: { current: number };
 }
 
 /// Resolve a path into a renderable URL. Local URIs (file://) pass through
@@ -144,9 +166,27 @@ export function MessageBubble({
   schedulingRequest,
   availabilityPoll,
   onOpenAvailabilityPoll,
+  scrollY,
+  scrollYRef,
 }: Props) {
   const attachmentUrl = useAttachmentUrl(message.attachment_url);
   const isDeleted = !!message.deleted_at;
+
+  // Screen-anchored gradient bookkeeping (mine bubbles only). We measure the
+  // bubble's window position once it lays out and store its content-space top
+  // (window-y + scroll-at-measure) + its left x. translateY = scrollY - anchorY
+  // and translateX = -anchorX then keep the screen-sized gradient pinned to
+  // the viewport while the bubble clips it.
+  const bubbleRef = useRef<View>(null);
+  const [gradAnchor, setGradAnchor] = useState<{ x: number; y: number } | null>(null);
+  const measureBubble = useCallback(() => {
+    if (!isMine || !scrollY) return;
+    bubbleRef.current?.measureInWindow((x, y) => {
+      if (Number.isFinite(x) && Number.isFinite(y)) {
+        setGradAnchor({ x, y: y + (scrollYRef?.current ?? 0) });
+      }
+    });
+  }, [isMine, scrollY, scrollYRef]);
   const wasEdited = !!message.edited_at && !isDeleted;
   const kind = message.kind ?? 'user';
 
@@ -212,6 +252,8 @@ export function MessageBubble({
       <View style={styles.bubbleRow}>
         {!isMine && <Avatar url={avatarUrl} name={senderName} />}
         <Pressable
+          ref={bubbleRef}
+          onLayout={measureBubble}
           onLongPress={isDeleted ? undefined : onLongPress}
           onPress={isMine && status === 'failed' ? onRetry : undefined}
           delayLongPress={250}
@@ -223,6 +265,30 @@ export function MessageBubble({
             isMine && status === 'failed' && styles.bubbleFailed,
           ]}
         >
+        {/* Screen-anchored gradient: the bubble (overflow:hidden) clips this
+            screen-sized gradient; translateX/Y keep it pinned to the viewport
+            as the list scrolls, so the bubble reveals the slice it sits over. */}
+        {isMine && scrollY && gradAnchor && !isDeleted && status !== 'failed' && (
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.mineGradientLayer,
+              {
+                transform: [
+                  { translateX: -gradAnchor.x },
+                  { translateY: Animated.subtract(scrollY, gradAnchor.y) },
+                ],
+              },
+            ]}
+          >
+            <LinearGradient
+              colors={MINE_GRADIENT}
+              start={MINE_GRADIENT_START}
+              end={MINE_GRADIENT_END}
+              style={styles.mineGradientFill}
+            />
+          </Animated.View>
+        )}
         {/* Reply preview — small bar above the body that quotes the parent.
             For attachment-only parents, an inline Paperclip + "Photo" label
             stands in for the body. */}
@@ -447,25 +513,35 @@ const styles = StyleSheet.create({
   bubble: {
     // iMessage rhythm — tight padding, no shadow, no internal meta row.
     maxWidth: '72%',
-    borderRadius: 18,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
+    borderRadius: 20,
+    paddingHorizontal: 13,
+    paddingVertical: 8,
     gap: 4,
     overflow: 'hidden',
   },
   bubbleMine: {
-    // Flat warm tan — drops the previous gradient. Solid #B48045 reads
-    // cleaner against the white canvas and matches iMessage's flat
-    // outgoing bubble. Locked to hex so it doesn't drift if Brand.accent
-    // is retuned elsewhere.
-    backgroundColor: '#E09948',
+    // Solid fallback (the midpoint taupe) — shown until the screen-anchored
+    // gradient measures + mounts, and on any bubble where the gradient is
+    // suppressed (failed / deleted).
+    backgroundColor: '#7F6F5D',
     borderBottomRightRadius: 4,
   },
+  // Screen-sized gradient layer clipped by the bubble's rounded rect.
+  mineGradientLayer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: SCREEN_W,
+    height: SCREEN_H,
+  },
+  mineGradientFill: {
+    width: SCREEN_W,
+    height: SCREEN_H,
+  },
   bubbleTheirs: {
-    // Warm-tinted iMessage gray. Previous #FFFFFF disappeared on the
-    // white chat canvas — bumping to a soft warm gray gives the bubble
-    // a real edge without breaking the brand cream palette.
-    backgroundColor: '#ECE9E2',
+    // Modern soft incoming fill — a clean, barely-warm gray that reads as a
+    // crisp bubble on the white canvas.
+    backgroundColor: '#F2EFEA',
     borderBottomLeftRadius: 4,
   },
   bubbleDeleted: { opacity: 0.65 },

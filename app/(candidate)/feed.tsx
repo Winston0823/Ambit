@@ -301,14 +301,14 @@ export default function DiscoveryFeed() {
   /// project doesn't reappear in future decks. Seeker-side: project_id =
   /// card.id, seeker = me. Owner-side: project_id = my first active
   /// project, seeker = card.id.
-  const handleMessage = async (card: DiscoveryCardData, text: string) => {
-    // Dismiss the composer optimistically — the user shouldn't wait on the
-    // network round-trip to get back to the deck. If the RPC fails below
-    // we surface an Alert; reopening the modal isn't necessary.
-    setReachOutCard(null);
-    setConsecutiveSkips(0);
-    setLastFiveSeen([]);
-    if (!user) return;
+  /// Composer-send. Performs the conversation create + first message and
+  /// returns true/false; the ReachOutComposer awaits this and only shows
+  /// its "on its way" affirmation on success (failure reverses with an
+  /// inline error). Dismissal + skip-counter reset happen in handleReachSent
+  /// (success only). Stays in the deck — the new conversation surfaces in
+  /// the Chat tab via the inbox's realtime subscription.
+  const handleMessage = async (card: DiscoveryCardData, text: string): Promise<boolean> => {
+    if (!user) return false;
 
     try {
       let projectId: string;
@@ -322,7 +322,7 @@ export default function DiscoveryFeed() {
             'Demo card',
             "This is a placeholder card — messaging isn't wired for it yet.",
           );
-          return;
+          return false;
         }
         projectId = card.id;
         seekerId  = user.id;
@@ -342,7 +342,7 @@ export default function DiscoveryFeed() {
             'Demo card',
             "This is a placeholder card — messaging isn't wired for it yet.",
           );
-          return;
+          return false;
         }
         // Owner messaging a seeker card. Look up the owner's first active
         // project as the conversation context.
@@ -359,7 +359,7 @@ export default function DiscoveryFeed() {
             'No active project',
             'Create a project before reaching out to seekers.',
           );
-          return;
+          return false;
         }
         projectId = (proj as { id: string }).id;
         seekerId  = card.id;
@@ -374,12 +374,19 @@ export default function DiscoveryFeed() {
         seekerId,
         body: text,
       });
-      // Intentionally no router.push here — the composer dismisses on its
-      // own and the new conversation surfaces in the Chat tab via the
-      // inbox's realtime subscription.
+      return true;
     } catch (e: any) {
       console.warn('reach out failed:', e?.message ?? e);
+      return false;
     }
+  };
+
+  /// Called by the composer after a confirmed send. Resets the skip
+  /// counters and closes the composer; we stay in the deck.
+  const handleReachSent = () => {
+    setConsecutiveSkips(0);
+    setLastFiveSeen([]);
+    setReachOutCard(null);
   };
 
   const handleOverviewPick = (card: DiscoveryCardData) => {
@@ -477,6 +484,7 @@ export default function DiscoveryFeed() {
         card={reachOutCard}
         onDismiss={() => setReachOutCard(null)}
         onSend={handleMessage}
+        onSent={handleReachSent}
       />
 
       {/* Portfolio detail — opens when the user taps the "Currently
@@ -531,7 +539,9 @@ const styles = StyleSheet.create({
     fontFamily: AmbitFont.display,
     fontSize: 26,
     color: Brand.inkPrimary,
-    letterSpacing: 0.5,
+    // Matches the inbox wordmark tracking so the logotype reads identically
+    // across tabs (was 0.5 here vs -0.4 on inbox — an accidental drift).
+    letterSpacing: -0.4,
   },
   bookmarkBtn: {
     position: 'absolute',

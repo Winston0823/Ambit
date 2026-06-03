@@ -3,13 +3,13 @@ import * as Clipboard from 'expo-clipboard';
 import { randomUUID } from 'expo-crypto';
 import {
   ActivityIndicator,
+  Animated,
   Alert,
   FlatList,
   Keyboard,
   KeyboardAvoidingView,
   LayoutAnimation,
   type LayoutAnimationConfig,
-  Modal,
   Platform,
   Pressable,
   StyleSheet,
@@ -40,6 +40,7 @@ import type { RealtimeChannel } from '@supabase/supabase-js';
 import * as Haptics from 'expo-haptics';
 import { CaretLeft, DotsThree } from 'phosphor-react-native';
 import {
+  BottomSheet,
   MessageBubble,
   type MessageStatus,
   PassReasonSheet,
@@ -155,6 +156,17 @@ export default function ThreadScreen() {
   const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const channelRef = useRef<RealtimeChannel | null>(null);
   const listRef = useRef<FlatList<MessageRow>>(null);
+
+  // Native-driven scroll offset for the screen-anchored bubble gradient.
+  // scrollY drives the per-bubble transforms (native); scrollYRef mirrors
+  // its current value on the JS thread so a bubble can capture the scroll
+  // offset at the moment it measures its window position.
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const scrollYRef = useRef(0);
+  useEffect(() => {
+    const id = scrollY.addListener(({ value }) => { scrollYRef.current = value; });
+    return () => scrollY.removeListener(id);
+  }, [scrollY]);
 
   /// Attachment grid (WeChat-style) — state lives here so the FlatList
   /// can close it on scroll/tap. Opening dismisses the keyboard so the
@@ -737,7 +749,7 @@ export default function ThreadScreen() {
   const isOwnSelected = selectedMessage?.sender_id === user?.id;
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top, paddingBottom: Math.max(insets.bottom, 8) }]}>
+    <View style={[styles.root, { paddingBottom: Math.max(insets.bottom, 8) }]}>
       {/* Hearth surface — single solid warm cream. The previous two-wash
           gradient setup made a visible "lighter cream stripe" in the
           middle where the washes faded out and the cool base canvas
@@ -824,11 +836,16 @@ export default function ThreadScreen() {
         style={{ flex: 1 }}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
-        <FlatList
-          ref={listRef}
+        <Animated.FlatList
+          ref={listRef as any}
           data={messages}
-          keyExtractor={(m) => m.id}
-          contentContainerStyle={styles.listContent}
+          keyExtractor={(m: MessageRow) => m.id}
+          contentContainerStyle={[styles.listContent, { paddingTop: insets.top + 96 }]}
+          scrollEventThrottle={16}
+          onScroll={Animated.event(
+            [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+            { useNativeDriver: true },
+          )}
           // WeChat parity: scrolling or tapping the messages list closes
           // the attachment grid. onScrollBeginDrag covers any drag/scroll;
           // onTouchStart catches pure taps without claiming the gesture
@@ -872,6 +889,8 @@ export default function ThreadScreen() {
                 onToggleReaction={(emoji) => handleToggleReaction(item, emoji)}
                 onLongPress={() => handleLongPress(item)}
                 onRetry={() => handleRetry(item.id)}
+                scrollY={scrollY}
+                scrollYRef={scrollYRef}
               />
             );
           }}
@@ -913,45 +932,35 @@ export default function ThreadScreen() {
 
       {/* Overflow menu — hire / pass / block. Lives above the
           keyboard so it stays usable even with the composer focused. */}
-      <Modal
-        visible={overflowOpen}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setOverflowOpen(false)}
-      >
-        <Pressable style={styles.modalBackdrop} onPress={() => setOverflowOpen(false)}>
-          <Pressable style={styles.sheet} onPress={() => {}}>
-            <View style={styles.sheetHandle} />
-            <Pressable
-              style={styles.overflowItem}
-              onPress={handleProposeHire}
-              disabled={!!meta && meta.status !== 'active'}
-            >
-              <Text style={[styles.overflowLabel, !!meta && meta.status !== 'active' && styles.overflowLabelDisabled]}>
-                Mark as Hired
-              </Text>
-            </Pressable>
-            <Pressable
-              style={styles.overflowItem}
-              onPress={handleOpenPass}
-              disabled={!!meta && meta.status !== 'active'}
-            >
-              <Text style={[styles.overflowLabel, !!meta && meta.status !== 'active' && styles.overflowLabelDisabled]}>
-                Pass on this chat
-              </Text>
-            </Pressable>
-            <Pressable
-              style={styles.overflowItem}
-              onPress={() => {
-                setOverflowOpen(false);
-                Alert.alert('Block', 'Block flow coming soon.');
-              }}
-            >
-              <Text style={[styles.overflowLabel, styles.overflowLabelDanger]}>Block</Text>
-            </Pressable>
-          </Pressable>
+      <BottomSheet visible={overflowOpen} onClose={() => setOverflowOpen(false)}>
+        <Pressable
+          style={styles.overflowItem}
+          onPress={handleProposeHire}
+          disabled={!!meta && meta.status !== 'active'}
+        >
+          <Text style={[styles.overflowLabel, !!meta && meta.status !== 'active' && styles.overflowLabelDisabled]}>
+            Mark as Hired
+          </Text>
         </Pressable>
-      </Modal>
+        <Pressable
+          style={styles.overflowItem}
+          onPress={handleOpenPass}
+          disabled={!!meta && meta.status !== 'active'}
+        >
+          <Text style={[styles.overflowLabel, !!meta && meta.status !== 'active' && styles.overflowLabelDisabled]}>
+            Pass on this chat
+          </Text>
+        </Pressable>
+        <Pressable
+          style={styles.overflowItem}
+          onPress={() => {
+            setOverflowOpen(false);
+            Alert.alert('Block', 'Block flow coming soon.');
+          }}
+        >
+          <Text style={[styles.overflowLabel, styles.overflowLabelDanger]}>Block</Text>
+        </Pressable>
+      </BottomSheet>
 
       <PassReasonSheet
         visible={passSheetOpen}
@@ -982,44 +991,35 @@ export default function ThreadScreen() {
       <AvailabilityPollModal
         visible={!!openPoll}
         poll={openPoll}
-        meId={user.id}
+        meId={user?.id ?? ''}
         onClose={() => setOpenPollId(null)}
       />
 
       {/* Action sheet on long-press. Modal so it lives above keyboard. */}
-      <Modal
-        visible={!!selectedMessage}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setSelectedMessage(null)}
-      >
-        <Pressable style={styles.modalBackdrop} onPress={() => setSelectedMessage(null)}>
-          <Pressable style={styles.sheet} onPress={() => {}}>
-            <View style={styles.reactRow}>
-              {QUICK_REACTIONS.map((e) => (
-                <Pressable
-                  key={e}
-                  onPress={() => handleQuickReact(e)}
-                  style={styles.reactBtn}
-                >
-                  <Text style={styles.reactEmoji}>{e}</Text>
-                </Pressable>
-              ))}
-            </View>
-            <View style={styles.menuDivider} />
-            <MenuButton label="Reply" onPress={() => handleMenuAction('reply')} />
-            {selectedMessage?.body ? (
-              <MenuButton label="Copy" onPress={() => handleMenuAction('copy')} />
-            ) : null}
-            {isOwnSelected && selectedMessage?.body ? (
-              <MenuButton label="Edit" onPress={() => handleMenuAction('edit')} />
-            ) : null}
-            {isOwnSelected ? (
-              <MenuButton label="Delete" onPress={() => handleMenuAction('delete')} destructive />
-            ) : null}
-          </Pressable>
-        </Pressable>
-      </Modal>
+      <BottomSheet visible={!!selectedMessage} onClose={() => setSelectedMessage(null)}>
+        <View style={styles.reactRow}>
+          {QUICK_REACTIONS.map((e) => (
+            <Pressable
+              key={e}
+              onPress={() => handleQuickReact(e)}
+              style={styles.reactBtn}
+            >
+              <Text style={styles.reactEmoji}>{e}</Text>
+            </Pressable>
+          ))}
+        </View>
+        <View style={styles.menuDivider} />
+        <MenuButton label="Reply" onPress={() => handleMenuAction('reply')} />
+        {selectedMessage?.body ? (
+          <MenuButton label="Copy" onPress={() => handleMenuAction('copy')} />
+        ) : null}
+        {isOwnSelected && selectedMessage?.body ? (
+          <MenuButton label="Edit" onPress={() => handleMenuAction('edit')} />
+        ) : null}
+        {isOwnSelected ? (
+          <MenuButton label="Delete" onPress={() => handleMenuAction('delete')} destructive />
+        ) : null}
+      </BottomSheet>
     </View>
   );
 }
@@ -1256,7 +1256,11 @@ const styles = StyleSheet.create({
     // Top inset clears the floating blur header AND the partner pill
     // that hangs below it (pill is 78pt tall at top:6, so bottom ≈ 84pt).
     // Extra breathing room keeps the first message off the pill's edge.
-    paddingTop: 96,
+    // NOTE: paddingTop is applied inline at the call site as
+    // `insets.top + 96` — the root View no longer adds a top inset, so the
+    // list fills to the very top of the screen (messages scroll under the
+    // Dynamic Island, iMessage-style) and the inset is folded into the
+    // first message's offset here instead.
     paddingBottom: Space.md,
   },
 

@@ -1,10 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
   FlatList,
   Platform,
   Pressable,
+  RefreshControl,
   StyleSheet,
   Text,
   View,
@@ -27,7 +27,7 @@ import {
   unpinConversation,
   type InboxItem,
 } from '../../../lib/messaging';
-import { Brand } from '../../../constants/theme';
+import { Brand, Space } from '../../../constants/theme';
 
 /// S-050 Inbox v4. Editorial paper canvas. "ambit" wordmark + side
 /// icons up top, large italic "Chats" title, iMessage-style pinned
@@ -37,6 +37,7 @@ export default function ChatTab() {
   const insets = useSafeAreaInsets();
   const [items, setItems] = useState<InboxItem[] | null>(null);
   const [passTargetId, setPassTargetId] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
     if (!user) {
@@ -53,6 +54,19 @@ export default function ChatTab() {
   }, [user?.id]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
+
+  // Pull-to-refresh. The inbox already updates live via the realtime
+  // subscription below, but a manual drag-down gives users an explicit
+  // way to re-fetch (and a clear spinner) when they want it.
+  const handleRefresh = useCallback(async () => {
+    if (Platform.OS !== 'web') Haptics.selectionAsync().catch(() => {});
+    setRefreshing(true);
+    try {
+      await load();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [load]);
 
   useEffect(() => {
     if (!user) return;
@@ -126,9 +140,12 @@ export default function ChatTab() {
   const safeTopPad = { paddingTop: insets.top };
 
   if (items === null) {
+    // Skeleton rows rather than a centered spinner — matches the feed's
+    // skeleton loading treatment so the loading vocabulary is consistent
+    // across tabs.
     return (
-      <View style={[styles.root, styles.center, safeTopPad]}>
-        <ActivityIndicator color={Brand.accent} />
+      <View style={[styles.root, safeTopPad]}>
+        <InboxSkeleton />
       </View>
     );
   }
@@ -138,6 +155,14 @@ export default function ChatTab() {
       <FlatList
         data={rest}
         keyExtractor={(i) => i.conversation_id}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor={Brand.accent}
+            colors={[Brand.accent]}
+          />
+        }
         renderItem={({ item }) =>
           user ? (
             <InboxRow
@@ -213,30 +238,29 @@ function ListHeader({
 }) {
   return (
     <View>
-      {/* Top header — compose (left) + "ambit" wordmark (center) + search (right) */}
+      {/* Top bar — matches the Discovery layout: icon left, centered title,
+          icon right. "Messages" replaces the old "ambit" wordmark; the
+          separate title row below it is gone. */}
       <View style={styles.topbar}>
         <Pressable
-          onPress={() => router.push('/(candidate)/feed')}
-          hitSlop={8}
-          style={({ pressed }) => [styles.iconBtn, pressed && { opacity: 0.6 }]}
+          onPress={() => router.push('/chat/new')}
+          hitSlop={12}
+          style={styles.leftBtn}
+          accessibilityRole="button"
           accessibilityLabel="New chat"
         >
-          <Plus size={20} color={Brand.inboxInkPrimary} weight="bold" />
+          <Plus size={22} color={Brand.inboxInkPrimary} weight="bold" />
         </Pressable>
-        <Text style={styles.wordmark}>ambit</Text>
+        <Text style={styles.title}>Messages</Text>
         <Pressable
           onPress={() => router.push('/chat/search')}
-          hitSlop={8}
-          style={({ pressed }) => [styles.iconBtn, pressed && { opacity: 0.6 }]}
+          hitSlop={12}
+          style={styles.rightBtn}
+          accessibilityRole="button"
           accessibilityLabel="Search messages"
         >
-          <MagnifyingGlass size={20} color={Brand.inboxInkPrimary} weight="regular" />
+          <MagnifyingGlass size={22} color={Brand.inboxInkPrimary} weight="regular" />
         </Pressable>
-      </View>
-
-      {/* "Messages" page title — restrained, sits under the wordmark */}
-      <View style={styles.titleRow}>
-        <Text style={styles.title}>Messages</Text>
       </View>
 
       {/* Pinned strip (only when there's at least one) */}
@@ -252,43 +276,102 @@ function ListHeader({
   );
 }
 
+/// Loading placeholder — wordmark/title chrome plus a handful of greyed
+/// row stand-ins. Mirrors the feed's skeleton-card approach so both tabs
+/// speak the same loading language.
+function InboxSkeleton() {
+  return (
+    <View style={styles.skeletonWrap}>
+      <View style={styles.skeletonTitle} />
+      {Array.from({ length: 6 }).map((_, i) => (
+        <View key={i} style={styles.skeletonRow}>
+          <View style={styles.skeletonAvatar} />
+          <View style={styles.skeletonLines}>
+            <View style={styles.skeletonLineWide} />
+            <View style={styles.skeletonLineNarrow} />
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Brand.inboxCanvas },
   center: { alignItems: 'center', justifyContent: 'center' },
 
-  // ── Top header ────────────────────────────────────────────────
-  topbar: {
-    paddingHorizontal: 22,
-    paddingTop: 14,
-    paddingBottom: 4,
+  // ── Loading skeleton ──────────────────────────────────────────
+  skeletonWrap: { paddingHorizontal: 22, paddingTop: 28 },
+  skeletonTitle: {
+    width: 140,
+    height: 28,
+    borderRadius: 8,
+    backgroundColor: Brand.inboxCardActive,
+    marginBottom: 24,
+  },
+  skeletonRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: 14,
+    paddingVertical: 12,
   },
-  iconBtn: {
-    width: 32, height: 32,
-    alignItems: 'center', justifyContent: 'center',
+  skeletonAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: Brand.inboxCardActive,
   },
-  wordmark: {
-    fontFamily: 'Zodiak-Bold',
-    fontSize: 26,
-    color: Brand.inboxInkPrimary,
-    letterSpacing: -0.4,
+  skeletonLines: { flex: 1, gap: 8 },
+  skeletonLineWide: {
+    width: '60%',
+    height: 13,
+    borderRadius: 6,
+    backgroundColor: Brand.inboxCardActive,
+  },
+  skeletonLineNarrow: {
+    width: '40%',
+    height: 11,
+    borderRadius: 6,
+    backgroundColor: Brand.inboxCardActive,
   },
 
-  // ── "Messages" title — quieter than the prior "Chats" display
-  titleRow: {
-    paddingHorizontal: 22,
-    paddingTop: 14,
-    paddingBottom: 14,
+  // ── Top bar — mirrors the Discovery feed bar (44pt, centered title,
+  //    absolutely-positioned icons at Space.lg from each edge).
+  topbar: {
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+    // The header renders inside the FlatList content container, which has
+    // paddingHorizontal: 18 (see listContent). Cancel it here so the bar is
+    // full-bleed and the icons sit at Space.lg from the SCREEN edge —
+    // matching the Discovery feed's icon X positions exactly.
+    marginHorizontal: -18,
+  },
+  leftBtn: {
+    position: 'absolute',
+    left: Space.lg,
+    top: 0,
+    bottom: 0,
+    width: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rightBtn: {
+    position: 'absolute',
+    right: Space.lg,
+    top: 0,
+    bottom: 0,
+    width: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   title: {
     fontFamily: 'Zodiak-Bold',
     fontStyle: 'italic',
-    fontSize: 28,
+    fontSize: 24,
     color: Brand.inboxInkPrimary,
     letterSpacing: -0.5,
-    lineHeight: 32,
   },
 
   // ── List — flat rows with hairline separators ────────────────

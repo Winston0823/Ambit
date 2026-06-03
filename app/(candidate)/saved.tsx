@@ -1,21 +1,18 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   Alert,
-  KeyboardAvoidingView,
   Modal,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PaperPlaneTilt, Trash, X } from 'phosphor-react-native';
 import { BackChevron } from '../../components/atoms';
-import { DiscoveryRowSummary } from '../../components/molecules';
+import { DiscoveryCard, DiscoveryRowSummary, ReachOutComposer } from '../../components/molecules';
 import { useSavedDeck } from '../../context/SavedDeckContext';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
@@ -24,29 +21,30 @@ import type { DiscoveryCardData } from '../../data/mock';
 import {
   AmbitFont,
   Brand,
-  Radii,
   Space,
   TypeScale,
 } from '../../constants/theme';
 
 /// Mock cards use ids like 'project-1'; real Supabase rows are uuids.
-/// Messaging only works on real rows — the placeholder cards predate
-/// the matching algorithm and have no corresponding profiles/projects
-/// rows to attach a conversation to.
+/// Messaging only works on real rows.
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/// Saved list. Reached via the bookmark icon on the Discovery feed.
-/// Each row now has two trailing actions: Message (opens a composer
-/// modal — sending starts the conversation, unsaves the card, and
-/// deep-links into the new thread) and Trash (unsave only).
+/// Saved list. Reached via the bookmark icon on the Discovery feed. Each
+/// row has Message (opens the shared ReachOutComposer — sending starts the
+/// conversation, unsaves the card, and deep-links into the thread) and
+/// Trash (unsave only). Reusing ReachOutComposer keeps the reach-out
+/// experience identical to the feed (paper-plane celebration + all).
 export default function SavedScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const { saved, unsave } = useSavedDeck();
 
+  /// Card currently targeted by the composer. Null = closed.
   const [composing, setComposing] = useState<DiscoveryCardData | null>(null);
-  const [draft, setDraft] = useState('');
-  const [sending, setSending] = useState(false);
+  /// Card being previewed full-screen (tapped from the list). Null = closed.
+  const [previewing, setPreviewing] = useState<DiscoveryCardData | null>(null);
+  /// Holds the result of a confirmed send so onSent can unsave + navigate.
+  const lastSent = useRef<{ card: DiscoveryCardData; conversationId: string } | null>(null);
 
   const openComposer = (card: DiscoveryCardData) => {
     if (!UUID_RE.test(card.id)) {
@@ -57,35 +55,23 @@ export default function SavedScreen() {
       return;
     }
     setComposing(card);
-    setDraft('');
   };
 
-  const dismissComposer = () => {
-    if (sending) return;
-    setComposing(null);
-    setDraft('');
-  };
-
-  const send = async () => {
-    const text = draft.trim();
-    const card = composing;
-    if (!text || !card || !user || sending) return;
-    setSending(true);
+  /// Performs the send and returns true/false. The composer awaits this and
+  /// only celebrates on success; navigation + unsave happen in handleSent.
+  const handleSend = async (card: DiscoveryCardData, text: string): Promise<boolean> => {
+    if (!user) return false;
     try {
       let projectId: string;
-      let seekerId:  string;
+      let seekerId: string;
 
       if (card.kind === 'project') {
         if (!UUID_RE.test(card.ownerId)) {
-          Alert.alert(
-            'Demo card',
-            "This is a placeholder card — messaging isn't wired for it yet.",
-          );
-          setSending(false);
-          return;
+          Alert.alert('Demo card', "This is a placeholder card — messaging isn't wired for it yet.");
+          return false;
         }
         projectId = card.id;
-        seekerId  = user.id;
+        seekerId = user.id;
         supabase
           .from('matches')
           .upsert(
@@ -94,8 +80,7 @@ export default function SavedScreen() {
           )
           .then(() => {});
       } else {
-        // Owner-saved seeker. Use the owner's first active project as
-        // the conversation's project anchor.
+        // Owner-saved seeker → anchor on the owner's first active project.
         const { data: proj } = await supabase
           .from('projects')
           .select('id')
@@ -105,36 +90,33 @@ export default function SavedScreen() {
           .limit(1)
           .maybeSingle();
         if (!proj) {
-          Alert.alert(
-            'No active project',
-            'Create a project before reaching out to seekers.',
-          );
-          setSending(false);
-          return;
+          Alert.alert('No active project', 'Create a project before reaching out to seekers.');
+          return false;
         }
         projectId = (proj as { id: string }).id;
-        seekerId  = card.id;
+        seekerId = card.id;
       }
 
-      // Per-project semantics: each reach-out about a different project
-      // gets its own thread. The DB-side ON CONFLICT in
-      // start_conversation_with_message handles same-project dedup.
       const conversationId = await startConversationWithMessage({
         projectId,
         seekerId,
         body: text,
       });
-      unsave(card.id);
-      setComposing(null);
-      setDraft('');
-      // replace so a Back tap from the thread returns to the feed,
-      // not to a stale saved list with the now-unsaved card missing.
-      router.replace({ pathname: '/chat/[id]', params: { id: conversationId } });
-    } catch (e: any) {
-      Alert.alert('Could not send', e?.message ?? 'Try again.');
-    } finally {
-      setSending(false);
+      lastSent.current = { card, conversationId };
+      return true;
+    } catch {
+      return false;
     }
+  };
+
+  /// Confirmed send — unsave the card and deep-link into the new thread.
+  /// replace() so a Back tap returns to the feed, not a stale saved list.
+  const handleSent = () => {
+    const sent = lastSent.current;
+    setComposing(null);
+    if (!sent) return;
+    unsave(sent.card.id);
+    router.replace({ pathname: '/chat/[id]', params: { id: sent.conversationId } });
   };
 
   return (
@@ -158,6 +140,7 @@ export default function SavedScreen() {
           <DiscoveryRowSummary
             key={card.id}
             card={card}
+            onPress={() => setPreviewing(card)}
             trailing={
               <View style={styles.actions}>
                 <Pressable
@@ -186,72 +169,52 @@ export default function SavedScreen() {
         ))}
       </ScrollView>
 
+      {/* Full-card preview — tapping a saved row opens the same rich
+          DiscoveryCard the deck shows, here with an X to dismiss. Reaching
+          out from the preview closes it and opens the composer. */}
       <Modal
-        visible={!!composing}
+        visible={!!previewing}
         transparent
-        animationType="slide"
-        onRequestClose={dismissComposer}
+        animationType="fade"
+        onRequestClose={() => setPreviewing(null)}
       >
-        <Pressable style={styles.modalBackdrop} onPress={dismissComposer}>
-          <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        <View style={styles.previewRoot}>
+          <View
+            style={[
+              styles.previewCardWrap,
+              { paddingTop: insets.top + 12, paddingBottom: insets.bottom + 12 },
+            ]}
           >
-            <Pressable style={styles.sheet} onPress={() => {}}>
-              <View style={styles.sheetHeader}>
-                <Text style={styles.sheetTitle}>
-                  {composing?.kind === 'project'
-                    ? `Message ${composing.ownerName.split(' ')[0]}`
-                    : composing?.kind === 'seeker'
-                      ? `Message ${composing.name.split(' ')[0]}`
-                      : 'Say hi'}
-                </Text>
-                <Pressable onPress={dismissComposer} hitSlop={10}>
-                  <X size={20} color={Brand.inkMuted} weight="bold" />
-                </Pressable>
-              </View>
-
-              {composing?.kind === 'project' && (
-                <Text style={styles.sheetContext} numberOfLines={1}>
-                  on {composing.title}
-                </Text>
-              )}
-
-              <TextInput
-                value={draft}
-                onChangeText={setDraft}
-                placeholder={
-                  composing?.kind === 'project'
-                    ? `Tell ${composing.ownerName.split(' ')[0]} what caught your eye…`
-                    : composing?.kind === 'seeker'
-                      ? `Tell ${composing.name.split(' ')[0]} why you'd be a good fit…`
-                      : 'Say hello…'
-                }
-                placeholderTextColor={Brand.inkPlaceholder}
-                multiline
-                autoFocus
-                editable={!sending}
-                style={styles.input}
+            {previewing && (
+              <DiscoveryCard
+                key={previewing.id}
+                card={previewing}
+                onReachOut={(c) => {
+                  setPreviewing(null);
+                  openComposer(c);
+                }}
               />
+            )}
+          </View>
 
-              <View style={styles.sheetActions}>
-                <Pressable
-                  onPress={send}
-                  disabled={!draft.trim() || sending}
-                  style={[
-                    styles.sendBtn,
-                    (!draft.trim() || sending) && styles.sendBtnDisabled,
-                  ]}
-                >
-                  <PaperPlaneTilt size={16} color={Brand.inkOnBrand} weight="fill" />
-                  <Text style={styles.sendLabel}>
-                    {sending ? 'Sending…' : 'Send'}
-                  </Text>
-                </Pressable>
-              </View>
-            </Pressable>
-          </KeyboardAvoidingView>
-        </Pressable>
+          <Pressable
+            onPress={() => setPreviewing(null)}
+            hitSlop={8}
+            style={[styles.previewClose, { top: insets.top + 22 }]}
+            accessibilityRole="button"
+            accessibilityLabel="Close preview"
+          >
+            <X size={20} color="#FFFFFF" weight="bold" />
+          </Pressable>
+        </View>
       </Modal>
+
+      <ReachOutComposer
+        card={composing}
+        onDismiss={() => setComposing(null)}
+        onSend={handleSend}
+        onSent={handleSent}
+      />
     </View>
   );
 }
@@ -292,65 +255,24 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
-  modalBackdrop: {
+  // ── Full-card preview ──────────────────────────────────────────
+  previewRoot: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.6)',
   },
-  sheet: {
-    backgroundColor: Brand.canvas,
-    borderTopLeftRadius: Radii.lg,
-    borderTopRightRadius: Radii.lg,
-    paddingTop: Space.md,
-    paddingBottom: 36,
+  previewCardWrap: {
+    flex: 1,
     paddingHorizontal: Space.lg,
-    gap: 12,
   },
-  sheetHeader: {
-    flexDirection: 'row',
+  previewClose: {
+    position: 'absolute',
+    left: Space.lg + 12,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  sheetTitle: {
-    fontFamily: AmbitFont.display,
-    fontSize: 20,
-    color: Brand.inkPrimary,
-  },
-  sheetContext: {
-    fontFamily: AmbitFont.body,
-    fontSize: 13,
-    color: Brand.accent,
-    marginTop: -8,
-  },
-  input: {
-    minHeight: 100,
-    maxHeight: 160,
-    backgroundColor: Brand.surface1,
-    borderRadius: Radii.md,
-    padding: 14,
-    fontFamily: AmbitFont.body,
-    fontSize: 15,
-    color: Brand.inkBody,
-    textAlignVertical: 'top',
-  },
-  sheetActions: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-  },
-  sendBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: Brand.primary,
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    borderRadius: Radii.md,
-  },
-  sendBtnDisabled: { opacity: 0.45 },
-  sendLabel: {
-    fontFamily: AmbitFont.body,
-    fontSize: 14,
-    fontWeight: '600',
-    color: Brand.inkOnBrand,
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    zIndex: 10,
   },
 });
