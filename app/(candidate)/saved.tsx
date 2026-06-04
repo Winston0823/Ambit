@@ -12,11 +12,16 @@ import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PaperPlaneTilt, Trash, X } from 'phosphor-react-native';
 import { BackChevron } from '../../components/atoms';
-import { DiscoveryCard, DiscoveryRowSummary, ReachOutComposer } from '../../components/molecules';
+import { DiscoveryCard, DiscoveryRowSummary, ReachOutComposer, ReachOutLimitSheet } from '../../components/molecules';
 import { useSavedDeck } from '../../context/SavedDeckContext';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { startConversationWithMessage } from '../../lib/messaging';
+import {
+  canReachOut,
+  recordReachOut,
+  getReachOutStatus,
+} from '../../lib/reachOutLimit';
 import type { DiscoveryCardData } from '../../data/mock';
 import {
   AmbitFont,
@@ -46,12 +51,25 @@ export default function SavedScreen() {
   /// Holds the result of a confirmed send so onSent can unsave + navigate.
   const lastSent = useRef<{ card: DiscoveryCardData; conversationId: string } | null>(null);
 
-  const openComposer = (card: DiscoveryCardData) => {
+  // Daily reach-out limit state.
+  const [limitSheetVisible, setLimitSheetVisible] = useState(false);
+  const [limitStatus, setLimitStatus] = useState<{ used: number; limit: number }>({ used: 0, limit: 5 });
+  const [pendingCompose, setPendingCompose] = useState<DiscoveryCardData | null>(null);
+
+  const openComposer = async (card: DiscoveryCardData) => {
     if (!UUID_RE.test(card.id)) {
       Alert.alert(
         'Demo card',
         "This is a placeholder card — messaging isn't wired for it yet.",
       );
+      return;
+    }
+    const ok = await canReachOut();
+    if (!ok) {
+      const status = await getReachOutStatus();
+      setLimitStatus(status);
+      setPendingCompose(card);
+      setLimitSheetVisible(true);
       return;
     }
     setComposing(card);
@@ -103,6 +121,7 @@ export default function SavedScreen() {
         body: text,
       });
       lastSent.current = { card, conversationId };
+      recordReachOut().catch(() => {});
       return true;
     } catch {
       return false;
@@ -214,6 +233,21 @@ export default function SavedScreen() {
         onDismiss={() => setComposing(null)}
         onSend={handleSend}
         onSent={handleSent}
+      />
+
+      <ReachOutLimitSheet
+        visible={limitSheetVisible}
+        used={limitStatus.used}
+        limit={limitStatus.limit}
+        onDismiss={() => {
+          setLimitSheetVisible(false);
+          setPendingCompose(null);
+        }}
+        onAdComplete={() => {
+          setLimitSheetVisible(false);
+          if (pendingCompose) setComposing(pendingCompose);
+          setPendingCompose(null);
+        }}
       />
     </View>
   );
