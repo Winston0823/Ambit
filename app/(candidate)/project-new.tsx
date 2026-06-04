@@ -45,7 +45,6 @@ export default function ProjectNewScreen() {
         title: values.title,
         vibe_blurb: values.vibeBlurb,
         required_skills: values.requiredSkills,
-        roles_sought: values.rolesSought,
         campus_id: values.campusId,
       })
       .select('id')
