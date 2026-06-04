@@ -2,13 +2,15 @@ import React, { useMemo, useRef, useState } from 'react';
 import {
   Animated,
   NativeSyntheticEvent,
+  Pressable,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Sparkle } from 'phosphor-react-native';
+import { Plus, Sparkle } from 'phosphor-react-native';
 import { BackChevron, Chip } from '../../atoms';
 import { OnboardingContinue } from '../../molecules';
 import { useOnboarding } from '../../../context/OnboardingContext';
@@ -33,6 +35,10 @@ export function SkillTagsScreen({ onBack, onContinue }: Props) {
   const { profile, update } = useOnboarding();
   const insets = useSafeAreaInsets();
   const selected = profile.skills;
+  const [customInput, setCustomInput] = useState('');
+
+  const allPreset = new Set(SKILL_CATEGORIES.flatMap((c) => c.tags));
+  const customSkills = selected.filter((s) => !allPreset.has(s));
 
   const toggle = (tag: string) => {
     if (selected.includes(tag)) {
@@ -40,6 +46,13 @@ export function SkillTagsScreen({ onBack, onContinue }: Props) {
     } else if (selected.length < MAX_SELECTED) {
       update('skills', [...selected, tag]);
     }
+  };
+
+  const addCustom = () => {
+    const skill = customInput.trim();
+    if (!skill || selected.includes(skill) || selected.length >= MAX_SELECTED) return;
+    update('skills', [...selected, skill]);
+    setCustomInput('');
   };
 
   const isValid = selected.length >= MIN_SELECTED;
@@ -107,6 +120,16 @@ export function SkillTagsScreen({ onBack, onContinue }: Props) {
             setLayoutH(e.nativeEvent.layout.height)
           }
         >
+          {customSkills.length > 0 && (
+            <View style={styles.category}>
+              <Text style={styles.categoryLabel}>ADDED BY YOU</Text>
+              <View style={styles.chipRow}>
+                {customSkills.map((s) => (
+                  <Chip key={s} label={s} selected onPress={() => toggle(s)} />
+                ))}
+              </View>
+            </View>
+          )}
           {SKILL_CATEGORIES.map((cat) => (
             <View key={cat.label} style={styles.category}>
               <Text style={styles.categoryLabel}>{cat.label}</Text>
@@ -122,6 +145,28 @@ export function SkillTagsScreen({ onBack, onContinue }: Props) {
               </View>
             </View>
           ))}
+          <View style={styles.customRow}>
+            <TextInput
+              value={customInput}
+              onChangeText={setCustomInput}
+              placeholder="Add a skill…"
+              placeholderTextColor="rgba(0,0,0,0.3)"
+              style={styles.customInput}
+              returnKeyType="done"
+              onSubmitEditing={addCustom}
+              autoCapitalize="words"
+              blurOnSubmit={false}
+            />
+            <Pressable
+              onPress={addCustom}
+              style={[
+                styles.customAddBtn,
+                (!customInput.trim() || selected.length >= MAX_SELECTED) && styles.customAddBtnDisabled,
+              ]}
+            >
+              <Plus size={16} color="white" weight="bold" />
+            </Pressable>
+          </View>
         </Animated.ScrollView>
 
         <Animated.View
@@ -226,4 +271,31 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  customRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: Space.xxl,
+  },
+  customInput: {
+    flex: 1,
+    height: 40,
+    borderRadius: 999,
+    paddingHorizontal: 16,
+    backgroundColor: 'rgba(0,0,0,0.05)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(0,0,0,0.1)',
+    fontFamily: AmbitFont.body,
+    fontSize: 14,
+    color: '#141414',
+  },
+  customAddBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#D4B490',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  customAddBtnDisabled: { opacity: 0.4 },
 });
