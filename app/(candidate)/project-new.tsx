@@ -156,7 +156,7 @@ export default function ProjectNewScreen() {
         style={[styles.cta, { bottom: insets.bottom + 24 }, (!canAdvance || submitting) && styles.ctaDisabled]}
       >
         {submitting ? (
-          <ActivityIndicator color={Brand.cardCream} />
+          <ActivityIndicator color={Brand.actionInk} />
         ) : (
           <Text style={styles.ctaText}>{step === 0 ? 'Continue' : 'Create project'}</Text>
         )}
@@ -199,9 +199,9 @@ const styles = StyleSheet.create({
   skillCatLabel: { fontFamily: AmbitFont.body, fontSize: 10.5, letterSpacing: 1, color: Brand.inkMuted, marginBottom: 12 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   chip: { paddingHorizontal: 16, paddingVertical: 11, borderRadius: 999, backgroundColor: '#EBE3D5' },
-  chipOn: { backgroundColor: Brand.primary },
+  chipOn: { backgroundColor: Brand.action, borderWidth: 1.5, borderColor: Brand.actionInk, shadowColor: Brand.actionInk, shadowOpacity: 1, shadowRadius: 0, shadowOffset: { width: 0, height: 2 } },
   chipText: { fontFamily: AmbitFont.body, fontSize: 14.5, fontWeight: '500', color: '#5A4A36' },
-  chipTextOn: { color: '#3A2A18' },
+  chipTextOn: { color: Brand.actionInk, fontWeight: '700' },
   skillChip: { flexDirection: 'row', alignItems: 'center', gap: 7 },
   addChip: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'transparent', borderWidth: 1.5, borderColor: Brand.accent },
   addChipText: { fontFamily: AmbitFont.body, fontSize: 14.5, fontWeight: '600', color: Brand.accent },
@@ -211,18 +211,20 @@ const styles = StyleSheet.create({
   cta: {
     position: 'absolute',
     alignSelf: 'center',
-    backgroundColor: Brand.accent,
+    backgroundColor: Brand.action,
+    borderWidth: 1.6,
+    borderColor: Brand.actionInk,
     paddingHorizontal: 54,
-    paddingVertical: 17,
+    paddingVertical: 16,
     borderRadius: 999,
     minWidth: 200,
     alignItems: 'center',
-    shadowColor: '#B48045',
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 6,
+    shadowColor: Brand.actionInk,
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 0,
   },
   ctaDisabled: { opacity: 0.4 },
-  ctaText: { fontFamily: AmbitFont.body, fontSize: 16, fontWeight: '600', color: Brand.cardCream },
+  ctaText: { fontFamily: AmbitFont.body, fontSize: 16, fontWeight: '700', color: Brand.actionInk },
 });

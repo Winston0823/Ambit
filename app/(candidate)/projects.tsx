@@ -140,9 +140,9 @@ export default function ProjectsTab() {
         accessibilityLabel={isPureSeeker ? 'Find a new project' : 'New project'}
       >
         {isPureSeeker ? (
-          <Compass size={18} color={Brand.inkOnBrand} weight="bold" />
+          <Compass size={18} color={Brand.actionInk} weight="bold" />
         ) : (
-          <Plus size={18} color={Brand.inkOnBrand} weight="bold" />
+          <Plus size={18} color={Brand.actionInk} weight="bold" />
         )}
         <Text style={styles.newBtnLabel}>{isPureSeeker ? 'Find new project' : 'New project'}</Text>
       </Pressable>
@@ -177,12 +177,6 @@ export default function ProjectsTab() {
                 )}
               >
                 <View style={styles.card}>
-                  <LinearGradient
-                    colors={RAILS[idx % RAILS.length]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 0, y: 1 }}
-                    style={styles.rail}
-                  />
                   <View style={styles.cardBody}>
                     <View style={styles.cardHeader}>
                       <Text style={styles.cardTitle} numberOfLines={1}>{p.title}</Text>
@@ -330,16 +324,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    paddingVertical: 14,
-    backgroundColor: Brand.primary,
-    borderRadius: Radii.md,
+    paddingVertical: 16,
+    backgroundColor: Brand.action,
+    borderWidth: 1.6,
+    borderColor: Brand.actionInk,
+    borderRadius: 999,
     marginTop: 4,
+    shadowColor: Brand.actionInk,
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 0,
   },
   newBtnLabel: {
     fontFamily: AmbitFont.body,
     fontSize: 15,
-    fontWeight: '600',
-    color: Brand.inkOnBrand,
+    fontWeight: '700',
+    color: Brand.actionInk,
   },
 
   empty: {
@@ -373,11 +374,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     backgroundColor: Brand.cardCream,
     borderRadius: Radii.lg,
-    borderWidth: 1,
-    borderColor: Brand.borderSoft,
-    overflow: 'hidden',
+    borderWidth: 1.5,
+    borderColor: Brand.inkEdge,
+    // hard black edge below — tactile, matches the buttons
+    shadowColor: Brand.inkEdge,
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 0,
   },
-  rail: { width: 5 },
   cardBody: { flex: 1, padding: Space.md, gap: 10 },
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   cardTitle: {
@@ -391,17 +396,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: Radii.sm,
-    backgroundColor: Brand.seekerSurface,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: Brand.tagMint,
   },
-  liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: Brand.sage },
+  liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: Brand.tagMintInk },
   liveText: {
     fontFamily: AmbitFont.body,
     fontSize: 10,
-    fontWeight: '700',
-    color: Brand.seekerInk,
+    fontWeight: '800',
+    color: Brand.tagMintInk,
     letterSpacing: 0.6,
   },
   statusPill: {

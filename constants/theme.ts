@@ -22,7 +22,7 @@ export const Brand = {
   seekerInk:      '#4D361D',  // seeker card title (deep brown on sand)
 
   // Surfaces — eggshell paper ground; cream islands lift above it.
-  canvas:         '#EBE7DC',  // warm eggshell paper
+  canvas:         '#F2EEE4',  // warm eggshell paper (lightened)
   cardCream:      '#FBFAF5',  // cream island cards
   surface1:       '#F3EFE5',  // input fill, default chip fill
   surface2:       '#EBE6DA',  // unselected fill

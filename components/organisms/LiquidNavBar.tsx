@@ -63,7 +63,7 @@ interface Props {
   badgeTabs?: Set<NavTabKey>;
 }
 
-const ACTIVE_COLOR   = Brand.inkOnBrand;                  // white icon on dark nav
+const ACTIVE_COLOR   = Brand.action;                      // teal active icon on dark nav
 const INACTIVE_COLOR = 'rgba(255, 255, 255, 0.55)';
 
 /// Icon glyph size. Bumped from 26 → 28 to sit closer to Instagram's

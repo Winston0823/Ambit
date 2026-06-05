@@ -184,7 +184,7 @@ export default function ProjectEditScreen() {
         disabled={!valid || saving}
         style={[styles.cta, { bottom: insets.bottom + 24 }, (!valid || saving) && styles.ctaDisabled]}
       >
-        {saving ? <ActivityIndicator color={Brand.cardCream} /> : <Text style={styles.ctaText}>Save changes</Text>}
+        {saving ? <ActivityIndicator color={Brand.actionInk} /> : <Text style={styles.ctaText}>Save changes</Text>}
       </Pressable>
     </View>
   );
@@ -205,9 +205,9 @@ const styles = StyleSheet.create({
   secLabel: { fontFamily: AmbitFont.body, fontSize: 11, fontWeight: '700', letterSpacing: 1.2, color: Brand.inkLabel, marginTop: 36, marginBottom: 14 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   chip: { paddingHorizontal: 16, paddingVertical: 11, borderRadius: 999, backgroundColor: '#EBE3D5' },
-  chipOn: { backgroundColor: Brand.primary },
+  chipOn: { backgroundColor: Brand.action, borderWidth: 1.5, borderColor: Brand.actionInk, shadowColor: Brand.actionInk, shadowOpacity: 1, shadowRadius: 0, shadowOffset: { width: 0, height: 2 } },
   chipText: { fontFamily: AmbitFont.body, fontSize: 14.5, fontWeight: '500', color: '#5A4A36' },
-  chipTextOn: { color: '#3A2A18' },
+  chipTextOn: { color: Brand.actionInk, fontWeight: '700' },
 
   toggleRow: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 16, marginTop: 34, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: Brand.borderSoft },
   toggleLabel: { fontFamily: AmbitFont.body, fontSize: 15, fontWeight: '600', color: Brand.inkPrimary },
@@ -219,18 +219,20 @@ const styles = StyleSheet.create({
   cta: {
     position: 'absolute',
     alignSelf: 'center',
-    backgroundColor: Brand.accent,
+    backgroundColor: Brand.action,
+    borderWidth: 1.6,
+    borderColor: Brand.actionInk,
     paddingHorizontal: 54,
-    paddingVertical: 17,
+    paddingVertical: 16,
     borderRadius: 999,
     minWidth: 200,
     alignItems: 'center',
-    shadowColor: '#B48045',
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 6,
+    shadowColor: Brand.actionInk,
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 0,
   },
   ctaDisabled: { opacity: 0.4 },
-  ctaText: { fontFamily: AmbitFont.body, fontSize: 16, fontWeight: '600', color: Brand.cardCream },
+  ctaText: { fontFamily: AmbitFont.body, fontSize: 16, fontWeight: '700', color: Brand.actionInk },
 });
