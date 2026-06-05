@@ -23,6 +23,7 @@ interface ProjectRow {
   title: string;
   vibe_blurb: string;
   required_skills: string[];
+  roles_sought: string[];
   campus_id: string | null;
   active: boolean;
 }
@@ -46,7 +47,7 @@ export default function ProjectEditScreen() {
     (async () => {
       const { data, error } = await supabase
         .from('projects')
-        .select('id, owner_id, title, vibe_blurb, required_skills, campus_id, active')
+        .select('id, owner_id, title, vibe_blurb, required_skills, roles_sought, campus_id, active')
         .eq('id', id)
         .maybeSingle();
       if (cancelled) return;
@@ -82,6 +83,7 @@ export default function ProjectEditScreen() {
         title: values.title,
         vibe_blurb: values.vibeBlurb,
         required_skills: values.requiredSkills,
+        roles_sought: values.rolesSought,
         campus_id: values.campusId,
         active,
       })
@@ -152,7 +154,7 @@ export default function ProjectEditScreen() {
           title: project.title,
           vibeBlurb: project.vibe_blurb,
           requiredSkills: project.required_skills,
-          rolesSought: [],
+          rolesSought: project.roles_sought ?? [],
           campusId: project.campus_id,
         }}
         submitLabel="Save changes"

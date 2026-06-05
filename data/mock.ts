@@ -68,6 +68,30 @@ export const ROLE_CATEGORIES: RoleCategory[] = [
   },
 ];
 
+/// Typical skills each role implies — drives the "roles → skills" auto-fill in
+/// project create (a role implies the skills it needs). Owners can edit the
+/// result; skills are what discovery actually matches on. Keys are ROLE_
+/// CATEGORIES roles; values are SKILL_CATEGORIES tags.
+export const ROLE_SKILLS: Record<string, string[]> = {
+  'Software Engineer': ['TypeScript', 'Python', 'Web'],
+  'Frontend':          ['TypeScript', 'Web', 'UI/UX'],
+  'Backend':           ['Python', 'Go', 'DevOps'],
+  'Full Stack':        ['TypeScript', 'Web', 'Python'],
+  'Mobile':            ['React Native', 'Swift', 'Kotlin', 'iOS', 'Android'],
+  'ML / AI':           ['Python'],
+  'Data Science':      ['Python'],
+  'DevOps / Infra':    ['DevOps', 'Go'],
+  'Product Design':    ['Figma', 'UI/UX', 'Prototyping'],
+  'UX Research':       ['User Research', 'UI/UX'],
+  'Brand / Visual':    ['Brand', 'Figma', 'Motion'],
+  'Product Manager':   ['Product Strategy', 'User Research'],
+  'Operations':        ['Operations'],
+  'Finance':           ['Operations'],
+  'Marketing':         ['Marketing', 'Growth Strategy'],
+  'Sales / BD':        ['Sales', 'Growth Strategy'],
+  'Content / Social':  ['Marketing', 'Brand'],
+};
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Discovery deck — owner view sees Seeker cards, seeker view sees Project cards.
 // Shape designed so the real matching API can swap in via one prop change:
