@@ -1,6 +1,7 @@
 import { randomUUID } from 'expo-crypto';
 import { File } from 'expo-file-system';
 import { supabase } from './supabase';
+import type { ProjectCardData } from '../data/mock';
 
 /// Read a local file URI (file:// or content://) as an ArrayBuffer ready
 /// to hand to Supabase Storage. Why not `fetch(uri).blob()`? On React
@@ -29,6 +30,12 @@ export interface MessageRow {
   /// When set, this message announces an availability poll; the bubble
   /// renders AvailabilityPollBubble. Added in migration 009_when2meet.
   availability_poll_id?: string | null;
+  /// When set, this message carries an attached project; the bubble renders
+  /// a tappable project card. Added in migration 011_message_project_ref.
+  project_ref_id?: string | null;
+  /// When set, this message carries a shared portfolio highlight; the bubble
+  /// renders a tappable highlight card. Added in 014_message_portfolio_ref.
+  portfolio_ref_id?: string | null;
   edited_at:       string | null;
   deleted_at:      string | null;
   created_at:      string;
@@ -189,6 +196,134 @@ export async function sendTextMessage(args: {
     .single();
   if (error) throw error;
   return data as MessageRow;
+}
+
+/// Minimal project row needed to render an attachment bubble + preview.
+export interface ProjectRefRow {
+  id:              string;
+  title:           string;
+  vibe_blurb:      string;
+  required_skills: string[];
+  owner_id:        string;
+}
+
+/// Send a message that carries an attached project. The body doubles as the
+/// inbox preview caption; the bubble itself renders a tappable project card
+/// (the body text is suppressed in the bubble when project_ref_id is set).
+export async function sendProjectAttachment(args: {
+  conversationId: string;
+  senderId:       string;
+  projectId:      string;
+  projectTitle:   string;
+  clientId?:      string;
+}): Promise<MessageRow> {
+  const { data, error } = await supabase
+    .from('messages')
+    .insert({
+      ...(args.clientId ? { id: args.clientId } : {}),
+      conversation_id: args.conversationId,
+      sender_id:       args.senderId,
+      body:            `Shared a project · ${args.projectTitle}`,
+      project_ref_id:  args.projectId,
+    })
+    .select('*')
+    .single();
+  if (error) throw error;
+  return data as MessageRow;
+}
+
+/// Send a message that carries a shared portfolio highlight. The body doubles
+/// as the inbox preview caption; the bubble renders a tappable highlight card
+/// (body text suppressed when portfolio_ref_id is set). Mirrors
+/// sendProjectAttachment.
+export async function sendPortfolioAttachment(args: {
+  conversationId: string;
+  senderId:       string;
+  portfolioId:    string;
+  portfolioTitle: string;
+  clientId?:      string;
+}): Promise<MessageRow> {
+  const { data, error } = await supabase
+    .from('messages')
+    .insert({
+      ...(args.clientId ? { id: args.clientId } : {}),
+      conversation_id:  args.conversationId,
+      sender_id:        args.senderId,
+      body:             `Shared a highlight · ${args.portfolioTitle}`,
+      portfolio_ref_id: args.portfolioId,
+    })
+    .select('*')
+    .single();
+  if (error) throw error;
+  return data as MessageRow;
+}
+
+/// Bulk-load the projects referenced by attachment messages, keyed by id.
+export async function fetchProjectRefs(ids: string[]): Promise<Map<string, ProjectRefRow>> {
+  const out = new Map<string, ProjectRefRow>();
+  if (ids.length === 0) return out;
+  const { data } = await supabase
+    .from('projects')
+    .select('id, title, vibe_blurb, required_skills, owner_id')
+    .in('id', ids);
+  for (const r of (data ?? []) as ProjectRefRow[]) out.set(r.id, r);
+  return out;
+}
+
+/// Warm-tan gradient family for project backdrops, mirroring the discovery
+/// deck. Deterministic per project id so the preview matches the bubble.
+const PROJECT_CARD_GRADIENTS: [string, string][] = [
+  ['#D4B490', '#B48045'],
+  ['#C9A57A', '#4D361D'],
+  ['#E8C9A0', '#D4B490'],
+  ['#B48045', '#7A5A38'],
+  ['#D4B490', '#4D361D'],
+];
+function projectGradient(id: string): [string, string] {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+  return PROJECT_CARD_GRADIENTS[h % PROJECT_CARD_GRADIENTS.length];
+}
+
+/// Hydrate a full discovery-style ProjectCardData for a project id — used to
+/// preview a shared project as the SAME card the discovery deck renders.
+/// Mirrors feed.tsx's project mapper. `select('*')` keeps it schema-tolerant.
+export async function fetchProjectCard(projectId: string): Promise<ProjectCardData | null> {
+  const { data } = await supabase
+    .from('projects')
+    .select('*')
+    .eq('id', projectId)
+    .maybeSingle();
+  if (!data) return null;
+  const r = data as {
+    id: string;
+    title: string;
+    vibe_blurb: string | null;
+    required_skills: string[] | null;
+    roles_sought: string[] | null;
+    campus_id: string | null;
+    owner_id: string;
+  };
+  const { data: owner } = await supabase
+    .from('profiles')
+    .select('name, photo_url')
+    .eq('id', r.owner_id)
+    .maybeSingle();
+  const o = owner as { name: string | null; photo_url: string | null } | null;
+  return {
+    kind: 'project',
+    id: r.id,
+    ownerId: r.owner_id,
+    title: r.title,
+    pitch: r.vibe_blurb || r.title,
+    ownerName: o?.name ?? 'Unknown',
+    ownerPhotoUri: o?.photo_url ?? null,
+    ownerCampusId: r.campus_id ?? '',
+    whyMatched: '',
+    skillsSought: (r.required_skills ?? []).slice(0, 5),
+    rolesSought: r.roles_sought ?? [],
+    gradient: projectGradient(r.id),
+  };
 }
 
 export async function sendImageMessage(args: {

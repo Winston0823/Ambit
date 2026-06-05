@@ -37,6 +37,7 @@ import { readLocalFileAsArrayBuffer } from '../../lib/messaging';
 import {
   deletePortfolioItem,
   fetchPortfolioForUser,
+  uploadPortfolioImage,
   upsertPortfolioItem,
 } from '../../lib/portfolio';
 import { randomUUID } from 'expo-crypto';
@@ -239,18 +240,36 @@ export default function ProfileTab() {
     const position = exists
       ? portfolio.findIndex((p) => p.id === updated.id)
       : portfolio.length;
-    // Optimistic local mirror.
+    // Optimistic local mirror (shows the local image URI immediately).
     setPortfolio((prev) =>
       exists ? prev.map((p) => (p.id === updated.id ? updated : p)) : [...prev, updated],
     );
     setActivePortfolio(null);
     try {
+      // A freshly-picked cover is a local file:// URI — upload it to the
+      // portfolio-images bucket and persist the public URL. Already-remote
+      // URLs (http) pass through untouched.
+      let imageUrl = updated.imageUri;
+      if (imageUrl && imageUrl.startsWith('file:')) {
+        try {
+          imageUrl = await uploadPortfolioImage(user.id, updated.id, imageUrl, Date.now());
+          const remote = imageUrl;
+          setPortfolio((prev) => prev.map((p) => (p.id === updated.id ? { ...p, imageUri: remote } : p)));
+        } catch (imgErr: any) {
+          console.warn('portfolio image upload failed:', imgErr?.message ?? imgErr);
+          imageUrl = exists ? portfolio.find((p) => p.id === updated.id)?.imageUri ?? null : null;
+        }
+      }
       await upsertPortfolioItem({
-        userId:      user.id,
-        id:          updated.id,
-        title:       updated.title,
-        description: updated.description,
-        imageUrl:    updated.imageUri,
+        userId:        user.id,
+        id:            updated.id,
+        title:         updated.title,
+        description:   updated.description,
+        imageUrl,
+        timeframe:     updated.timeframe,
+        contributions: updated.contributions,
+        linkUrl:       updated.linkUrl,
+        tools:         updated.tools,
         position,
       });
     } catch (e: any) {

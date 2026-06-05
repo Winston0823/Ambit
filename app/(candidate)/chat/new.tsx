@@ -4,6 +4,7 @@ import {
   Alert,
   FlatList,
   Image,
+  Modal,
   Pressable,
   StyleSheet,
   Text,
@@ -13,19 +14,24 @@ import {
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MagnifyingGlass, X, CaretRight } from 'phosphor-react-native';
-import { BackChevron, Chip } from '../../../components/atoms';
-import { BottomSheet, ReachOutComposer } from '../../../components/molecules';
+import { BackChevron } from '../../../components/atoms';
+import { BottomSheet, DiscoveryCard, ReachOutComposer } from '../../../components/molecules';
 import { supabase } from '../../../lib/supabase';
-import { startConversationWithMessage } from '../../../lib/messaging';
+import { sendProjectAttachment, startConversationWithMessage } from '../../../lib/messaging';
+import { fetchPortfoliosByUser } from '../../../lib/portfolio';
 import { useAuth } from '../../../context/AuthContext';
 import { CAMPUSES, type SeekerCardData } from '../../../data/mock';
 import { AmbitFont, Brand, Radii, Space } from '../../../constants/theme';
 
-/// S-051 People search. Find another user by display name, preview their
-/// profile card, then reach out about one of *your* active projects —
-/// every conversation is project-anchored, so the project the user picks
-/// becomes the thread's context and the searched person becomes the
-/// seeker on it.
+/// S-051 People search. Find another user by display name, preview the same
+/// discovery card an owner would see, then reach out. Every conversation is
+/// project-anchored and the OWNER party is whoever owns that project — so we
+/// don't gate on the searcher's role. A chat can be anchored on *either*
+/// side's active project:
+///   - one of MY active projects → the other person joins as the seeker
+///   - one of THEIR active projects → I join as the seeker
+/// If multiple projects qualify the user picks; only when neither side has an
+/// active project is there nothing to anchor on (the DB has no project-less DM).
 interface Person {
   id:         string;
   name:       string;
@@ -35,10 +41,30 @@ interface Person {
   vibe_blurb: string | null;
 }
 
-interface MyProject {
+interface ProjectRow {
   id:    string;
   title: string;
 }
+
+/// A concrete way to start the thread: which project anchors it and, derived
+/// from that project's owner, who is owner vs seeker on the new conversation.
+interface ReachOption {
+  projectId: string;
+  title:     string;
+  seekerId:  string;  // the party that is NOT the project owner
+  mine:      boolean;  // true = my project (they join), false = their project (I join)
+}
+
+const cardFromPerson = (p: Person, portfolio: SeekerCardData['portfolio'] = []): SeekerCardData => ({
+  kind:      'seeker',
+  id:        p.id,
+  name:      p.name,
+  photoUri:  p.photo_url,
+  campusId:  p.campus_id ?? '',
+  skills:    p.skills ?? [],
+  vibeBlurb: p.vibe_blurb ?? '',
+  portfolio,
+});
 
 const campusName = (id: string | null): string | null =>
   CAMPUSES.find((c) => c.id === id)?.name ?? null;
@@ -52,16 +78,20 @@ export default function NewChatScreen() {
   const [searching, setSearching] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Person whose card is being previewed in the modal. Null = closed.
+  // The person being acted on (preview + reach-out flow).
   const [selected, setSelected] = useState<Person | null>(null);
+  // Full discovery card for the previewed person — null = preview closed.
+  // Built from the search row immediately; portfolio is patched in async.
+  const [previewCard, setPreviewCard] = useState<SeekerCardData | null>(null);
 
-  // Project picker state — surfaced when the user has >1 active project.
-  const [pickerProjects, setPickerProjects] = useState<MyProject[] | null>(null);
+  // Project picker — surfaced when more than one project could anchor the chat.
+  const [pickerOptions, setPickerOptions] = useState<ReachOption[] | null>(null);
 
-  // Card handed to the ReachOutComposer. Non-null = composer open. We
-  // stash the chosen project id alongside so onSend can anchor the thread.
+  // Card handed to the ReachOutComposer. Non-null = composer open.
   const [reachCard, setReachCard] = useState<SeekerCardData | null>(null);
   const chosenProjectId = useRef<string | null>(null);
+  // Seeker on the new thread — derived from the chosen project's owner.
+  const chosenSeekerId = useRef<string | null>(null);
 
   // ── Debounced name search ──────────────────────────────────────
   useEffect(() => {
@@ -91,22 +121,50 @@ export default function NewChatScreen() {
     };
   }, [query, user?.id]);
 
-  // ── Reach out: resolve which project anchors the new thread ────
+  // ── Open the full discovery card for a tapped result ───────────
+  const openPreview = async (person: Person) => {
+    setSelected(person);
+    setPreviewCard(cardFromPerson(person));
+    // Pull their portfolio so the card's second page is real, not empty.
+    try {
+      const map = await fetchPortfoliosByUser([person.id]);
+      const portfolio = map.get(person.id) ?? [];
+      if (portfolio.length) {
+        setPreviewCard((c) => (c && c.id === person.id ? { ...c, portfolio } : c));
+      }
+    } catch { /* keep the card without portfolio */ }
+  };
+
+  const closePreview = () => {
+    setPreviewCard(null);
+    setSelected(null);
+  };
+
+  // ── Reach out: collect every project that could anchor this chat ──
+  // No role gate — a chat can hang off one of my projects (they're the
+  // seeker) OR one of theirs (I'm the seeker), so anyone can reach anyone.
   const beginReachOut = async (person: Person) => {
     if (!user) return;
-    const { data } = await supabase
-      .from('projects')
-      .select('id, title')
-      .eq('owner_id', user.id)
-      .eq('active', true)
-      .order('created_at', { ascending: false });
+    const [mineRes, theirsRes] = await Promise.all([
+      supabase.from('projects').select('id, title')
+        .eq('owner_id', user.id).eq('active', true)
+        .order('created_at', { ascending: false }),
+      supabase.from('projects').select('id, title')
+        .eq('owner_id', person.id).eq('active', true)
+        .order('created_at', { ascending: false }),
+    ]);
+    const mine   = (mineRes.data   as ProjectRow[] | null) ?? [];
+    const theirs = (theirsRes.data as ProjectRow[] | null) ?? [];
 
-    const projects = (data as MyProject[] | null) ?? [];
+    const options: ReachOption[] = [
+      ...mine.map((p)   => ({ projectId: p.id, title: p.title, seekerId: person.id, mine: true })),
+      ...theirs.map((p) => ({ projectId: p.id, title: p.title, seekerId: user.id,  mine: false })),
+    ];
 
-    if (projects.length === 0) {
+    if (options.length === 0) {
       Alert.alert(
-        'No active project',
-        'Create a project before reaching out — every chat is about a project.',
+        'Nothing to anchor on',
+        `Every chat hangs off a project, and neither you nor ${person.name} has an active one yet. Post a project to start the conversation.`,
         [
           { text: 'Not now', style: 'cancel' },
           { text: 'New project', onPress: () => router.push('/project-new') },
@@ -115,44 +173,48 @@ export default function NewChatScreen() {
       return;
     }
 
-    if (projects.length === 1) {
-      openComposer(person, projects[0].id);
+    if (options.length === 1) {
+      openComposer(person, options[0]);
       return;
     }
-
-    // Multiple active projects → let the user choose which one.
-    setPickerProjects(projects);
+    setPickerOptions(options);
   };
 
-  const openComposer = (person: Person, projectId: string) => {
-    chosenProjectId.current = projectId;
-    setPickerProjects(null);
-    setSelected(null);
-    setReachCard({
-      kind:      'seeker',
-      id:        person.id,
-      name:      person.name,
-      photoUri:  person.photo_url,
-      campusId:  person.campus_id ?? '',
-      skills:    person.skills ?? [],
-      vibeBlurb: person.vibe_blurb ?? '',
-      portfolio: [],
-    });
+  const openComposer = (person: Person, option: ReachOption) => {
+    chosenProjectId.current = option.projectId;
+    chosenSeekerId.current  = option.seekerId;
+    setPickerOptions(null);
+    // Keep `previewCard` mounted — the composer is a transparent sheet that
+    // sits over the card, so the person's card stays visible behind it.
+    setReachCard(cardFromPerson(person));
   };
 
   // Holds the new conversation id from a confirmed send so onSent can
   // navigate after the composer's success affirmation.
   const lastConvId = useRef<string | null>(null);
 
-  const handleSend = async (card: SeekerCardData, text: string): Promise<boolean> => {
+  const handleSend = async (
+    _card: SeekerCardData,
+    text: string,
+    attachment?: { id: string; title: string } | null,
+  ): Promise<boolean> => {
     const projectId = chosenProjectId.current;
-    if (!projectId) return false;
+    const seekerId  = chosenSeekerId.current;
+    if (!projectId || !seekerId || !user) return false;
     try {
       const conversationId = await startConversationWithMessage({
         projectId,
-        seekerId: card.id,
-        body:     text,
+        seekerId,
+        body: text,
       });
+      if (attachment) {
+        await sendProjectAttachment({
+          conversationId,
+          senderId: user.id,
+          projectId: attachment.id,
+          projectTitle: attachment.title,
+        }).catch(() => {});
+      }
       lastConvId.current = conversationId;
       return true;
     } catch {
@@ -162,6 +224,8 @@ export default function NewChatScreen() {
 
   const handleSent = () => {
     setReachCard(null);
+    setPreviewCard(null);
+    setSelected(null);
     if (lastConvId.current) {
       router.replace({ pathname: '/chat/[id]', params: { id: lastConvId.current } });
     }
@@ -195,7 +259,7 @@ export default function NewChatScreen() {
       {results === null ? (
         <View style={styles.empty}>
           <Text style={styles.emptyBody}>
-            Search for someone by name, then reach out about one of your projects.
+            Search for someone by name to start a conversation.
           </Text>
         </View>
       ) : searching ? (
@@ -215,7 +279,7 @@ export default function NewChatScreen() {
           keyboardShouldPersistTaps="handled"
           renderItem={({ item }) => (
             <Pressable
-              onPress={() => setSelected(item)}
+              onPress={() => openPreview(item)}
               style={({ pressed }) => [styles.row, pressed && { opacity: 0.7 }]}
               accessibilityRole="button"
               accessibilityLabel={`View ${item.name}'s profile`}
@@ -243,57 +307,46 @@ export default function NewChatScreen() {
         />
       )}
 
-      {/* Profile preview — bottom sheet (Luma-style). */}
-      <BottomSheet visible={!!selected} onClose={() => setSelected(null)}>
-        {selected && (
-          <View style={styles.cardContent}>
-            {selected.photo_url ? (
-              <Image source={{ uri: selected.photo_url }} style={styles.cardAvatar} />
-            ) : (
-              <View style={[styles.cardAvatar, styles.rowAvatarFallback]}>
-                <Text style={styles.cardAvatarInitial}>
-                  {(selected.name ?? '?').slice(0, 1).toUpperCase()}
-                </Text>
-              </View>
-            )}
-            <Text style={styles.cardName}>{selected.name}</Text>
-            {campusName(selected.campus_id) && (
-              <Text style={styles.cardCampus}>{campusName(selected.campus_id)}</Text>
-            )}
-            {selected.vibe_blurb ? (
-              <Text style={styles.cardVibe}>{selected.vibe_blurb}</Text>
-            ) : null}
-            {selected.skills && selected.skills.length > 0 && (
-              <View style={styles.chipRow}>
-                {selected.skills.map((s) => (
-                  <Chip key={s} label={s} selected={false} onPress={() => {}} />
-                ))}
-              </View>
-            )}
-            <Pressable
-              style={({ pressed }) => [styles.reachBtn, pressed && { opacity: 0.9 }]}
-              onPress={() => beginReachOut(selected)}
-              accessibilityRole="button"
-              accessibilityLabel={`Reach out to ${selected.name}`}
-            >
-              <Text style={styles.reachBtnLabel}>Reach out</Text>
+      {/* Full-screen discovery card preview — the same card seen in the deck. */}
+      <Modal
+        visible={!!previewCard}
+        animationType="slide"
+        onRequestClose={closePreview}
+      >
+        <View style={[styles.previewRoot, { paddingTop: insets.top + 6 }]}>
+          <View style={styles.previewBar}>
+            <Pressable onPress={closePreview} hitSlop={10} style={styles.previewClose} accessibilityLabel="Close">
+              <X size={22} color={Brand.inkPrimary} weight="bold" />
             </Pressable>
           </View>
-        )}
-      </BottomSheet>
+          <View style={styles.previewCardWrap}>
+            {previewCard && (
+              <DiscoveryCard
+                card={previewCard}
+                onReachOut={() => selected && beginReachOut(selected)}
+              />
+            )}
+          </View>
+        </View>
+      </Modal>
 
-      {/* Project picker — bottom sheet, only when the user has >1 active project */}
-      <BottomSheet visible={!!pickerProjects} onClose={() => setPickerProjects(null)}>
+      {/* Project picker — only when more than one project could anchor the chat */}
+      <BottomSheet visible={!!pickerOptions} onClose={() => setPickerOptions(null)}>
         <Text style={styles.pickerTitle}>Reach out about…</Text>
-        {(pickerProjects ?? []).map((p) => (
+        {(pickerOptions ?? []).map((opt) => (
           <Pressable
-            key={p.id}
+            key={opt.projectId}
             style={({ pressed }) => [styles.pickerRow, pressed && { opacity: 0.7 }]}
-            onPress={() => selected && openComposer(selected, p.id)}
+            onPress={() => selected && openComposer(selected, opt)}
             accessibilityRole="button"
-            accessibilityLabel={`Reach out about ${p.title}`}
+            accessibilityLabel={`Reach out about ${opt.title}`}
           >
-            <Text style={styles.pickerRowText} numberOfLines={1}>{p.title}</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.pickerRowText} numberOfLines={1}>{opt.title}</Text>
+              <Text style={styles.pickerRowSub} numberOfLines={1}>
+                {opt.mine ? 'Your project' : `${selected?.name ?? 'Their'}’s project`}
+              </Text>
+            </View>
             <CaretRight size={15} color={Brand.inkLabel} weight="regular" />
           </Pressable>
         ))}
@@ -302,7 +355,7 @@ export default function NewChatScreen() {
       <ReachOutComposer
         card={reachCard}
         onDismiss={() => setReachCard(null)}
-        onSend={(card, text) => handleSend(card as SeekerCardData, text)}
+        onSend={(card, text, attachment) => handleSend(card as SeekerCardData, text, attachment)}
         onSent={handleSent}
       />
     </View>
@@ -381,44 +434,25 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 
-  // ── Profile preview (bottom sheet content) ────────────────────
-  cardContent: { alignItems: 'center', gap: 10, paddingTop: 4, paddingBottom: Space.md },
-  cardAvatar: { width: 96, height: 96, borderRadius: 24 },
-  cardAvatarInitial: { fontFamily: AmbitFont.display, fontSize: 36, color: Brand.inkLabel },
-  cardName: {
-    fontFamily: AmbitFont.display,
-    fontSize: 22,
-    color: Brand.seekerInk,
-    textAlign: 'center',
-  },
-  cardCampus: { fontFamily: AmbitFont.body, fontSize: 13, color: Brand.inkLabel },
-  cardVibe: {
-    fontFamily: AmbitFont.body,
-    fontSize: 14,
-    color: Brand.inkBody,
-    lineHeight: 20,
-    textAlign: 'center',
-  },
-  chipRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+  // ── Full-screen card preview ──────────────────────────────────
+  previewRoot: { flex: 1, backgroundColor: Brand.canvas },
+  previewBar: {
+    height: 44,
     justifyContent: 'center',
-    gap: 8,
-    marginTop: 4,
+    paddingHorizontal: Space.md,
   },
-  reachBtn: {
-    marginTop: 12,
-    alignSelf: 'stretch',
-    backgroundColor: Brand.primary,
-    paddingVertical: 14,
-    borderRadius: Radii.md,
+  previewClose: {
+    width: 40,
+    height: 40,
     alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: -8,
   },
-  reachBtnLabel: {
-    fontFamily: AmbitFont.body,
-    fontSize: 15,
-    fontWeight: '700',
-    color: Brand.inkOnBrand,
+  previewCardWrap: {
+    flex: 1,
+    paddingHorizontal: Space.lg,
+    paddingTop: 4,
+    paddingBottom: Space.lg,
   },
 
   // ── Project picker (bottom sheet content) ─────────────────────
@@ -437,12 +471,18 @@ const styles = StyleSheet.create({
     backgroundColor: Brand.surface1,
     borderRadius: Radii.md,
     gap: 10,
+    marginTop: 8,
   },
   pickerRowText: {
-    flex: 1,
     fontFamily: AmbitFont.body,
     fontSize: 15,
     fontWeight: '600',
     color: Brand.inkBody,
+  },
+  pickerRowSub: {
+    fontFamily: AmbitFont.body,
+    fontSize: 12,
+    color: Brand.inkMuted,
+    marginTop: 2,
   },
 });

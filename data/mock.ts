@@ -91,6 +91,15 @@ export interface PortfolioItem {
   /// Two-stop gradient used as the placeholder when no image is set.
   /// Keyed off id when seeding mock data so each bubble feels distinct.
   gradient: [string, string];
+  /// When the work happened — "2025" / "Spring 2025". Required in the editor;
+  /// optional on the type so legacy rows + mock seeds stay valid. '' = unset.
+  timeframe?: string;
+  /// Role / contribution bullets (one per line in the editor).
+  contributions?: string[];
+  /// One external link — live demo / repo / case study.
+  linkUrl?: string | null;
+  /// Tool / tech tags shown as chips.
+  tools?: string[];
 }
 
 /// External links surfaced as icon buttons on the card's Portfolio

@@ -16,7 +16,7 @@ import { DiscoveryCard, DiscoveryRowSummary, ReachOutComposer } from '../../comp
 import { useSavedDeck } from '../../context/SavedDeckContext';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
-import { startConversationWithMessage } from '../../lib/messaging';
+import { sendProjectAttachment, startConversationWithMessage } from '../../lib/messaging';
 import type { DiscoveryCardData } from '../../data/mock';
 import {
   AmbitFont,
@@ -59,7 +59,11 @@ export default function SavedScreen() {
 
   /// Performs the send and returns true/false. The composer awaits this and
   /// only celebrates on success; navigation + unsave happen in handleSent.
-  const handleSend = async (card: DiscoveryCardData, text: string): Promise<boolean> => {
+  const handleSend = async (
+    card: DiscoveryCardData,
+    text: string,
+    attachment?: { id: string; title: string } | null,
+  ): Promise<boolean> => {
     if (!user) return false;
     try {
       let projectId: string;
@@ -102,6 +106,14 @@ export default function SavedScreen() {
         seekerId,
         body: text,
       });
+      if (attachment) {
+        await sendProjectAttachment({
+          conversationId,
+          senderId: user.id,
+          projectId: attachment.id,
+          projectTitle: attachment.title,
+        }).catch(() => {});
+      }
       lastSent.current = { card, conversationId };
       return true;
     } catch {

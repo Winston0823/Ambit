@@ -15,6 +15,7 @@ import { OnboardingInline } from '../components/organisms';
 import Constants from 'expo-constants';
 import { useProfileRole } from '../hooks/useProfileRole';
 import { clearBadge } from '../lib/pushNotifications';
+import { touchPresence } from '../lib/presence';
 import { supabase } from '../lib/supabase';
 
 export default function RootLayout() {
@@ -148,10 +149,13 @@ function NotificationHandler() {
   // has opened the app so the "unread" signal is no longer needed.
   useEffect(() => {
     const sub = AppState.addEventListener('change', (state) => {
-      if (state === 'active') clearBadge();
+      if (state === 'active') {
+        clearBadge();
+        if (user?.id) touchPresence(user.id);
+      }
     });
     return () => sub.remove();
-  }, []);
+  }, [user?.id]);
 
   // ── Realtime local-notification fallback ────────────────────────────
   // iOS Simulator and Expo Go can't receive remote APNs push notifications.

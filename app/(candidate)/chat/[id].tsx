@@ -6,10 +6,12 @@ import {
   Animated,
   Alert,
   FlatList,
+  Image,
   Keyboard,
   KeyboardAvoidingView,
   LayoutAnimation,
   type LayoutAnimationConfig,
+  Modal,
   Platform,
   Pressable,
   StyleSheet,
@@ -38,7 +40,11 @@ import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import * as Haptics from 'expo-haptics';
-import { CaretLeft, DotsThree } from 'phosphor-react-native';
+import { CaretDown, CaretLeft, CaretRight, DotsThree, X } from 'phosphor-react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Motion } from '../../../constants/motion';
+import { Tactile } from '../../../components/atoms';
+import { touchPresence } from '../../../lib/presence';
 import {
   BottomSheet,
   MessageBubble,
@@ -63,15 +69,23 @@ import { supabase } from '../../../lib/supabase';
 import {
   deleteMessage,
   editMessage,
+  fetchProjectCard,
+  fetchProjectRefs,
   listMessages,
   listReactions,
   markConversationRead,
   sendImageMessage,
+  sendPortfolioAttachment,
   sendTextMessage,
   toggleReaction,
   type MessageRow,
+  type ProjectRefRow,
   type ReactionRow,
 } from '../../../lib/messaging';
+import { fetchPortfolioForUser, fetchPortfolioRefs } from '../../../lib/portfolio';
+import { DiscoveryCard, PortfolioModal } from '../../../components/molecules';
+import { DaySeparator, dayLabel, sameDay } from '../../../components/molecules/DaySeparator';
+import type { DiscoveryCardData, PortfolioItem } from '../../../data/mock';
 import {
   listSchedulingRequests,
   type SchedulingRequestRow,
@@ -93,6 +107,7 @@ interface ConvoMeta {
   partner_id:        string;
   partner_name:      string;
   partner_photo_url: string | null;
+  partner_last_active_at: string | null;
   /// Closure-loop fields used by the thread header to render the banner
   /// state (hired-pending confirm prompt, hired celebration, passed
   /// banner, auto-decline banner) and to disable the composer on
@@ -125,6 +140,25 @@ export default function ThreadScreen() {
   const [reactions, setReactions] = useState<ReactionRow[]>([]);
   const [schedulingRequests, setSchedulingRequests] = useState<SchedulingRequestRow[]>([]);
   const [polls, setPolls] = useState<AvailabilityPollRow[]>([]);
+  // Projects attached to messages, keyed by id — drives the project-card
+  // bubbles + the preview modal.
+  const [projectRefs, setProjectRefs] = useState<Record<string, ProjectRefRow>>({});
+  // Full discovery-style card shown when a project attachment is tapped.
+  const [previewCard, setPreviewCard] = useState<DiscoveryCardData | null>(null);
+  // Portfolio highlights referenced by portfolio_ref_id messages.
+  const [portfolioRefs, setPortfolioRefs] = useState<Record<string, PortfolioItem>>({});
+  // One-page highlight preview, opened by tapping a highlight bubble.
+  const [previewPortfolio, setPreviewPortfolio] = useState<PortfolioItem | null>(null);
+  // The + menu → "Highlight" picker: the user's own highlights to share.
+  const [portfolioPickerOpen, setPortfolioPickerOpen] = useState(false);
+  const [myPortfolio, setMyPortfolio] = useState<PortfolioItem[] | null>(null);
+  // Messages newer than this (set at mount) animate in; history doesn't.
+  const mountedAt = useRef(new Date().toISOString()).current;
+  // Jump-to-newest FAB: visible when scrolled up, with an unseen-message count.
+  const [scrollFabVisible, setScrollFabVisible] = useState(false);
+  const [unseenCount, setUnseenCount] = useState(0);
+  const fabAnim = useRef(new Animated.Value(0)).current;
+  const prevLenRef = useRef(0);
   const [openPollId, setOpenPollId] = useState<string | null>(null);
   const [pollComposerOpen, setPollComposerOpen] = useState(false);
   const [partnerLastReadAt, setPartnerLastReadAt] = useState<string | null>(null);
@@ -156,6 +190,9 @@ export default function ThreadScreen() {
   const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const channelRef = useRef<RealtimeChannel | null>(null);
   const listRef = useRef<FlatList<MessageRow>>(null);
+  // True once the user drags the list — stops us from force-pinning to the
+  // bottom (so we don't yank them off a message they scrolled up to read).
+  const userScrolledRef = useRef(false);
 
   // Native-driven scroll offset for the screen-anchored bubble gradient.
   // scrollY drives the per-bubble transforms (native); scrollYRef mirrors
@@ -199,6 +236,51 @@ export default function ThreadScreen() {
   /// Closure-loop UI state: overflow menu (⋯) + pass-reason picker.
   const [overflowOpen, setOverflowOpen]   = useState(false);
   const [passSheetOpen, setPassSheetOpen] = useState(false);
+
+  // Lazy-load the projects referenced by attachment messages. A ref tracks
+  // which ids we've already requested so message updates don't refetch.
+  const fetchedRefIds = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const ids = Array.from(
+      new Set(messages.map((m) => m.project_ref_id).filter(Boolean) as string[]),
+    ).filter((id) => !fetchedRefIds.current.has(id));
+    if (ids.length === 0) return;
+    ids.forEach((id) => fetchedRefIds.current.add(id));
+    let cancelled = false;
+    fetchProjectRefs(ids)
+      .then((map) => {
+        if (cancelled || map.size === 0) return;
+        setProjectRefs((prev) => {
+          const next = { ...prev };
+          map.forEach((v, k) => { next[k] = v; });
+          return next;
+        });
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [messages]);
+
+  // Same lazy-load for shared portfolio highlights.
+  const fetchedPortfolioRefIds = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const ids = Array.from(
+      new Set(messages.map((m) => m.portfolio_ref_id).filter(Boolean) as string[]),
+    ).filter((id) => !fetchedPortfolioRefIds.current.has(id));
+    if (ids.length === 0) return;
+    ids.forEach((id) => fetchedPortfolioRefIds.current.add(id));
+    let cancelled = false;
+    fetchPortfolioRefs(ids)
+      .then((map) => {
+        if (cancelled || map.size === 0) return;
+        setPortfolioRefs((prev) => {
+          const next = { ...prev };
+          map.forEach((v, k) => { next[k] = v; });
+          return next;
+        });
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [messages]);
 
   const handleProposeHire = async () => {
     setOverflowOpen(false);
@@ -281,7 +363,7 @@ export default function ThreadScreen() {
 
       const { data: partnerProfile } = await supabase
         .from('profiles')
-        .select('name, photo_url')
+        .select('name, photo_url, last_active_at')
         .eq('id', partnerId)
         .maybeSingle();
 
@@ -294,6 +376,7 @@ export default function ThreadScreen() {
         partner_id:        partnerId,
         partner_name:      partnerProfile?.name ?? (isOwner ? 'Seeker' : 'Owner'),
         partner_photo_url: partnerProfile?.photo_url ?? null,
+        partner_last_active_at: (partnerProfile as any)?.last_active_at ?? null,
         status:            ((convo as any).status as ConversationStatus) ?? 'active',
         pass_reason:       (convo as any).pass_reason ?? null,
         hired_at:          (convo as any).hired_at ?? null,
@@ -497,13 +580,41 @@ export default function ThreadScreen() {
   // UX. (If we wanted symmetry later, we could try silent-add when
   // permission has already been granted before.)
 
-  // ── Auto-scroll on new message ───────────────────────────────
+  // ── Open at the newest message ───────────────────────────────
+  // A non-inverted FlatList virtualizes (renders ~10 rows first), so one
+  // scrollToEnd lands on a stale, short content height — and bubbles/images
+  // keep growing it afterward. We reset the "user scrolled" flag on open and
+  // re-pin to the bottom across the settle window (also see onContentSizeChange
+  // + onLayout on the list). Retries stop the moment the user drags.
   useEffect(() => {
-    if (messages.length === 0) return;
-    requestAnimationFrame(() => {
-      listRef.current?.scrollToEnd({ animated: true });
-    });
+    userScrolledRef.current = false;
+    const timers = [0, 80, 250, 600].map((d) =>
+      setTimeout(() => {
+        if (!userScrolledRef.current) listRef.current?.scrollToEnd({ animated: false });
+      }, d),
+    );
+    return () => timers.forEach(clearTimeout);
+  }, [conversationId]);
+
+  // New message: follow it down if parked at the bottom; otherwise bump the
+  // unseen counter on the jump-to-newest FAB.
+  useEffect(() => {
+    const grew = messages.length > prevLenRef.current;
+    prevLenRef.current = messages.length;
+    if (!grew || messages.length === 0) return;
+    if (userScrolledRef.current) setUnseenCount((c) => c + 1);
+    else requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: true }));
   }, [messages.length]);
+
+  // Spring the FAB in/out on the shared motion curve.
+  useEffect(() => {
+    Animated.spring(fabAnim, { toValue: scrollFabVisible ? 1 : 0, ...Motion.spring, useNativeDriver: true }).start();
+  }, [scrollFabVisible, fabAnim]);
+
+  // Stamp my presence when I open this thread.
+  useEffect(() => {
+    if (user?.id) touchPresence(user.id);
+  }, [user?.id, conversationId]);
 
   // ── Name map for bubble labels ───────────────────────────────
   const nameById = useMemo<Record<string, string>>(() => {
@@ -611,6 +722,56 @@ export default function ThreadScreen() {
       markSent(clientId);
     } catch {
       failedPayloadsRef.current.set(clientId, { type: 'text', body, parentId });
+      markFailed(clientId);
+    }
+  };
+
+  /// Open the + menu's highlight picker, lazily loading the user's own
+  /// highlights the first time.
+  const openPortfolioPicker = async () => {
+    if (!user) return;
+    setPortfolioPickerOpen(true);
+    if (myPortfolio === null) {
+      const items = await fetchPortfolioForUser(user.id).catch(() => []);
+      setMyPortfolio(items);
+    }
+  };
+
+  /// Share one of my highlights into the thread as a structured card.
+  /// Mirrors handleSendText's optimistic-then-confirm flow.
+  const handleSendPortfolio = async (item: PortfolioItem) => {
+    if (!user || !conversationId) return;
+    setPortfolioPickerOpen(false);
+    const clientId = randomUUID();
+    // Make the bubble resolvable immediately (skip the ref fetch round-trip).
+    setPortfolioRefs((prev) => ({ ...prev, [item.id]: item }));
+    fetchedPortfolioRefIds.current.add(item.id);
+    const optimistic: MessageRow = {
+      id:               clientId,
+      conversation_id:  conversationId,
+      sender_id:        user.id,
+      body:             `Shared a highlight · ${item.title}`,
+      attachment_url:   null,
+      portfolio_ref_id: item.id,
+      parent_id:        null,
+      edited_at:        null,
+      deleted_at:       null,
+      created_at:       new Date().toISOString(),
+    };
+    setMessages((prev) => [...prev, optimistic]);
+    markPending(clientId);
+    scrollToEnd();
+    try {
+      const real = await sendPortfolioAttachment({
+        conversationId,
+        senderId: user.id,
+        portfolioId: item.id,
+        portfolioTitle: item.title,
+        clientId,
+      });
+      setMessages((prev) => prev.map((m) => (m.id === clientId ? real : m)));
+      markSent(clientId);
+    } catch {
       markFailed(clientId);
     }
   };
@@ -767,6 +928,15 @@ export default function ThreadScreen() {
           a parent with `paddingTop` reference the parent's padding-box
           edge (y=0), not the content edge — so we have to offset by
           the safe-area inset ourselves to clear the Dynamic Island. */}
+      {/* Top fade — content dissolves into the canvas as it scrolls under the
+          floating back button + island, keeping the borderless top readable
+          without reintroducing a blur strip. */}
+      <LinearGradient
+        colors={[Brand.hearthBgBase, 'rgba(255,255,255,0)']}
+        style={[styles.headerScrim, { height: insets.top + 88 }]}
+        pointerEvents="none"
+      />
+
       <View pointerEvents="box-none" style={[styles.headerOverlay, { top: insets.top }]}>
         <View style={styles.headerRow}>
           <Pressable
@@ -820,6 +990,7 @@ export default function ThreadScreen() {
           partnerId={meta.partner_id}
           partnerName={meta.partner_name}
           partnerPhotoUrl={meta.partner_photo_url}
+          partnerLastActiveAt={meta.partner_last_active_at}
           top={insets.top + 6}
           currentConversationId={meta.id}
           meUserId={user?.id}
@@ -844,19 +1015,53 @@ export default function ThreadScreen() {
           scrollEventThrottle={16}
           onScroll={Animated.event(
             [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-            { useNativeDriver: true },
+            {
+              useNativeDriver: true,
+              listener: (e: { nativeEvent: { contentOffset: { y: number }; contentSize: { height: number }; layoutMeasurement: { height: number } } }) => {
+                const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
+                const fromBottom = contentSize.height - layoutMeasurement.height - contentOffset.y;
+                const atBottom = fromBottom < 140;
+                if (atBottom) {
+                  if (scrollFabVisible) setScrollFabVisible(false);
+                  if (unseenCount !== 0) setUnseenCount(0);
+                  userScrolledRef.current = false; // resume auto-follow
+                } else if (!scrollFabVisible) {
+                  setScrollFabVisible(true);
+                }
+              },
+            },
           )}
           // WeChat parity: scrolling or tapping the messages list closes
           // the attachment grid. onScrollBeginDrag covers any drag/scroll;
           // onTouchStart catches pure taps without claiming the gesture
           // (FlatList still owns scroll). Both are guarded by attachMenuOpen
           // so they're no-ops while the grid is closed.
-          onScrollBeginDrag={attachMenuOpen ? closeAttachMenu : undefined}
+          onScrollBeginDrag={() => { userScrolledRef.current = true; if (attachMenuOpen) closeAttachMenu(); }}
           onTouchStart={attachMenuOpen ? closeAttachMenu : undefined}
-          renderItem={({ item }) => {
+          // Pin to the newest message as the thread's variable-height content
+          // settles on open (bubbles measure, images load) — and on new
+          // messages while the user is at the bottom. Stops once they scroll.
+          onContentSizeChange={() => {
+            if (!userScrolledRef.current) listRef.current?.scrollToEnd({ animated: false });
+          }}
+          onLayout={() => {
+            if (!userScrolledRef.current) listRef.current?.scrollToEnd({ animated: false });
+          }}
+          renderItem={({ item, index }) => {
             const parent = item.parent_id
               ? messages.find((m) => m.id === item.parent_id) ?? null
               : null;
+            // Grouping: consecutive user messages from the same sender within
+            // 5 min tuck together (avatar + tail only on the last of a run).
+            const prevMsg = messages[index - 1];
+            const nextMsg = messages[index + 1];
+            const grouped = (a?: MessageRow, b?: MessageRow) =>
+              !!a && !!b && (!a.kind || a.kind === 'user') && (!b.kind || b.kind === 'user') &&
+              a.sender_id === b.sender_id &&
+              Math.abs(new Date(b.created_at).getTime() - new Date(a.created_at).getTime()) < 5 * 60 * 1000;
+            const firstInGroup = !grouped(prevMsg, item);
+            const lastInGroup = !grouped(item, nextMsg);
+            const showDay = !prevMsg || !sameDay(prevMsg.created_at, item.created_at);
             const status: MessageStatus =
               pendingIds.has(item.id) ? 'sending'
               : failedIds.has(item.id) ? 'failed'
@@ -870,10 +1075,21 @@ export default function ThreadScreen() {
             const availPoll = item.availability_poll_id
               ? polls.find((p) => p.id === item.availability_poll_id) ?? null
               : null;
+            const projRef = item.project_ref_id
+              ? projectRefs[item.project_ref_id] ?? null
+              : null;
+            const portRef = item.portfolio_ref_id
+              ? portfolioRefs[item.portfolio_ref_id] ?? null
+              : null;
             return (
+              <>
+                {showDay && <DaySeparator label={dayLabel(item.created_at)} />}
               <MessageBubble
                 message={item}
                 isMine={isMine}
+                animateIn={item.created_at > mountedAt}
+                firstInGroup={firstInGroup}
+                lastInGroup={lastInGroup}
                 reactions={reactionsByMessage[item.id] ?? []}
                 nameById={nameById}
                 parent={parent}
@@ -886,18 +1102,56 @@ export default function ThreadScreen() {
                 schedulingRequest={schedRequest}
                 availabilityPoll={availPoll}
                 onOpenAvailabilityPoll={setOpenPollId}
+                projectRef={projRef}
+                onOpenProjectRef={(ref) => {
+                  // Hydrate the SAME card the discovery deck renders, then show it.
+                  fetchProjectCard(ref.id)
+                    .then((c) => { if (c) setPreviewCard(c); })
+                    .catch(() => {});
+                }}
+                portfolioRef={portRef}
+                onOpenPortfolioRef={setPreviewPortfolio}
                 onToggleReaction={(emoji) => handleToggleReaction(item, emoji)}
                 onLongPress={() => handleLongPress(item)}
                 onRetry={() => handleRetry(item.id)}
                 scrollY={scrollY}
                 scrollYRef={scrollYRef}
               />
+              </>
             );
           }}
           ListFooterComponent={partnerTyping ? (
             <TypingIndicator name={meta.partner_name.split(' ')[0]} />
           ) : null}
         />
+
+        {/* Jump to newest — appears when scrolled up, with an unseen count. */}
+        <Animated.View
+          pointerEvents={scrollFabVisible ? 'auto' : 'none'}
+          style={[
+            styles.scrollFab,
+            { bottom: insets.bottom + 76, opacity: fabAnim, transform: [{ scale: fabAnim.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] }) }] },
+          ]}
+        >
+          <Tactile
+            haptic="tap"
+            onPress={() => {
+              userScrolledRef.current = false;
+              setUnseenCount(0);
+              setScrollFabVisible(false);
+              listRef.current?.scrollToEnd({ animated: true });
+            }}
+            style={styles.scrollFabBtn}
+            accessibilityLabel="Jump to newest messages"
+          >
+            <CaretDown size={18} color={Brand.inkPrimary} weight="bold" />
+            {unseenCount > 0 && (
+              <View style={styles.scrollFabBadge}>
+                <Text style={styles.scrollFabBadgeText}>{unseenCount > 9 ? '9+' : unseenCount}</Text>
+              </View>
+            )}
+          </Tactile>
+        </Animated.View>
 
         {meta.status === 'active' || meta.status === 'hired_pending' ? (
           <ChatComposer
@@ -911,6 +1165,7 @@ export default function ThreadScreen() {
             onSaveEdit={handleSaveEdit}
             onOpenScheduling={() => setSchedulingOpen(true)}
             onOpenAvailabilityPoll={() => setPollComposerOpen(true)}
+            onOpenPortfolio={openPortfolioPicker}
             onTypingPing={handleTypingPing}
             attachMenuOpen={attachMenuOpen}
             onToggleAttachMenu={toggleAttachMenu}
@@ -994,6 +1249,74 @@ export default function ThreadScreen() {
         meId={user?.id ?? ''}
         onClose={() => setOpenPollId(null)}
       />
+
+      {/* Project preview — tapping a project-attachment bubble opens the SAME
+          card the discovery deck renders, at the same size (and the 2-page
+          pager for seeker cards, handled inside DiscoveryCard). */}
+      <Modal
+        visible={!!previewCard}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPreviewCard(null)}
+        statusBarTranslucent
+      >
+        <View style={styles.previewRoot}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setPreviewCard(null)} />
+          <View style={[styles.previewFrame, { paddingTop: insets.top + Space.md, paddingBottom: insets.bottom + Space.md }]}>
+            {previewCard && (
+              <View style={styles.previewCardArea}>
+                <DiscoveryCard card={previewCard} showReachButton={false} />
+              </View>
+            )}
+          </View>
+          <Pressable
+            style={[styles.previewClose, { top: insets.top + Space.md + 8 }]}
+            onPress={() => setPreviewCard(null)}
+            hitSlop={12}
+            accessibilityRole="button"
+            accessibilityLabel="Close project"
+          >
+            <X size={18} color="#FFFFFF" weight="bold" />
+          </Pressable>
+        </View>
+      </Modal>
+
+      {/* Highlight picker — + menu → "Highlight". Lists the user's own
+          highlights to share into the thread as a card. */}
+      <BottomSheet visible={portfolioPickerOpen} onClose={() => setPortfolioPickerOpen(false)}>
+        <Text style={styles.pickerTitle}>Share a highlight</Text>
+        {myPortfolio === null ? (
+          <ActivityIndicator color={Brand.accent} style={{ marginVertical: Space.lg }} />
+        ) : myPortfolio.length === 0 ? (
+          <Text style={styles.pickerEmpty}>
+            You don’t have any portfolio highlights yet. Add some from your profile.
+          </Text>
+        ) : (
+          myPortfolio.map((it) => (
+            <Pressable
+              key={it.id}
+              onPress={() => handleSendPortfolio(it)}
+              style={({ pressed }) => [styles.pickerRow, pressed && { opacity: 0.7 }]}
+              accessibilityRole="button"
+              accessibilityLabel={`Share ${it.title}`}
+            >
+              {it.imageUri ? (
+                <Image source={{ uri: it.imageUri }} style={styles.pickerThumb} resizeMode="cover" />
+              ) : (
+                <LinearGradient colors={it.gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.pickerThumb} />
+              )}
+              <View style={styles.pickerMeta}>
+                <Text style={styles.pickerRowTitle} numberOfLines={1}>{it.title}</Text>
+                {!!it.timeframe && <Text style={styles.pickerRowSub} numberOfLines={1}>{it.timeframe}</Text>}
+              </View>
+              <CaretRight size={16} color={Brand.inkMuted} weight="bold" />
+            </Pressable>
+          ))
+        )}
+      </BottomSheet>
+
+      {/* One-page highlight preview — read-only (no onSave/onDelete). */}
+      <PortfolioModal item={previewPortfolio} onDismiss={() => setPreviewPortfolio(null)} />
 
       {/* Action sheet on long-press. Modal so it lives above keyboard. */}
       <BottomSheet visible={!!selectedMessage} onClose={() => setSelectedMessage(null)}>
@@ -1115,6 +1438,54 @@ function StatusBanner({
 }
 
 const styles = StyleSheet.create({
+  // ── Project preview modal ──────────────────────────────────────
+  // Full-size project preview — mirrors the discovery deck's frame: dim
+  // backdrop, Space.lg horizontal padding, card fills the area (flex:1).
+  previewRoot: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)' },
+  previewFrame: { flex: 1, paddingHorizontal: Space.lg },
+  previewCardArea: { flex: 1, position: 'relative' },
+  // ── Highlight picker (+ menu) ──────────────────────────────────────────
+  pickerTitle: {
+    fontFamily: AmbitFont.display,
+    fontSize: 20,
+    color: Brand.inkPrimary,
+    marginBottom: Space.md,
+  },
+  pickerEmpty: {
+    fontFamily: AmbitFont.body,
+    fontSize: 14,
+    lineHeight: 20,
+    color: Brand.inkMuted,
+    paddingVertical: Space.md,
+  },
+  pickerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 10,
+  },
+  pickerThumb: {
+    width: 52,
+    height: 52,
+    borderRadius: Radii.md,
+    backgroundColor: Brand.surface2,
+  },
+  pickerMeta: { flex: 1, minWidth: 0 },
+  pickerRowTitle: { fontFamily: AmbitFont.display, fontSize: 16, color: Brand.inkPrimary },
+  pickerRowSub: { fontFamily: AmbitFont.body, fontSize: 12.5, color: Brand.inkMuted, marginTop: 2 },
+
+  previewClose: {
+    position: 'absolute',
+    left: Space.lg + 4,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(20,20,20,0.5)',
+    zIndex: 10,
+  },
+
   root: { flex: 1, backgroundColor: Brand.hearthBgBase },
   // Loading body — sits below the header row and fills the remaining
   // vertical space so the spinner is centered in what would otherwise
@@ -1136,6 +1507,44 @@ const styles = StyleSheet.create({
     right: 0,
     zIndex: 5,
   },
+  // Sits above the message list, below the floating chrome (zIndex 4).
+  headerScrim: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 4,
+  },
+  // Jump-to-newest FAB — floats above the composer, right-aligned.
+  scrollFab: { position: 'absolute', right: Space.lg, zIndex: 6 },
+  scrollFabBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: Brand.canvas,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: Brand.borderSoft,
+    shadowColor: '#000',
+    shadowOpacity: 0.16,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 5,
+  },
+  scrollFabBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    paddingHorizontal: 4,
+    backgroundColor: Brand.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  scrollFabBadgeText: { fontFamily: AmbitFont.body, fontSize: 11, fontWeight: '700', color: Brand.inkOnBrand },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',

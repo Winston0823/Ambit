@@ -3,16 +3,21 @@ import {
   Alert,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ArrowsClockwise, BookmarkSimple } from 'phosphor-react-native';
+import { ArrowsClockwise, BookmarkSimple, CaretDown, Check, GraduationCap, MagnifyingGlass, Sparkle, X } from 'phosphor-react-native';
+import type { IconProps } from 'phosphor-react-native';
 import * as Haptics from 'expo-haptics';
 import { DiscoveryOverview, SwipeDeck } from '../../components/organisms';
-import { PortfolioModal, ReachOutComposer } from '../../components/molecules';
+import { PortfolioModal, ReachOutComposer, BottomSheet } from '../../components/molecules';
+import { Tactile } from '../../components/atoms';
+import { CAMPUSES } from '../../data/mock';
 import type { PortfolioItem } from '../../data/mock';
 import { useProfileRole } from '../../hooks/useProfileRole';
 import { useSavedDeck } from '../../context/SavedDeckContext';
@@ -30,11 +35,13 @@ import {
   MOCK_SEEKERS,
 } from '../../data/mock';
 import { supabase } from '../../lib/supabase';
-import { startConversationWithMessage } from '../../lib/messaging';
+import { sendProjectAttachment, startConversationWithMessage } from '../../lib/messaging';
 import { fetchPortfoliosByUser } from '../../lib/portfolio';
 import { useAuth } from '../../context/AuthContext';
 
 const SKIP_OVERVIEW_THRESHOLD = 5;
+// Stable reference so the filter BottomSheet doesn't see a new array each render.
+const FILTER_SNAP_POINTS = [0.5, 0.92];
 
 /// Mock discovery cards use non-UUID ids like 'seeker-2' / 'project-1' for
 /// readability. start_conversation_with_message expects real UUIDs and
@@ -268,6 +275,47 @@ export default function DiscoveryFeed() {
     [reinserted, deck],
   );
 
+  // ── Discovery filters (skills + campus) ──────────────────────
+  const [filterSkills, setFilterSkills] = useState<string[]>([]);
+  const [filterCampus, setFilterCampus] = useState<string[]>([]);
+  const [filterSheet, setFilterSheet] = useState<null | 'skills' | 'campus'>(null);
+  const [filterSearch, setFilterSearch] = useState('');
+  const openFilterSheet = (dim: 'skills' | 'campus') => { setFilterSearch(''); setFilterSheet(dim); };
+  const campusLabel = (id: string) => CAMPUSES.find((c) => c.id === id)?.name ?? id;
+
+  const cardSkills = (c: DiscoveryCardData) => (c.kind === 'project' ? c.skillsSought : c.skills) ?? [];
+  const cardCampus = (c: DiscoveryCardData) => (c.kind === 'project' ? c.ownerCampusId : c.campusId) ?? '';
+
+  const filteredDeck = useMemo(
+    () =>
+      activeDeck.filter((c) => {
+        const sk = cardSkills(c).map((s) => s.toLowerCase());
+        const skillOk = filterSkills.length === 0 || filterSkills.some((f) => sk.includes(f.toLowerCase()));
+        const campusOk = filterCampus.length === 0 || filterCampus.includes(cardCampus(c));
+        return skillOk && campusOk;
+      }),
+    [activeDeck, filterSkills, filterCampus],
+  );
+
+  const skillOptions = useMemo(
+    () => Array.from(new Set(activeDeck.flatMap(cardSkills))).sort((a, b) => a.localeCompare(b)),
+    [activeDeck],
+  );
+
+  const toggleFilter = (dim: 'skills' | 'campus', value: string) => {
+    const [list, set] = dim === 'skills' ? [filterSkills, setFilterSkills] as const : [filterCampus, setFilterCampus] as const;
+    set(list.includes(value) ? list.filter((v) => v !== value) : [...list, value]);
+  };
+  const filterCount = filterSkills.length + filterCampus.length;
+
+  // Options for the open sheet, narrowed by the search box.
+  const sheetOptions = useMemo(() => {
+    const all = filterSheet === 'campus' ? CAMPUSES.map((c) => c.id) : skillOptions;
+    const q = filterSearch.trim().toLowerCase();
+    if (!q) return all;
+    return all.filter((opt) => (filterSheet === 'campus' ? campusLabel(opt) : opt).toLowerCase().includes(q));
+  }, [filterSheet, filterSearch, skillOptions]);
+
   const overviewVisible = consecutiveSkips >= SKIP_OVERVIEW_THRESHOLD;
 
   const handlePass = (card: DiscoveryCardData) => {
@@ -333,7 +381,11 @@ export default function DiscoveryFeed() {
   /// inline error). Dismissal + skip-counter reset happen in handleReachSent
   /// (success only). Stays in the deck — the new conversation surfaces in
   /// the Chat tab via the inbox's realtime subscription.
-  const handleMessage = async (card: DiscoveryCardData, text: string): Promise<boolean> => {
+  const handleMessage = async (
+    card: DiscoveryCardData,
+    text: string,
+    attachment?: { id: string; title: string } | null,
+  ): Promise<boolean> => {
     if (!user) return false;
 
     try {
@@ -395,11 +447,19 @@ export default function DiscoveryFeed() {
       // becomes its own thread. The DB-side ON CONFLICT in
       // start_conversation_with_message means re-reaching about the same
       // project appends to the existing thread, which is correct dedup.
-      await startConversationWithMessage({
+      const conversationId = await startConversationWithMessage({
         projectId,
         seekerId,
         body: text,
       });
+      if (attachment) {
+        await sendProjectAttachment({
+          conversationId,
+          senderId: user.id,
+          projectId: attachment.id,
+          projectTitle: attachment.title,
+        }).catch(() => {});
+      }
       return true;
     } catch (e: any) {
       console.warn('reach out failed:', e?.message ?? e);
@@ -480,6 +540,19 @@ export default function DiscoveryFeed() {
         </Pressable>
       </View>
 
+      {/* Filter row — short rectangle buttons above the card. */}
+      {!loading && !overviewVisible && (
+        <View style={styles.filterRow}>
+          <FilterButton Icon={Sparkle} label="Skills" count={filterSkills.length} onPress={() => openFilterSheet('skills')} />
+          <FilterButton Icon={GraduationCap} label="Campus" count={filterCampus.length} onPress={() => openFilterSheet('campus')} />
+          {filterCount > 0 && (
+            <Tactile haptic="tap" onPress={() => { setFilterSkills([]); setFilterCampus([]); }} style={styles.filterClear} accessibilityLabel="Clear filters">
+              <Text style={styles.filterClearText}>Clear</Text>
+            </Tactile>
+          )}
+        </View>
+      )}
+
       {loading ? (
         <Skeleton />
       ) : overviewVisible ? (
@@ -490,8 +563,8 @@ export default function DiscoveryFeed() {
         />
       ) : (
         <SwipeDeck
-          key={deckResetKey}
-          deck={activeDeck}
+          key={`${deckResetKey}-${filterSkills.join(',')}-${filterCampus.join(',')}`}
+          deck={filteredDeck}
           matchedSkills={viewerSkills}
           onPass={handlePass}
           onSave={handleSave}
@@ -522,7 +595,98 @@ export default function DiscoveryFeed() {
         item={activePortfolio}
         onDismiss={() => setActivePortfolio(null)}
       />
+
+      {/* Filter sheet — searchable + drag-to-expand (half → near-top). */}
+      <BottomSheet visible={filterSheet !== null} onClose={() => setFilterSheet(null)} snapPoints={FILTER_SNAP_POINTS}>
+        <View style={styles.filterSheetHead}>
+          <Text style={styles.filterSheetTitle}>
+            {filterSheet === 'campus' ? 'Campus' : 'Skills'}
+          </Text>
+          {filterCount > 0 && (
+            <Tactile haptic="tap" onPress={() => { setFilterSkills([]); setFilterCampus([]); }} style={styles.filterSheetClear} accessibilityLabel="Clear all filters">
+              <Text style={styles.filterSheetClearText}>Clear all</Text>
+            </Tactile>
+          )}
+        </View>
+
+        <View style={styles.filterSearchBar}>
+          <MagnifyingGlass size={16} color={Brand.inkMuted} weight="bold" />
+          <TextInput
+            value={filterSearch}
+            onChangeText={setFilterSearch}
+            placeholder={filterSheet === 'campus' ? 'Search campuses' : 'Search skills'}
+            placeholderTextColor={Brand.inkPlaceholder}
+            style={styles.filterSearchInput}
+            autoCapitalize="none"
+            autoCorrect={false}
+            returnKeyType="search"
+          />
+          {filterSearch !== '' && (
+            <Pressable onPress={() => setFilterSearch('')} hitSlop={8} accessibilityLabel="Clear search">
+              <X size={14} color={Brand.inkMuted} weight="bold" />
+            </Pressable>
+          )}
+        </View>
+
+        <ScrollView
+          style={styles.filterScroll}
+          contentContainerStyle={styles.filterSheetChips}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          {sheetOptions.map((opt) => {
+            const selected = (filterSheet === 'campus' ? filterCampus : filterSkills).includes(opt);
+            const label = filterSheet === 'campus' ? campusLabel(opt) : opt;
+            return (
+              <Tactile
+                key={opt}
+                haptic="selection"
+                onPress={() => toggleFilter(filterSheet === 'campus' ? 'campus' : 'skills', opt)}
+                style={[styles.filterSheetChip, selected && styles.filterSheetChipSel]}
+                accessibilityLabel={label}
+              >
+                {selected && <Check size={13} color={Brand.inkOnBrand} weight="bold" />}
+                <Text style={[styles.filterSheetChipText, selected && styles.filterSheetChipTextSel]}>{label}</Text>
+              </Tactile>
+            );
+          })}
+          {sheetOptions.length === 0 && (
+            <Text style={styles.filterSheetEmpty}>{filterSearch ? 'No matches.' : 'Nothing to filter on yet.'}</Text>
+          )}
+        </ScrollView>
+      </BottomSheet>
     </View>
+  );
+}
+
+/// Borderless icon + label filter trigger. No bubble/outline when inactive;
+/// a soft warm-tan tint (no border) + accent + count when it has selections.
+function FilterButton({
+  Icon,
+  label,
+  count,
+  onPress,
+}: {
+  Icon: React.ComponentType<IconProps>;
+  label: string;
+  count: number;
+  onPress: () => void;
+}) {
+  const active = count > 0;
+  const tint = active ? Brand.accent : Brand.inkLabel;
+  return (
+    <Tactile
+      haptic="tap"
+      onPress={onPress}
+      style={[styles.filterBtn, active && styles.filterBtnActive]}
+      accessibilityLabel={`Filter by ${label}`}
+    >
+      <Icon size={15} color={tint} weight={active ? 'fill' : 'regular'} />
+      <Text style={[styles.filterBtnText, active && styles.filterBtnTextActive]}>
+        {label}{active ? ` · ${count}` : ''}
+      </Text>
+      <CaretDown size={11} color={active ? Brand.accent : Brand.inkMuted} weight="bold" />
+    </Tactile>
   );
 }
 
@@ -564,6 +728,56 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+
+  // ── Filter row (above the card) — borderless icon+label triggers.
+  filterRow: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: Space.lg - 4, paddingBottom: 4 },
+  filterBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999, // only matters when the active tint shows
+  },
+  filterBtnActive: { backgroundColor: 'rgba(212, 180, 144, 0.18)' }, // soft warm tint, no border
+  filterBtnText: { fontFamily: AmbitFont.body, fontSize: 14, fontWeight: '600', color: Brand.inkBody },
+  filterBtnTextActive: { color: Brand.accent },
+  filterClear: { paddingHorizontal: 8, paddingVertical: 6 },
+  filterClearText: { fontFamily: AmbitFont.body, fontSize: 13.5, fontWeight: '600', color: Brand.accent },
+
+  // ── Filter sheet (searchable, tall + scrollable) ───────────────────────
+  filterSheetHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, paddingHorizontal: 4 },
+  filterSheetTitle: { fontFamily: AmbitFont.display, fontSize: 22, color: Brand.inkPrimary },
+  filterSheetClear: { paddingVertical: 4, paddingHorizontal: 4 },
+  filterSheetClearText: { fontFamily: AmbitFont.body, fontSize: 13.5, fontWeight: '600', color: Brand.accent },
+  filterSearchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 12,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: Brand.surface1,
+    marginBottom: 14,
+  },
+  filterSearchInput: { flex: 1, fontFamily: AmbitFont.body, fontSize: 15, color: Brand.inkBody, padding: 0 },
+  filterScroll: { flex: 1 },
+  filterSheetChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingBottom: 16 },
+  filterSheetChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 999,
+    backgroundColor: Brand.surface1,
+    borderWidth: 1,
+    borderColor: Brand.borderDefault,
+  },
+  filterSheetChipSel: { backgroundColor: Brand.primary, borderColor: Brand.primary },
+  filterSheetChipText: { fontFamily: AmbitFont.body, fontSize: 14, fontWeight: '600', color: Brand.inkBody },
+  filterSheetChipTextSel: { color: Brand.inkOnBrand },
+  filterSheetEmpty: { fontFamily: AmbitFont.body, fontSize: 14, color: Brand.inkMuted, paddingVertical: 12 },
   wordmark: {
     fontFamily: AmbitFont.display,
     fontSize: 26,

@@ -1,8 +1,9 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { CalendarBlank, CalendarCheck, CalendarX } from 'phosphor-react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import type { AvailabilityPollRow } from '../../lib/availability';
 import { AmbitFont, Brand, Radii } from '../../constants/theme';
+import { StructuredHeader, structuredStyles } from './structuredCard';
+import { Tactile } from '../atoms';
 
 interface Props {
   poll:   AvailabilityPollRow;
@@ -17,39 +18,28 @@ interface Props {
 /// scheduling bubble (from settled_scheduling_request_id) sits in
 /// its own message right below and handles calendar add.
 export function AvailabilityPollBubble({ poll, isMine, onOpen }: Props) {
-  const isOpen      = poll.status === 'open';
-  const isClosed    = poll.status === 'closed';
-  const isCancelled = poll.status === 'cancelled';
-
-  const headerIcon = isOpen ? CalendarBlank : isClosed ? CalendarCheck : CalendarX;
-  const HeaderIcon = headerIcon;
+  const isOpen   = poll.status === 'open';
+  const isClosed = poll.status === 'closed';
 
   return (
-    <View style={[styles.card, isMine && styles.cardMine]}>
-      <View style={styles.headerRow}>
-        <HeaderIcon
-          size={16}
-          color={isMine ? Brand.primary : Brand.accent}
-          weight="bold"
-        />
-        <Text style={[styles.headerText, isMine && styles.accentMine]} numberOfLines={1}>
-          {poll.title}
-        </Text>
-      </View>
+    <View style={[isMine ? structuredStyles.surfaceDark : structuredStyles.surfaceLight]}>
+      <StructuredHeader label="AVAILABILITY" title={poll.title} dark={isMine} />
 
       <Text style={[styles.subline, isMine && styles.subTextOnBrand]}>
         {formatRange(poll)} · {poll.day_start_hour}:00–{poll.day_end_hour}:00
       </Text>
 
       {isOpen ? (
-        <Pressable
+        <Tactile
           onPress={onOpen}
+          haptic="tap"
           style={[styles.openBtn, isMine && styles.openBtnMine]}
+          accessibilityLabel="Open availability poll"
         >
           <Text style={[styles.openBtnText, isMine && styles.accentMine]}>
             Open availability poll
           </Text>
-        </Pressable>
+        </Tactile>
       ) : (
         <Text style={[styles.statusText, isMine && styles.subTextOnBrand]}>
           {isClosed ? 'Locked in — see meeting below' : 'Cancelled'}

@@ -19,6 +19,8 @@ import {
   getStoredLocalEventId,
 } from '../../lib/deviceCalendar';
 import { AmbitFont, Brand, Radii } from '../../constants/theme';
+import { StructuredHeader, structuredStyles } from './structuredCard';
+import { Tactile } from '../atoms';
 
 interface Props {
   request: SchedulingRequestRow;
@@ -139,8 +141,8 @@ export function SchedulingBubble({ request, meId, isMine }: Props) {
   // ── Render ────────────────────────────────────────────────
   if (request.status === 'accepted' && request.accepted_slot) {
     return (
-      <View style={[styles.card, isMine && styles.cardMine]}>
-        <Header title={request.title} isMine={isMine} />
+      <View style={[isMine ? structuredStyles.surfaceDark : structuredStyles.surfaceLight]}>
+        <StructuredHeader label="MEETING" title={request.title} dark={isMine} />
         <View style={styles.confirmedRow}>
           <CheckCircle
             size={18}
@@ -191,8 +193,8 @@ export function SchedulingBubble({ request, meId, isMine }: Props) {
 
   if (request.status === 'declined' || request.status === 'cancelled') {
     return (
-      <View style={[styles.card, styles.cardTombstone, isMine && styles.cardMine]}>
-        <Header title={request.title} isMine={isMine} />
+      <View style={[isMine ? structuredStyles.surfaceDark : structuredStyles.surfaceLight, styles.cardTombstone]}>
+        <StructuredHeader label="MEETING" title={request.title} dark={isMine} />
         <View style={styles.confirmedRow}>
           <XCircle
             size={18}
@@ -209,8 +211,8 @@ export function SchedulingBubble({ request, meId, isMine }: Props) {
 
   // status === 'proposed'
   return (
-    <View style={[styles.card, isMine && styles.cardMine]}>
-      <Header title={request.title} isMine={isMine} />
+    <View style={[isMine ? structuredStyles.surfaceDark : structuredStyles.surfaceLight]}>
+      <StructuredHeader label="MEETING" title={request.title} dark={isMine} />
 
       {isProposer ? (
         <Text style={[styles.waitingText, isMine && styles.textOnBrand]}>
@@ -227,18 +229,16 @@ export function SchedulingBubble({ request, meId, isMine }: Props) {
               </Text>
             </View>
           ) : (
-            <Pressable
+            <Tactile
               key={i}
               onPress={() => handleAccept(i)}
               disabled={busy}
-              style={({ pressed }) => [
-                styles.slotBtn,
-                pressed && { opacity: 0.85 },
-                busy && { opacity: 0.6 },
-              ]}
+              haptic="selection"
+              style={[styles.slotBtn, busy && { opacity: 0.6 }]}
+              accessibilityLabel={`Accept ${formatSlot(slot)}`}
             >
               <Text style={styles.slotBtnText}>{formatSlot(slot)}</Text>
-            </Pressable>
+            </Tactile>
           ),
         )}
       </View>
@@ -260,20 +260,6 @@ export function SchedulingBubble({ request, meId, isMine }: Props) {
   );
 }
 
-function Header({ title, isMine }: { title: string; isMine: boolean }) {
-  return (
-    <View style={styles.headerRow}>
-      <CalendarBlank
-        size={16}
-        color={isMine ? Brand.primary : Brand.accent}
-        weight="bold"
-      />
-      <Text style={[styles.headerText, isMine && styles.headerTextMine]} numberOfLines={1}>
-        {title}
-      </Text>
-    </View>
-  );
-}
 
 function formatSlot(slot: SchedulingSlot): string {
   const d = new Date(slot.start);

@@ -27,6 +27,7 @@ import { Chip } from '../atoms';
 import { supabase } from '../../lib/supabase';
 import { CAMPUSES } from '../../data/mock';
 import { formatResponseRate, formatResponseTime } from '../../lib/closureLoop';
+import { isOnline, presenceLabel } from '../../lib/presence';
 import { AmbitFont, Brand, Radii, Space } from '../../constants/theme';
 
 const { width: SCREEN_W } = Dimensions.get('window');
@@ -36,15 +37,18 @@ const { width: SCREEN_W } = Dimensions.get('window');
 /// to morph into the full profile card.
 // Hearth pill: wider glass pill with photo + name + presence row.
 const PILL_W = 140;
-const PILL_H = 78;
+const PILL_H = 100;
 const CARD_W = SCREEN_W - 24;
 const CARD_H = 560;
-const AVATAR_IN_PILL_SIZE = 36;
+const AVATAR_IN_PILL_SIZE = 44;
 
 interface Props {
   partnerId:        string | null;
   partnerName:      string;
   partnerPhotoUrl?: string | null;
+  /// Partner's last-active timestamp (profiles.last_active_at). Drives the
+  /// presence dot color (online vs muted) and the "Active …" subline.
+  partnerLastActiveAt?: string | null;
   /// Top inset to anchor the pill's resting position below the status
   /// bar. Caller passes `paddingTop` (e.g. 6) plus any inset already
   /// applied by a SafeAreaView ancestor.
@@ -98,6 +102,7 @@ export function PartnerProfileIsland({
   partnerId,
   partnerName,
   partnerPhotoUrl,
+  partnerLastActiveAt,
   top,
   currentConversationId,
   meUserId,
@@ -305,11 +310,14 @@ export function PartnerProfileIsland({
               </View>
             )}
             <View style={styles.pillNameRow}>
-              <Text style={styles.pillStatusDot}>●</Text>
+              <Text style={[styles.pillStatusDot, !isOnline(partnerLastActiveAt) && styles.pillStatusDotOff]}>●</Text>
               <Text style={styles.pillName} numberOfLines={1}>
                 {(partnerName ?? '').split(' ')[0] || 'Profile'}
               </Text>
             </View>
+            {presenceLabel(partnerLastActiveAt) && (
+              <Text style={styles.pillPresence} numberOfLines={1}>{presenceLabel(partnerLastActiveAt)}</Text>
+            )}
           </Pressable>
         </Animated.View>
 
@@ -555,7 +563,7 @@ const styles = StyleSheet.create({
   pillAvatar: {
     width: AVATAR_IN_PILL_SIZE,
     height: AVATAR_IN_PILL_SIZE,
-    borderRadius: 10,
+    borderRadius: 13,
   },
   pillAvatarFallback: {
     backgroundColor: Brand.surface2,
@@ -564,7 +572,7 @@ const styles = StyleSheet.create({
   },
   pillAvatarInitial: {
     fontFamily: AmbitFont.display,
-    fontSize: 18,
+    fontSize: 22,
     color: Brand.inkLabel,
   },
   pillNameRow: {
@@ -584,6 +592,14 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: Brand.inkPrimary,
     letterSpacing: -0.1,
+  },
+  pillStatusDotOff: { color: Brand.inkMuted },
+  pillPresence: {
+    fontFamily: AmbitFont.body,
+    fontSize: 10,
+    fontWeight: '600',
+    color: Brand.inkMuted,
+    letterSpacing: 0.1,
   },
 
   // Expanded card content

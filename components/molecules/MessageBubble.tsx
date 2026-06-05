@@ -14,6 +14,10 @@ import { Paperclip, Warning } from 'phosphor-react-native';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 
+/// Ids that have already played their entrance — so a message animates in
+/// exactly once (a new/sent message), never again on FlatList scroll-recycle.
+const animatedMsgIds = new Set<string>();
+
 // Screen-anchored gradient revealed through my (outgoing) bubbles. The
 // gradient is the size of the whole screen and stays pinned to the viewport;
 // each bubble clips it to its own rect, so a bubble shows whatever slice it
@@ -30,7 +34,12 @@ import type { SchedulingRequestRow } from '../../lib/scheduling';
 import { SchedulingBubble } from './SchedulingBubble';
 import type { AvailabilityPollRow } from '../../lib/availability';
 import { AvailabilityPollBubble } from './AvailabilityPollBubble';
+import type { ProjectRefRow } from '../../lib/messaging';
+import type { PortfolioItem } from '../../data/mock';
+import { ProjectAttachmentBubble } from './ProjectAttachmentBubble';
+import { PortfolioAttachmentBubble } from './PortfolioAttachmentBubble';
 import { AmbitFont, Brand, Radii, Space } from '../../constants/theme';
+import { Motion } from '../../constants/motion';
 
 /// Send lifecycle for a locally-originated message — used to render the
 /// in-flight spinner / failure marker on my-own bubbles. Partner bubbles
@@ -81,12 +90,29 @@ interface Props {
   /// AvailabilityPollBubble. Tap on "Open" propagates up.
   availabilityPoll?: AvailabilityPollRow | null;
   onOpenAvailabilityPoll?: (pollId: string) => void;
+  /// When the message carries an attached project, the parent provides the
+  /// project row so the bubble renders a tappable project card. Tap opens
+  /// the preview (propagated up via onOpenProjectRef).
+  projectRef?: ProjectRefRow | null;
+  onOpenProjectRef?: (project: ProjectRefRow) => void;
+  /// Resolved portfolio highlight for a portfolio_ref_id message; tapping the
+  /// card opens the one-page preview (propagated via onOpenPortfolioRef).
+  portfolioRef?: PortfolioItem | null;
+  onOpenPortfolioRef?: (item: PortfolioItem) => void;
   /// Native-driven scroll offset of the message list + a plain ref mirror of
   /// its current value. Used by my own bubbles to keep their screen-anchored
   /// gradient pinned to the viewport as the list scrolls. Optional — when
   /// absent, mine bubbles just use their solid fallback fill.
   scrollY?:    Animated.Value;
   scrollYRef?: { current: number };
+  /// Message grouping (consecutive messages from the same sender within a
+  /// short window). `firstInGroup` controls top spacing; `lastInGroup` controls
+  /// the avatar + the bubble's tail corner. Both default true → ungrouped.
+  firstInGroup?: boolean;
+  lastInGroup?:  boolean;
+  /// When true (a message that arrived after the thread mounted), the bubble
+  /// fades + rises in on the shared motion curve. Historical messages don't.
+  animateIn?: boolean;
 }
 
 /// Resolve a path into a renderable URL. Local URIs (file://) pass through
@@ -166,9 +192,28 @@ export function MessageBubble({
   schedulingRequest,
   availabilityPoll,
   onOpenAvailabilityPoll,
+  projectRef,
+  onOpenProjectRef,
+  portfolioRef,
+  onOpenPortfolioRef,
   scrollY,
   scrollYRef,
+  firstInGroup = true,
+  lastInGroup = true,
+  animateIn = false,
 }: Props) {
+  // Entrance: fade + rise, once per id (new/sent messages only).
+  const shouldAnimate = animateIn && !animatedMsgIds.has(message.id);
+  const entrance = useRef(new Animated.Value(shouldAnimate ? 0 : 1)).current;
+  useEffect(() => {
+    if (shouldAnimate) {
+      animatedMsgIds.add(message.id);
+      Animated.timing(entrance, { toValue: 1, duration: 280, easing: Motion.easeOutExpo, useNativeDriver: true }).start();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const entranceY = entrance.interpolate({ inputRange: [0, 1], outputRange: [10, 0] });
+
   const attachmentUrl = useAttachmentUrl(message.attachment_url);
   const isDeleted = !!message.deleted_at;
 
@@ -233,6 +278,32 @@ export function MessageBubble({
     );
   }
 
+  // Project attachment — tappable project card in place of the body text.
+  if (message.project_ref_id && projectRef && !isDeleted) {
+    return (
+      <View style={[styles.row, isMine ? styles.rowMine : styles.rowTheirs]}>
+        <ProjectAttachmentBubble
+          project={projectRef}
+          isMine={isMine}
+          onPress={() => onOpenProjectRef?.(projectRef)}
+        />
+      </View>
+    );
+  }
+
+  // Portfolio-highlight attachment — tappable highlight card.
+  if (message.portfolio_ref_id && portfolioRef && !isDeleted) {
+    return (
+      <View style={[styles.row, isMine ? styles.rowMine : styles.rowTheirs]}>
+        <PortfolioAttachmentBubble
+          item={portfolioRef}
+          isMine={isMine}
+          onPress={() => onOpenPortfolioRef?.(portfolioRef)}
+        />
+      </View>
+    );
+  }
+
   const readByPartner =
     isMine &&
     partnerLastReadAt !== null &&
@@ -245,12 +316,21 @@ export function MessageBubble({
   }, {});
 
   return (
-    <View style={[styles.row, isMine ? styles.rowMine : styles.rowTheirs]}>
+    <Animated.View
+      style={[
+        styles.row,
+        isMine ? styles.rowMine : styles.rowTheirs,
+        !firstInGroup && styles.rowGrouped,
+        { opacity: entrance, transform: [{ translateY: entranceY }] },
+      ]}
+    >
       {/* Inner row aligns the avatar to the bubble's bottom edge —
           iMessage pattern. Partner avatar on the LEFT (outside-of-
-          screen-edge side), mine on the RIGHT for the mirror. */}
+          screen-edge side), mine on the RIGHT for the mirror. The avatar
+          shows only on the LAST bubble of a run; earlier bubbles keep a
+          spacer so the column stays aligned. */}
       <View style={styles.bubbleRow}>
-        {!isMine && <Avatar url={avatarUrl} name={senderName} />}
+        {!isMine && (lastInGroup ? <Avatar url={avatarUrl} name={senderName} /> : <View style={styles.avatarSpacer} />)}
         <Pressable
           ref={bubbleRef}
           onLayout={measureBubble}
@@ -260,6 +340,8 @@ export function MessageBubble({
           style={[
             styles.bubble,
             isMine ? styles.bubbleMine : styles.bubbleTheirs,
+            // Tail corner only on the last bubble of a run; otherwise round it.
+            !lastInGroup && (isMine ? styles.bubbleMineGrouped : styles.bubbleTheirsGrouped),
             isDeleted && styles.bubbleDeleted,
             isMine && status === 'sending' && styles.bubblePending,
             isMine && status === 'failed' && styles.bubbleFailed,
@@ -345,7 +427,7 @@ export function MessageBubble({
           <Text style={[styles.body, isMine && styles.bodyMine]}>{message.body}</Text>
         ) : null}
       </Pressable>
-        {isMine && <Avatar url={avatarUrl} name={senderName} />}
+        {isMine && (lastInGroup ? <Avatar url={avatarUrl} name={senderName} /> : <View style={styles.avatarSpacer} />)}
       </View>
 
       {/* External status line — iMessage style. Only renders for the latest
@@ -401,7 +483,7 @@ export function MessageBubble({
           })}
         </View>
       )}
-    </View>
+    </Animated.View>
   );
 }
 
@@ -447,8 +529,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: Space.md,
     marginVertical: 3,
   },
+  // Grouped (same sender, back-to-back): tuck closer so a run reads as one voice.
+  rowGrouped: { marginTop: 0 },
   rowMine:   { alignItems: 'flex-end' },
   rowTheirs: { alignItems: 'flex-start' },
+  // Keeps the bubble column aligned when the avatar is hidden mid-run.
+  avatarSpacer: { width: 32 },
 
   // Inner row that pairs the avatar with the bubble. alignItems:flex-end
   // anchors the avatar to the bubble's bottom edge regardless of how
@@ -539,11 +625,22 @@ const styles = StyleSheet.create({
     height: SCREEN_H,
   },
   bubbleTheirs: {
-    // Modern soft incoming fill — a clean, barely-warm gray that reads as a
-    // crisp bubble on the white canvas.
-    backgroundColor: '#F2EFEA',
+    // Warm incoming surface with real depth — a soft drop shadow + hairline so
+    // it reads as a crafted, lifted card on the white canvas (parity with the
+    // gradient mine bubble), tied into the warm-tan brand rather than neutral.
+    backgroundColor: '#F4EFE7',
     borderBottomLeftRadius: 4,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(60,40,20,0.06)',
+    shadowColor: Brand.hearthBubbleTheirsShadow,
+    shadowOpacity: 1,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 1,
   },
+  // Mid-run bubbles round their tail corner (the tail belongs to the last one).
+  bubbleTheirsGrouped: { borderBottomLeftRadius: 20 },
+  bubbleMineGrouped:   { borderBottomRightRadius: 20 },
   bubbleDeleted: { opacity: 0.65 },
   // Optimistic-send tints: while in flight the bubble is slightly
   // translucent; on failure it shifts to a muted red so the user sees the

@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
-import { AccessibilityInfo, Animated, Easing } from 'react-native';
+import { AccessibilityInfo, Animated } from 'react-native';
 import type { StyleProp, ViewStyle } from 'react-native';
+import { Motion } from '../../constants/motion';
 
 interface Props {
   children: React.ReactNode;
@@ -19,7 +20,7 @@ interface Props {
 /// Native-driver (opacity + translateY) so it stays smooth alongside the
 /// screen-level slide transition. Respects the OS "Reduce Motion" setting —
 /// when on, content simply appears with no movement.
-export function Entrance({ children, index = 0, step = 70, offset = 14, style }: Props) {
+export function Entrance({ children, index = 0, step = Motion.stagger, offset = 14, style }: Props) {
   const t = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -33,9 +34,8 @@ export function Entrance({ children, index = 0, step = 70, offset = 14, style }:
         }
         Animated.timing(t, {
           toValue: 1,
-          duration: 420,
+          ...Motion.timing,
           delay: index * step,
-          easing: Easing.out(Easing.cubic),
           useNativeDriver: true,
         }).start();
       })

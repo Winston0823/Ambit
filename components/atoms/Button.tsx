@@ -2,15 +2,15 @@ import React, { useRef } from 'react';
 import {
   Animated,
   Image,
-  Platform,
   Pressable,
   StyleSheet,
   Text,
   TextStyle,
   ViewStyle,
 } from 'react-native';
-import * as Haptics from 'expo-haptics';
 import { Brand, Radii, AmbitFont } from '../../constants/theme';
+import { Motion } from '../../constants/motion';
+import { haptics } from '../../lib/haptics';
 
 type Variant = 'primary' | 'secondary' | 'ghost';
 
@@ -43,29 +43,15 @@ export function Button({
 
   const press = () => {
     if (disabled) return;
-    if (Platform.OS !== 'web') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    }
+    haptics.tap();
     onPress();
   };
 
-  const pressIn = () => {
-    Animated.spring(scale, {
-      toValue: 0.96,
-      friction: 8,
-      tension: 240,
-      useNativeDriver: true,
-    }).start();
-  };
+  const pressIn = () =>
+    Animated.spring(scale, { toValue: Motion.press.scale, ...Motion.press.in, useNativeDriver: true }).start();
 
-  const pressOut = () => {
-    Animated.spring(scale, {
-      toValue: 1,
-      friction: 5,
-      tension: 200,
-      useNativeDriver: true,
-    }).start();
-  };
+  const pressOut = () =>
+    Animated.spring(scale, { toValue: 1, ...Motion.press.out, useNativeDriver: true }).start();
 
   return (
     <Animated.View style={{ transform: [{ scale }] }}>

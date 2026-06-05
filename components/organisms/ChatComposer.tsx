@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   Animated,
-  Easing,
   Image,
   LayoutAnimation,
   Pressable,
@@ -13,11 +12,9 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import {
   CalendarPlus,
-  Camera,
   Clock,
-  FileText,
   ImageSquare,
-  MapPin,
+  Images,
   PaperPlaneTilt,
   Paperclip,
   PencilSimple,
@@ -26,6 +23,7 @@ import {
 } from 'phosphor-react-native';
 import type { MessageRow } from '../../lib/messaging';
 import { AmbitFont, Brand, Radii, Space } from '../../constants/theme';
+import { Motion } from '../../constants/motion';
 
 interface Props {
   /// When set, the composer shows a quoted preview above the input and
@@ -51,6 +49,9 @@ interface Props {
   /// from onOpenScheduling — that one books a specific time, this one
   /// runs a poll across a date range.
   onOpenAvailabilityPoll?: () => void;
+  /// Opens the portfolio-highlight picker so the user can share one of their
+  /// own highlights into the thread. Hidden when undefined.
+  onOpenPortfolio?: () => void;
   /// Fired on every meaningful keystroke. Caller debounces & broadcasts
   /// presence; the composer just signals intent.
   onTypingPing:    () => void;
@@ -79,6 +80,7 @@ export function ChatComposer({
   onSaveEdit,
   onOpenScheduling,
   onOpenAvailabilityPoll,
+  onOpenPortfolio,
   onTypingPing,
   attachMenuOpen,
   onToggleAttachMenu,
@@ -98,18 +100,17 @@ export function ChatComposer({
 
   const sendEnabled = (!!text.trim() || !!pendingAttachment) && !sending;
   useEffect(() => {
-    Animated.timing(sendActivation, {
+    // Spring (soft overshoot) so the send button pops in when there's
+    // something to send — the shared motion language.
+    Animated.spring(sendActivation, {
       toValue: sendEnabled ? 1 : 0,
-      duration: 150,
-      easing: Easing.inOut(Easing.cubic),
+      ...Motion.spring,
       useNativeDriver: true,
     }).start();
   }, [sendEnabled, sendActivation]);
 
-  const sendOpacity = sendActivation.interpolate({
-    inputRange:  [0, 1],
-    outputRange: [0.4, 1],
-  });
+  const sendOpacity = sendActivation.interpolate({ inputRange: [0, 1], outputRange: [0.35, 1] });
+  const sendScale   = sendActivation.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] });
 
   // Sync text into the editor when an edit starts. Using key change in the
   // parent could also do this; keeping it local avoids a remount on every
@@ -280,7 +281,7 @@ export function ChatComposer({
           disabled={!sendEnabled}
           accessibilityLabel={editing ? 'Save edit' : 'Send'}
         >
-          <Animated.View style={[styles.sendBtn, { opacity: sendOpacity }]}>
+          <Animated.View style={[styles.sendBtn, { opacity: sendOpacity, transform: [{ scale: sendScale }] }]}>
             <PaperPlaneTilt size={16} color={Brand.inkOnBrand} weight="fill" />
           </Animated.View>
         </Pressable>
@@ -288,8 +289,7 @@ export function ChatComposer({
 
       {/* Attachment grid — WeChat pattern. Lives BELOW the input row in
           the keyboard's vacated footprint. Parent dismisses the keyboard
-          before flipping attachMenuOpen=true. Photos is the only live
-          action today; Camera / File / Location are dim placeholders. */}
+          before flipping attachMenuOpen=true. Photos / Meeting / Highlight are the live actions. */}
       {attachMenuOpen && !editing && (
         <View style={styles.attachGrid}>
           <View style={styles.attachGridRow}>
@@ -321,24 +321,17 @@ export function ChatComposer({
                 }}
               />
             )}
-            <AttachTile
-              Icon={Camera}
-              label="Camera"
-              tint={Brand.surface2}
-              disabled
-            />
-            <AttachTile
-              Icon={FileText}
-              label="File"
-              tint={Brand.surface2}
-              disabled
-            />
-            <AttachTile
-              Icon={MapPin}
-              label="Location"
-              tint={Brand.surface2}
-              disabled
-            />
+            {onOpenPortfolio && (
+              <AttachTile
+                Icon={Images}
+                label="Highlight"
+                tint={Brand.primary}
+                onPress={() => {
+                  onCloseAttachMenu();
+                  onOpenPortfolio();
+                }}
+              />
+            )}
           </View>
         </View>
       )}

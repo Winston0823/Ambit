@@ -322,7 +322,9 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     paddingHorizontal: Space.lg,
-    paddingTop: Space.md,
+    // Tighter top so the card reclaims height + sits closer to the filter row
+    // (the row above already provides the breathing room from the wordmark).
+    paddingTop: Space.sm,
     paddingBottom: Space.md,
   },
   cardArea: { flex: 1, position: 'relative' },
