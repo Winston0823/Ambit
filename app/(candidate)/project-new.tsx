@@ -11,12 +11,10 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Plus, X } from 'phosphor-react-native';
 import { BackChevron, OnboardingProgress } from '../../components/atoms';
-import { BottomSheet } from '../../components/molecules';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
-import { ROLE_CATEGORIES, ROLE_SKILLS, SKILL_CATEGORIES } from '../../data/mock';
+import { ROLE_CATEGORIES, skillsForRoles } from '../../data/mock';
 import { AmbitFont, Brand, Space } from '../../constants/theme';
 
 const BLURB_MIN = 10;
@@ -43,11 +41,6 @@ export default function ProjectNewScreen() {
   const [title, setTitle] = useState('');
   const [vibe, setVibe] = useState('');
   const [roles, setRoles] = useState<string[]>([]);
-  // Skills are DERIVED from roles (a role implies its skills). The owner can
-  // tweak: manualSkills adds beyond the roles, removedSkills drops auto ones.
-  const [manualSkills, setManualSkills] = useState<string[]>([]);
-  const [removedSkills, setRemovedSkills] = useState<string[]>([]);
-  const [skillSheet, setSkillSheet] = useState(false);
   const [campusId, setCampusId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -63,29 +56,11 @@ export default function ProjectNewScreen() {
 
   const allRoles = useMemo(() => ROLE_CATEGORIES.flatMap((c) => c.roles), []);
 
-  // Effective skill set = roles' implied skills + manual adds − manual removes.
-  const skills = useMemo(() => {
-    const fromRoles = new Set(roles.flatMap((r) => ROLE_SKILLS[r] ?? []));
-    manualSkills.forEach((s) => fromRoles.add(s));
-    removedSkills.forEach((s) => fromRoles.delete(s));
-    return [...fromRoles];
-  }, [roles, manualSkills, removedSkills]);
-
   const toggleRole = (r: string) =>
     setRoles((rs) => (rs.includes(r) ? rs.filter((x) => x !== r) : [...rs, r]));
 
-  const removeSkill = (s: string) => {
-    setManualSkills((m) => m.filter((x) => x !== s));
-    setRemovedSkills((r) => (r.includes(s) ? r : [...r, s]));
-  };
-  const addSkill = (s: string) => {
-    setRemovedSkills((r) => r.filter((x) => x !== s));
-    setManualSkills((m) => (m.includes(s) ? m : [...m, s]));
-  };
-  const toggleSkill = (s: string) => (skills.includes(s) ? removeSkill(s) : addSkill(s));
-
   const detailsValid = title.trim().length > 0 && vibe.trim().length >= BLURB_MIN;
-  const whoValid = skills.length >= 1;
+  const whoValid = roles.length >= 1;
   const canAdvance = step === 0 ? detailsValid : whoValid;
 
   const submit = async () => {
@@ -98,7 +73,7 @@ export default function ProjectNewScreen() {
           owner_id: user.id,
           title: title.trim(),
           vibe_blurb: vibe.trim(),
-          required_skills: skills,
+          required_skills: skillsForRoles(roles),
           roles_sought: roles,
           campus_id: campusId,
         })
@@ -163,7 +138,7 @@ export default function ProjectNewScreen() {
         ) : (
           <>
             <Text style={styles.h}>Who do you{'\n'}need?</Text>
-            <Text style={styles.sub}>Pick the roles you're hiring for — we'll fill in the skills to match on.</Text>
+            <Text style={styles.sub}>Pick the roles you're hiring for. We match people by the skills each role needs.</Text>
 
             <Text style={styles.secLabel}>ROLES YOU'RE HIRING</Text>
             <View style={styles.chips}>
@@ -171,25 +146,6 @@ export default function ProjectNewScreen() {
                 <SteerChip key={r} label={r} selected={roles.includes(r)} onPress={() => toggleRole(r)} />
               ))}
             </View>
-
-            {(roles.length > 0 || skills.length > 0) && (
-              <>
-                <Text style={[styles.secLabel, { marginTop: 34 }]}>SKILLS WE'LL MATCH ON</Text>
-                <Text style={styles.skillHint}>Auto-filled from your roles — tap × to remove, or add your own.</Text>
-                <View style={styles.chips}>
-                  {skills.map((s) => (
-                    <Pressable key={s} onPress={() => removeSkill(s)} style={[styles.chip, styles.chipOn, styles.skillChip]}>
-                      <Text style={[styles.chipText, styles.chipTextOn]}>{s}</Text>
-                      <X size={13} color={Brand.cardCream} weight="bold" />
-                    </Pressable>
-                  ))}
-                  <Pressable onPress={() => setSkillSheet(true)} style={[styles.chip, styles.addChip]}>
-                    <Plus size={14} color={Brand.accent} weight="bold" />
-                    <Text style={styles.addChipText}>Add</Text>
-                  </Pressable>
-                </View>
-              </>
-            )}
           </>
         )}
         <View style={{ height: 120 }} />
@@ -206,22 +162,6 @@ export default function ProjectNewScreen() {
           <Text style={styles.ctaText}>{step === 0 ? 'Continue' : 'Create project'}</Text>
         )}
       </Pressable>
-
-      <BottomSheet visible={skillSheet} onClose={() => setSkillSheet(false)} snapPoints={[0.5, 0.92]}>
-        <Text style={styles.sheetTitle}>Skills to match on</Text>
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 20 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-          {SKILL_CATEGORIES.map((cat) => (
-            <View key={cat.label} style={styles.skillCat}>
-              <Text style={styles.skillCatLabel}>{cat.label}</Text>
-              <View style={styles.chips}>
-                {cat.tags.map((t) => (
-                  <SteerChip key={t} label={t} selected={skills.includes(t)} onPress={() => toggleSkill(t)} />
-                ))}
-              </View>
-            </View>
-          ))}
-        </ScrollView>
-      </BottomSheet>
     </View>
   );
 }

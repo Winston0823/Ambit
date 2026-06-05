@@ -92,6 +92,15 @@ export const ROLE_SKILLS: Record<string, string[]> = {
   'Content / Social':  ['Marketing', 'Brand'],
 };
 
+/// Derive the skills a project matches on from the roles it's hiring for.
+/// Owners pick roles; discovery still ranks on skill overlap, so we map roles
+/// → skills silently (no skills UI). De-duped, order-stable.
+export function skillsForRoles(roles: string[]): string[] {
+  const out: string[] = [];
+  for (const r of roles) for (const s of ROLE_SKILLS[r] ?? []) if (!out.includes(s)) out.push(s);
+  return out;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Discovery deck — owner view sees Seeker cards, seeker view sees Project cards.
 // Shape designed so the real matching API can swap in via one prop change:

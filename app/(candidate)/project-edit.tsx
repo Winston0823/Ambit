@@ -1,45 +1,52 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   Pressable,
+  ScrollView,
   StyleSheet,
   Switch,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Trash } from 'phosphor-react-native';
 import { BackChevron } from '../../components/atoms';
-import { ProjectForm, ProjectFormValues } from '../../components/organisms/ProjectForm';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
-import { AmbitFont, Brand, Radii, Space } from '../../constants/theme';
+import { ROLE_CATEGORIES, skillsForRoles } from '../../data/mock';
+import { AmbitFont, Brand } from '../../constants/theme';
 
-interface ProjectRow {
-  id: string;
-  owner_id: string;
-  title: string;
-  vibe_blurb: string;
-  required_skills: string[];
-  roles_sought: string[];
-  campus_id: string | null;
-  active: boolean;
+const BLURB_MIN = 10;
+const INK = '#2A2018';
+
+function SteerChip({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) {
+  return (
+    <Pressable onPress={onPress} style={[styles.chip, selected && styles.chipOn]}>
+      <Text style={[styles.chipText, selected && styles.chipTextOn]}>{label}</Text>
+    </Pressable>
+  );
 }
 
-/// S-101 Edit Project. Loads a project by id (must be owned by the
-/// signed-in user — RLS enforces this at the DB layer; we also check
-/// client-side so we can show a clearer error). Save updates the row;
-/// the Switch toggles `active` (soft pause); the destructive button
-/// hard-deletes after confirmation.
+/// Edit project — steered, roles-only (mirrors create). Skills are derived
+/// from the roles on save; owners never hand-pick them.
 export default function ProjectEditScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
-  const [project, setProject] = useState<ProjectRow | null>(null);
+
   const [loading, setLoading] = useState(true);
+  const [title, setTitle] = useState('');
+  const [vibe, setVibe] = useState('');
+  const [roles, setRoles] = useState<string[]>([]);
+  const [campusId, setCampusId] = useState<string | null>(null);
   const [active, setActive] = useState(true);
+  const [origText, setOrigText] = useState({ title: '', vibe: '' });
+  const [saving, setSaving] = useState(false);
+
+  const allRoles = useMemo(() => ROLE_CATEGORIES.flatMap((c) => c.roles), []);
 
   useEffect(() => {
     if (!id || !user) return;
@@ -47,7 +54,7 @@ export default function ProjectEditScreen() {
     (async () => {
       const { data, error } = await supabase
         .from('projects')
-        .select('id, owner_id, title, vibe_blurb, required_skills, roles_sought, campus_id, active')
+        .select('owner_id, title, vibe_blurb, roles_sought, campus_id, active')
         .eq('id', id)
         .maybeSingle();
       if (cancelled) return;
@@ -56,82 +63,74 @@ export default function ProjectEditScreen() {
         router.back();
         return;
       }
-      if (data.owner_id !== user.id) {
+      if ((data as any).owner_id !== user.id) {
         Alert.alert("Can't edit", "You don't own this project.");
         router.back();
         return;
       }
-      setProject(data);
-      setActive(data.active);
+      const d = data as any;
+      setTitle(d.title ?? '');
+      setVibe(d.vibe_blurb ?? '');
+      setRoles(d.roles_sought ?? []);
+      setCampusId(d.campus_id ?? null);
+      setActive(d.active);
+      setOrigText({ title: d.title ?? '', vibe: d.vibe_blurb ?? '' });
       setLoading(false);
     })();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [id, user?.id]);
 
-  const handleSubmit = async (values: ProjectFormValues) => {
-    if (!project) return;
-    // Re-embed only when the embeddable text actually changed. Skill or
-    // campus edits don't affect the vibe vector.
-    const textChanged =
-      values.title !== project.title || values.vibeBlurb !== project.vibe_blurb;
+  const toggleRole = (r: string) =>
+    setRoles((rs) => (rs.includes(r) ? rs.filter((x) => x !== r) : [...rs, r]));
 
-    const { error } = await supabase
-      .from('projects')
-      .update({
-        title: values.title,
-        vibe_blurb: values.vibeBlurb,
-        required_skills: values.requiredSkills,
-        roles_sought: values.rolesSought,
-        campus_id: values.campusId,
-        active,
-      })
-      .eq('id', project.id);
-    if (error) throw error;
+  const valid = title.trim().length > 0 && vibe.trim().length >= BLURB_MIN && roles.length >= 1;
 
-    if (textChanged) {
-      supabase.functions
-        .invoke('embed-vibe', {
-          body: {
-            table: 'projects',
-            id: project.id,
-            text: `${values.title}\n\n${values.vibeBlurb}`,
-          },
+  const save = async () => {
+    if (!id) return;
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from('projects')
+        .update({
+          title: title.trim(),
+          vibe_blurb: vibe.trim(),
+          required_skills: skillsForRoles(roles),
+          roles_sought: roles,
+          campus_id: campusId,
+          active,
         })
-        .catch((e) => console.warn('embed-vibe failed:', e?.message ?? e));
+        .eq('id', id);
+      if (error) throw error;
+      const textChanged = title.trim() !== origText.title || vibe.trim() !== origText.vibe;
+      if (textChanged) {
+        supabase.functions
+          .invoke('embed-vibe', { body: { table: 'projects', id, text: `${title.trim()}\n\n${vibe.trim()}` } })
+          .catch((e) => console.warn('embed-vibe failed:', e?.message ?? e));
+      }
+      router.back();
+    } catch (e: any) {
+      Alert.alert("Couldn't save", e?.message ?? 'Try again.');
+      setSaving(false);
     }
-
-    router.back();
   };
 
-  const handleDelete = () => {
-    if (!project) return;
-    Alert.alert(
-      'Delete this project?',
-      'This permanently removes it. Anyone who saved it will see it disappear.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            const { error } = await supabase
-              .from('projects')
-              .delete()
-              .eq('id', project.id);
-            if (error) {
-              Alert.alert('Delete failed', error.message);
-              return;
-            }
-            router.back();
-          },
+  const del = () => {
+    Alert.alert('Delete this project?', 'This permanently removes it. Anyone who saved it will see it disappear.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          if (!id) return;
+          const { error } = await supabase.from('projects').delete().eq('id', id);
+          if (error) { Alert.alert('Delete failed', error.message); return; }
+          router.back();
         },
-      ],
-    );
+      },
+    ]);
   };
 
-  if (loading || !project) {
+  if (loading) {
     return (
       <View style={[styles.root, styles.center]}>
         <BackChevron onPress={() => router.back()} />
@@ -143,105 +142,96 @@ export default function ProjectEditScreen() {
   return (
     <View style={styles.root}>
       <BackChevron onPress={() => router.back()} />
-      <View style={[styles.header, { marginTop: insets.top + 40 }]}>
-        <Text style={styles.title}>Edit project</Text>
-        <Text style={styles.subtitle}>
-          Update the pitch, swap skills, or pause matching when you're not actively recruiting.
-        </Text>
-      </View>
-      <ProjectForm
-        initialValues={{
-          title: project.title,
-          vibeBlurb: project.vibe_blurb,
-          requiredSkills: project.required_skills,
-          rolesSought: project.roles_sought ?? [],
-          campusId: project.campus_id,
-        }}
-        submitLabel="Save changes"
-        onSubmit={handleSubmit}
-        extraActions={
-          <View style={{ gap: Space.md, marginTop: Space.sm }}>
-            <View style={styles.toggleRow}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.toggleLabel}>
-                  {active ? 'Active' : 'Paused'}
-                </Text>
-                <Text style={styles.toggleHelp}>
-                  {active
-                    ? "Showing in seekers' discovery feed."
-                    : 'Hidden from discovery until you reactivate.'}
-                </Text>
-              </View>
-              <Switch
-                value={active}
-                onValueChange={setActive}
-                trackColor={{ false: Brand.borderDefault, true: Brand.primary }}
-                thumbColor={Brand.canvas}
-              />
-            </View>
-            <Pressable onPress={handleDelete} style={styles.deleteBtn}>
-              <Trash size={18} color={Brand.accent} weight="regular" />
-              <Text style={styles.deleteLabel}>Delete project</Text>
-            </Pressable>
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        <View style={{ height: insets.top + 34 }} />
+        <Text style={styles.kicker}>EDIT PROJECT</Text>
+
+        <View style={styles.field}>
+          <Text style={styles.fieldLabel}>PROJECT NAME</Text>
+          <TextInput value={title} onChangeText={setTitle} style={styles.input} maxLength={60} placeholderTextColor={Brand.inkPlaceholder} />
+        </View>
+        <View style={styles.field}>
+          <Text style={styles.fieldLabel}>ONE LINE THAT CAPTURES IT</Text>
+          <TextInput value={vibe} onChangeText={setVibe} style={[styles.input, styles.inputMultiline]} multiline maxLength={140} placeholderTextColor={Brand.inkPlaceholder} />
+        </View>
+
+        <Text style={styles.secLabel}>ROLES YOU'RE HIRING</Text>
+        <View style={styles.chips}>
+          {allRoles.map((r) => (
+            <SteerChip key={r} label={r} selected={roles.includes(r)} onPress={() => toggleRole(r)} />
+          ))}
+        </View>
+
+        <View style={styles.toggleRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.toggleLabel}>{active ? 'Active' : 'Paused'}</Text>
+            <Text style={styles.toggleHelp}>
+              {active ? "Showing in seekers' discovery feed." : 'Hidden from discovery until you reactivate.'}
+            </Text>
           </View>
-        }
-      />
+          <Switch value={active} onValueChange={setActive} trackColor={{ false: Brand.borderDefault, true: Brand.primary }} thumbColor={Brand.canvas} />
+        </View>
+
+        <Pressable onPress={del} style={styles.deleteBtn}>
+          <Trash size={18} color={Brand.accent} weight="regular" />
+          <Text style={styles.deleteLabel}>Delete project</Text>
+        </Pressable>
+
+        <View style={{ height: 120 }} />
+      </ScrollView>
+
+      <Pressable
+        onPress={save}
+        disabled={!valid || saving}
+        style={[styles.cta, { bottom: insets.bottom + 24 }, (!valid || saving) && styles.ctaDisabled]}
+      >
+        {saving ? <ActivityIndicator color={Brand.cardCream} /> : <Text style={styles.ctaText}>Save changes</Text>}
+      </Pressable>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: Brand.canvas },
+  root: { flex: 1, backgroundColor: Brand.cardCream },
   center: { alignItems: 'center', justifyContent: 'center' },
-  header: { paddingHorizontal: Space.lg, paddingBottom: Space.md },
-  title: {
-    fontFamily: AmbitFont.display,
-    fontSize: 30,
-    color: Brand.inkPrimary,
-  },
-  subtitle: {
-    fontFamily: AmbitFont.body,
-    fontSize: 14,
-    color: Brand.inkMuted,
-    marginTop: 8,
-    lineHeight: 20,
-  },
-  toggleRow: {
-    flexDirection: 'row',
+  scroll: { flex: 1 },
+  content: { paddingHorizontal: 28 },
+  kicker: { fontFamily: AmbitFont.body, fontSize: 12, fontWeight: '600', letterSpacing: 1.6, color: Brand.accent, marginBottom: 4 },
+
+  field: { marginTop: 30 },
+  fieldLabel: { fontFamily: AmbitFont.body, fontSize: 11, fontWeight: '600', letterSpacing: 1, color: Brand.inkLabel, marginBottom: 10 },
+  input: { fontFamily: AmbitFont.display, fontSize: 22, color: Brand.inkPrimary, borderBottomWidth: 1.5, borderBottomColor: Brand.borderDefault, paddingBottom: 10 },
+  inputMultiline: { fontSize: 18, lineHeight: 25, minHeight: 60, textAlignVertical: 'top' },
+
+  secLabel: { fontFamily: AmbitFont.body, fontSize: 11, fontWeight: '700', letterSpacing: 1.2, color: Brand.inkLabel, marginTop: 36, marginBottom: 14 },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  chip: { paddingHorizontal: 16, paddingVertical: 11, borderRadius: 999, backgroundColor: '#EBE3D5' },
+  chipOn: { backgroundColor: INK },
+  chipText: { fontFamily: AmbitFont.body, fontSize: 14.5, fontWeight: '500', color: '#5A4A36' },
+  chipTextOn: { color: Brand.cardCream },
+
+  toggleRow: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 16, marginTop: 34, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: Brand.borderSoft },
+  toggleLabel: { fontFamily: AmbitFont.body, fontSize: 15, fontWeight: '600', color: Brand.inkPrimary },
+  toggleHelp: { fontFamily: AmbitFont.body, fontSize: 12.5, color: Brand.inkMuted, marginTop: 3, lineHeight: 17 },
+
+  deleteBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 14, marginTop: 6 },
+  deleteLabel: { fontFamily: AmbitFont.body, fontSize: 15, fontWeight: '600', color: Brand.accent },
+
+  cta: {
+    position: 'absolute',
+    alignSelf: 'center',
+    backgroundColor: INK,
+    paddingHorizontal: 54,
+    paddingVertical: 17,
+    borderRadius: 999,
+    minWidth: 200,
     alignItems: 'center',
-    gap: 14,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    backgroundColor: Brand.surface1,
-    borderRadius: Radii.md,
+    shadowColor: '#241C14',
+    shadowOpacity: 0.22,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 6,
   },
-  toggleLabel: {
-    fontFamily: AmbitFont.body,
-    fontSize: 15,
-    fontWeight: '600',
-    color: Brand.inkPrimary,
-  },
-  toggleHelp: {
-    fontFamily: AmbitFont.body,
-    fontSize: 12,
-    color: Brand.inkMuted,
-    marginTop: 2,
-  },
-  deleteBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 14,
-    borderRadius: Radii.md,
-    borderWidth: 1.5,
-    borderColor: Brand.borderDefault,
-    backgroundColor: 'transparent',
-  },
-  deleteLabel: {
-    fontFamily: AmbitFont.body,
-    fontSize: 15,
-    fontWeight: '600',
-    color: Brand.accent,
-  },
+  ctaDisabled: { opacity: 0.4 },
+  ctaText: { fontFamily: AmbitFont.body, fontSize: 16, fontWeight: '600', color: Brand.cardCream },
 });
