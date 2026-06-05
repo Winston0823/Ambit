@@ -25,6 +25,8 @@ import {
   inboxState,
   isReachedOutToYou,
   pinConversation,
+  setConversationArchived,
+  setConversationMuted,
   unpinConversation,
   type InboxFilter,
   type InboxItem,
@@ -42,6 +44,7 @@ export default function ChatTab() {
   const [passTargetId, setPassTargetId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<InboxFilter>('all');
+  const [archivedUndo, setArchivedUndo] = useState<InboxItem | null>(null);
 
   // The "+" button opens the discovery feed to find new people to reach out
   // to. Route to the correct group so the user stays in their context.
@@ -100,18 +103,53 @@ export default function ChatTab() {
   const { pinned, rest } = useMemo(() => {
     const all = items ?? [];
     return {
-      pinned: all.filter((i) => i.is_pinned),
+      pinned: all.filter((i) => i.is_pinned && !i.is_archived),
       rest:   all.filter((i) => !i.is_pinned),
     };
   }, [items]);
 
-  // Apply the segmented filter to the main list (pinned strip shows only on All).
+  // Archived rows are hidden from every tab; the rest get the active filter.
   const filteredRest = useMemo(() => {
-    if (!user || filter === 'all') return rest;
-    return rest.filter((i) =>
+    const visible = rest.filter((i) => !i.is_archived);
+    if (!user || filter === 'all') return visible;
+    return visible.filter((i) =>
       filter === 'unread' ? i.unread_count > 0 : inboxState(i, user.id) === filter,
     );
   }, [rest, filter, user]);
+
+  const patchItem = useCallback((id: string, patch: Partial<InboxItem>) => {
+    setItems((prev) => (prev ?? []).map((it) => (it.conversation_id === id ? { ...it, ...patch } : it)));
+  }, []);
+
+  const handleMute = useCallback(async (item: InboxItem) => {
+    if (Platform.OS !== 'web') Haptics.selectionAsync().catch(() => {});
+    const next = !item.is_muted;
+    patchItem(item.conversation_id, { is_muted: next });
+    try { await setConversationMuted(item.conversation_id, next); }
+    catch { patchItem(item.conversation_id, { is_muted: !next }); }
+  }, [patchItem]);
+
+  const handleArchive = useCallback(async (item: InboxItem) => {
+    if (Platform.OS !== 'web') Haptics.selectionAsync().catch(() => {});
+    patchItem(item.conversation_id, { is_archived: true });
+    setArchivedUndo(item);
+    try { await setConversationArchived(item.conversation_id, true); }
+    catch { patchItem(item.conversation_id, { is_archived: false }); }
+  }, [patchItem]);
+
+  const undoArchive = useCallback(async () => {
+    const it = archivedUndo;
+    if (!it) return;
+    setArchivedUndo(null);
+    patchItem(it.conversation_id, { is_archived: false });
+    try { await setConversationArchived(it.conversation_id, false); } catch { /* refetch reconciles */ }
+  }, [archivedUndo, patchItem]);
+
+  useEffect(() => {
+    if (!archivedUndo) return;
+    const t = setTimeout(() => setArchivedUndo(null), 4000);
+    return () => clearTimeout(t);
+  }, [archivedUndo]);
 
   // Pin / unpin via long-press. Surfaces the `pin_limit_reached` error
   // verbatim as a friendly alert; optimistic-updates the row so the
@@ -187,6 +225,8 @@ export default function ChatTab() {
               onPress={() => openConversation(item.conversation_id)}
               onPassRequest={(id) => setPassTargetId(id)}
               onLongPress={handleTogglePin}
+              onMute={handleMute}
+              onArchive={handleArchive}
             />
           ) : null
         }
@@ -240,6 +280,17 @@ export default function ChatTab() {
           );
         }}
       />
+
+      {archivedUndo && (
+        <View style={[styles.undoToastWrap, { bottom: insets.bottom + 16 }]} pointerEvents="box-none">
+          <View style={styles.undoToast}>
+            <Text style={styles.undoToastText}>Archived</Text>
+            <Pressable onPress={undoArchive} hitSlop={8} style={styles.undoBtn} accessibilityLabel="Undo archive">
+              <Text style={styles.undoBtnText}>Undo</Text>
+            </Pressable>
+          </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -409,6 +460,26 @@ const styles = StyleSheet.create({
   filterChipActive: { backgroundColor: Brand.inboxInkPrimary, borderColor: Brand.inboxInkPrimary },
   filterChipText: { fontFamily: AmbitFont.body, fontSize: 13.5, fontWeight: '600', color: Brand.inboxInkBody },
   filterChipTextActive: { color: Brand.inboxCanvas },
+
+  undoToastWrap: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
+  undoToast: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    paddingLeft: 18,
+    paddingRight: 8,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: Brand.inboxInkPrimary,
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 8,
+  },
+  undoToastText: { fontFamily: AmbitFont.body, fontSize: 14, fontWeight: '600', color: Brand.inboxCanvas },
+  undoBtn: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999, backgroundColor: Brand.accent },
+  undoBtnText: { fontFamily: AmbitFont.body, fontSize: 14, fontWeight: '700', color: '#FFFFFF' },
 
   topbar: {
     height: 44,

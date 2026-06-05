@@ -78,6 +78,10 @@ export interface InboxItem {
   /// `pin_limit_reached` when exceeded.
   is_pinned:                   boolean;
   pinned_at:                   string | null;
+  /// Per-participant inbox state (016 + 019). Muted shows a badge; archived
+  /// is hidden from the inbox client-side.
+  is_muted:                    boolean;
+  is_archived:                 boolean;
 }
 
 /// Pin a conversation. Throws if the caller has already pinned 4
@@ -93,6 +97,24 @@ export async function pinConversation(conversationId: string): Promise<void> {
 export async function unpinConversation(conversationId: string): Promise<void> {
   const { error } = await supabase.rpc('unpin_conversation', {
     p_conversation_id: conversationId,
+  });
+  if (error) throw new Error(error.message);
+}
+
+/// Mute / unmute a conversation for the current user (019 RPC).
+export async function setConversationMuted(conversationId: string, muted: boolean): Promise<void> {
+  const { error } = await supabase.rpc('set_conversation_muted', {
+    p_conversation_id: conversationId,
+    p_muted: muted,
+  });
+  if (error) throw new Error(error.message);
+}
+
+/// Archive / unarchive a conversation for the current user (019 RPC).
+export async function setConversationArchived(conversationId: string, archived: boolean): Promise<void> {
+  const { error } = await supabase.rpc('set_conversation_archived', {
+    p_conversation_id: conversationId,
+    p_archived: archived,
   });
   if (error) throw new Error(error.message);
 }

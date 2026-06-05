@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
-import { ArrowBendUpLeft, Clock, X } from 'phosphor-react-native';
+import { Archive, ArrowBendUpLeft, Bell, BellSlash, Clock, X } from 'phosphor-react-native';
 import type { InboxItem } from '../../lib/messaging';
 import { inboxState, isReachedOutToYou } from '../../lib/messaging';
 import { getAutoCloseCountdown } from '../../lib/closureLoop';
@@ -16,6 +16,9 @@ interface Props {
   /// Long-press → toggle pin via parent (the parent decides whether to
   /// show a confirmation toast on pin-limit-reached).
   onLongPress?: (item: InboxItem) => void;
+  /// Left-swipe → Mute / Archive (per-participant).
+  onMute?: (item: InboxItem) => void;
+  onArchive?: (item: InboxItem) => void;
 }
 
 /// Inbox row (v4). Three visual states share the same skeleton:
@@ -26,7 +29,7 @@ interface Props {
 ///   • active — any conversation that doesn't fit the above and isn't
 ///     auto-closed. White card. Optional "Reply" / "Hired" chip.
 ///   • auto-closed — terminal. Same shape, 55% opacity.
-export function InboxRow({ item, meId, onPress, onPassRequest, onLongPress }: Props) {
+export function InboxRow({ item, meId, onPress, onPassRequest, onLongPress, onMute, onArchive }: Props) {
   const initial = (item.partner_name ?? '?').slice(0, 1).toUpperCase();
   const swipeRef = useRef<Swipeable>(null);
   const sentByMe  = item.last_message_sender_id === meId;
@@ -77,6 +80,38 @@ export function InboxRow({ item, meId, onPress, onPassRequest, onLongPress }: Pr
     );
   };
 
+  // Left-swipe → Mute / Archive (per-participant, role-agnostic).
+  const renderLeftActions = (progress: Animated.AnimatedInterpolation<number>) => {
+    if (!onMute && !onArchive) return null;
+    const translateX = progress.interpolate({ inputRange: [0, 1], outputRange: [-160, 0] });
+    return (
+      <Animated.View style={[styles.leftActions, { transform: [{ translateX }] }]}>
+        {onMute && (
+          <Pressable
+            onPress={() => { swipeRef.current?.close(); onMute(item); }}
+            style={[styles.leftAction, styles.muteAction]}
+            accessibilityLabel={item.is_muted ? 'Unmute' : 'Mute'}
+          >
+            {item.is_muted
+              ? <Bell size={18} color="#FFFFFF" weight="bold" />
+              : <BellSlash size={18} color="#FFFFFF" weight="bold" />}
+            <Text style={styles.leftActionLabel}>{item.is_muted ? 'Unmute' : 'Mute'}</Text>
+          </Pressable>
+        )}
+        {onArchive && (
+          <Pressable
+            onPress={() => { swipeRef.current?.close(); onArchive(item); }}
+            style={[styles.leftAction, styles.archiveAction]}
+            accessibilityLabel="Archive"
+          >
+            <Archive size={18} color="#FFFFFF" weight="bold" />
+            <Text style={styles.leftActionLabel}>Archive</Text>
+          </Pressable>
+        )}
+      </Animated.View>
+    );
+  };
+
   // ── Derived display strings ──────────────────────────────────────
   const previewText = item.last_message_deleted
     ? 'Message deleted'
@@ -111,10 +146,12 @@ export function InboxRow({ item, meId, onPress, onPassRequest, onLongPress }: Pr
   return (
     <Swipeable
       ref={swipeRef}
-      enabled={passable}
+      enabled={passable || !!onMute || !!onArchive}
       renderRightActions={renderRightActions}
+      renderLeftActions={renderLeftActions}
       friction={2}
       rightThreshold={36}
+      leftThreshold={40}
     >
       <Pressable
         onPress={onPress}
@@ -163,7 +200,10 @@ export function InboxRow({ item, meId, onPress, onPassRequest, onLongPress }: Pr
               ) : null}
             </View>
           </View>
-          <Text style={styles.time}>{formatRelative(item.last_message_at)}</Text>
+          <View style={styles.timeRow}>
+            {item.is_muted && <BellSlash size={12} color={Brand.inboxInkBody} weight="bold" />}
+            <Text style={styles.time}>{formatRelative(item.last_message_at)}</Text>
+          </View>
         </View>
 
         {/* Preview + chip live in the full card width with a left
@@ -382,4 +422,13 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     color: '#FFFFFF',
   },
+
+  // Left-swipe Mute / Archive.
+  leftActions: { flexDirection: 'row' },
+  leftAction: { width: 80, alignItems: 'center', justifyContent: 'center', gap: 4 },
+  muteAction: { backgroundColor: '#A8895E' },
+  archiveAction: { backgroundColor: '#6B7280' },
+  leftActionLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 0.5, color: '#FFFFFF' },
+
+  timeRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
 });
