@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Brand } from '../../constants/theme';
+import { Motion } from '../../constants/motion';
 import {
   OnboardingProvider,
   OnboardingProfile,
@@ -243,8 +244,7 @@ function Steps({ onDismiss }: { onDismiss: () => void }) {
       translateX.setValue(forward ? SCREEN_W : -SCREEN_W);
       Animated.timing(translateX, {
         toValue: 0,
-        duration: 280,
-        easing: Easing.out(Easing.cubic),
+        ...Motion.slide,
         useNativeDriver: true,
       }).start();
     }

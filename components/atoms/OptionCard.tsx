@@ -1,9 +1,10 @@
 import React, { useEffect, useRef } from 'react';
-import { Animated, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { Animated, Pressable, StyleSheet, View } from 'react-native';
 import { CheckCircle } from 'phosphor-react-native';
 import type { IconProps } from 'phosphor-react-native';
-import * as Haptics from 'expo-haptics';
 import { Brand, Radii, AmbitFont } from '../../constants/theme';
+import { Motion } from '../../constants/motion';
+import { haptics } from '../../lib/haptics';
 
 type PhosphorIcon = React.ComponentType<IconProps>;
 
@@ -43,12 +44,10 @@ export function OptionCard({ title, subtitle, selected = false, onPress, icon: I
   }, [selected, sel]);
 
   const press = () => {
-    if (Platform.OS !== 'web') {
-      Haptics.selectionAsync().catch(() => {});
-    }
+    haptics.selection();
     Animated.sequence([
-      Animated.timing(scale, { toValue: 0.97, duration: 80, useNativeDriver: true }),
-      Animated.spring(scale, { toValue: 1, friction: 4, tension: 200, useNativeDriver: true }),
+      Animated.timing(scale, { toValue: Motion.press.scale, duration: 80, useNativeDriver: true }),
+      Animated.spring(scale, { toValue: 1, ...Motion.press.out, useNativeDriver: true }),
     ]).start();
     onPress?.();
   };
