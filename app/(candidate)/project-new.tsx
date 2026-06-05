@@ -18,9 +18,8 @@ import { ROLE_CATEGORIES, skillsForRoles } from '../../data/mock';
 import { AmbitFont, Brand, Space } from '../../constants/theme';
 
 const BLURB_MIN = 10;
-const SKILLS_MAX = 8;
 
-/// Airy ink-fill chip (the "Vocabulary steer" — monochrome selection, no tan).
+/// Airy chip — brand-tan when selected (the "Vocabulary steer" — monochrome selection, no tan).
 function SteerChip({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) {
   return (
     <Pressable onPress={onPress} style={[styles.chip, selected && styles.chipOn]}>
@@ -200,9 +199,9 @@ const styles = StyleSheet.create({
   skillCatLabel: { fontFamily: AmbitFont.body, fontSize: 10.5, letterSpacing: 1, color: Brand.inkMuted, marginBottom: 12 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   chip: { paddingHorizontal: 16, paddingVertical: 11, borderRadius: 999, backgroundColor: '#EBE3D5' },
-  chipOn: { backgroundColor: INK },
+  chipOn: { backgroundColor: Brand.primary },
   chipText: { fontFamily: AmbitFont.body, fontSize: 14.5, fontWeight: '500', color: '#5A4A36' },
-  chipTextOn: { color: Brand.cardCream },
+  chipTextOn: { color: '#3A2A18' },
   skillChip: { flexDirection: 'row', alignItems: 'center', gap: 7 },
   addChip: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'transparent', borderWidth: 1.5, borderColor: Brand.accent },
   addChipText: { fontFamily: AmbitFont.body, fontSize: 14.5, fontWeight: '600', color: Brand.accent },
@@ -212,14 +211,14 @@ const styles = StyleSheet.create({
   cta: {
     position: 'absolute',
     alignSelf: 'center',
-    backgroundColor: INK,
+    backgroundColor: Brand.accent,
     paddingHorizontal: 54,
     paddingVertical: 17,
     borderRadius: 999,
     minWidth: 200,
     alignItems: 'center',
-    shadowColor: '#241C14',
-    shadowOpacity: 0.22,
+    shadowColor: '#B48045',
+    shadowOpacity: 0.3,
     shadowRadius: 20,
     shadowOffset: { width: 0, height: 8 },
     elevation: 6,

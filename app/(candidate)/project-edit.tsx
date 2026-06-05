@@ -20,7 +20,6 @@ import { ROLE_CATEGORIES, skillsForRoles } from '../../data/mock';
 import { AmbitFont, Brand } from '../../constants/theme';
 
 const BLURB_MIN = 10;
-const INK = '#2A2018';
 
 function SteerChip({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) {
   return (
@@ -206,9 +205,9 @@ const styles = StyleSheet.create({
   secLabel: { fontFamily: AmbitFont.body, fontSize: 11, fontWeight: '700', letterSpacing: 1.2, color: Brand.inkLabel, marginTop: 36, marginBottom: 14 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   chip: { paddingHorizontal: 16, paddingVertical: 11, borderRadius: 999, backgroundColor: '#EBE3D5' },
-  chipOn: { backgroundColor: INK },
+  chipOn: { backgroundColor: Brand.primary },
   chipText: { fontFamily: AmbitFont.body, fontSize: 14.5, fontWeight: '500', color: '#5A4A36' },
-  chipTextOn: { color: Brand.cardCream },
+  chipTextOn: { color: '#3A2A18' },
 
   toggleRow: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 16, marginTop: 34, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: Brand.borderSoft },
   toggleLabel: { fontFamily: AmbitFont.body, fontSize: 15, fontWeight: '600', color: Brand.inkPrimary },
@@ -220,14 +219,14 @@ const styles = StyleSheet.create({
   cta: {
     position: 'absolute',
     alignSelf: 'center',
-    backgroundColor: INK,
+    backgroundColor: Brand.accent,
     paddingHorizontal: 54,
     paddingVertical: 17,
     borderRadius: 999,
     minWidth: 200,
     alignItems: 'center',
-    shadowColor: '#241C14',
-    shadowOpacity: 0.22,
+    shadowColor: '#B48045',
+    shadowOpacity: 0.3,
     shadowRadius: 20,
     shadowOffset: { width: 0, height: 8 },
     elevation: 6,
