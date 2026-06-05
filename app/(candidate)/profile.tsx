@@ -975,18 +975,18 @@ const styles = StyleSheet.create({
   previewWrap: { flex: 1, paddingHorizontal: Space.lg, paddingTop: Space.sm, paddingBottom: Space.md },
 
   // Segmented Edit | Preview control (centered in the header band).
-  segment: { flexDirection: 'row', backgroundColor: Brand.surface1, borderRadius: 999, padding: 3 },
-  segmentBtn: { paddingHorizontal: 18, paddingVertical: 6, borderRadius: 999 },
+  segment: { flexDirection: 'row', backgroundColor: Brand.cardCream, borderWidth: 1.5, borderColor: Brand.inkEdge, borderRadius: 999, padding: 3 },
+  segmentBtn: { paddingHorizontal: 18, paddingVertical: 8, borderRadius: 999 },
   segmentBtnActive: {
-    backgroundColor: Brand.canvas,
-    shadowColor: '#000',
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 1 },
-    elevation: 1,
+    backgroundColor: Brand.action,
+    shadowColor: Brand.inkEdge,
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 0,
   },
   segmentText: { fontFamily: AmbitFont.body, fontSize: 14, fontWeight: '600', color: Brand.inkMuted },
-  segmentTextActive: { color: Brand.inkPrimary },
+  segmentTextActive: { color: Brand.actionInk, fontWeight: '700' },
 
   // Field-list editor (Tinder / Hinge convention).
   photoRow: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14 },

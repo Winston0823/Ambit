@@ -206,7 +206,7 @@ function ReachOutCircle({
           <BlurView intensity={36} tint="default" style={styles.reachBlur}>
             <View style={styles.reachTint} pointerEvents="none" />
             <View style={styles.reachTopHighlight} pointerEvents="none" />
-            <PaperPlaneTilt size={20} color="#FFFFFF" weight="fill" />
+            <PaperPlaneTilt size={20} color={Brand.actionInk} weight="fill" />
           </BlurView>
         </Animated.View>
       </Pressable>
@@ -984,8 +984,8 @@ const styles = StyleSheet.create({
     shadowRadius: 28,
     shadowOffset: { width: 0, height: 12 },
     elevation: 10,
-    borderWidth: 1,
-    borderColor: Brand.glassEdge,
+    borderWidth: 1.6,
+    borderColor: Brand.actionInk,
   },
   reachBlur: {
     width: '100%',
@@ -996,7 +996,7 @@ const styles = StyleSheet.create({
   },
   reachTint: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: Brand.glassInk,
+    backgroundColor: Brand.action, // signature teal — pops on the dark photo
   },
   reachTopHighlight: {
     position: 'absolute',
