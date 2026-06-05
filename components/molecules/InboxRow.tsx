@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
-import { Clock, X } from 'phosphor-react-native';
+import { ArrowBendUpLeft, Clock, X } from 'phosphor-react-native';
 import type { InboxItem } from '../../lib/messaging';
-import { isReachedOutToYou } from '../../lib/messaging';
+import { inboxState, isReachedOutToYou } from '../../lib/messaging';
 import { getAutoCloseCountdown } from '../../lib/closureLoop';
 import { Brand } from '../../constants/theme';
 
@@ -33,6 +33,10 @@ export function InboxRow({ item, meId, onPress, onPassRequest, onLongPress }: Pr
   const isPending = isReachedOutToYou(item, meId);
   const isClosed  = item.status === 'passed' || item.status === 'auto_declined';
   const passable  = item.status === 'active' && !!onPassRequest;
+  // "Your turn" on active, non-pending rows where they sent last (pending rows
+  // already signal it via the countdown chip, so we don't double up).
+  const yourTurnChip =
+    !isPending && !isClosed && item.status === 'active' && inboxState(item, meId) === 'your_turn';
 
   // Countdown ticks the label once a minute when the card is pending.
   // Cheap timer; only the label string updates so the rest of the
@@ -180,12 +184,18 @@ export function InboxRow({ item, meId, onPress, onPassRequest, onLongPress }: Pr
             {previewText}
           </Text>
 
-          {(countdown || showHiredChip) && (
+          {(countdown || showHiredChip || yourTurnChip) && (
             <View style={styles.chipRow}>
               {countdown && (
                 <View style={[styles.chip, styles.chipOutline]}>
                   <Clock size={11} color={Brand.inboxBronze} weight="bold" />
                   <Text style={styles.chipText}>{countdown.label}</Text>
+                </View>
+              )}
+              {yourTurnChip && (
+                <View style={[styles.chip, styles.chipSolid]}>
+                  <ArrowBendUpLeft size={11} color={Brand.inboxCanvas} weight="bold" />
+                  <Text style={[styles.chipText, styles.chipTextSolid]}>Your turn</Text>
                 </View>
               )}
               {showHiredChip && (

@@ -22,12 +22,14 @@ import { useAuth } from '../../../context/AuthContext';
 import { supabase } from '../../../lib/supabase';
 import {
   getInbox,
+  inboxState,
   isReachedOutToYou,
   pinConversation,
   unpinConversation,
+  type InboxFilter,
   type InboxItem,
 } from '../../../lib/messaging';
-import { Brand, Space } from '../../../constants/theme';
+import { AmbitFont, Brand, Space } from '../../../constants/theme';
 
 /// S-050 Inbox v4. Editorial paper canvas. "ambit" wordmark + side
 /// icons up top, large italic "Chats" title, iMessage-style pinned
@@ -39,6 +41,7 @@ export default function ChatTab() {
   const [items, setItems] = useState<InboxItem[] | null>(null);
   const [passTargetId, setPassTargetId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [filter, setFilter] = useState<InboxFilter>('all');
 
   // The "+" button opens the discovery feed to find new people to reach out
   // to. Route to the correct group so the user stays in their context.
@@ -102,6 +105,14 @@ export default function ChatTab() {
     };
   }, [items]);
 
+  // Apply the segmented filter to the main list (pinned strip shows only on All).
+  const filteredRest = useMemo(() => {
+    if (!user || filter === 'all') return rest;
+    return rest.filter((i) =>
+      filter === 'unread' ? i.unread_count > 0 : inboxState(i, user.id) === filter,
+    );
+  }, [rest, filter, user]);
+
   // Pin / unpin via long-press. Surfaces the `pin_limit_reached` error
   // verbatim as a friendly alert; optimistic-updates the row so the
   // pinned strip reflects the change before the next refetch.
@@ -158,7 +169,7 @@ export default function ChatTab() {
   return (
     <View style={[styles.root, safeTopPad]}>
       <FlatList
-        data={rest}
+        data={filteredRest}
         keyExtractor={(i) => i.conversation_id}
         refreshControl={
           <RefreshControl
@@ -197,6 +208,8 @@ export default function ChatTab() {
             onOpen={openConversation}
             onUnpin={handleTogglePin}
             discoveryPath={discoveryPath}
+            filter={filter}
+            onFilter={setFilter}
           />
         }
         ListEmptyComponent={
@@ -233,18 +246,29 @@ export default function ChatTab() {
 
 /// Scrolls with the list — keeps the wordmark / title / pinned strip
 /// out of any scroll-pin behavior so the v4 reading rhythm is preserved.
+const INBOX_TABS: { key: InboxFilter; label: string }[] = [
+  { key: 'all', label: 'All' },
+  { key: 'unread', label: 'Unread' },
+  { key: 'your_turn', label: 'Your turn' },
+  { key: 'hired', label: 'Hired' },
+];
+
 function ListHeader({
   user,
   pinned,
   onOpen,
   onUnpin,
   discoveryPath,
+  filter,
+  onFilter,
 }: {
   user:   { id: string } | null;
   pinned: InboxItem[];
   onOpen: (conversationId: string) => void;
   onUnpin: (item: InboxItem) => void;
   discoveryPath: string;
+  filter: InboxFilter;
+  onFilter: (f: InboxFilter) => void;
 }) {
   return (
     <View>
@@ -273,8 +297,29 @@ function ListHeader({
         </Pressable>
       </View>
 
-      {/* Pinned strip (only when there's at least one) */}
-      {user && (
+      {/* Segmented filter — role-agnostic (works for whoever reached out). */}
+      <View style={styles.filterRow}>
+        {INBOX_TABS.map((t) => {
+          const active = filter === t.key;
+          return (
+            <Pressable
+              key={t.key}
+              onPress={() => {
+                if (Platform.OS !== 'web') Haptics.selectionAsync().catch(() => {});
+                onFilter(t.key);
+              }}
+              style={[styles.filterChip, active && styles.filterChipActive]}
+              accessibilityRole="button"
+              accessibilityLabel={`Filter: ${t.label}`}
+            >
+              <Text style={[styles.filterChipText, active && styles.filterChipTextActive]}>{t.label}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      {/* Pinned strip — only on All (a filtered view shows just its matches). */}
+      {user && filter === 'all' && (
         <PinnedStrip
           items={pinned}
           meId={user.id}
@@ -347,6 +392,24 @@ const styles = StyleSheet.create({
 
   // ── Top bar — mirrors the Discovery feed bar (44pt, centered title,
   //    absolutely-positioned icons at Space.lg from each edge).
+  filterRow: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingBottom: 12,
+    paddingTop: 2,
+  },
+  filterChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 999,
+    backgroundColor: Brand.inboxCardActive,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: Brand.inboxHairline,
+  },
+  filterChipActive: { backgroundColor: Brand.inboxInkPrimary, borderColor: Brand.inboxInkPrimary },
+  filterChipText: { fontFamily: AmbitFont.body, fontSize: 13.5, fontWeight: '600', color: Brand.inboxInkBody },
+  filterChipTextActive: { color: Brand.inboxCanvas },
+
   topbar: {
     height: 44,
     alignItems: 'center',

@@ -111,6 +111,26 @@ export function isReachedOutToYou(item: InboxItem, meId: string): boolean {
   );
 }
 
+/// Role-agnostic conversation state from the viewer's seat. Direction comes
+/// from who sent last + unread — no schema needed. Used by the inbox filter
+/// tabs AND the row chip so they always agree.
+///   - your_turn : they reached out / replied — it's on you
+///   - awaiting  : you sent last — waiting on them
+///   - hired     : a hire is proposed or done (matters to both sides)
+///   - closed    : passed / auto-declined
+export type InboxState = 'your_turn' | 'awaiting' | 'hired' | 'closed';
+export type InboxFilter = 'all' | 'unread' | 'your_turn' | 'hired';
+
+export function inboxState(item: InboxItem, meId: string): InboxState {
+  if (item.status === 'hired' || item.status === 'hired_pending') return 'hired';
+  if (item.status === 'passed' || item.status === 'auto_declined') return 'closed';
+  if (isReachedOutToYou(item, meId)) return 'your_turn';
+  const theySentLast =
+    item.last_message_sender_id != null && item.last_message_sender_id !== meId;
+  if (theySentLast || item.unread_count > 0) return 'your_turn';
+  return 'awaiting';
+}
+
 export interface SearchHit {
   message_id:      string;
   conversation_id: string;
