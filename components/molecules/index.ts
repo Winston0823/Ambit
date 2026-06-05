@@ -3,6 +3,8 @@ export { OnboardingContinue } from './OnboardingContinue';
 export { DiscoveryCard } from './DiscoveryCard';
 export { DiscoveryRowSummary } from './DiscoveryRowSummary';
 export { SavedCarousel } from './SavedCarousel';
+export { OwnerProfileCard } from './OwnerProfileCard';
+export type { OwnerProject } from './OwnerProfileCard';
 export { TypingIndicator } from './TypingIndicator';
 export { MessageBubble } from './MessageBubble';
 export type { MessageStatus } from './MessageBubble';

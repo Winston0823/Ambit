@@ -26,13 +26,16 @@ import {
   X,
 } from 'phosphor-react-native';
 import { Chip } from '../../components/atoms';
+import { router } from 'expo-router';
 import {
   AddPortfolioBubble,
   DiscoveryCard,
+  OwnerProfileCard,
   PortfolioBubble,
   PortfolioModal,
   SpeechBubble,
 } from '../../components/molecules';
+import type { OwnerProject } from '../../components/molecules';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { readLocalFileAsArrayBuffer } from '../../lib/messaging';
@@ -108,6 +111,7 @@ export default function ProfileTab() {
   // Preview (read-only discovery card) vs. edit mode. Opens in preview so the
   // user sees exactly how owners see them, Instagram-style, then taps Edit.
   const [editing, setEditing] = useState(false);
+  const [ownerProjects, setOwnerProjects] = useState<OwnerProject[]>([]);
 
   // Edit modal state
   const [textEdit, setTextEdit] = useState<TextEditState | null>(null);
@@ -237,6 +241,30 @@ export default function ProfileTab() {
     })();
     return () => { cancelled = true; };
   }, [user?.id]);
+
+  // Owner's live (active) projects — drives the owner profile preview card.
+  useEffect(() => {
+    if (!user || profile?.role !== 'owner') { setOwnerProjects([]); return; }
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from('projects')
+        .select('id, title, vibe_blurb, roles_sought')
+        .eq('owner_id', user.id)
+        .eq('active', true)
+        .order('created_at', { ascending: false });
+      if (cancelled) return;
+      setOwnerProjects(
+        (data ?? []).map((p: { id: string; title: string | null; vibe_blurb: string | null; roles_sought: string[] | null }) => ({
+          id: p.id,
+          title: p.title ?? '',
+          pitch: p.vibe_blurb ?? '',
+          roles: p.roles_sought ?? [],
+        })),
+      );
+    })();
+    return () => { cancelled = true; };
+  }, [user?.id, profile?.role]);
 
   /// Save: optimistic local update + write-through. If the write
   /// fails, the next focus refetch will reconcile back to truth.
@@ -441,39 +469,84 @@ export default function ProfileTab() {
           </View>
         </View>
 
-        {/* Portfolio */}
-        <View style={styles.editSection}>
-          <Text style={styles.sectionLabel}>PORTFOLIO</Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.portfolioRow}
-          >
-            {portfolio.map((item) => (
-              <PortfolioBubble
-                key={item.id}
-                item={item}
-                onPress={() => setActivePortfolio(item)}
-                active={activePortfolio?.id === item.id}
+        {/* Owners → Live projects; seekers → Portfolio. */}
+        {profile?.role === 'owner' ? (
+          <View style={styles.editSection}>
+            <View style={styles.editSectionHead}>
+              <Text style={styles.sectionLabel}>LIVE PROJECTS</Text>
+              <Pressable onPress={() => router.push('/projects')} hitSlop={8}>
+                <Text style={styles.editLink}>Manage</Text>
+              </Pressable>
+            </View>
+            {ownerProjects.length === 0 ? (
+              <Pressable onPress={() => router.push('/project-new')} style={styles.projAddRow}>
+                <Plus size={16} color={Brand.accent} weight="bold" />
+                <Text style={styles.projAddText}>Create your first project</Text>
+              </Pressable>
+            ) : (
+              ownerProjects.map((p) => (
+                <Pressable
+                  key={p.id}
+                  onPress={() => router.push({ pathname: '/project-manage', params: { id: p.id } })}
+                  style={styles.projEditRow}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.projEditTitle} numberOfLines={1}>{p.title}</Text>
+                    <Text style={styles.projEditSub} numberOfLines={1}>
+                      {p.roles.length ? `Looking for · ${p.roles.join(' · ')}` : 'Active'}
+                    </Text>
+                  </View>
+                  <PencilSimpleLine size={15} color={Brand.inkMuted} weight="regular" />
+                </Pressable>
+              ))
+            )}
+          </View>
+        ) : (
+          <View style={styles.editSection}>
+            <Text style={styles.sectionLabel}>PORTFOLIO</Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.portfolioRow}
+            >
+              {portfolio.map((item) => (
+                <PortfolioBubble
+                  key={item.id}
+                  item={item}
+                  onPress={() => setActivePortfolio(item)}
+                  active={activePortfolio?.id === item.id}
+                />
+              ))}
+              <AddPortfolioBubble
+                onPress={addNewPortfolio}
+                label={portfolio.length === 0 ? 'Add first' : 'Add'}
               />
-            ))}
-            <AddPortfolioBubble
-              onPress={addNewPortfolio}
-              label={portfolio.length === 0 ? 'Add first' : 'Add'}
-            />
-          </ScrollView>
-        </View>
+            </ScrollView>
+          </View>
+        )}
 
         <View style={{ height: Space.xl }} />
       </ScrollView>
       ) : (
         <View style={styles.previewWrap}>
-          <DiscoveryCard
-            card={previewCard}
-            showReachButton={false}
-            onPortfolioPress={setActivePortfolio}
-            activePortfolioId={activePortfolio?.id ?? null}
-          />
+          {profile?.role === 'owner' ? (
+            <OwnerProfileCard
+              name={profile?.name ?? ''}
+              photoUri={profile?.photo_url ?? null}
+              campusName={campus?.name ?? null}
+              vibe={profile?.vibe_blurb ?? ''}
+              skills={skills}
+              projects={ownerProjects}
+              onProjectPress={(id) => router.push({ pathname: '/project-manage', params: { id } })}
+            />
+          ) : (
+            <DiscoveryCard
+              card={previewCard}
+              showReachButton={false}
+              onPortfolioPress={setActivePortfolio}
+              activePortfolioId={activePortfolio?.id ?? null}
+            />
+          )}
         </View>
       )}
 
@@ -930,6 +1003,18 @@ const styles = StyleSheet.create({
   editSection: { marginTop: Space.lg },
   editSectionHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
   editLink: { fontFamily: AmbitFont.body, fontSize: 14, fontWeight: '600', color: Brand.accent },
+  projAddRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 14 },
+  projAddText: { fontFamily: AmbitFont.body, fontSize: 15, fontWeight: '600', color: Brand.accent },
+  projEditRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: Brand.borderSoft,
+  },
+  projEditTitle: { fontFamily: AmbitFont.display, fontSize: 17, color: Brand.inkPrimary },
+  projEditSub: { fontFamily: AmbitFont.body, fontSize: 12.5, color: Brand.inkMuted, marginTop: 2 },
 
   card: {
     backgroundColor: Brand.canvas,
