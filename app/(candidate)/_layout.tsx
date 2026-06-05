@@ -1,6 +1,9 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Tabs, useSegments } from 'expo-router';
 import { LiquidNavBar, NavTabKey } from '../../components/organisms';
+import { useAuth } from '../../context/AuthContext';
+import { supabase } from '../../lib/supabase';
+import { getInbox } from '../../lib/messaging';
 
 const TAB_TO_ROUTE: Record<NavTabKey, string> = {
   discovery: 'feed',
@@ -21,19 +24,47 @@ const ROUTE_TO_TAB: Record<string, NavTabKey> = {
 };
 
 export default function CandidateLayout() {
-  // Hide the nav bar while a conversation thread (chat/[id]) is the focused
-  // route so the chat gets the full canvas. `useSegments` reports the active
-  // route's file segments — the thread's deepest segment is the literal
-  // `[id]`. The chat list (`chat`) and search (`chat/search`) keep the bar.
+  const { user } = useAuth();
   const segments = useSegments();
   const inThread = segments[segments.length - 1] === '[id]';
 
+  // Tracks whether there are any unread conversations for the badge dot.
+  const [hasUnread, setHasUnread] = useState(false);
+
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+
+    const refresh = async () => {
+      try {
+        const items = await getInbox();
+        if (!cancelled) setHasUnread(items.some((i) => i.unread_count > 0));
+      } catch {}
+    };
+
+    refresh();
+
+    // Keep the badge in sync with incoming messages and read receipts.
+    const ch = supabase
+      .channel('layout-badge-watch')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, refresh)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'conversation_reads', filter: `user_id=eq.${user.id}` },
+        refresh,
+      )
+      .subscribe();
+
+    return () => {
+      cancelled = true;
+      ch.unsubscribe();
+    };
+  }, [user?.id]);
+
+  const badgeTabs = new Set<NavTabKey>(hasUnread ? ['chat'] : []);
+
   return (
     <Tabs
-      // `history` so going back from a pushed tab route (project-manage,
-      // project-edit, project-new, saved) returns to the route you came
-      // from — not the first tab. Default `firstRoute` was sending back
-      // taps to Discovery instead of the Projects list.
       backBehavior="history"
       screenOptions={{ headerShown: false }}
       tabBar={({ state, navigation }) => {
@@ -43,6 +74,7 @@ export default function CandidateLayout() {
           <LiquidNavBar
             activeKey={activeKey}
             hidden={inThread}
+            badgeTabs={badgeTabs}
             onChange={(key) => navigation.navigate(TAB_TO_ROUTE[key] as never)}
           />
         );
@@ -52,11 +84,7 @@ export default function CandidateLayout() {
       <Tabs.Screen name="chat" />
       <Tabs.Screen name="projects" />
       <Tabs.Screen name="profile" />
-      {/* Saved exists as a route but never appears in the nav bar — it's
-          pushed via router.push('/saved') from the feed's bookmark icon. */}
       <Tabs.Screen name="saved" options={{ href: null }} />
-      {/* Project create / edit / manage screens — reached from the projects
-          tab. Hidden from the nav bar via href:null. */}
       <Tabs.Screen name="project-new" options={{ href: null }} />
       <Tabs.Screen name="project-edit" options={{ href: null }} />
       <Tabs.Screen name="project-manage" options={{ href: null }} />

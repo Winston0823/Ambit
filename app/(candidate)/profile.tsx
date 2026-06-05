@@ -21,6 +21,7 @@ import {
   Check,
   MapPin,
   PencilSimpleLine,
+  Plus,
   SignOut,
   X,
 } from 'phosphor-react-native';
@@ -633,13 +634,25 @@ function SkillsEditModal({
   onSave: (next: string[]) => void;
 }) {
   const [draft, setDraft] = useState<string[]>(selected);
+  const [customInput, setCustomInput] = useState('');
 
   useEffect(() => {
-    if (visible) setDraft(selected);
+    if (visible) { setDraft(selected); setCustomInput(''); }
   }, [visible, selected]);
 
+  const allPreset = new Set(SKILL_CATEGORIES.flatMap((c) => c.tags));
+  const customSkills = draft.filter((s) => !allPreset.has(s));
+  const MAX_SKILLS = 8;
+
   const toggle = (skill: string) => {
-    setDraft((d) => (d.includes(skill) ? d.filter((s) => s !== skill) : [...d, skill]));
+    setDraft((d) => (d.includes(skill) ? d.filter((s) => s !== skill) : d.length < MAX_SKILLS ? [...d, skill] : d));
+  };
+
+  const addCustom = () => {
+    const skill = customInput.trim();
+    if (!skill || draft.includes(skill) || draft.length >= MAX_SKILLS) return;
+    setDraft((d) => [...d, skill]);
+    setCustomInput('');
   };
 
   return (
@@ -648,13 +661,26 @@ function SkillsEditModal({
         <Pressable style={modalStyles.scrim} onPress={onCancel} />
         <View style={[modalStyles.sheet, { maxHeight: '80%' }]}>
           <View style={modalStyles.sheetHeader}>
-            <Text style={modalStyles.sheetTitle}>Your skills</Text>
+            <Text style={modalStyles.sheetTitle}>Your skills · {draft.length} / {MAX_SKILLS}</Text>
             <Pressable onPress={onCancel} hitSlop={10}>
               <X size={20} color={Brand.inkMuted} weight="bold" />
             </Pressable>
           </View>
 
-          <ScrollView contentContainerStyle={{ gap: Space.lg, paddingBottom: Space.lg }}>
+          <ScrollView
+            contentContainerStyle={{ gap: Space.lg, paddingBottom: Space.lg }}
+            keyboardShouldPersistTaps="handled"
+          >
+            {customSkills.length > 0 && (
+              <View style={{ gap: 10 }}>
+                <Text style={styles.sectionLabel}>ADDED BY YOU</Text>
+                <View style={styles.chipRow}>
+                  {customSkills.map((s) => (
+                    <Chip key={s} label={s} selected onPress={() => toggle(s)} />
+                  ))}
+                </View>
+              </View>
+            )}
             {SKILL_CATEGORIES.map((cat) => (
               <View key={cat.label} style={{ gap: 10 }}>
                 <Text style={styles.sectionLabel}>{cat.label}</Text>
@@ -670,6 +696,25 @@ function SkillsEditModal({
                 </View>
               </View>
             ))}
+            <View style={styles.customRow}>
+              <TextInput
+                value={customInput}
+                onChangeText={setCustomInput}
+                placeholder="Add a skill…"
+                placeholderTextColor={Brand.inkPlaceholder}
+                style={styles.customInput}
+                returnKeyType="done"
+                onSubmitEditing={addCustom}
+                autoCapitalize="words"
+                blurOnSubmit={false}
+              />
+              <Pressable
+                onPress={addCustom}
+                style={[styles.customAddBtn, (!customInput.trim() || draft.length >= MAX_SKILLS) && styles.customAddBtnDisabled]}
+              >
+                <Plus size={16} color={Brand.inkOnBrand} weight="bold" />
+              </Pressable>
+            </View>
           </ScrollView>
 
           <View style={modalStyles.footer}>
@@ -969,6 +1014,32 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: Space.sm,
   },
+  customRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  customInput: {
+    flex: 1,
+    height: 40,
+    borderRadius: Radii.pill,
+    paddingHorizontal: 16,
+    backgroundColor: Brand.surface1,
+    borderWidth: 1.5,
+    borderColor: Brand.borderDefault,
+    fontFamily: AmbitFont.body,
+    fontSize: 14,
+    color: Brand.inkBody,
+  },
+  customAddBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: Brand.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  customAddBtnDisabled: { opacity: 0.4 },
   addChip: {
     flexDirection: 'row',
     alignItems: 'center',

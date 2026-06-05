@@ -9,7 +9,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { MapPin } from 'phosphor-react-native';
+import { MapPin, Plus } from 'phosphor-react-native';
 import { Button, Chip, KeyboardDismiss } from '../atoms';
 import { CAMPUSES, ROLE_CATEGORIES, SKILL_CATEGORIES } from '../../data/mock';
 import { AmbitFont, Brand, Radii, Space } from '../../constants/theme';
@@ -61,6 +61,17 @@ export function ProjectForm({
     initialValues?.campusId ?? null,
   );
   const [submitting, setSubmitting] = useState(false);
+  const [customSkillInput, setCustomSkillInput] = useState('');
+
+  const allPresetSkills = new Set(SKILL_CATEGORIES.flatMap((c) => c.tags));
+  const customSkills = requiredSkills.filter((s) => !allPresetSkills.has(s));
+
+  const addCustomSkill = () => {
+    const skill = customSkillInput.trim();
+    if (!skill || requiredSkills.includes(skill) || requiredSkills.length >= SKILLS_MAX) return;
+    setRequiredSkills((prev) => [...prev, skill]);
+    setCustomSkillInput('');
+  };
 
   const titleValid = title.trim().length > 0;
   const blurbValid = vibeBlurb.length >= BLURB_MIN && vibeBlurb.length <= BLURB_MAX;
@@ -152,6 +163,16 @@ export function ProjectForm({
         </Section>
 
         <Section eyebrow={`SKILLS YOU NEED  ·  ${requiredSkills.length} / ${SKILLS_MAX}`}>
+          {customSkills.length > 0 && (
+            <View style={styles.category}>
+              <Text style={styles.categoryLabel}>ADDED BY YOU</Text>
+              <View style={styles.chipRow}>
+                {customSkills.map((s) => (
+                  <Chip key={s} label={s} selected onPress={() => toggleSkill(s)} />
+                ))}
+              </View>
+            </View>
+          )}
           {SKILL_CATEGORIES.map((cat) => (
             <View key={cat.label} style={styles.category}>
               <Text style={styles.categoryLabel}>{cat.label}</Text>
@@ -167,6 +188,29 @@ export function ProjectForm({
               </View>
             </View>
           ))}
+          <View style={styles.customRow}>
+            <TextInput
+              value={customSkillInput}
+              onChangeText={setCustomSkillInput}
+              placeholder="Add a skill…"
+              placeholderTextColor={Brand.inkPlaceholder}
+              style={styles.customInput}
+              returnKeyType="done"
+              onSubmitEditing={addCustomSkill}
+              autoCapitalize="words"
+              blurOnSubmit={false}
+            />
+            <Pressable
+              onPress={addCustomSkill}
+              style={[
+                styles.customAddBtn,
+                (!customSkillInput.trim() || requiredSkills.length >= SKILLS_MAX) && styles.customAddBtnDisabled,
+              ]}
+              accessibilityLabel="Add custom skill"
+            >
+              <Plus size={16} color={Brand.inkOnBrand} weight="bold" />
+            </Pressable>
+          </View>
         </Section>
 
         <Section
@@ -310,6 +354,33 @@ const styles = StyleSheet.create({
     color: Brand.inkLabel,
   },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  customRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 8,
+  },
+  customInput: {
+    flex: 1,
+    height: 40,
+    borderRadius: Radii.pill,
+    paddingHorizontal: 16,
+    backgroundColor: Brand.surface1,
+    borderWidth: 1.5,
+    borderColor: Brand.borderDefault,
+    fontFamily: AmbitFont.body,
+    fontSize: 14,
+    color: Brand.inkBody,
+  },
+  customAddBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: Brand.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  customAddBtnDisabled: { opacity: 0.4 },
   campusRow: {
     flexDirection: 'row',
     alignItems: 'center',

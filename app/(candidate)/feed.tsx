@@ -15,9 +15,14 @@ import { ArrowsClockwise, BookmarkSimple, CaretDown, Check, GraduationCap, Magni
 import type { IconProps } from 'phosphor-react-native';
 import * as Haptics from 'expo-haptics';
 import { DiscoveryOverview, SwipeDeck } from '../../components/organisms';
-import { PortfolioModal, ReachOutComposer, BottomSheet } from '../../components/molecules';
+import { PortfolioModal, ReachOutComposer, BottomSheet, ReachOutLimitSheet } from '../../components/molecules';
 import { Tactile } from '../../components/atoms';
 import { CAMPUSES } from '../../data/mock';
+import {
+  canReachOut,
+  recordReachOut,
+  getReachOutStatus,
+} from '../../lib/reachOutLimit';
 import type { PortfolioItem } from '../../data/mock';
 import { useProfileRole } from '../../hooks/useProfileRole';
 import { useSavedDeck } from '../../context/SavedDeckContext';
@@ -264,6 +269,25 @@ export default function DiscoveryFeed() {
   /// SwipeDeck pauses its PanResponder via gesturesDisabled while non-null so
   /// the deck doesn't swipe out from under the composer.
   const [reachOutCard, setReachOutCard] = useState<DiscoveryCardData | null>(null);
+
+  // Daily reach-out limit gate. When the user hits the cap, pendingCard
+  // holds the card they wanted to reach out to so we can open the composer
+  // right after they earn a bonus via the rewarded ad.
+  const [limitSheetVisible, setLimitSheetVisible] = useState(false);
+  const [limitStatus, setLimitStatus] = useState<{ used: number; limit: number }>({ used: 0, limit: 5 });
+  const [pendingReachOutCard, setPendingReachOutCard] = useState<DiscoveryCardData | null>(null);
+
+  const handleReachOutPress = async (card: DiscoveryCardData) => {
+    const ok = await canReachOut();
+    if (ok) {
+      setReachOutCard(card);
+    } else {
+      const status = await getReachOutStatus();
+      setLimitStatus(status);
+      setPendingReachOutCard(card);
+      setLimitSheetVisible(true);
+    }
+  };
 
   /// Portfolio item the user tapped to expand. Non-null = PortfolioModal
   /// visible. Pause SwipeDeck gestures while open so the deck doesn't
@@ -569,7 +593,7 @@ export default function DiscoveryFeed() {
           onPass={handlePass}
           onSave={handleSave}
           onRewind={handleRewind}
-          onReachOut={setReachOutCard}
+          onReachOut={handleReachOutPress}
           onPortfolioPress={setActivePortfolio}
           activePortfolioId={activePortfolio?.id ?? null}
           gesturesDisabled={!!reachOutCard || !!activePortfolio}
@@ -583,7 +607,11 @@ export default function DiscoveryFeed() {
       <ReachOutComposer
         card={reachOutCard}
         onDismiss={() => setReachOutCard(null)}
-        onSend={handleMessage}
+        onSend={async (card, text) => {
+          const ok = await handleMessage(card, text);
+          if (ok) recordReachOut().catch(() => {});
+          return ok;
+        }}
         onSent={handleReachSent}
       />
 
@@ -655,6 +683,22 @@ export default function DiscoveryFeed() {
           )}
         </ScrollView>
       </BottomSheet>
+
+      <ReachOutLimitSheet
+        visible={limitSheetVisible}
+        used={limitStatus.used}
+        limit={limitStatus.limit}
+        onDismiss={() => {
+          setLimitSheetVisible(false);
+          setPendingReachOutCard(null);
+        }}
+        onAdComplete={() => {
+          setLimitSheetVisible(false);
+          // Open the composer with the card they originally wanted to reach out to.
+          if (pendingReachOutCard) setReachOutCard(pendingReachOutCard);
+          setPendingReachOutCard(null);
+        }}
+      />
     </View>
   );
 }

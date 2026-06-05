@@ -58,6 +58,9 @@ interface Props {
   /// conversation thread for a full-canvas chat). Slides back up on exit.
   /// Animated entirely within this component.
   hidden?: boolean;
+  /// Tabs that should show an unread dot. Callers pass a new Set each
+  /// render so the component stays purely presentational.
+  badgeTabs?: Set<NavTabKey>;
 }
 
 const ACTIVE_COLOR   = Brand.inkOnBrand;                  // white icon on dark nav
@@ -86,7 +89,7 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 /// never per frame: showing reserves the slot then slides up into it;
 /// hiding slides away then reclaims the slot in one smooth LayoutAnimation
 /// step so the thread's composer eases to the bottom instead of jumping.
-export function LiquidNavBar({ activeKey, onChange, hidden = false }: Props) {
+export function LiquidNavBar({ activeKey, onChange, hidden = false, badgeTabs }: Props) {
   const insets = useSafeAreaInsets();
 
   /// Natural bar height, measured once from the inner row — drives the
@@ -178,6 +181,8 @@ export function LiquidNavBar({ activeKey, onChange, hidden = false }: Props) {
           const active = tab.key === activeKey;
           const Icon = active ? tab.activeIcon : tab.inactiveIcon;
 
+          const hasBadge = badgeTabs?.has(tab.key) ?? false;
+
           return (
             <Pressable
               key={tab.key}
@@ -187,11 +192,14 @@ export function LiquidNavBar({ activeKey, onChange, hidden = false }: Props) {
               accessibilityLabel={tab.label}
               accessibilityState={{ selected: active }}
             >
-              <Icon
-                size={ICON_SIZE}
-                color={active ? ACTIVE_COLOR : INACTIVE_COLOR}
-                weight={active ? 'fill' : 'regular'}
-              />
+              <View style={styles.iconWrap}>
+                <Icon
+                  size={ICON_SIZE}
+                  color={active ? ACTIVE_COLOR : INACTIVE_COLOR}
+                  weight={active ? 'fill' : 'regular'}
+                />
+                {hasBadge && <View style={styles.badge} />}
+              </View>
             </Pressable>
           );
         })}
@@ -233,5 +241,21 @@ const styles = StyleSheet.create({
     // Taller tap targets so the bar's overall height grows toward
     // Instagram's, not just the icon glyphs.
     paddingVertical: 8,
+  },
+  iconWrap: {
+    position: 'relative',
+  },
+  badge: {
+    position: 'absolute',
+    top: -1,
+    right: -3,
+    width: 9,
+    height: 9,
+    borderRadius: 5,
+    backgroundColor: '#FF3B30',
+    borderWidth: 1.5,
+    // Border matches the nav bar background so the dot appears to "cut out"
+    // from the surface rather than overlay it.
+    borderColor: Brand.navBarBg,
   },
 });

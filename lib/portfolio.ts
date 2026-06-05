@@ -53,7 +53,9 @@ export async function fetchPortfolioForUser(userId: string): Promise<PortfolioIt
     .eq('user_id', userId)
     .order('position', { ascending: true });
   if (error) {
-    console.warn('fetchPortfolioForUser failed:', error.message);
+    if (!error.message.includes('schema cache')) {
+      console.warn('fetchPortfolioForUser failed:', error.message);
+    }
     return [];
   }
   return (data as PortfolioRow[]).map(rowToItem);
@@ -73,7 +75,9 @@ export async function fetchPortfoliosByUser(
     .order('position', { ascending: true });
   const out = new Map<string, PortfolioItem[]>();
   if (error || !data) {
-    if (error) console.warn('fetchPortfoliosByUser failed:', error.message);
+    if (error && !error.message.includes('schema cache')) {
+      console.warn('fetchPortfoliosByUser failed:', error.message);
+    }
     return out;
   }
   for (const row of data as PortfolioRow[]) {
