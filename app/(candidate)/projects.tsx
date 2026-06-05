@@ -194,36 +194,15 @@ export default function ProjectsTab() {
                       )}
                     </View>
 
-                    {/* Pipeline stat row */}
-                    <View style={styles.statRow}>
-                      <View style={styles.stat}>
-                        <ChatCircle size={15} color={Brand.accent} weight="fill" />
-                        <Text style={styles.statText}>{s.talking} talking</Text>
-                      </View>
-                      <View style={styles.stat}>
-                        <Handshake size={15} color={Brand.accent} weight="fill" />
-                        <Text style={styles.statText}>{s.hired} hired</Text>
-                      </View>
-                      {s.unread > 0 && (
-                        <View style={styles.unreadPill}>
-                          <Text style={styles.unreadPillText}>{s.unread} new</Text>
-                        </View>
-                      )}
-                    </View>
-
-                    {/* Interested faces */}
-                    {s.total > 0 ? (
-                      <View style={styles.facesRow}>
-                        <AvatarStack uris={s.avatars} />
-                        <Text style={styles.facesText}>
-                          {s.total} {s.total === 1 ? 'person' : 'people'} interested
-                        </Text>
-                      </View>
-                    ) : (
-                      <Text style={styles.facesEmpty}>
-                        {p.active ? 'No one yet — it’s live and matching.' : 'Paused — flip it live to match.'}
-                      </Text>
-                    )}
+                    {/* Single calm summary line (Vocabulary restraint) */}
+                    <Text style={styles.cardSummary}>
+                      {[
+                        `${s.talking} in conversation`,
+                        s.total > 0 ? `${s.total} interested` : null,
+                        s.unread > 0 ? `${s.unread} new` : null,
+                      ].filter(Boolean).join('  ·  ') ||
+                        (p.active ? 'Live and matching' : 'Paused')}
+                    </Text>
                   </View>
                 </View>
               </SwipeRevealRow>
@@ -302,9 +281,9 @@ const styles = StyleSheet.create({
   kicker: {
     fontFamily: AmbitFont.body,
     fontSize: 11,
-    fontWeight: '600',
-    letterSpacing: 1.5,
-    color: Brand.accent,
+    fontWeight: '700',
+    letterSpacing: 1.6,
+    color: Brand.inkMuted,
   },
   title: {
     fontFamily: AmbitFont.display,
@@ -383,14 +362,18 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     elevation: 0,
   },
-  cardBody: { flex: 1, padding: Space.md, gap: 10 },
+  cardBody: { flex: 1, padding: 18, gap: 8 },
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   cardTitle: {
     flex: 1,
+    fontFamily: AmbitFont.display,
+    fontSize: 20,
+    color: Brand.inkPrimary,
+  },
+  cardSummary: {
     fontFamily: AmbitFont.body,
-    fontSize: 16,
-    fontWeight: '700',
-    color: Brand.inkHigh,
+    fontSize: 13,
+    color: Brand.inkMuted,
   },
   liveBadge: {
     flexDirection: 'row',
