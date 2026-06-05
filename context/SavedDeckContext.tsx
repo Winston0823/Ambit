@@ -17,6 +17,11 @@ interface SavedDeckCtx {
   save: (card: DiscoveryCardData) => void;
   /// Remove by id. No-op if not saved.
   unsave: (id: string) => void;
+  /// Private per-card notes (the "sticky note"). Session-only for v1 — moves
+  /// to matches.note when the saved deck itself is DB-backed (v2).
+  notes: Record<string, string>;
+  /// Set or clear (empty string) a card's note.
+  setNote: (id: string, note: string) => void;
   /// Total count — used for badge in the bookmark icon.
   count: number;
 }
@@ -41,9 +46,19 @@ export function SavedDeckProvider({ children }: { children: ReactNode }) {
     setSaved((prev) => prev.filter((c) => c.id !== id));
   }, []);
 
+  const [notes, setNotes] = useState<Record<string, string>>({});
+  const setNote = useCallback((id: string, note: string) => {
+    setNotes((prev) => {
+      const next = { ...prev };
+      if (note.trim()) next[id] = note.trim();
+      else delete next[id];
+      return next;
+    });
+  }, []);
+
   const value = useMemo<SavedDeckCtx>(
-    () => ({ saved, isSaved, save, unsave, count: saved.length }),
-    [saved, isSaved, save, unsave],
+    () => ({ saved, isSaved, save, unsave, notes, setNote, count: saved.length }),
+    [saved, isSaved, save, unsave, notes, setNote],
   );
 
   return (

@@ -1,18 +1,25 @@
 import React, { useRef, useState } from 'react';
 import {
   Alert,
+  Animated,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { PaperPlaneTilt, Trash, X } from 'phosphor-react-native';
-import { BackChevron } from '../../components/atoms';
+import { Swipeable } from 'react-native-gesture-handler';
+import { NotePencil, PaperPlaneTilt, Trash, X } from 'phosphor-react-native';
+import { BackChevron, Tactile } from '../../components/atoms';
 import { DiscoveryCard, DiscoveryRowSummary, ReachOutComposer, ReachOutLimitSheet } from '../../components/molecules';
+import { Motion } from '../../constants/motion';
+import { haptics } from '../../lib/haptics';
 import { useSavedDeck } from '../../context/SavedDeckContext';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
@@ -42,7 +49,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 export default function SavedScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
-  const { saved, unsave } = useSavedDeck();
+  const { saved, unsave, save, notes, setNote } = useSavedDeck();
 
   /// Card currently targeted by the composer. Null = closed.
   const [composing, setComposing] = useState<DiscoveryCardData | null>(null);
@@ -55,6 +62,43 @@ export default function SavedScreen() {
   const [limitSheetVisible, setLimitSheetVisible] = useState(false);
   const [limitStatus, setLimitStatus] = useState<{ used: number; limit: number }>({ used: 0, limit: 5 });
   const [pendingCompose, setPendingCompose] = useState<DiscoveryCardData | null>(null);
+
+  // ── Swipe-to-remove + Undo ──────────────────────────────────────────
+  const swipeableRefs = useRef<Record<string, Swipeable | null>>({});
+  const [undoCard, setUndoCard] = useState<DiscoveryCardData | null>(null);
+  const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const toastAnim = useRef(new Animated.Value(0)).current;
+
+  const hideUndo = () => {
+    Animated.timing(toastAnim, { toValue: 0, duration: 200, useNativeDriver: true })
+      .start(() => setUndoCard(null));
+  };
+  const removeWithUndo = (card: DiscoveryCardData) => {
+    haptics.tap();
+    swipeableRefs.current[card.id]?.close();
+    unsave(card.id);
+    setUndoCard(card);
+    if (undoTimer.current) clearTimeout(undoTimer.current);
+    Animated.spring(toastAnim, { toValue: 1, ...Motion.spring, useNativeDriver: true }).start();
+    undoTimer.current = setTimeout(hideUndo, 4000);
+  };
+  const undoRemove = () => {
+    if (undoCard) save(undoCard);
+    if (undoTimer.current) clearTimeout(undoTimer.current);
+    hideUndo();
+  };
+
+  // ── Notes ("sticky note") ───────────────────────────────────────────
+  const [noteEditing, setNoteEditing] = useState<DiscoveryCardData | null>(null);
+  const [noteDraft, setNoteDraft] = useState('');
+  const openNote = (card: DiscoveryCardData) => {
+    setNoteDraft(notes[card.id] ?? '');
+    setNoteEditing(card);
+  };
+  const saveNote = () => {
+    if (noteEditing) setNote(noteEditing.id, noteDraft);
+    setNoteEditing(null);
+  };
 
   const openComposer = async (card: DiscoveryCardData) => {
     if (!UUID_RE.test(card.id)) {
@@ -168,35 +212,62 @@ export default function SavedScreen() {
         showsVerticalScrollIndicator={false}
       >
         {saved.map((card) => (
-          <DiscoveryRowSummary
+          <Swipeable
             key={card.id}
-            card={card}
-            onPress={() => setPreviewing(card)}
-            trailing={
-              <View style={styles.actions}>
-                <Pressable
-                  onPress={() => openComposer(card)}
-                  hitSlop={6}
-                  style={styles.actionBtn}
-                  accessibilityLabel={
-                    card.kind === 'project'
-                      ? `Message ${card.ownerName}`
-                      : `Message ${card.name}`
-                  }
-                >
-                  <PaperPlaneTilt size={18} color={Brand.accent} weight="fill" />
+            ref={(r) => { swipeableRefs.current[card.id] = r; }}
+            friction={2}
+            rightThreshold={44}
+            overshootRight={false}
+            renderRightActions={() => (
+              <Pressable
+                onPress={() => removeWithUndo(card)}
+                style={styles.swipeRemove}
+                accessibilityLabel="Remove from saved"
+              >
+                <Trash size={20} color="#FFFFFF" weight="bold" />
+                <Text style={styles.swipeRemoveText}>Remove</Text>
+              </Pressable>
+            )}
+          >
+            <View style={styles.savedItem}>
+              <DiscoveryRowSummary
+                card={card}
+                onPress={() => setPreviewing(card)}
+                trailing={
+                  <View style={styles.actions}>
+                    <Pressable
+                      onPress={() => openComposer(card)}
+                      hitSlop={6}
+                      style={styles.actionBtn}
+                      accessibilityLabel={
+                        card.kind === 'project' ? `Message ${card.ownerName}` : `Message ${card.name}`
+                      }
+                    >
+                      <PaperPlaneTilt size={18} color={Brand.accent} weight="fill" />
+                    </Pressable>
+                    <Pressable
+                      onPress={() => openNote(card)}
+                      hitSlop={6}
+                      style={styles.actionBtn}
+                      accessibilityLabel={notes[card.id] ? 'Edit note' : 'Add a note'}
+                    >
+                      <NotePencil
+                        size={18}
+                        color={notes[card.id] ? Brand.accent : Brand.inkMuted}
+                        weight={notes[card.id] ? 'fill' : 'regular'}
+                      />
+                    </Pressable>
+                  </View>
+                }
+              />
+              {notes[card.id] ? (
+                <Pressable onPress={() => openNote(card)} style={styles.noteTag}>
+                  <NotePencil size={12} color={Brand.accent} weight="fill" />
+                  <Text style={styles.noteTagText} numberOfLines={2}>{notes[card.id]}</Text>
                 </Pressable>
-                <Pressable
-                  onPress={() => unsave(card.id)}
-                  hitSlop={6}
-                  style={styles.actionBtn}
-                  accessibilityLabel="Remove from saved"
-                >
-                  <Trash size={18} color={Brand.inkMuted} weight="regular" />
-                </Pressable>
-              </View>
-            }
-          />
+              ) : null}
+            </View>
+          </Swipeable>
         ))}
       </ScrollView>
 
@@ -261,6 +332,58 @@ export default function SavedScreen() {
           setPendingCompose(null);
         }}
       />
+
+      {/* Undo toast — appears after a swipe-remove, re-saves on tap. */}
+      {undoCard ? (
+        <Animated.View
+          pointerEvents="box-none"
+          style={[styles.toastWrap, { bottom: insets.bottom + 16 }]}
+        >
+          <Animated.View
+            style={[
+              styles.toast,
+              { opacity: toastAnim, transform: [{ translateY: toastAnim.interpolate({ inputRange: [0, 1], outputRange: [24, 0] }) }] },
+            ]}
+          >
+            <Text style={styles.toastText}>Removed from saved</Text>
+            <Tactile haptic="tap" onPress={undoRemove} style={styles.toastBtn} accessibilityLabel="Undo remove">
+              <Text style={styles.toastBtnText}>Undo</Text>
+            </Tactile>
+          </Animated.View>
+        </Animated.View>
+      ) : null}
+
+      {/* Private note editor. */}
+      <Modal visible={!!noteEditing} transparent animationType="fade" onRequestClose={() => setNoteEditing(null)}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.noteModalRoot}
+        >
+          <Pressable style={styles.noteScrim} onPress={() => setNoteEditing(null)} />
+          <View style={styles.noteSheet}>
+            <View style={styles.noteHead}>
+              <Text style={styles.noteTitle}>Private note</Text>
+              <Pressable onPress={() => setNoteEditing(null)} hitSlop={10}>
+                <X size={20} color={Brand.inkMuted} weight="bold" />
+              </Pressable>
+            </View>
+            <Text style={styles.noteHint}>Only you can see this — jot why you saved them.</Text>
+            <TextInput
+              value={noteDraft}
+              onChangeText={setNoteDraft}
+              placeholder="e.g. strong RN portfolio — ping after midterms"
+              placeholderTextColor={Brand.inkPlaceholder}
+              style={styles.noteInput}
+              multiline
+              maxLength={160}
+              autoFocus
+            />
+            <Tactile haptic="tap" onPress={saveNote} style={styles.noteSave}>
+              <Text style={styles.noteSaveText}>{noteDraft.trim() ? 'Save note' : 'Clear note'}</Text>
+            </Tactile>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 }
@@ -300,6 +423,88 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+
+  // ── Swipe-to-remove + note ─────────────────────────────────────
+  savedItem: { backgroundColor: Brand.canvas },
+  swipeRemove: {
+    width: 92,
+    marginLeft: 8,
+    borderRadius: 16,
+    backgroundColor: '#C2453B',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 3,
+  },
+  swipeRemoveText: { fontFamily: AmbitFont.body, fontSize: 12, fontWeight: '700', color: '#FFFFFF' },
+  noteTag: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+    marginTop: 6,
+    marginLeft: 56,
+    marginRight: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 10,
+    backgroundColor: Brand.seekerSurface,
+  },
+  noteTagText: { flex: 1, fontFamily: AmbitFont.body, fontSize: 12.5, color: Brand.seekerInk, lineHeight: 17 },
+
+  // ── Undo toast ─────────────────────────────────────────────────
+  toastWrap: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
+  toast: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingLeft: 18,
+    paddingRight: 8,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: Brand.inkPrimary,
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 8,
+  },
+  toastText: { fontFamily: AmbitFont.body, fontSize: 14, fontWeight: '600', color: Brand.canvas },
+  toastBtn: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999, backgroundColor: Brand.primary },
+  toastBtnText: { fontFamily: AmbitFont.body, fontSize: 14, fontWeight: '700', color: Brand.inkOnBrand },
+
+  // ── Note editor sheet ──────────────────────────────────────────
+  noteModalRoot: { flex: 1, justifyContent: 'flex-end' },
+  noteScrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.4)' },
+  noteSheet: {
+    backgroundColor: Brand.canvas,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: Space.lg,
+    paddingBottom: Space.lg + 8,
+    gap: 10,
+  },
+  noteHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  noteTitle: { fontFamily: AmbitFont.display, fontSize: 20, color: Brand.inkPrimary },
+  noteHint: { fontFamily: AmbitFont.body, fontSize: 13, color: Brand.inkMuted },
+  noteInput: {
+    minHeight: 80,
+    maxHeight: 160,
+    borderRadius: 14,
+    padding: 14,
+    backgroundColor: Brand.surface1,
+    fontFamily: AmbitFont.body,
+    fontSize: 15,
+    color: Brand.inkBody,
+    textAlignVertical: 'top',
+  },
+  noteSave: {
+    alignSelf: 'stretch',
+    alignItems: 'center',
+    paddingVertical: 14,
+    borderRadius: 14,
+    backgroundColor: Brand.primary,
+    marginTop: 4,
+  },
+  noteSaveText: { fontFamily: AmbitFont.body, fontSize: 15, fontWeight: '700', color: Brand.inkOnBrand },
 
   // ── Full-card preview ──────────────────────────────────────────
   previewRoot: {
