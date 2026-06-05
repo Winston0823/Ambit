@@ -82,8 +82,17 @@ export function Button({
 
 const TONES: Record<Variant, { container: ViewStyle; label: TextStyle }> = {
   primary: {
-    container: { backgroundColor: Brand.primary },
-    label: { color: Brand.inkOnBrand },
+    container: {
+      backgroundColor: Brand.action,
+      borderWidth: 1.6,
+      borderColor: Brand.actionInk,
+      // hard black offset EDGE below (not a soft shadow) — the signature look
+      shadowColor: Brand.actionInk,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 1,
+      shadowRadius: 0,
+    },
+    label: { color: Brand.actionInk },
   },
   secondary: {
     container: {
@@ -102,7 +111,7 @@ const TONES: Record<Variant, { container: ViewStyle; label: TextStyle }> = {
 const styles = StyleSheet.create({
   base: {
     minHeight: 52,
-    borderRadius: Radii.md,
+    borderRadius: 999,
     paddingHorizontal: 24,
     flexDirection: 'row',
     alignItems: 'center',

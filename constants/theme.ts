@@ -6,22 +6,32 @@ import { Platform, TextStyle } from 'react-native';
 // ---------- Color ----------
 
 export const Brand = {
-  // Brand
-  primary:        '#D4B490',  // warm tan — CTAs, selected pills
-  accent:         '#B48045',  // deeper tan — helper coaching copy, links
+  // ── LOCKED "Vocabulary-committed" system (2026-06-05) ──────────────────────
+  // Eggshell paper · serif heroes · one tactile button language (teal fill +
+  // ink border + a HARD black offset edge below — not a soft shadow). See
+  // Obsidian Vault/Ambit/Design/Vocabulary Steer.md.
+  primary:        '#D4B490',  // warm tan — warm-decorative only (rails/gradients)
+  accent:         '#B48045',  // deeper tan — warm decorative
+  // The signature interactive accent: muted teal-blue fill, ink border + edge.
+  action:         '#A6C7C2',  // teal-blue button/selected fill
+  actionInk:      '#1C1C1A',  // text + border + the hard offset edge on `action`
+  // Mint "tag" (LIVE / New / status).
+  tagMint:        '#DDEEE3',
+  tagMintInk:     '#3E6B53',
   seekerSurface:  '#F2E8DD',  // seeker themed card bg
   seekerInk:      '#4D361D',  // seeker card title (deep brown on sand)
 
-  // Surfaces
-  canvas:         '#FFFFFF',
-  cardCream:      '#FAF6F0',  // warm off-white for primary card surfaces (Hinge-style)
-  surface1:       '#F6F6F6',  // input fill, default chip fill
-  surface2:       '#EFEFEF',  // unselected option card fill
-  borderDefault:  '#E0E0E0',  // 1.5px hairlines on inputs/chips
-  borderSoft:     'rgba(0, 0, 0, 0.06)',  // softer hairline for card on cream
+  // Surfaces — eggshell paper ground; cream islands lift above it.
+  canvas:         '#EBE7DC',  // warm eggshell paper
+  cardCream:      '#FBFAF5',  // cream island cards
+  surface1:       '#F3EFE5',  // input fill, default chip fill
+  surface2:       '#EBE6DA',  // unselected fill
+  borderDefault:  '#E4DECF',  // soft hairlines
+  borderSoft:     'rgba(28, 28, 26, 0.07)',
+  inkEdge:        '#1C1C1A',  // hard tactile border/edge on buttons + cards
 
-  // Ink
-  inkPrimary:     '#000000',  // display headlines
+  // Ink — refined neutral near-black on eggshell.
+  inkPrimary:     '#1C1C1A',  // display headlines
   inkHigh:        '#141414',
   inkBody:        '#212121',
   inkLabel:       '#737373',

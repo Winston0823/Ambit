@@ -60,7 +60,13 @@ const styles = StyleSheet.create({
     borderColor: Brand.borderDefault,
   },
   selected: {
-    backgroundColor: Brand.primary,
+    backgroundColor: Brand.action,
+    borderWidth: 1.5,
+    borderColor: Brand.actionInk,
+    shadowColor: Brand.actionInk,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
   },
   label: {
     fontFamily: AmbitFont.body,
@@ -68,5 +74,5 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   labelOff: { color: Brand.inkBody },
-  labelOn: { color: Brand.inkOnBrand, fontWeight: '600' },
+  labelOn: { color: Brand.actionInk, fontWeight: '700' },
 });
