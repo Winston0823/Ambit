@@ -28,6 +28,7 @@ import {
 import { Chip } from '../../components/atoms';
 import {
   AddPortfolioBubble,
+  DiscoveryCard,
   PortfolioBubble,
   PortfolioModal,
   SpeechBubble,
@@ -44,7 +45,7 @@ import {
 import { randomUUID } from 'expo-crypto';
 import { formatResponseRate, formatResponseTime } from '../../lib/closureLoop';
 import { CAMPUSES, SKILL_CATEGORIES } from '../../data/mock';
-import type { PortfolioItem } from '../../data/mock';
+import type { PortfolioItem, SeekerCardData } from '../../data/mock';
 import {
   AmbitFont,
   Brand,
@@ -103,6 +104,10 @@ export default function ProfileTab() {
   // Local state mirrors the DB for snappy UI; mutations write through
   // optimistically and reconcile from the network on save errors.
   const [portfolio, setPortfolio] = useState<PortfolioItem[]>([]);
+
+  // Preview (read-only discovery card) vs. edit mode. Opens in preview so the
+  // user sees exactly how owners see them, Instagram-style, then taps Edit.
+  const [editing, setEditing] = useState(false);
 
   // Edit modal state
   const [textEdit, setTextEdit] = useState<TextEditState | null>(null);
@@ -322,6 +327,19 @@ export default function ProfileTab() {
   const initial = (profile?.name ?? '?')[0]?.toUpperCase() ?? '?';
   const skills = profile?.skills ?? [];
 
+  // The user's own card, shaped exactly like a discovery seeker card so the
+  // preview is pixel-identical to what owners swipe through.
+  const previewCard: SeekerCardData = {
+    kind: 'seeker',
+    id: user?.id ?? 'me',
+    name: profile?.name ?? '',
+    photoUri: profile?.photo_url ?? null,
+    campusId: profile?.campus_id ?? '',
+    skills,
+    vibeBlurb: profile?.vibe_blurb ?? '',
+    portfolio,
+  };
+
   return (
     <View style={styles.root}>
       {/* Header — minimal: an eyebrow label so the user knows they're in
@@ -330,7 +348,22 @@ export default function ProfileTab() {
           centers the eyebrow + sign-out button, giving a snug top that sits
           right below the Dynamic Island. */}
       <View style={[styles.header, { marginTop: insets.top }]}>
-        <Text style={styles.eyebrow}>YOUR CARD</Text>
+        <View style={styles.segment}>
+          <Pressable
+            onPress={() => { if (Platform.OS !== 'web') Haptics.selectionAsync().catch(() => {}); setEditing(true); }}
+            style={[styles.segmentBtn, editing && styles.segmentBtnActive]}
+            accessibilityLabel="Edit profile"
+          >
+            <Text style={[styles.segmentText, editing && styles.segmentTextActive]}>Edit</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => { if (Platform.OS !== 'web') Haptics.selectionAsync().catch(() => {}); setEditing(false); }}
+            style={[styles.segmentBtn, !editing && styles.segmentBtnActive]}
+            accessibilityLabel="Preview profile"
+          >
+            <Text style={[styles.segmentText, !editing && styles.segmentTextActive]}>Preview</Text>
+          </Pressable>
+        </View>
         <Pressable
           onPress={() => { signOut().catch(() => {}); }}
           style={styles.signOutBtn}
@@ -341,161 +374,108 @@ export default function ProfileTab() {
         </Pressable>
       </View>
 
+      {editing ? (
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.card}>
-          {/* Top row: avatar (with camera badge) + name (with pencil) +
-              campus (with pencil) */}
-          <View style={styles.topRow}>
-            <Pressable onPress={pickPhoto} hitSlop={4} style={styles.avatarPressable}>
-              <View style={styles.avatar}>
-                {profile?.photo_url ? (
-                  <Image source={{ uri: profile.photo_url }} style={styles.avatarImg} />
-                ) : (
-                  <Text style={styles.avatarInitial}>{initial}</Text>
-                )}
-              </View>
-              <View style={styles.cameraBadge}>
-                <Camera size={12} color={Brand.inkPrimary} weight="regular" />
-              </View>
-            </Pressable>
-
-            <View style={styles.nameCol}>
-              <Pressable
-                onPress={() =>
-                  setTextEdit({
-                    field: 'name',
-                    title: 'Your name',
-                    value: profile?.name ?? '',
-                    placeholder: 'Alex Chen',
-                    multiline: false,
-                  })
-                }
-                style={styles.fieldPress}
-                hitSlop={4}
-              >
-                <Text style={styles.name} numberOfLines={1}>
-                  {profile?.name || 'Tap to add your name'}
-                </Text>
-                <PencilSimpleLine size={13} color={Brand.inkMuted} weight="regular" />
-              </Pressable>
-
-              <Pressable
-                onPress={() => setCampusOpen(true)}
-                style={styles.fieldPress}
-                hitSlop={4}
-              >
-                <MapPin size={12} color={Brand.inkMuted} weight="fill" />
-                <Text style={styles.campusText} numberOfLines={1}>
-                  {campus?.name ?? 'Tap to set campus'}
-                </Text>
-                <PencilSimpleLine size={11} color={Brand.inkMuted} weight="regular" />
-              </Pressable>
-
-              {/* Role pill — shows current seeker/owner/both intent.
-                  Tap → opens RoleEditModal to switch. Always shown
-                  (defaulting to 'Pick a role' if null) so the user
-                  always knows which side of the marketplace their
-                  card represents. */}
-              <Pressable
-                onPress={() => setRoleOpen(true)}
-                style={styles.rolePill}
-                hitSlop={4}
-                accessibilityLabel="Change role"
-              >
-                <Text style={styles.rolePillText}>
-                  {profile?.role ? ROLE_LABEL[profile.role] : 'Pick a role'}
-                </Text>
-                <PencilSimpleLine size={11} color={Brand.accent} weight="regular" />
-              </Pressable>
-
-              {/* Closure-loop response-rate pill. Only rendered when
-                  the user has at least one conversation aged past 72h
-                  (response_rate becomes non-null). */}
-              {profile && (profile.response_rate != null || profile.avg_response_minutes != null) && (
-                <View style={styles.responseRow}>
-                  <Chat size={11} color={Brand.accent} weight="regular" />
-                  <Text style={styles.responseText}>
-                    {[
-                      formatResponseTime(profile.avg_response_minutes) &&
-                        `Responds ${formatResponseTime(profile.avg_response_minutes)}`,
-                      formatResponseRate(profile.response_rate),
-                    ]
-                      .filter(Boolean)
-                      .join(' · ')}
-                  </Text>
-                </View>
-              )}
-            </View>
+        {/* Photo */}
+        <Pressable onPress={pickPhoto} style={styles.photoRow}>
+          <View style={styles.photoThumb}>
+            {profile?.photo_url
+              ? <Image source={{ uri: profile.photo_url }} style={styles.photoThumbImg} />
+              : <Text style={styles.photoThumbInitial}>{initial}</Text>}
           </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.fieldRowLabel}>Photo</Text>
+            <Text style={styles.fieldRowValueStacked}>
+              {profile?.photo_url ? 'Tap to change' : 'Add a photo'}
+            </Text>
+          </View>
+          <Camera size={18} color={Brand.inkMuted} weight="regular" />
+        </Pressable>
 
-          {/* Vibe blurb — speech bubble with pencil at the right edge */}
-          <Pressable
-            onPress={() =>
-              setTextEdit({
-                field: 'vibe_blurb',
-                title: 'Your vibe',
-                value: profile?.vibe_blurb ?? '',
-                placeholder: 'Two sentences about how you like to work.',
-                multiline: true,
-              })
-            }
-          >
-            <SpeechBubble color={Brand.seekerSurface} tailAnchor="top-left" tailOffset={20}>
-              <View style={styles.vibeRow}>
-                <Text style={styles.vibe}>
-                  {profile?.vibe_blurb || 'Tap to add your vibe.'}
-                </Text>
-                <PencilSimpleLine size={14} color={Brand.seekerInk} weight="regular" />
-              </View>
-            </SpeechBubble>
-          </Pressable>
+        {/* Core fields — labeled list (Tinder / Hinge convention) */}
+        <View style={styles.fieldGroup}>
+          <FieldRow
+            label="Name"
+            value={profile?.name ?? ''}
+            placeholder="Add your name"
+            onPress={() => setTextEdit({ field: 'name', title: 'Your name', value: profile?.name ?? '', placeholder: 'Alex Chen', multiline: false })}
+          />
+          <FieldRow
+            label="About"
+            stacked
+            value={profile?.vibe_blurb ?? ''}
+            placeholder="Two sentences on how you like to work"
+            onPress={() => setTextEdit({ field: 'vibe_blurb', title: 'Your vibe', value: profile?.vibe_blurb ?? '', placeholder: 'Two sentences about how you like to work.', multiline: true })}
+          />
+          <FieldRow
+            label="Campus"
+            value={campus?.name ?? ''}
+            placeholder="Set your campus"
+            onPress={() => setCampusOpen(true)}
+          />
+          <FieldRow
+            label="Looking to"
+            value={profile?.role ? ROLE_LABEL[profile.role] : ''}
+            placeholder="Pick a role"
+            onPress={() => setRoleOpen(true)}
+            last
+          />
+        </View>
 
-          {/* Skills */}
-          <View style={styles.section}>
+        {/* Skills */}
+        <View style={styles.editSection}>
+          <View style={styles.editSectionHead}>
             <Text style={styles.sectionLabel}>SKILLS</Text>
-            <View style={styles.chipRow}>
-              {skills.map((s) => (
-                <Chip key={s} label={s} selected={false} />
-              ))}
-              <Pressable onPress={() => setSkillsOpen(true)} style={styles.addChip}>
-                <Text style={styles.addChipPlus}>+</Text>
-                <Text style={styles.addChipLabel}>
-                  {skills.length === 0 ? 'Add skills' : 'Edit'}
-                </Text>
-              </Pressable>
-            </View>
+            <Pressable onPress={() => setSkillsOpen(true)} hitSlop={8}>
+              <Text style={styles.editLink}>{skills.length === 0 ? 'Add' : 'Edit'}</Text>
+            </Pressable>
           </View>
+          <View style={styles.chipRow}>
+            {skills.length === 0
+              ? <Text style={styles.fieldRowEmpty}>No skills added yet</Text>
+              : skills.map((s) => <Chip key={s} label={s} selected={false} />)}
+          </View>
+        </View>
 
-          {/* Portfolio */}
-          <View style={styles.section}>
-            <Text style={styles.sectionLabel}>PORTFOLIO</Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.portfolioRow}
-            >
-              {portfolio.map((item) => (
-                <PortfolioBubble
-                  key={item.id}
-                  item={item}
-                  onPress={() => setActivePortfolio(item)}
-                  active={activePortfolio?.id === item.id}
-                />
-              ))}
-              <AddPortfolioBubble
-                onPress={addNewPortfolio}
-                label={portfolio.length === 0 ? 'Add first' : 'Add'}
+        {/* Portfolio */}
+        <View style={styles.editSection}>
+          <Text style={styles.sectionLabel}>PORTFOLIO</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.portfolioRow}
+          >
+            {portfolio.map((item) => (
+              <PortfolioBubble
+                key={item.id}
+                item={item}
+                onPress={() => setActivePortfolio(item)}
+                active={activePortfolio?.id === item.id}
               />
-            </ScrollView>
-          </View>
+            ))}
+            <AddPortfolioBubble
+              onPress={addNewPortfolio}
+              label={portfolio.length === 0 ? 'Add first' : 'Add'}
+            />
+          </ScrollView>
         </View>
 
         <View style={{ height: Space.xl }} />
       </ScrollView>
+      ) : (
+        <View style={styles.previewWrap}>
+          <DiscoveryCard
+            card={previewCard}
+            showReachButton={false}
+            onPortfolioPress={setActivePortfolio}
+            activePortfolioId={activePortfolio?.id ?? null}
+          />
+        </View>
+      )}
 
       {/* ── Edit modals ────────────────────────────────────────────────── */}
       <TextEditModal
@@ -544,6 +524,45 @@ export default function ProfileTab() {
         onDelete={handleDeletePortfolio}
       />
     </View>
+  );
+}
+
+/// One labeled, tappable row in the profile editor (Tinder/Hinge field list).
+function FieldRow({
+  label,
+  value,
+  placeholder,
+  onPress,
+  stacked,
+  last,
+}: {
+  label: string;
+  value: string;
+  placeholder: string;
+  onPress: () => void;
+  stacked?: boolean;
+  last?: boolean;
+}) {
+  const empty = !value.trim();
+  return (
+    <Pressable onPress={onPress} style={[styles.fieldRow, !last && styles.fieldRowDivider]}>
+      {stacked ? (
+        <View style={{ flex: 1, gap: 3 }}>
+          <Text style={styles.fieldRowLabel}>{label}</Text>
+          <Text style={[styles.fieldRowValueStacked, empty && styles.fieldRowEmpty]} numberOfLines={2}>
+            {empty ? placeholder : value}
+          </Text>
+        </View>
+      ) : (
+        <>
+          <Text style={styles.fieldRowLabel}>{label}</Text>
+          <Text style={[styles.fieldRowValue, empty && styles.fieldRowEmpty]} numberOfLines={1}>
+            {empty ? placeholder : value}
+          </Text>
+        </>
+      )}
+      <PencilSimpleLine size={15} color={Brand.inkMuted} weight="regular" />
+    </Pressable>
   );
 }
 
@@ -878,6 +897,39 @@ const styles = StyleSheet.create({
 
   scroll: { flex: 1 },
   scrollContent: { paddingHorizontal: Space.lg, paddingTop: Space.md },
+
+  // Preview mode — the real discovery card, filling the screen like the deck.
+  previewWrap: { flex: 1, paddingHorizontal: Space.lg, paddingTop: Space.sm, paddingBottom: Space.md },
+
+  // Segmented Edit | Preview control (centered in the header band).
+  segment: { flexDirection: 'row', backgroundColor: Brand.surface1, borderRadius: 999, padding: 3 },
+  segmentBtn: { paddingHorizontal: 18, paddingVertical: 6, borderRadius: 999 },
+  segmentBtnActive: {
+    backgroundColor: Brand.canvas,
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 1 },
+    elevation: 1,
+  },
+  segmentText: { fontFamily: AmbitFont.body, fontSize: 14, fontWeight: '600', color: Brand.inkMuted },
+  segmentTextActive: { color: Brand.inkPrimary },
+
+  // Field-list editor (Tinder / Hinge convention).
+  photoRow: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14 },
+  photoThumb: { width: 56, height: 56, borderRadius: 16, backgroundColor: Brand.surface1, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  photoThumbImg: { width: '100%', height: '100%' },
+  photoThumbInitial: { fontFamily: AmbitFont.display, fontSize: 24, color: Brand.inkMuted },
+  fieldGroup: { backgroundColor: Brand.surface1, borderRadius: 16, paddingHorizontal: 16 },
+  fieldRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 15 },
+  fieldRowDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: Brand.borderSoft },
+  fieldRowLabel: { fontFamily: AmbitFont.body, fontSize: 15, fontWeight: '600', color: Brand.inkBody },
+  fieldRowValue: { flex: 1, textAlign: 'right', fontFamily: AmbitFont.body, fontSize: 15, color: Brand.inkPrimary },
+  fieldRowValueStacked: { fontFamily: AmbitFont.body, fontSize: 14, color: Brand.inkPrimary, lineHeight: 19 },
+  fieldRowEmpty: { color: Brand.inkMuted, fontWeight: '400' },
+  editSection: { marginTop: Space.lg },
+  editSectionHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
+  editLink: { fontFamily: AmbitFont.body, fontSize: 14, fontWeight: '600', color: Brand.accent },
 
   card: {
     backgroundColor: Brand.canvas,
