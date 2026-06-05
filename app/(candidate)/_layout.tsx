@@ -21,6 +21,13 @@ const ROUTE_TO_TAB: Record<string, NavTabKey> = {
   chat: 'chat',
   projects: 'projects',
   profile: 'profile',
+  // Hidden routes (href:null) still need a home tab, or the `?? 'discovery'`
+  // fallback lights up the wrong icon. Project screens belong to Projects;
+  // Saved is launched from the Discovery bookmark.
+  'project-new': 'projects',
+  'project-edit': 'projects',
+  'project-manage': 'projects',
+  saved: 'discovery',
 };
 
 export default function CandidateLayout() {
