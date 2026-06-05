@@ -17,7 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Swipeable } from 'react-native-gesture-handler';
 import { NotePencil, PaperPlaneTilt, Trash, X } from 'phosphor-react-native';
 import { BackChevron, Tactile } from '../../components/atoms';
-import { DiscoveryCard, DiscoveryRowSummary, ReachOutComposer, ReachOutLimitSheet } from '../../components/molecules';
+import { DiscoveryCard, DiscoveryRowSummary, ReachOutComposer, ReachOutLimitSheet, SavedCarousel } from '../../components/molecules';
 import { Motion } from '../../constants/motion';
 import { haptics } from '../../lib/haptics';
 import { useSavedDeck } from '../../context/SavedDeckContext';
@@ -65,6 +65,24 @@ export default function SavedScreen() {
 
   // ── Swipe-to-remove + Undo ──────────────────────────────────────────
   const swipeableRefs = useRef<Record<string, Swipeable | null>>({});
+  /// Which row is currently open (revealed Remove).
+  const openRowRef = useRef<string | null>(null);
+  /// True briefly while/after a swipe opens a row, so the swipe's trailing
+  /// press is swallowed (the row stays open) instead of opening the preview.
+  const justSwipedRef = useRef(false);
+
+  /// Tap semantics: ignore the press that trails a swipe; a deliberate tap on
+  /// an open row closes it; a clean tap on a closed row previews.
+  const handleRowPress = (card: DiscoveryCardData) => {
+    if (justSwipedRef.current) return;
+    const openId = openRowRef.current;
+    if (openId) {
+      swipeableRefs.current[openId]?.close();
+      openRowRef.current = null;
+      return;
+    }
+    setPreviewing(card);
+  };
   const [undoCard, setUndoCard] = useState<DiscoveryCardData | null>(null);
   const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const toastAnim = useRef(new Animated.Value(0)).current;
@@ -211,6 +229,11 @@ export default function SavedScreen() {
         contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
       >
+        {saved.length >= 3 && (
+          <View style={styles.carouselBleed}>
+            <SavedCarousel cards={[...saved].reverse().slice(0, 8)} onPress={setPreviewing} />
+          </View>
+        )}
         {saved.map((card) => (
           <Swipeable
             key={card.id}
@@ -218,6 +241,12 @@ export default function SavedScreen() {
             friction={2}
             rightThreshold={44}
             overshootRight={false}
+            onSwipeableWillOpen={() => {
+              openRowRef.current = card.id;
+              justSwipedRef.current = true;
+              setTimeout(() => { justSwipedRef.current = false; }, 500);
+            }}
+            onSwipeableClose={() => { if (openRowRef.current === card.id) openRowRef.current = null; }}
             renderRightActions={() => (
               <Pressable
                 onPress={() => removeWithUndo(card)}
@@ -232,7 +261,7 @@ export default function SavedScreen() {
             <View style={styles.savedItem}>
               <DiscoveryRowSummary
                 card={card}
-                onPress={() => setPreviewing(card)}
+                onPress={() => handleRowPress(card)}
                 trailing={
                   <View style={styles.actions}>
                     <Pressable
@@ -423,6 +452,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+
+  // Full-bleed the carousel past the list's horizontal padding.
+  carouselBleed: { marginHorizontal: -Space.lg },
 
   // ── Swipe-to-remove + note ─────────────────────────────────────
   savedItem: { backgroundColor: Brand.canvas },
