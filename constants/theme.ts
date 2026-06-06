@@ -78,16 +78,16 @@ export const Brand = {
   // reach-outs are the only cards (soft golden cream), avatars are
   // rounded-square pale gray tiles with italic bronze monograms.
   // Source: `_design/Stitch — Refined Design.html`.
-  inboxCanvas:       '#FBF9F4', // warm cream — matches the Stitch direction
+  inboxCanvas:       '#F2EEE4', // eggshell — matches the app canvas
   inboxCardActive:   'transparent', // active rows are flat — no card fill
-  inboxCardPending:  'rgba(254,215,151,0.30)', // soft golden cream
-  inboxAvatarBg:     '#F0EEE9', // pale surface-container — same for pinned + row
-  inboxHairline:     'rgba(116,120,120,0.10)',
-  inboxBorderTan:    'rgba(254,215,151,0.30)',
-  inboxBronze:       '#765A26', // secondary — italic monogram + active dot + bylines
-  inboxBronzeDim:    '#E6C183', // secondary-fixed-dim — initial color (warmer)
-  inboxChipHired:    '#E4E2DD', // surface-container-highest — pale "Hired" pill
-  inboxInkPrimary:   '#1B1C19',
+  inboxCardPending:  'rgba(166,199,194,0.14)', // soft teal-tint (pending = needs you)
+  inboxAvatarBg:     '#ECE7DB', // pale tile
+  inboxHairline:     'rgba(28,28,26,0.08)',
+  inboxBorderTan:    'rgba(110,156,161,0.28)', // teal hairline on pending
+  inboxBronze:       '#8C857A', // de-warmed muted secondary — monogram + bylines
+  inboxBronzeDim:    '#B8B0A2', // muted initial color
+  inboxChipHired:    '#DDEEE3', // mint status pill
+  inboxInkPrimary:   '#1C1C1A',
   inboxInkBody:      '#444748',
   inboxInkMute:      'rgba(68,71,72,0.6)',
   inboxInkSoft:      '#C4C7C7',

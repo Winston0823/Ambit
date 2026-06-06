@@ -234,7 +234,7 @@ export function InboxRow({ item, meId, onPress, onPassRequest, onLongPress, onMu
               )}
               {yourTurnChip && (
                 <View style={[styles.chip, styles.chipSolid]}>
-                  <ArrowBendUpLeft size={11} color={Brand.inboxCanvas} weight="bold" />
+                  <ArrowBendUpLeft size={11} color={Brand.tagMintInk} weight="bold" />
                   <Text style={[styles.chipText, styles.chipTextSolid]}>Your turn</Text>
                 </View>
               )}
@@ -400,7 +400,7 @@ const styles = StyleSheet.create({
     color: Brand.inboxBronze,
     letterSpacing: 0.02,
   },
-  chipTextSolid: { color: Brand.inboxInkPrimary },
+  chipTextSolid: { color: Brand.tagMintInk },
 
   // Swipe-action panel (kept from v3)
   actionWrap: {

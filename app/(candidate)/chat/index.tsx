@@ -457,9 +457,9 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: Brand.inboxHairline,
   },
-  filterChipActive: { backgroundColor: Brand.inboxInkPrimary, borderColor: Brand.inboxInkPrimary },
+  filterChipActive: { backgroundColor: Brand.action, borderColor: Brand.actionInk },
   filterChipText: { fontFamily: AmbitFont.body, fontSize: 13.5, fontWeight: '600', color: Brand.inboxInkBody },
-  filterChipTextActive: { color: Brand.inboxCanvas },
+  filterChipTextActive: { color: Brand.actionInk, fontWeight: '700' },
 
   undoToastWrap: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
   undoToast: {
