@@ -25,7 +25,7 @@ const animatedMsgIds = new Set<string>();
 // colors / direction freely; everything else is positioning math.
 // Tonal warm-brown → espresso. Single hue family (no olive-gold), so the
 // windowed effect reads cleanly instead of muddy.
-const MINE_GRADIENT = ['#6E5A44', '#3D332B', '#1E1A16'] as const;
+const MINE_GRADIENT = ['#B6D2CE', '#A6C7C2', '#9BBFBA'] as const; // teal (dark ink text on top)
 const MINE_GRADIENT_START = { x: 0.4, y: 0 };
 const MINE_GRADIENT_END = { x: 0.6, y: 1 };
 import type { MessageRow, ReactionRow } from '../../lib/messaging';

@@ -12,12 +12,14 @@ import { AmbitFont, Brand } from '../../constants/theme';
 export const STRUCT_CARD_WIDTH = 268;
 export const STRUCT_CARD_RADIUS = 22;
 /// Warm dark surface — same as the project/portfolio attachment cards.
-export const STRUCT_DARK = '#2A1A0C';
+/// Structured cards are now LIGHT cream on the eggshell canvas (was warm-dark).
+export const STRUCT_DARK = '#FBFAF5';
 
-/// Content colors, by surface, so callers tint their own body/buttons.
+/// Content colors, by surface. Both surfaces are light now, so both use dark
+/// ink with a teal eyebrow accent.
 export const structInk = {
-  light: { title: Brand.inkPrimary, eyebrow: Brand.accent, body: Brand.inkBody, muted: Brand.inkMuted },
-  dark:  { title: '#F5E9D8', eyebrow: 'rgba(245,233,216,0.7)', body: 'rgba(255,255,255,0.92)', muted: 'rgba(255,255,255,0.6)' },
+  light: { title: Brand.inkPrimary, eyebrow: '#6E9CA1', body: Brand.inkBody, muted: Brand.inkMuted },
+  dark:  { title: Brand.inkPrimary, eyebrow: '#6E9CA1', body: Brand.inkBody, muted: Brand.inkMuted },
 };
 
 export const structuredStyles = StyleSheet.create({
@@ -26,9 +28,9 @@ export const structuredStyles = StyleSheet.create({
   surfaceLight: {
     width: STRUCT_CARD_WIDTH,
     borderRadius: STRUCT_CARD_RADIUS,
-    backgroundColor: '#F4EFE7',
+    backgroundColor: Brand.cardCream,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(60,40,20,0.06)',
+    borderColor: 'rgba(28,28,26,0.08)',
     padding: 14,
     gap: 8,
     shadowColor: Brand.hearthBubbleTheirsShadow,
@@ -37,13 +39,20 @@ export const structuredStyles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     elevation: 1,
   },
-  // Dark surface (mine) — matches the attachment cards.
+  // Both surfaces are light cream now — same crafted card look.
   surfaceDark: {
     width: STRUCT_CARD_WIDTH,
     borderRadius: STRUCT_CARD_RADIUS,
-    backgroundColor: STRUCT_DARK,
+    backgroundColor: Brand.cardCream,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(28,28,26,0.08)',
     padding: 14,
     gap: 8,
+    shadowColor: Brand.hearthBubbleTheirsShadow,
+    shadowOpacity: 1,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 1,
   },
   eyebrow: {
     fontFamily: AmbitFont.body,
