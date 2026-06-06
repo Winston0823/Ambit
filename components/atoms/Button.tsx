@@ -11,6 +11,7 @@ import {
 import { Brand, Radii, AmbitFont } from '../../constants/theme';
 import { Motion } from '../../constants/motion';
 import { haptics } from '../../lib/haptics';
+import { HardShadow } from './HardShadow';
 
 type Variant = 'primary' | 'secondary' | 'ghost';
 
@@ -53,44 +54,46 @@ export function Button({
   const pressOut = () =>
     Animated.spring(scale, { toValue: 1, ...Motion.press.out, useNativeDriver: true }).start();
 
+  const isPrimary = variant === 'primary';
+  const inner = (
+    <Pressable
+      onPress={press}
+      onPressIn={pressIn}
+      onPressOut={pressOut}
+      disabled={disabled}
+      style={({ pressed }) => [
+        styles.base,
+        tones.container,
+        { opacity: pressed ? 0.92 : 1 },
+        style,
+      ]}
+    >
+      <Text style={[styles.label, tones.label]}>{title}</Text>
+      {trailingArrow && (
+        <Image
+          source={require('../../assets/icons/ArrowSwirl.png')}
+          style={styles.arrow}
+          resizeMode="contain"
+        />
+      )}
+    </Pressable>
+  );
+
   return (
-    <Animated.View style={{ transform: [{ scale }] }}>
-      <Pressable
-        onPress={press}
-        onPressIn={pressIn}
-        onPressOut={pressOut}
-        disabled={disabled}
-        style={({ pressed }) => [
-          styles.base,
-          tones.container,
-          { opacity: disabled ? 0.45 : pressed ? 0.92 : 1 },
-          style,
-        ]}
-      >
-        <Text style={[styles.label, tones.label]}>{title}</Text>
-        {trailingArrow && (
-          <Image
-            source={require('../../assets/icons/ArrowSwirl.png')}
-            style={styles.arrow}
-            resizeMode="contain"
-          />
-        )}
-      </Pressable>
+    <Animated.View style={[{ transform: [{ scale }] }, disabled && { opacity: 0.45 }]}>
+      {isPrimary ? <HardShadow radius={999} offset={4}>{inner}</HardShadow> : inner}
     </Animated.View>
   );
 }
 
 const TONES: Record<Variant, { container: ViewStyle; label: TextStyle }> = {
   primary: {
+    // The hard shadow is provided by a <HardShadow> wrapper (crisp solid block,
+    // not RN's blurry shadowRadius:0). Just the fill + ink border here.
     container: {
       backgroundColor: Brand.action,
       borderWidth: 1.6,
       borderColor: Brand.actionInk,
-      // hard black offset EDGE below (not a soft shadow) — the signature look
-      shadowColor: Brand.actionInk,
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 1,
-      shadowRadius: 0,
     },
     label: { color: Brand.actionInk },
   },
