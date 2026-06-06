@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { BackChevron, OnboardingProgress } from '../../components/atoms';
+import { BackChevron, HardShadow, OnboardingProgress } from '../../components/atoms';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { ROLE_CATEGORIES, skillsForRoles } from '../../data/mock';
@@ -150,17 +150,15 @@ export default function ProjectNewScreen() {
         <View style={{ height: 120 }} />
       </ScrollView>
 
-      <Pressable
-        onPress={advance}
-        disabled={!canAdvance || submitting}
-        style={[styles.cta, { bottom: insets.bottom + 24 }, (!canAdvance || submitting) && styles.ctaDisabled]}
-      >
-        {submitting ? (
-          <ActivityIndicator color={Brand.actionInk} />
-        ) : (
-          <Text style={styles.ctaText}>{step === 0 ? 'Continue' : 'Create project'}</Text>
-        )}
-      </Pressable>
+      <HardShadow radius={999} offset={4} style={[styles.ctaWrap, { bottom: insets.bottom + 24 }, (!canAdvance || submitting) && styles.ctaDisabled]}>
+        <Pressable onPress={advance} disabled={!canAdvance || submitting} style={styles.cta}>
+          {submitting ? (
+            <ActivityIndicator color={Brand.actionInk} />
+          ) : (
+            <Text style={styles.ctaText}>{step === 0 ? 'Continue' : 'Create project'}</Text>
+          )}
+        </Pressable>
+      </HardShadow>
     </View>
   );
 }
@@ -208,9 +206,8 @@ const styles = StyleSheet.create({
   skillHint: { fontFamily: AmbitFont.body, fontSize: 13, color: Brand.inkMuted, marginTop: -6, marginBottom: 14, lineHeight: 19 },
   sheetTitle: { fontFamily: AmbitFont.display, fontSize: 22, color: Brand.inkPrimary, marginBottom: 16 },
 
+  ctaWrap: { position: 'absolute', alignSelf: 'center' },
   cta: {
-    position: 'absolute',
-    alignSelf: 'center',
     backgroundColor: Brand.action,
     borderWidth: 1.6,
     borderColor: Brand.actionInk,
@@ -219,11 +216,6 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     minWidth: 200,
     alignItems: 'center',
-    shadowColor: Brand.actionInk,
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 0,
   },
   ctaDisabled: { opacity: 0.4 },
   ctaText: { fontFamily: AmbitFont.body, fontSize: 16, fontWeight: '700', color: Brand.actionInk },

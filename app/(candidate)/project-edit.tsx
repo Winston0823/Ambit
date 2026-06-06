@@ -13,7 +13,7 @@ import {
 import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Trash } from 'phosphor-react-native';
-import { BackChevron } from '../../components/atoms';
+import { BackChevron, HardShadow } from '../../components/atoms';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { ROLE_CATEGORIES, skillsForRoles } from '../../data/mock';
@@ -179,13 +179,11 @@ export default function ProjectEditScreen() {
         <View style={{ height: 120 }} />
       </ScrollView>
 
-      <Pressable
-        onPress={save}
-        disabled={!valid || saving}
-        style={[styles.cta, { bottom: insets.bottom + 24 }, (!valid || saving) && styles.ctaDisabled]}
-      >
-        {saving ? <ActivityIndicator color={Brand.actionInk} /> : <Text style={styles.ctaText}>Save changes</Text>}
-      </Pressable>
+      <HardShadow radius={999} offset={4} style={[styles.ctaWrap, { bottom: insets.bottom + 24 }, (!valid || saving) && styles.ctaDisabled]}>
+        <Pressable onPress={save} disabled={!valid || saving} style={styles.cta}>
+          {saving ? <ActivityIndicator color={Brand.actionInk} /> : <Text style={styles.ctaText}>Save changes</Text>}
+        </Pressable>
+      </HardShadow>
     </View>
   );
 }
@@ -216,9 +214,8 @@ const styles = StyleSheet.create({
   deleteBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 14, marginTop: 6 },
   deleteLabel: { fontFamily: AmbitFont.body, fontSize: 15, fontWeight: '600', color: Brand.accent },
 
+  ctaWrap: { position: 'absolute', alignSelf: 'center' },
   cta: {
-    position: 'absolute',
-    alignSelf: 'center',
     backgroundColor: Brand.action,
     borderWidth: 1.6,
     borderColor: Brand.actionInk,
@@ -227,11 +224,6 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     minWidth: 200,
     alignItems: 'center',
-    shadowColor: Brand.actionInk,
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 0,
   },
   ctaDisabled: { opacity: 0.4 },
   ctaText: { fontFamily: AmbitFont.body, fontSize: 16, fontWeight: '700', color: Brand.actionInk },
