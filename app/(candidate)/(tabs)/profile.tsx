@@ -25,7 +25,7 @@ import {
   SignOut,
   X,
 } from 'phosphor-react-native';
-import { Chip, HardShadow } from '../../components/atoms';
+import { Chip, HardShadow } from '../../../components/atoms';
 import { router } from 'expo-router';
 import {
   AddPortfolioBubble,
@@ -34,28 +34,28 @@ import {
   PortfolioBubble,
   PortfolioModal,
   SpeechBubble,
-} from '../../components/molecules';
-import type { OwnerProject } from '../../components/molecules';
-import { useAuth } from '../../context/AuthContext';
-import { supabase } from '../../lib/supabase';
-import { readLocalFileAsArrayBuffer } from '../../lib/messaging';
+} from '../../../components/molecules';
+import type { OwnerProject } from '../../../components/molecules';
+import { useAuth } from '../../../context/AuthContext';
+import { supabase } from '../../../lib/supabase';
+import { readLocalFileAsArrayBuffer } from '../../../lib/messaging';
 import {
   deletePortfolioItem,
   fetchPortfolioForUser,
   uploadPortfolioImage,
   upsertPortfolioItem,
-} from '../../lib/portfolio';
+} from '../../../lib/portfolio';
 import { randomUUID } from 'expo-crypto';
-import { formatResponseRate, formatResponseTime } from '../../lib/closureLoop';
-import { CAMPUSES, SKILL_CATEGORIES } from '../../data/mock';
-import type { PortfolioItem, SeekerCardData } from '../../data/mock';
+import { formatResponseRate, formatResponseTime } from '../../../lib/closureLoop';
+import { CAMPUSES, SKILL_CATEGORIES } from '../../../data/mock';
+import type { PortfolioItem, SeekerCardData } from '../../../data/mock';
 import {
   AmbitFont,
   Brand,
   Radii,
   Space,
   TypeScale,
-} from '../../constants/theme';
+} from '../../../constants/theme';
 
 interface ProfileRow {
   id: string;

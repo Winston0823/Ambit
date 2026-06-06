@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { HardShadow } from '../../../components/atoms';
+import { HardShadow } from '../../../../components/atoms';
 import {
   Alert,
   FlatList,
@@ -18,9 +18,9 @@ import {
   InboxRow,
   PassReasonSheet,
   PinnedStrip,
-} from '../../../components/molecules';
-import { useAuth } from '../../../context/AuthContext';
-import { supabase } from '../../../lib/supabase';
+} from '../../../../components/molecules';
+import { useAuth } from '../../../../context/AuthContext';
+import { supabase } from '../../../../lib/supabase';
 import {
   getInbox,
   inboxState,
@@ -31,8 +31,8 @@ import {
   unpinConversation,
   type InboxFilter,
   type InboxItem,
-} from '../../../lib/messaging';
-import { AmbitFont, Brand, Space } from '../../../constants/theme';
+} from '../../../../lib/messaging';
+import { AmbitFont, Brand, Space } from '../../../../constants/theme';
 
 /// S-050 Inbox v4. Editorial paper canvas. "ambit" wordmark + side
 /// icons up top, large italic "Chats" title, iMessage-style pinned

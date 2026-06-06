@@ -18,13 +18,13 @@ import {
   PencilSimple,
   Plus,
 } from 'phosphor-react-native';
-import { useAuth } from '../../context/AuthContext';
-import { useProfileRole } from '../../hooks/useProfileRole';
-import { supabase } from '../../lib/supabase';
-import { getInbox, type InboxItem } from '../../lib/messaging';
-import { SwipeRevealRow } from '../../components/molecules/SwipeRevealRow';
-import { HardShadow } from '../../components/atoms';
-import { AmbitFont, Brand, Radii, Space } from '../../constants/theme';
+import { useAuth } from '../../../context/AuthContext';
+import { useProfileRole } from '../../../hooks/useProfileRole';
+import { supabase } from '../../../lib/supabase';
+import { getInbox, type InboxItem } from '../../../lib/messaging';
+import { SwipeRevealRow } from '../../../components/molecules/SwipeRevealRow';
+import { HardShadow } from '../../../components/atoms';
+import { AmbitFont, Brand, Radii, Space } from '../../../constants/theme';
 
 interface ProjectRow {
   id: string;

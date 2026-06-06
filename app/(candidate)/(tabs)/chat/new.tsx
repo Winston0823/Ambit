@@ -14,14 +14,14 @@ import {
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MagnifyingGlass, X, CaretRight } from 'phosphor-react-native';
-import { BackChevron } from '../../../components/atoms';
-import { BottomSheet, DiscoveryCard, ReachOutComposer } from '../../../components/molecules';
-import { supabase } from '../../../lib/supabase';
-import { sendProjectAttachment, startConversationWithMessage } from '../../../lib/messaging';
-import { fetchPortfoliosByUser } from '../../../lib/portfolio';
-import { useAuth } from '../../../context/AuthContext';
-import { CAMPUSES, type SeekerCardData } from '../../../data/mock';
-import { AmbitFont, Brand, Radii, Space } from '../../../constants/theme';
+import { BackChevron } from '../../../../components/atoms';
+import { BottomSheet, DiscoveryCard, ReachOutComposer } from '../../../../components/molecules';
+import { supabase } from '../../../../lib/supabase';
+import { sendProjectAttachment, startConversationWithMessage } from '../../../../lib/messaging';
+import { fetchPortfoliosByUser } from '../../../../lib/portfolio';
+import { useAuth } from '../../../../context/AuthContext';
+import { CAMPUSES, type SeekerCardData } from '../../../../data/mock';
+import { AmbitFont, Brand, Radii, Space } from '../../../../constants/theme';
 
 /// S-051 People search. Find another user by display name, preview the same
 /// discovery card an owner would see, then reach out. Every conversation is

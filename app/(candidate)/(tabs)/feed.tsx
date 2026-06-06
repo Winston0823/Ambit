@@ -14,35 +14,35 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowsClockwise, BookmarkSimple, CaretDown, Check, GraduationCap, MagnifyingGlass, Sparkle, X } from 'phosphor-react-native';
 import type { IconProps } from 'phosphor-react-native';
 import * as Haptics from 'expo-haptics';
-import { DiscoveryOverview, SwipeDeck } from '../../components/organisms';
-import { PortfolioModal, ReachOutComposer, BottomSheet, ReachOutLimitSheet } from '../../components/molecules';
-import { Tactile } from '../../components/atoms';
-import { CAMPUSES } from '../../data/mock';
+import { DiscoveryOverview, SwipeDeck } from '../../../components/organisms';
+import { PortfolioModal, ReachOutComposer, BottomSheet, ReachOutLimitSheet } from '../../../components/molecules';
+import { Tactile } from '../../../components/atoms';
+import { CAMPUSES } from '../../../data/mock';
 import {
   canReachOut,
   recordReachOut,
   getReachOutStatus,
-} from '../../lib/reachOutLimit';
-import type { PortfolioItem } from '../../data/mock';
-import { useProfileRole } from '../../hooks/useProfileRole';
-import { useSavedDeck } from '../../context/SavedDeckContext';
+} from '../../../lib/reachOutLimit';
+import type { PortfolioItem } from '../../../data/mock';
+import { useProfileRole } from '../../../hooks/useProfileRole';
+import { useSavedDeck } from '../../../context/SavedDeckContext';
 import {
   AmbitFont,
   Brand,
   Radii,
   Space,
-} from '../../constants/theme';
+} from '../../../constants/theme';
 import {
   type DiscoveryCardData,
   type ProjectCardData,
   type SeekerCardData,
   MOCK_PROJECTS,
   MOCK_SEEKERS,
-} from '../../data/mock';
-import { supabase } from '../../lib/supabase';
-import { sendPortfolioAttachment, sendProjectAttachment, startConversationWithMessage } from '../../lib/messaging';
-import { fetchPortfoliosByUser } from '../../lib/portfolio';
-import { useAuth } from '../../context/AuthContext';
+} from '../../../data/mock';
+import { supabase } from '../../../lib/supabase';
+import { sendPortfolioAttachment, sendProjectAttachment, startConversationWithMessage } from '../../../lib/messaging';
+import { fetchPortfoliosByUser } from '../../../lib/portfolio';
+import { useAuth } from '../../../context/AuthContext';
 
 const SKIP_OVERVIEW_THRESHOLD = 5;
 // Stable reference so the filter BottomSheet doesn't see a new array each render.

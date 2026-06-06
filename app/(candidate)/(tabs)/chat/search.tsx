@@ -11,9 +11,9 @@ import {
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MagnifyingGlass, X } from 'phosphor-react-native';
-import { BackChevron } from '../../../components/atoms';
-import { searchMessages, type SearchHit } from '../../../lib/messaging';
-import { AmbitFont, Brand, Radii, Space } from '../../../constants/theme';
+import { BackChevron } from '../../../../components/atoms';
+import { searchMessages, type SearchHit } from '../../../../lib/messaging';
+import { AmbitFont, Brand, Radii, Space } from '../../../../constants/theme';
 
 /// S-052 Message Search. Full-text search across all messages in
 /// conversations the signed-in user is part of. Debounced 250ms so

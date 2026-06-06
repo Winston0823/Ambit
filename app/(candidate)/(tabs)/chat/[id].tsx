@@ -42,30 +42,30 @@ import type { RealtimeChannel } from '@supabase/supabase-js';
 import * as Haptics from 'expo-haptics';
 import { CaretDown, CaretLeft, CaretRight, DotsThree, X } from 'phosphor-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Motion } from '../../../constants/motion';
-import { Tactile } from '../../../components/atoms';
-import { touchPresence } from '../../../lib/presence';
+import { Motion } from '../../../../constants/motion';
+import { Tactile } from '../../../../components/atoms';
+import { touchPresence } from '../../../../lib/presence';
 import {
   BottomSheet,
   MessageBubble,
   type MessageStatus,
   PassReasonSheet,
   TypingIndicator,
-} from '../../../components/molecules';
+} from '../../../../components/molecules';
 import {
   AvailabilityPollComposer,
   AvailabilityPollModal,
   ChatComposer,
   PartnerProfileIsland,
   SchedulingComposer,
-} from '../../../components/organisms';
+} from '../../../../components/organisms';
 import {
   confirmHire,
   proposeHire,
   type ConversationStatus,
-} from '../../../lib/closureLoop';
-import { useAuth } from '../../../context/AuthContext';
-import { supabase } from '../../../lib/supabase';
+} from '../../../../lib/closureLoop';
+import { useAuth } from '../../../../context/AuthContext';
+import { supabase } from '../../../../lib/supabase';
 import {
   deleteMessage,
   editMessage,
@@ -81,20 +81,20 @@ import {
   type MessageRow,
   type ProjectRefRow,
   type ReactionRow,
-} from '../../../lib/messaging';
-import { fetchPortfolioForUser, fetchPortfolioRefs } from '../../../lib/portfolio';
-import { DiscoveryCard, PortfolioModal } from '../../../components/molecules';
-import { DaySeparator, dayLabel, sameDay } from '../../../components/molecules/DaySeparator';
-import type { DiscoveryCardData, PortfolioItem } from '../../../data/mock';
+} from '../../../../lib/messaging';
+import { fetchPortfolioForUser, fetchPortfolioRefs } from '../../../../lib/portfolio';
+import { DiscoveryCard, PortfolioModal } from '../../../../components/molecules';
+import { DaySeparator, dayLabel, sameDay } from '../../../../components/molecules/DaySeparator';
+import type { DiscoveryCardData, PortfolioItem } from '../../../../data/mock';
 import {
   listSchedulingRequests,
   type SchedulingRequestRow,
-} from '../../../lib/scheduling';
+} from '../../../../lib/scheduling';
 import {
   listAvailabilityPolls,
   type AvailabilityPollRow,
-} from '../../../lib/availability';
-import { AmbitFont, Brand, Radii, Space } from '../../../constants/theme';
+} from '../../../../lib/availability';
+import { AmbitFont, Brand, Radii, Space } from '../../../../constants/theme';
 
 const QUICK_REACTIONS = ['👍', '❤️', '😂', '🙏', '🔥', '👀'];
 

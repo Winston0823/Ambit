@@ -3,4 +3,4 @@
 // new, jumping groups into a stack with no inbox root and dead-ending the
 // back button. The shared screen's useSegments-based routing keeps it in the
 // founder group.
-export { default } from '../../(candidate)/chat/new';
+export { default } from '../../../(candidate)/(tabs)/chat/new';
