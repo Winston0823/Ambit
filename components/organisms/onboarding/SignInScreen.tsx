@@ -82,7 +82,7 @@ export function SignInScreen({ onBack, onSignedIn }: Props) {
           the EduEmail Mailbox so the auth/entry screens share a quiet
           visual system. */}
       <View style={styles.watermark} pointerEvents="none">
-        <HandWaving size={280} color={Brand.accent} weight="duotone" />
+        <HandWaving size={280} color={Brand.actionDeep} weight="duotone" />
       </View>
 
       <BackChevron onPress={onBack} />
@@ -265,7 +265,7 @@ const styles = StyleSheet.create({
   forgot: {
     fontFamily: AmbitFont.body,
     fontSize: 13,
-    color: Brand.accent,
+    color: Brand.actionDeep,
     fontWeight: '600',
   },
   errorNote: {

@@ -78,7 +78,7 @@ export function PhotoScreen({ onBack, onContinue }: Props) {
               <Image source={{ uri: profile.photoUri }} style={styles.avatarImg} />
             ) : (
               <View style={styles.avatarPlaceholder}>
-                <Feather name="camera" size={36} color={Brand.accent} />
+                <Feather name="camera" size={36} color={Brand.actionDeep} />
                 <Text style={styles.avatarLabel}>Tap to add a photo</Text>
               </View>
             )}
@@ -121,7 +121,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   avatarLabel: {
-    fontFamily: AmbitFont.body, fontSize: 13, color: Brand.accent,
+    fontFamily: AmbitFont.body, fontSize: 13, color: Brand.actionDeep,
   },
   nameInput: {
     width: '100%',

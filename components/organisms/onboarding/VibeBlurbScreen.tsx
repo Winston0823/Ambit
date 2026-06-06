@@ -95,6 +95,6 @@ const styles = StyleSheet.create({
     textAlignVertical: 'top',
   },
   helperRow: { flexDirection: 'row', marginTop: 12, gap: 12 },
-  helper: { flex: 1, fontFamily: AmbitFont.body, fontSize: 13, color: Brand.accent },
+  helper: { flex: 1, fontFamily: AmbitFont.body, fontSize: 13, color: Brand.actionDeep },
   count: { fontFamily: AmbitFont.body, fontSize: 12 },
 });
