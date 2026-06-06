@@ -400,7 +400,7 @@ export function MessageBubble({
               <View style={styles.replyBodyRow}>
                 <Paperclip
                   size={12}
-                  color={isMine ? Brand.inkOnBrand : Brand.inkMuted}
+                  color={isMine ? Brand.actionInk : Brand.inkMuted}
                   weight="regular"
                 />
                 <Text style={[styles.replyBody, isMine && styles.replyBodyMine]}>
@@ -609,7 +609,7 @@ const styles = StyleSheet.create({
     // Solid fallback (the midpoint taupe) — shown until the screen-anchored
     // gradient measures + mounts, and on any bubble where the gradient is
     // suppressed (failed / deleted).
-    backgroundColor: '#7F6F5D',
+    backgroundColor: Brand.action, // teal fallback (matches the gradient)
     borderBottomRightRadius: 4,
   },
   // Screen-sized gradient layer clipped by the bubble's rounded rect.
@@ -628,10 +628,10 @@ const styles = StyleSheet.create({
     // Warm incoming surface with real depth — a soft drop shadow + hairline so
     // it reads as a crafted, lifted card on the white canvas (parity with the
     // gradient mine bubble), tied into the warm-tan brand rather than neutral.
-    backgroundColor: '#F4EFE7',
+    backgroundColor: Brand.cardCream, // lighter than the eggshell bg → lifts off it
     borderBottomLeftRadius: 4,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(60,40,20,0.06)',
+    borderColor: 'rgba(28,28,26,0.08)',
     shadowColor: Brand.hearthBubbleTheirsShadow,
     shadowOpacity: 1,
     shadowRadius: 8,
@@ -654,7 +654,7 @@ const styles = StyleSheet.create({
     color: Brand.inkBody,
     lineHeight: 21,
   },
-  bodyMine: { color: Brand.inkOnBrand },
+  bodyMine: { color: Brand.actionInk },
 
   // External status line below the latest mine bubble — iMessage
   // "Delivered" / "Read 3:36 PM". Tiny, right-aligned, muted.
@@ -679,7 +679,7 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     color: Brand.inkMuted,
   },
-  tombstoneMine: { color: Brand.inkOnBrand },
+  tombstoneMine: { color: Brand.actionInk },
 
   image: {
     width: 220,
@@ -708,7 +708,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: Brand.inkMuted,
   },
-  replyBodyMine: { color: 'rgba(255,255,255,0.85)' },
+  replyBodyMine: { color: 'rgba(28,28,26,0.72)' },
   replyBodyRow: {
     flexDirection: 'row',
     alignItems: 'center',
