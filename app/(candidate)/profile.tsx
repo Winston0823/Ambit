@@ -975,16 +975,9 @@ const styles = StyleSheet.create({
   previewWrap: { flex: 1, paddingHorizontal: Space.lg, paddingTop: Space.sm, paddingBottom: Space.md },
 
   // Segmented Edit | Preview control (centered in the header band).
-  segment: { flexDirection: 'row', backgroundColor: Brand.cardCream, borderWidth: 1.5, borderColor: Brand.inkEdge, borderRadius: 999, padding: 3 },
-  segmentBtn: { paddingHorizontal: 18, paddingVertical: 8, borderRadius: 999 },
-  segmentBtnActive: {
-    backgroundColor: Brand.action,
-    shadowColor: Brand.inkEdge,
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 0,
-  },
+  segment: { flexDirection: 'row', backgroundColor: Brand.surface1, borderRadius: 999, padding: 4 },
+  segmentBtn: { paddingHorizontal: 20, paddingVertical: 8, borderRadius: 999 },
+  segmentBtnActive: { backgroundColor: Brand.action }, // just the teal indicator — no outline
   segmentText: { fontFamily: AmbitFont.body, fontSize: 14, fontWeight: '600', color: Brand.inkMuted },
   segmentTextActive: { color: Brand.actionInk, fontWeight: '700' },
 
