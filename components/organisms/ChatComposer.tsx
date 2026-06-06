@@ -254,7 +254,7 @@ export function ChatComposer({
           >
             <Plus
               size={22}
-              color={attachMenuOpen ? Brand.inkPrimary : Brand.accent}
+              color={attachMenuOpen ? Brand.inkPrimary : Brand.inkBody}
               weight="bold"
             />
           </Pressable>
