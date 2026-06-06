@@ -9,6 +9,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { CalendarCheck, X } from 'phosphor-react-native';
 import {
@@ -42,6 +43,7 @@ const SAVE_DEBOUNCE_MS = 500;
 /// realtime updates, debounces my own response saves, and exposes a
 /// "Lock in" action per overlap slot.
 export function AvailabilityPollModal({ visible, poll, meId, onClose }: Props) {
+  const insets = useSafeAreaInsets();
   const [responses, setResponses] = useState<AvailabilityResponseRow[]>([]);
   const [busyKeys, setBusyKeys]   = useState<Set<string>>(new Set());
   const [loading, setLoading]     = useState(true);
@@ -200,7 +202,7 @@ export function AvailabilityPollModal({ visible, poll, meId, onClose }: Props) {
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
       <View style={styles.root}>
-        <View style={styles.header}>
+        <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
           <Pressable onPress={onClose} hitSlop={10}>
             <X size={22} color={Brand.inkPrimary} weight="bold" />
           </Pressable>
@@ -360,15 +362,15 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   lockBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: Radii.md,
-    backgroundColor: Brand.accent,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 999,
+    backgroundColor: Brand.action,
   },
   lockBtnText: {
     fontFamily: AmbitFont.body,
     fontSize: 13,
-    fontWeight: '600',
-    color: Brand.inkOnBrand,
+    fontWeight: '700',
+    color: Brand.actionInk,
   },
 });

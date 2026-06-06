@@ -205,7 +205,7 @@ export function SchedulingComposer({
               disabled={sending || !conversationId}
               style={[styles.sendBtn, (sending || !conversationId) && styles.sendBtnDisabled]}
             >
-              <CalendarPlus size={16} color={Brand.inkOnBrand} weight="bold" />
+              <CalendarPlus size={16} color={Brand.actionInk} weight="bold" />
               <Text style={styles.sendBtnText}>
                 {sending ? 'Sending…' : 'Send request'}
               </Text>
@@ -337,15 +337,15 @@ const styles = StyleSheet.create({
     borderColor: Brand.borderDefault,
   },
   durationChipSelected: {
-    backgroundColor: Brand.primary,
-    borderColor: Brand.primary,
+    backgroundColor: Brand.action,
+    borderColor: Brand.actionInk,
   },
   durationChipText: {
     fontFamily: AmbitFont.body,
     fontSize: 13,
     color: Brand.inkBody,
   },
-  durationChipTextSelected: { color: Brand.inkOnBrand, fontWeight: '600' },
+  durationChipTextSelected: { color: Brand.actionInk, fontWeight: '700' },
 
   slotRow: {
     flexDirection: 'row',
@@ -388,7 +388,7 @@ const styles = StyleSheet.create({
   addBtnText: {
     fontFamily: AmbitFont.body,
     fontSize: 13,
-    color: Brand.accent,
+    color: Brand.inkBody,
     fontWeight: '600',
   },
 
@@ -399,15 +399,22 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     paddingVertical: 14,
-    borderRadius: Radii.md,
-    backgroundColor: Brand.primary,
+    borderRadius: 999,
+    backgroundColor: Brand.action,
+    borderWidth: 1.6,
+    borderColor: Brand.actionInk,
+    shadowColor: Brand.actionInk,
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 0,
   },
   sendBtnDisabled: { opacity: 0.45 },
   sendBtnText: {
     fontFamily: AmbitFont.body,
     fontSize: 15,
-    fontWeight: '600',
-    color: Brand.inkOnBrand,
+    fontWeight: '700',
+    color: Brand.actionInk,
   },
 
   iosPickerDoneOverlay: {
@@ -428,6 +435,6 @@ const styles = StyleSheet.create({
     fontFamily: AmbitFont.body,
     fontSize: 16,
     fontWeight: '600',
-    color: Brand.accent,
+    color: Brand.inkBody,
   },
 });
