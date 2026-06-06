@@ -500,8 +500,8 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   toastText: { fontFamily: AmbitFont.body, fontSize: 14, fontWeight: '600', color: Brand.canvas },
-  toastBtn: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999, backgroundColor: Brand.primary },
-  toastBtnText: { fontFamily: AmbitFont.body, fontSize: 14, fontWeight: '700', color: Brand.inkOnBrand },
+  toastBtn: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999, backgroundColor: Brand.action },
+  toastBtnText: { fontFamily: AmbitFont.body, fontSize: 14, fontWeight: '700', color: Brand.actionInk },
 
   // ── Note editor sheet ──────────────────────────────────────────
   noteModalRoot: { flex: 1, justifyContent: 'flex-end' },
@@ -532,11 +532,18 @@ const styles = StyleSheet.create({
     alignSelf: 'stretch',
     alignItems: 'center',
     paddingVertical: 14,
-    borderRadius: 14,
-    backgroundColor: Brand.primary,
+    borderRadius: 999,
+    backgroundColor: Brand.action,
+    borderWidth: 1.6,
+    borderColor: Brand.actionInk,
+    shadowColor: Brand.actionInk,
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 0,
     marginTop: 4,
   },
-  noteSaveText: { fontFamily: AmbitFont.body, fontSize: 15, fontWeight: '700', color: Brand.inkOnBrand },
+  noteSaveText: { fontFamily: AmbitFont.body, fontSize: 15, fontWeight: '700', color: Brand.actionInk },
 
   // ── Full-card preview ──────────────────────────────────────────
   previewRoot: {

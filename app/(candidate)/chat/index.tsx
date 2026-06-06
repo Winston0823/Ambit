@@ -478,8 +478,8 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   undoToastText: { fontFamily: AmbitFont.body, fontSize: 14, fontWeight: '600', color: Brand.inboxCanvas },
-  undoBtn: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999, backgroundColor: Brand.accent },
-  undoBtnText: { fontFamily: AmbitFont.body, fontSize: 14, fontWeight: '700', color: '#FFFFFF' },
+  undoBtn: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999, backgroundColor: Brand.action },
+  undoBtnText: { fontFamily: AmbitFont.body, fontSize: 14, fontWeight: '700', color: Brand.actionInk },
 
   topbar: {
     height: 44,

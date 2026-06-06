@@ -818,9 +818,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Brand.borderDefault,
   },
-  filterSheetChipSel: { backgroundColor: Brand.primary, borderColor: Brand.primary },
+  filterSheetChipSel: { backgroundColor: Brand.action, borderColor: Brand.actionInk },
   filterSheetChipText: { fontFamily: AmbitFont.body, fontSize: 14, fontWeight: '600', color: Brand.inkBody },
-  filterSheetChipTextSel: { color: Brand.inkOnBrand },
+  filterSheetChipTextSel: { color: Brand.actionInk, fontWeight: '700' },
   filterSheetEmpty: { fontFamily: AmbitFont.body, fontSize: 14, color: Brand.inkMuted, paddingVertical: 12 },
   wordmark: {
     fontFamily: AmbitFont.display,

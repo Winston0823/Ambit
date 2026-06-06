@@ -557,6 +557,6 @@ const styles = StyleSheet.create({
   editFooter: { marginTop: 14, flexDirection: 'row', alignItems: 'center', gap: 12 },
   deleteBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 6, paddingHorizontal: 4 },
   deleteLabel: { fontFamily: AmbitFont.body, fontSize: 14, fontWeight: '600', color: '#C0392B' },
-  saveBtn: { paddingHorizontal: 18, paddingVertical: 10, backgroundColor: Brand.primary, borderRadius: Radii.md },
-  saveLabel: { fontFamily: AmbitFont.body, fontSize: 14, fontWeight: '600', color: Brand.inkOnBrand },
+  saveBtn: { paddingHorizontal: 20, paddingVertical: 11, backgroundColor: Brand.action, borderRadius: 999, borderWidth: 1.6, borderColor: Brand.actionInk, shadowColor: Brand.actionInk, shadowOpacity: 1, shadowRadius: 0, shadowOffset: { width: 0, height: 3 }, elevation: 0 },
+  saveLabel: { fontFamily: AmbitFont.body, fontSize: 14, fontWeight: '700', color: Brand.actionInk },
 });
