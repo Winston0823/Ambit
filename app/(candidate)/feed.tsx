@@ -793,7 +793,7 @@ const styles = StyleSheet.create({
   filterSheetHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, paddingHorizontal: 4 },
   filterSheetTitle: { fontFamily: AmbitFont.display, fontSize: 22, color: Brand.inkPrimary },
   filterSheetClear: { paddingVertical: 4, paddingHorizontal: 4 },
-  filterSheetClearText: { fontFamily: AmbitFont.body, fontSize: 13.5, fontWeight: '600', color: Brand.accent },
+  filterSheetClearText: { fontFamily: AmbitFont.body, fontSize: 13.5, fontWeight: '700', color: Brand.inkBody },
   filterSearchBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -818,7 +818,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Brand.borderDefault,
   },
-  filterSheetChipSel: { backgroundColor: Brand.action, borderColor: Brand.actionInk },
+  filterSheetChipSel: { backgroundColor: Brand.action, borderWidth: 1.5, borderColor: Brand.actionInk, shadowColor: Brand.actionInk, shadowOpacity: 1, shadowRadius: 0, shadowOffset: { width: 0, height: 3 }, elevation: 0 },
   filterSheetChipText: { fontFamily: AmbitFont.body, fontSize: 14, fontWeight: '600', color: Brand.inkBody },
   filterSheetChipTextSel: { color: Brand.actionInk, fontWeight: '700' },
   filterSheetEmpty: { fontFamily: AmbitFont.body, fontSize: 14, color: Brand.inkMuted, paddingVertical: 12 },
