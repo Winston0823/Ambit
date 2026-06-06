@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { HardShadow } from '../../components/atoms';
+import { HardShadow } from '../../../components/atoms';
 import {
   Alert,
   FlatList,
