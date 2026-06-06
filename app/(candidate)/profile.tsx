@@ -975,7 +975,7 @@ const styles = StyleSheet.create({
   previewWrap: { flex: 1, paddingHorizontal: Space.lg, paddingTop: Space.sm, paddingBottom: Space.md },
 
   // Segmented Edit | Preview control (centered in the header band).
-  segment: { flexDirection: 'row', backgroundColor: Brand.surface1, borderRadius: 999, padding: 4 },
+  segment: { flexDirection: 'row', backgroundColor: Brand.surface2, borderRadius: 999, padding: 4 }, // visible grouping groove (no outline)
   segmentBtn: { paddingHorizontal: 20, paddingVertical: 8, borderRadius: 999 },
   segmentBtnActive: { backgroundColor: Brand.action }, // just the teal indicator — no outline
   segmentText: { fontFamily: AmbitFont.body, fontSize: 14, fontWeight: '600', color: Brand.inkMuted },
