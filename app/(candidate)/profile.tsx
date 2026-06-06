@@ -702,7 +702,7 @@ function TextEditModal({
               disabled={!canSave}
               style={[modalStyles.saveBtn, !canSave && { opacity: 0.45 }]}
             >
-              <Check size={16} color={Brand.inkOnBrand} weight="bold" />
+              <Check size={16} color={Brand.actionInk} weight="bold" />
               <Text style={modalStyles.saveLabel}>Save</Text>
             </Pressable>
           </View>
@@ -804,14 +804,14 @@ function SkillsEditModal({
                 onPress={addCustom}
                 style={[styles.customAddBtn, (!customInput.trim() || draft.length >= MAX_SKILLS) && styles.customAddBtnDisabled]}
               >
-                <Plus size={16} color={Brand.inkOnBrand} weight="bold" />
+                <Plus size={16} color={Brand.actionInk} weight="bold" />
               </Pressable>
             </View>
           </ScrollView>
 
           <View style={modalStyles.footer}>
             <Pressable onPress={() => onSave(draft)} style={modalStyles.saveBtn}>
-              <Check size={16} color={Brand.inkOnBrand} weight="bold" />
+              <Check size={16} color={Brand.actionInk} weight="bold" />
               <Text style={modalStyles.saveLabel}>Save</Text>
             </Pressable>
           </View>
@@ -995,9 +995,9 @@ const styles = StyleSheet.create({
   fieldRowEmpty: { color: Brand.inkMuted, fontWeight: '400' },
   editSection: { marginTop: Space.lg },
   editSectionHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
-  editLink: { fontFamily: AmbitFont.body, fontSize: 14, fontWeight: '600', color: Brand.accent },
+  editLink: { fontFamily: AmbitFont.body, fontSize: 14, fontWeight: '600', color: '#6E9CA1' },
   projAddRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 14 },
-  projAddText: { fontFamily: AmbitFont.body, fontSize: 15, fontWeight: '600', color: Brand.accent },
+  projAddText: { fontFamily: AmbitFont.body, fontSize: 15, fontWeight: '600', color: '#6E9CA1' },
   projEditRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1096,7 +1096,7 @@ const styles = StyleSheet.create({
     fontFamily: AmbitFont.body,
     fontSize: 12,
     fontWeight: '600',
-    color: Brand.accent,
+    color: '#6E9CA1',
     letterSpacing: 0.2,
   },
 
@@ -1116,7 +1116,7 @@ const styles = StyleSheet.create({
     fontFamily: AmbitFont.body,
     fontSize: 11,
     fontWeight: '600',
-    color: Brand.accent,
+    color: '#6E9CA1',
     letterSpacing: 0.2,
   },
 
@@ -1165,7 +1165,14 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: Brand.primary,
+    backgroundColor: Brand.action,
+    borderWidth: 1.6,
+    borderColor: Brand.actionInk,
+    shadowColor: Brand.actionInk,
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 0,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1185,13 +1192,13 @@ const styles = StyleSheet.create({
     fontFamily: AmbitFont.body,
     fontSize: 14,
     fontWeight: '700',
-    color: Brand.accent,
+    color: '#6E9CA1',
   },
   addChipLabel: {
     fontFamily: AmbitFont.body,
     fontSize: 13,
     fontWeight: '600',
-    color: Brand.accent,
+    color: '#6E9CA1',
   },
 
   portfolioRow: {
@@ -1247,16 +1254,23 @@ const modalStyles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    backgroundColor: Brand.primary,
-    borderRadius: Radii.md,
+    paddingHorizontal: 18,
+    paddingVertical: 11,
+    backgroundColor: Brand.action,
+    borderRadius: 999,
+    borderWidth: 1.6,
+    borderColor: Brand.actionInk,
+    shadowColor: Brand.actionInk,
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 0,
   },
   saveLabel: {
     fontFamily: AmbitFont.body,
     fontSize: 14,
-    fontWeight: '600',
-    color: Brand.inkOnBrand,
+    fontWeight: '700',
+    color: Brand.actionInk,
   },
 
   // CampusEditModal
