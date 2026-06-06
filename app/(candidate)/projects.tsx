@@ -23,6 +23,7 @@ import { useProfileRole } from '../../hooks/useProfileRole';
 import { supabase } from '../../lib/supabase';
 import { getInbox, type InboxItem } from '../../lib/messaging';
 import { SwipeRevealRow } from '../../components/molecules/SwipeRevealRow';
+import { HardShadow } from '../../components/atoms';
 import { AmbitFont, Brand, Radii, Space } from '../../constants/theme';
 
 interface ProjectRow {
@@ -133,19 +134,21 @@ export default function ProjectsTab() {
       <Text style={styles.title}>{isPureSeeker ? 'Projects you’re in' : 'Your projects'}</Text>
       {summary !== '' && <Text style={styles.summary}>{summary}</Text>}
 
-      <Pressable
-        onPress={() => router.push(isPureSeeker ? '/feed' : '/project-new')}
-        style={styles.newBtn}
-        accessibilityRole="button"
-        accessibilityLabel={isPureSeeker ? 'Find a new project' : 'New project'}
-      >
-        {isPureSeeker ? (
-          <Compass size={18} color={Brand.actionInk} weight="bold" />
-        ) : (
-          <Plus size={18} color={Brand.actionInk} weight="bold" />
-        )}
-        <Text style={styles.newBtnLabel}>{isPureSeeker ? 'Find new project' : 'New project'}</Text>
-      </Pressable>
+      <HardShadow radius={999} offset={4} style={styles.newBtnWrap}>
+        <Pressable
+          onPress={() => router.push(isPureSeeker ? '/feed' : '/project-new')}
+          style={styles.newBtn}
+          accessibilityRole="button"
+          accessibilityLabel={isPureSeeker ? 'Find a new project' : 'New project'}
+        >
+          {isPureSeeker ? (
+            <Compass size={18} color={Brand.actionInk} weight="bold" />
+          ) : (
+            <Plus size={18} color={Brand.actionInk} weight="bold" />
+          )}
+          <Text style={styles.newBtnLabel}>{isPureSeeker ? 'Find new project' : 'New project'}</Text>
+        </Pressable>
+      </HardShadow>
 
       {/* ── Owner dashboard ────────────────────────────────────── */}
       {!isPureSeeker && (
@@ -298,6 +301,7 @@ const styles = StyleSheet.create({
     marginTop: -8,
   },
 
+  newBtnWrap: { marginTop: 4 },
   newBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -308,12 +312,6 @@ const styles = StyleSheet.create({
     borderWidth: 1.6,
     borderColor: Brand.actionInk,
     borderRadius: 999,
-    marginTop: 4,
-    shadowColor: Brand.actionInk,
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 0,
   },
   newBtnLabel: {
     fontFamily: AmbitFont.body,
