@@ -14,10 +14,25 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Trash } from 'phosphor-react-native';
 import { BackChevron, HardShadow } from '../../components/atoms';
+import { DiscoveryCard } from '../../components/molecules';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
-import { ROLE_CATEGORIES, skillsForRoles } from '../../data/mock';
+import { ROLE_CATEGORIES, skillsForRoles, type ProjectCardData } from '../../data/mock';
 import { AmbitFont, Brand } from '../../constants/theme';
+
+/// Deterministic warm gradient per project id (matches the discovery deck's
+/// photo-fallback look).
+const CARD_GRADS: [string, string][] = [
+  [Brand.primary, Brand.accent],
+  ['#C9A57A', '#4D361D'],
+  ['#E8C9A0', Brand.primary],
+  [Brand.accent, '#7A5A38'],
+];
+const gradFor = (s: string): [string, string] => {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return CARD_GRADS[h % CARD_GRADS.length];
+};
 
 const BLURB_MIN = 10;
 
@@ -37,11 +52,13 @@ export default function ProjectEditScreen() {
   const { user } = useAuth();
 
   const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState(true); // Edit first; Preview is a tap away
   const [title, setTitle] = useState('');
   const [vibe, setVibe] = useState('');
   const [roles, setRoles] = useState<string[]>([]);
   const [campusId, setCampusId] = useState<string | null>(null);
   const [active, setActive] = useState(true);
+  const [owner, setOwner] = useState<{ name: string; photo: string | null }>({ name: '', photo: null });
   const [origText, setOrigText] = useState({ title: '', vibe: '' });
   const [saving, setSaving] = useState(false);
 
@@ -75,6 +92,13 @@ export default function ProjectEditScreen() {
       setActive(d.active);
       setOrigText({ title: d.title ?? '', vibe: d.vibe_blurb ?? '' });
       setLoading(false);
+      // Owner identity for the Preview card (how seekers see the project).
+      const { data: prof } = await supabase
+        .from('profiles')
+        .select('name, photo_url')
+        .eq('id', user.id)
+        .maybeSingle();
+      if (!cancelled && prof) setOwner({ name: (prof as any).name ?? '', photo: (prof as any).photo_url ?? null });
     })();
     return () => { cancelled = true; };
   }, [id, user?.id]);
@@ -129,6 +153,22 @@ export default function ProjectEditScreen() {
     ]);
   };
 
+  // Live preview = exactly how a seeker sees this project in the deck.
+  const previewCard: ProjectCardData = useMemo(() => ({
+    kind: 'project',
+    id: id ?? 'preview',
+    ownerId: user?.id ?? '',
+    title: title.trim() || 'Untitled project',
+    pitch: vibe.trim(),
+    ownerName: owner.name,
+    ownerPhotoUri: owner.photo,
+    ownerCampusId: campusId ?? '',
+    whyMatched: '',
+    skillsSought: skillsForRoles(roles),
+    rolesSought: roles,
+    gradient: gradFor(id ?? 'preview'),
+  }), [id, user?.id, title, vibe, owner, campusId, roles]);
+
   if (loading) {
     return (
       <View style={[styles.root, styles.center]}>
@@ -141,9 +181,26 @@ export default function ProjectEditScreen() {
   return (
     <View style={styles.root}>
       <BackChevron onPress={() => router.back()} />
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-        <View style={{ height: insets.top + 34 }} />
-        <Text style={styles.kicker}>EDIT PROJECT</Text>
+      <View style={[styles.segHeader, { marginTop: insets.top + 6 }]}>
+        <View style={styles.segment}>
+          <Pressable onPress={() => setEditing(true)} style={[styles.segmentBtn, editing && styles.segmentBtnActive]} accessibilityLabel="Edit project">
+            <Text style={[styles.segmentText, editing && styles.segmentTextActive]}>Edit</Text>
+          </Pressable>
+          <Pressable onPress={() => setEditing(false)} style={[styles.segmentBtn, !editing && styles.segmentBtnActive]} accessibilityLabel="Preview project">
+            <Text style={[styles.segmentText, !editing && styles.segmentTextActive]}>Preview</Text>
+          </Pressable>
+        </View>
+      </View>
+
+      {!editing ? (
+        <View style={styles.previewWrap}>
+          <DiscoveryCard card={previewCard} showReachButton={false} />
+        </View>
+      ) : (
+        <>
+          <ScrollView style={styles.scroll} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+            <View style={{ height: 12 }} />
+            <Text style={styles.kicker}>EDIT PROJECT</Text>
 
         <View style={styles.field}>
           <Text style={styles.fieldLabel}>PROJECT NAME</Text>
@@ -184,6 +241,8 @@ export default function ProjectEditScreen() {
           {saving ? <ActivityIndicator color={Brand.actionInk} /> : <Text style={styles.ctaText}>Save changes</Text>}
         </Pressable>
       </HardShadow>
+        </>
+      )}
     </View>
   );
 }
@@ -191,6 +250,16 @@ export default function ProjectEditScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Brand.cardCream },
   center: { alignItems: 'center', justifyContent: 'center' },
+
+  // Edit | Preview segment (mirrors profile)
+  segHeader: { alignItems: 'center', paddingBottom: 12 },
+  segment: { flexDirection: 'row', backgroundColor: Brand.surface1, borderRadius: 999, padding: 4 },
+  segmentBtn: { paddingHorizontal: 22, paddingVertical: 8, borderRadius: 999 },
+  segmentBtnActive: { backgroundColor: Brand.action },
+  segmentText: { fontFamily: AmbitFont.body, fontSize: 14, fontWeight: '600', color: Brand.inkMuted },
+  segmentTextActive: { color: Brand.actionInk, fontWeight: '700' },
+  previewWrap: { flex: 1, paddingHorizontal: 20, paddingTop: 8, paddingBottom: 24 },
+
   scroll: { flex: 1 },
   content: { paddingHorizontal: 28 },
   kicker: { fontFamily: AmbitFont.body, fontSize: 12, fontWeight: '600', letterSpacing: 1.6, color: Brand.accent, marginBottom: 4 },
