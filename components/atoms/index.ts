@@ -8,3 +8,4 @@ export { OnboardingProgress } from './OnboardingProgress';
 export { Entrance } from './Entrance';
 export { Tactile } from './Tactile';
 export { Celebrate } from './Celebrate';
+export { HardShadow } from './HardShadow';

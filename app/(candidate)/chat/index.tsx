@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { HardShadow } from '../../components/atoms';
 import {
   Alert,
   FlatList,
@@ -352,9 +353,8 @@ function ListHeader({
       <View style={styles.filterRow}>
         {INBOX_TABS.map((t) => {
           const active = filter === t.key;
-          return (
+          const pill = (
             <Pressable
-              key={t.key}
               onPress={() => {
                 if (Platform.OS !== 'web') Haptics.selectionAsync().catch(() => {});
                 onFilter(t.key);
@@ -366,6 +366,10 @@ function ListHeader({
               <Text style={[styles.filterChipText, active && styles.filterChipTextActive]}>{t.label}</Text>
             </Pressable>
           );
+          // Active tab gets the crisp hard shadow via a solid backing block.
+          return active
+            ? <HardShadow key={t.key} radius={999} offset={3}>{pill}</HardShadow>
+            : <React.Fragment key={t.key}>{pill}</React.Fragment>;
         })}
       </View>
 
@@ -457,7 +461,7 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: Brand.inboxHairline,
   },
-  filterChipActive: { backgroundColor: Brand.action, borderWidth: 1.5, borderColor: Brand.actionInk, shadowColor: Brand.actionInk, shadowOpacity: 1, shadowRadius: 0, shadowOffset: { width: 0, height: 3 }, elevation: 0 },
+  filterChipActive: { backgroundColor: Brand.action, borderWidth: 1.5, borderColor: Brand.actionInk },
   filterChipText: { fontFamily: AmbitFont.body, fontSize: 13.5, fontWeight: '600', color: Brand.inboxInkBody },
   filterChipTextActive: { color: Brand.actionInk, fontWeight: '700' },
 
