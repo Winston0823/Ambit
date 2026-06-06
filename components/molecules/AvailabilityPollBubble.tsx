@@ -85,7 +85,7 @@ const styles = StyleSheet.create({
     shadowRadius: 14,
     shadowOffset: { width: 0, height: 4 },
   },
-  accentMine: { color: Brand.primary },
+  accentMine: { color: Brand.actionInk },
 
   headerRow: {
     flexDirection: 'row',
@@ -108,26 +108,31 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: Brand.inkBody,
   },
-  subTextOnBrand: { color: 'rgba(255,255,255,0.9)' },
+  subTextOnBrand: { color: Brand.inkBody },
 
   openBtn: {
     marginTop: 4,
-    paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: Brand.canvas,
-    borderWidth: 1,
-    borderColor: Brand.borderDefault,
+    paddingVertical: 10,
+    borderRadius: 999,
+    backgroundColor: Brand.action,
+    borderWidth: 1.5,
+    borderColor: Brand.actionInk,
+    shadowColor: Brand.actionInk,
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 0,
     alignItems: 'center',
   },
   openBtnMine: {
-    backgroundColor: 'rgba(212,180,144,0.18)',
-    borderColor: 'rgba(212,180,144,0.45)',
+    backgroundColor: Brand.action,
+    borderColor: Brand.actionInk,
   },
   openBtnText: {
     fontFamily: AmbitFont.body,
     fontSize: 13,
-    fontWeight: '600',
-    color: Brand.accent,
+    fontWeight: '700',
+    color: Brand.actionInk,
   },
 
   statusText: {

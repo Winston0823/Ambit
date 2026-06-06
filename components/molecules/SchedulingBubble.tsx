@@ -146,7 +146,7 @@ export function SchedulingBubble({ request, meId, isMine }: Props) {
         <View style={styles.confirmedRow}>
           <CheckCircle
             size={18}
-            color={isMine ? Brand.primary : Brand.accent}
+            color={'#6E9CA1'}
             weight="fill"
           />
           <Text style={[styles.confirmedText, isMine && styles.textOnBrand]}>
@@ -158,7 +158,7 @@ export function SchedulingBubble({ request, meId, isMine }: Props) {
           <View style={styles.addedRow}>
             <CalendarCheck
               size={14}
-              color={isMine ? 'rgba(255,255,255,0.85)' : Brand.inkMuted}
+              color={isMine ? Brand.inkMuted : Brand.inkMuted}
               weight="regular"
             />
             <Text style={[styles.addedText, isMine && styles.addedTextMine]}>
@@ -172,12 +172,12 @@ export function SchedulingBubble({ request, meId, isMine }: Props) {
             style={[styles.addBtn, isMine && styles.addBtnMine, busy && { opacity: 0.5 }]}
           >
             {busy ? (
-              <ActivityIndicator color={isMine ? Brand.primary : Brand.accent} />
+              <ActivityIndicator color={'#6E9CA1'} />
             ) : (
               <>
                 <CalendarBlank
                   size={14}
-                  color={isMine ? Brand.primary : Brand.accent}
+                  color={'#6E9CA1'}
                   weight="bold"
                 />
                 <Text style={[styles.addBtnText, isMine && styles.addBtnTextMine]}>
@@ -198,7 +198,7 @@ export function SchedulingBubble({ request, meId, isMine }: Props) {
         <View style={styles.confirmedRow}>
           <XCircle
             size={18}
-            color={isMine ? 'rgba(255,255,255,0.7)' : Brand.inkMuted}
+            color={Brand.inkMuted}
             weight="regular"
           />
           <Text style={[styles.tombstoneText, isMine && styles.tombstoneTextMine]}>
@@ -245,7 +245,7 @@ export function SchedulingBubble({ request, meId, isMine }: Props) {
 
       <View style={styles.actionRow}>
         {busy ? (
-          <ActivityIndicator color={isMine ? Brand.primary : Brand.accent} />
+          <ActivityIndicator color={'#6E9CA1'} />
         ) : isProposer ? (
           <Pressable onPress={handleCancel}>
             <Text style={[styles.linkBtnMine]}>Cancel request</Text>
@@ -297,7 +297,7 @@ const styles = StyleSheet.create({
     backgroundColor: Brand.navBarBg,
     borderColor: Brand.navBarBg,
   },
-  headerTextMine: { color: Brand.primary },
+  headerTextMine: { color: Brand.inkPrimary },
   cardTombstone: { opacity: 0.85 },
 
   headerRow: {
@@ -310,11 +310,11 @@ const styles = StyleSheet.create({
     fontFamily: AmbitFont.body,
     fontSize: 13,
     fontWeight: '700',
-    color: Brand.accent,
+    color: '#6E9CA1',
     textTransform: 'uppercase',
     letterSpacing: 0.8,
   },
-  textOnBrand: { color: Brand.canvas },
+  textOnBrand: { color: Brand.inkPrimary },
 
   waitingText: {
     fontFamily: AmbitFont.body,
@@ -369,7 +369,7 @@ const styles = StyleSheet.create({
     color: Brand.inkMuted,
     fontStyle: 'italic',
   },
-  tombstoneTextMine: { color: 'rgba(255,255,255,0.85)' },
+  tombstoneTextMine: { color: Brand.inkMuted },
 
   addedRow: {
     flexDirection: 'row',
@@ -381,7 +381,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: Brand.inkMuted,
   },
-  addedTextMine: { color: 'rgba(255,255,255,0.85)' },
+  addedTextMine: { color: Brand.inkMuted },
 
   addBtn: {
     flexDirection: 'row',
@@ -395,16 +395,16 @@ const styles = StyleSheet.create({
     borderColor: Brand.borderDefault,
   },
   addBtnMine: {
-    backgroundColor: 'rgba(212,180,144,0.18)',
-    borderColor: 'rgba(212,180,144,0.45)',
+    backgroundColor: 'rgba(166,199,194,0.22)',
+    borderColor: 'rgba(110,156,161,0.5)',
   },
   addBtnText: {
     fontFamily: AmbitFont.body,
     fontSize: 13,
     fontWeight: '600',
-    color: Brand.accent,
+    color: '#6E9CA1',
   },
-  addBtnTextMine: { color: Brand.primary },
+  addBtnTextMine: { color: '#6E9CA1' },
 
   actionRow: {
     marginTop: 2,
@@ -414,12 +414,12 @@ const styles = StyleSheet.create({
     fontFamily: AmbitFont.body,
     fontSize: 13,
     fontWeight: '600',
-    color: Brand.accent,
+    color: '#6E9CA1',
   },
   linkBtnMine: {
     fontFamily: AmbitFont.body,
     fontSize: 13,
     fontWeight: '600',
-    color: 'rgba(255,255,255,0.7)',
+    color: '#6E9CA1',
   },
 });
