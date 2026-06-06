@@ -457,7 +457,7 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: Brand.inboxHairline,
   },
-  filterChipActive: { backgroundColor: Brand.action, borderColor: Brand.actionInk },
+  filterChipActive: { backgroundColor: Brand.action, borderWidth: 1.5, borderColor: Brand.actionInk, shadowColor: Brand.actionInk, shadowOpacity: 1, shadowRadius: 0, shadowOffset: { width: 0, height: 3 }, elevation: 0 },
   filterChipText: { fontFamily: AmbitFont.body, fontSize: 13.5, fontWeight: '600', color: Brand.inboxInkBody },
   filterChipTextActive: { color: Brand.actionInk, fontWeight: '700' },
 
