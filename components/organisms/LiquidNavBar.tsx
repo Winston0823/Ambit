@@ -89,6 +89,55 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 /// never per frame: showing reserves the slot then slides up into it;
 /// hiding slides away then reclaims the slot in one smooth LayoutAnimation
 /// step so the thread's composer eases to the bottom instead of jumping.
+/// One nav button. Owns a spring that runs 0→1 as its tab becomes active —
+/// the icon pops up + lifts slightly on entry and settles back on leave, so
+/// every tab change is physically acknowledged. Native-driver transform only.
+function NavTabButton({
+  tab,
+  active,
+  hasBadge,
+  onPress,
+}: {
+  tab: NavTab;
+  active: boolean;
+  hasBadge: boolean;
+  onPress: () => void;
+}) {
+  const a = useRef(new Animated.Value(active ? 1 : 0)).current;
+
+  useEffect(() => {
+    Animated.spring(a, {
+      toValue: active ? 1 : 0,
+      friction: 6,
+      tension: 150,
+      useNativeDriver: true,
+    }).start();
+  }, [active, a]);
+
+  const Icon = active ? tab.activeIcon : tab.inactiveIcon;
+  const scale = a.interpolate({ inputRange: [0, 1], outputRange: [1, 1.14] });
+  const translateY = a.interpolate({ inputRange: [0, 1], outputRange: [0, -3] });
+
+  return (
+    <Pressable
+      onPress={onPress}
+      style={styles.tab}
+      accessibilityRole="tab"
+      accessibilityLabel={tab.label}
+      accessibilityState={{ selected: active }}
+    >
+      <Animated.View style={[styles.iconWrap, { transform: [{ scale }, { translateY }] }]}>
+        <Icon
+          size={ICON_SIZE}
+          color={active ? ACTIVE_COLOR : INACTIVE_COLOR}
+          weight={active ? 'fill' : 'regular'}
+        />
+        {hasBadge && <View style={styles.badge} />}
+      </Animated.View>
+    </Pressable>
+  );
+}
+
 export function LiquidNavBar({ activeKey, onChange, hidden = false, badgeTabs }: Props) {
   const insets = useSafeAreaInsets();
 
@@ -177,32 +226,15 @@ export function LiquidNavBar({ activeKey, onChange, hidden = false, badgeTabs }:
           if (h > 0 && Math.abs(h - barHeight) > 0.5) setBarHeight(h);
         }}
       >
-        {TABS.map((tab) => {
-          const active = tab.key === activeKey;
-          const Icon = active ? tab.activeIcon : tab.inactiveIcon;
-
-          const hasBadge = badgeTabs?.has(tab.key) ?? false;
-
-          return (
-            <Pressable
-              key={tab.key}
-              onPress={() => handleTap(tab.key)}
-              style={styles.tab}
-              accessibilityRole="tab"
-              accessibilityLabel={tab.label}
-              accessibilityState={{ selected: active }}
-            >
-              <View style={styles.iconWrap}>
-                <Icon
-                  size={ICON_SIZE}
-                  color={active ? ACTIVE_COLOR : INACTIVE_COLOR}
-                  weight={active ? 'fill' : 'regular'}
-                />
-                {hasBadge && <View style={styles.badge} />}
-              </View>
-            </Pressable>
-          );
-        })}
+        {TABS.map((tab) => (
+          <NavTabButton
+            key={tab.key}
+            tab={tab}
+            active={tab.key === activeKey}
+            hasBadge={badgeTabs?.has(tab.key) ?? false}
+            onPress={() => handleTap(tab.key)}
+          />
+        ))}
       </View>
     </Animated.View>
   );
