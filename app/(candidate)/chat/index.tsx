@@ -368,7 +368,7 @@ function ListHeader({
           );
           // Active tab gets the crisp hard shadow via a solid backing block.
           return active
-            ? <HardShadow key={t.key} radius={999} offset={3}>{pill}</HardShadow>
+            ? <HardShadow key={t.key} radius={999} offset={4}>{pill}</HardShadow>
             : <React.Fragment key={t.key}>{pill}</React.Fragment>;
         })}
       </View>
