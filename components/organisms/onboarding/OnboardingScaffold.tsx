@@ -56,7 +56,7 @@ export function OnboardingScaffold({
 
       {Watermark && (
         <View style={styles.watermark} pointerEvents="none">
-          <Watermark size={360} color={Brand.accent} weight="duotone" />
+          <Watermark size={360} color={Brand.actionDeep} weight="duotone" />
         </View>
       )}
 
@@ -101,10 +101,10 @@ const styles = StyleSheet.create({
   kicker: {
     fontFamily: AmbitFont.body,
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '700',
     letterSpacing: 1.5,
     textTransform: 'uppercase',
-    color: Brand.accent,
+    color: Brand.actionDeep,
     marginBottom: 10,
   },
   headline: {

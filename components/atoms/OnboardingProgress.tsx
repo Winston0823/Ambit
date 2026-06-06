@@ -81,7 +81,7 @@ export function OnboardingProgress({ current, total }: Props) {
         <Animated.View style={[styles.clip, { width: clip }]}>
           <Animated.View style={{ transform: [{ translateX: waveX }] }}>
             <Svg width={w + WL * 2} height={H}>
-              <Path d={path} fill="none" stroke={Brand.primary} strokeWidth={STROKE} strokeLinecap="round" />
+              <Path d={path} fill="none" stroke={Brand.actionDeep} strokeWidth={STROKE} strokeLinecap="round" />
             </Svg>
           </Animated.View>
         </Animated.View>
@@ -110,6 +110,6 @@ const styles = StyleSheet.create({
     width: DOT_R * 2,
     height: DOT_R * 2,
     borderRadius: DOT_R,
-    backgroundColor: Brand.primary,
+    backgroundColor: Brand.actionDeep,
   },
 });

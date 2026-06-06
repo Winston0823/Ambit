@@ -14,6 +14,7 @@ export const Brand = {
   accent:         '#B48045',  // deeper tan — warm decorative
   // The signature interactive accent: muted teal-blue fill, ink border + edge.
   action:         '#A6C7C2',  // teal-blue button/selected fill
+  actionDeep:     '#6E9CA1',  // deeper teal — links, the wave, icons/strokes on cream
   actionInk:      '#1C1C1A',  // text + border + the hard offset edge on `action`
   // Mint "tag" (LIVE / New / status).
   tagMint:        '#DDEEE3',

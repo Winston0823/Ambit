@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { Animated, Pressable, StyleSheet, View } from 'react-native';
 import { CheckCircle } from 'phosphor-react-native';
 import type { IconProps } from 'phosphor-react-native';
+import { HardShadow } from './HardShadow';
 import { Brand, Radii, AmbitFont } from '../../constants/theme';
 import { Motion } from '../../constants/motion';
 import { haptics } from '../../lib/haptics';
@@ -54,46 +55,44 @@ export function OptionCard({ title, subtitle, selected = false, onPress, icon: I
 
   const bg = sel.interpolate({
     inputRange: [0, 1],
-    outputRange: [Brand.cardCream, Brand.seekerSurface],
-  });
-  const borderColor = sel.interpolate({
-    inputRange: [0, 1],
-    outputRange: [Brand.borderSoft, Brand.primary],
+    outputRange: [Brand.cardCream, Brand.action],
   });
   const titleColor = sel.interpolate({
     inputRange: [0, 1],
-    outputRange: [Brand.inkHigh, Brand.seekerInk],
+    outputRange: [Brand.inkHigh, Brand.actionInk],
   });
   const subColor = sel.interpolate({
     inputRange: [0, 1],
-    outputRange: [Brand.inkMuted, Brand.accent],
+    outputRange: [Brand.inkMuted, '#3A4F4D'],
   });
   const checkScale = sel.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1] });
 
   return (
-    <Animated.View style={{ transform: [{ scale }] }}>
-      <Pressable onPress={press}>
-        <Animated.View style={[styles.card, { backgroundColor: bg, borderColor }]}>
-          {Icon && (
-            <View style={styles.iconWrap}>
-              <Icon size={26} color={selected ? Brand.seekerInk : Brand.accent} weight="duotone" />
+    <HardShadow radius={Radii.lg} offset={4}>
+      <Animated.View style={{ transform: [{ scale }] }}>
+        <Pressable onPress={press}>
+          <Animated.View style={[styles.card, { backgroundColor: bg }]}>
+            {Icon && (
+              <View style={styles.iconWrap}>
+                <Icon size={26} color={selected ? Brand.actionInk : Brand.actionDeep} weight="duotone" />
+              </View>
+            )}
+
+            <View style={styles.textCol}>
+              <Animated.Text style={[styles.title, { color: titleColor }]}>{title}</Animated.Text>
+              <Animated.Text style={[styles.subtitle, { color: subColor }]}>{subtitle}</Animated.Text>
             </View>
-          )}
 
-          <View style={styles.textCol}>
-            <Animated.Text style={[styles.title, { color: titleColor }]}>{title}</Animated.Text>
-            <Animated.Text style={[styles.subtitle, { color: subColor }]}>{subtitle}</Animated.Text>
-          </View>
-
-          <Animated.View
-            pointerEvents="none"
-            style={{ opacity: sel, transform: [{ scale: checkScale }] }}
-          >
-            <CheckCircle size={24} color={Brand.accent} weight="fill" />
+            <Animated.View
+              pointerEvents="none"
+              style={{ opacity: sel, transform: [{ scale: checkScale }] }}
+            >
+              <CheckCircle size={24} color={Brand.actionInk} weight="fill" />
+            </Animated.View>
           </Animated.View>
-        </Animated.View>
-      </Pressable>
-    </Animated.View>
+        </Pressable>
+      </Animated.View>
+    </HardShadow>
   );
 }
 
@@ -103,7 +102,8 @@ const styles = StyleSheet.create({
     borderRadius: Radii.lg,
     paddingHorizontal: 18,
     paddingVertical: 16,
-    borderWidth: 1,
+    borderWidth: 1.5,
+    borderColor: Brand.actionInk,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 14,
