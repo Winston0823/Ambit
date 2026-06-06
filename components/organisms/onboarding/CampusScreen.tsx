@@ -63,7 +63,7 @@ export function CampusScreen({ onBack, onContinue }: Props) {
   return (
     <SafeAreaView style={styles.root}>
       <View style={styles.watermark} pointerEvents="none">
-        <MapPin size={360} color={Brand.accent} weight="duotone" />
+        <MapPin size={360} color={Brand.actionDeep} weight="duotone" />
       </View>
 
       <BackChevron onPress={onBack} />
@@ -106,7 +106,7 @@ export function CampusScreen({ onBack, onContinue }: Props) {
                 <View style={styles.rowIcon}>
                   <MapPin
                     size={20}
-                    color={selected ? Brand.seekerInk : Brand.inkMuted}
+                    color={selected ? Brand.actionInk : Brand.actionDeep}
                     weight={selected ? 'fill' : 'regular'}
                   />
                 </View>
@@ -121,7 +121,7 @@ export function CampusScreen({ onBack, onContinue }: Props) {
                 </View>
 
                 {selected && (
-                  <CheckCircle size={22} color={Brand.seekerInk} weight="fill" />
+                  <CheckCircle size={22} color={Brand.actionInk} weight="fill" />
                 )}
               </Pressable>
             );
@@ -172,7 +172,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     letterSpacing: 1.5,
     textTransform: 'uppercase',
-    color: Brand.accent,
+    color: Brand.actionDeep,
     marginBottom: 10,
   },
   headline: {
@@ -214,11 +214,19 @@ const styles = StyleSheet.create({
     gap: 14,
     paddingVertical: 14,
     paddingHorizontal: 16,
-    backgroundColor: Brand.surface2,
+    backgroundColor: Brand.cardCream,
     borderRadius: Radii.md,
+    borderWidth: 1.5,
+    borderColor: Brand.actionInk,
+    marginBottom: 12,
+    shadowColor: Brand.actionInk,
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 0,
   },
   rowSelected: {
-    backgroundColor: Brand.seekerSurface,
+    backgroundColor: Brand.action,
   },
   rowIcon: {
     width: 28,
@@ -231,12 +239,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: Brand.inkHigh,
   },
-  rowNameSelected: { color: Brand.seekerInk },
+  rowNameSelected: { color: Brand.actionInk },
   rowCity: {
     fontFamily: AmbitFont.body,
     fontSize: 12,
     color: Brand.inkMuted,
     marginTop: 2,
   },
-  rowCitySelected: { color: Brand.accent },
+  rowCitySelected: { color: '#3A4F4D' },
 });

@@ -89,7 +89,7 @@ export function SkillTagsScreen({ onBack, onContinue }: Props) {
   return (
     <SafeAreaView style={styles.root}>
       <View style={styles.watermark} pointerEvents="none">
-        <Sparkle size={360} color={Brand.accent} weight="duotone" />
+        <Sparkle size={360} color={Brand.actionDeep} weight="duotone" />
       </View>
 
       <BackChevron onPress={onBack} />
@@ -208,7 +208,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     letterSpacing: 1.5,
     textTransform: 'uppercase',
-    color: Brand.accent,
+    color: Brand.actionDeep,
     paddingHorizontal: Space.lg,
     marginTop: 40,
     marginBottom: 4,
@@ -228,18 +228,24 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   counter: {
-    backgroundColor: Brand.primary,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
-    // Sits with the first line of the headline (30px display font, default
-    // line-height ≈ 36 — center the pill optically against that line).
-    marginTop: 10,
+    backgroundColor: Brand.action,
+    borderWidth: 1.5,
+    borderColor: Brand.actionInk,
+    paddingHorizontal: 11,
+    paddingVertical: 5,
+    borderRadius: 10,
+    marginTop: 8,
+    shadowColor: Brand.actionInk,
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 0,
   },
   counterText: {
     fontFamily: AmbitFont.body,
     fontSize: 11,
-    color: Brand.inkOnBrand,
+    fontWeight: '700',
+    color: Brand.actionInk,
   },
   scrollWrap: {
     flex: 1,
