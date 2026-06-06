@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { HardShadow } from '../../../../components/atoms';
+import { HardShadow, Skeleton } from '../../../../components/atoms';
 import {
   Alert,
   FlatList,
@@ -382,13 +382,13 @@ function ListHeader({
 function InboxSkeleton() {
   return (
     <View style={styles.skeletonWrap}>
-      <View style={styles.skeletonTitle} />
+      <Skeleton width={140} height={28} radius={8} style={{ marginBottom: 24 }} />
       {Array.from({ length: 6 }).map((_, i) => (
         <View key={i} style={styles.skeletonRow}>
-          <View style={styles.skeletonAvatar} />
+          <Skeleton width={48} height={48} radius={24} />
           <View style={styles.skeletonLines}>
-            <View style={styles.skeletonLineWide} />
-            <View style={styles.skeletonLineNarrow} />
+            <Skeleton width="60%" height={14} radius={6} />
+            <Skeleton width="40%" height={12} radius={6} />
           </View>
         </View>
       ))}

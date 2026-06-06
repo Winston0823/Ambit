@@ -43,7 +43,7 @@ import * as Haptics from 'expo-haptics';
 import { CaretDown, CaretLeft, CaretRight, DotsThree, X } from 'phosphor-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Motion } from '../../../../constants/motion';
-import { Tactile } from '../../../../components/atoms';
+import { Tactile, Skeleton } from '../../../../components/atoms';
 import { touchPresence } from '../../../../lib/presence';
 import {
   BottomSheet,
@@ -998,8 +998,24 @@ export default function ThreadScreen() {
       )}
 
       {loading || !meta || !user ? (
-        <View style={styles.loadingBody}>
-          <ActivityIndicator color={Brand.accent} />
+        <View style={styles.skeletonBody}>
+          {[
+            { mine: false, w: '62%', h: 46 },
+            { mine: true, w: '48%', h: 40 },
+            { mine: false, w: '72%', h: 58 },
+            { mine: false, w: '40%', h: 40 },
+            { mine: true, w: '58%', h: 50 },
+            { mine: true, w: '34%', h: 40 },
+            { mine: false, w: '54%', h: 46 },
+          ].map((b, i) => (
+            <Skeleton
+              key={i}
+              width={b.w as any}
+              height={b.h}
+              radius={20}
+              style={{ alignSelf: b.mine ? 'flex-end' : 'flex-start', marginBottom: 12 }}
+            />
+          ))}
         </View>
       ) : (
       <KeyboardAvoidingView
@@ -1491,6 +1507,7 @@ const styles = StyleSheet.create({
   // vertical space so the spinner is centered in what would otherwise
   // be the messages-list area. Keeps the header pinned at its final
   // position so there's no jump when meta resolves.
+  skeletonBody: { flex: 1, paddingHorizontal: 18, paddingTop: 22 },
   loadingBody: {
     flex: 1,
     alignItems: 'center',
