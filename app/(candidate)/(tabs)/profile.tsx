@@ -25,7 +25,7 @@ import {
   SignOut,
   X,
 } from 'phosphor-react-native';
-import { Chip, HardShadow } from '../../../components/atoms';
+import { Chip, HardShadow, Skeleton } from '../../../components/atoms';
 import { router } from 'expo-router';
 import {
   AddPortfolioBubble,
@@ -346,8 +346,17 @@ export default function ProfileTab() {
 
   if (loading) {
     return (
-      <View style={[styles.root, styles.center]}>
-        <ActivityIndicator color={Brand.accent} />
+      <View style={styles.root}>
+        <View style={{ paddingHorizontal: 24, paddingTop: insets.top + 64, alignItems: 'center' }}>
+          <Skeleton width={96} height={96} radius={48} />
+          <Skeleton width={150} height={28} radius={8} style={{ marginTop: 18 }} />
+          <Skeleton width={100} height={14} radius={6} style={{ marginTop: 10 }} />
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center', marginTop: 28 }}>
+            {[72, 96, 60, 84, 68].map((w, i) => (
+              <Skeleton key={i} width={w} height={34} radius={999} />
+            ))}
+          </View>
+        </View>
       </View>
     );
   }

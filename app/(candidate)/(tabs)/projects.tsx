@@ -23,7 +23,7 @@ import { useProfileRole } from '../../../hooks/useProfileRole';
 import { supabase } from '../../../lib/supabase';
 import { getInbox, type InboxItem } from '../../../lib/messaging';
 import { SwipeRevealRow } from '../../../components/molecules/SwipeRevealRow';
-import { HardShadow } from '../../../components/atoms';
+import { HardShadow, Skeleton } from '../../../components/atoms';
 import { AmbitFont, Brand, Radii, Space } from '../../../constants/theme';
 
 interface ProjectRow {
@@ -91,8 +91,21 @@ export default function ProjectsTab() {
 
   if (projects === null) {
     return (
-      <View style={[styles.root, styles.center]}>
-        <ActivityIndicator color={Brand.accent} />
+      <View style={styles.root}>
+        <View style={[styles.content, { paddingTop: insets.top + 40 }]}>
+          <Skeleton width={60} height={12} radius={6} />
+          <Skeleton width={180} height={34} radius={10} style={{ marginTop: 10, marginBottom: 24 }} />
+          <Skeleton height={52} radius={999} style={{ marginBottom: 18 }} />
+          {[0, 1].map((i) => (
+            <View key={i} style={styles.skelCard}>
+              <View style={styles.skelHeader}>
+                <Skeleton width={110} height={20} radius={6} />
+                <Skeleton width={46} height={18} radius={999} />
+              </View>
+              <Skeleton width="68%" height={13} radius={6} style={{ marginTop: 12 }} />
+            </View>
+          ))}
+        </View>
       </View>
     );
   }
@@ -280,6 +293,10 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Brand.canvas },
   center: { alignItems: 'center', justifyContent: 'center' },
   content: { paddingHorizontal: Space.lg, paddingTop: Space.lg, gap: Space.md },
+
+  // Skeleton (loading) cards — shaped like the real project cards.
+  skelCard: { backgroundColor: Brand.cardCream, borderWidth: 1.5, borderColor: Brand.borderSoft, borderRadius: Radii.lg, padding: 18 },
+  skelHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
 
   kicker: {
     fontFamily: AmbitFont.body,

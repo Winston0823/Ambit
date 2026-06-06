@@ -9,3 +9,4 @@ export { Entrance } from './Entrance';
 export { Tactile } from './Tactile';
 export { Celebrate } from './Celebrate';
 export { HardShadow } from './HardShadow';
+export { Skeleton } from './Skeleton';

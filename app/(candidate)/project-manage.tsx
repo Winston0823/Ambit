@@ -13,7 +13,7 @@ import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PencilSimple } from 'phosphor-react-native';
 import * as Haptics from 'expo-haptics';
-import { BackChevron } from '../../components/atoms';
+import { BackChevron, Skeleton } from '../../components/atoms';
 import { getInbox, type InboxItem } from '../../lib/messaging';
 import { supabase } from '../../lib/supabase';
 import { AmbitFont, Brand, Radii, Space } from '../../constants/theme';
@@ -65,8 +65,20 @@ export default function ProjectManageScreen() {
 
   if (candidates === null) {
     return (
-      <View style={[styles.root, styles.center]}>
-        <ActivityIndicator color={Brand.accent} />
+      <View style={styles.root}>
+        <View style={{ paddingHorizontal: 24, paddingTop: insets.top + 64 }}>
+          <Skeleton width={60} height={12} radius={6} />
+          <Skeleton width={200} height={30} radius={8} style={{ marginTop: 10, marginBottom: 28 }} />
+          {[0, 1, 2].map((i) => (
+            <View key={i} style={styles.skelRow}>
+              <Skeleton width={48} height={48} radius={14} />
+              <View style={{ flex: 1, gap: 9 }}>
+                <Skeleton width="55%" height={16} radius={6} />
+                <Skeleton width="80%" height={12} radius={6} />
+              </View>
+            </View>
+          ))}
+        </View>
       </View>
     );
   }
@@ -173,6 +185,7 @@ export default function ProjectManageScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Brand.canvas },
   center: { alignItems: 'center', justifyContent: 'center' },
+  skelRow: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: Brand.borderSoft },
   content: { paddingHorizontal: Space.lg, gap: Space.md },
 
   header: { gap: 10, marginTop: 8 },
