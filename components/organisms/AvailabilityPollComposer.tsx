@@ -12,6 +12,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { CalendarPlus, X } from 'phosphor-react-native';
 import {
@@ -55,6 +56,7 @@ export function AvailabilityPollComposer({
   onClose,
   onProposed,
 }: Props) {
+  const insets = useSafeAreaInsets();
   // Default to 'mark' so the grid is the first thing the user sees.
   // 'setup' is reachable from the grid header for advanced edits.
   const [step, setStep]                 = useState<'setup' | 'mark'>('mark');
@@ -200,7 +202,7 @@ export function AvailabilityPollComposer({
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={dismiss}>
       <View style={styles.root}>
-        <View style={styles.header}>
+        <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
           <Pressable onPress={dismiss} hitSlop={10}>
             <X size={22} color={Brand.inkPrimary} weight="bold" />
           </Pressable>
@@ -335,7 +337,7 @@ export function AvailabilityPollComposer({
                 disabled={posting}
                 style={[styles.primaryBtn, posting && { opacity: 0.5 }]}
               >
-                <CalendarPlus size={16} color={Brand.inkOnBrand} weight="bold" />
+                <CalendarPlus size={16} color={Brand.actionInk} weight="bold" />
                 <Text style={styles.primaryBtnText}>
                   {posting ? 'Posting…' : `Post poll  ·  ${mineKeys.size}`}
                 </Text>
@@ -554,8 +556,8 @@ const styles = StyleSheet.create({
     borderColor: Brand.borderDefault,
   },
   hourChipSelected: {
-    backgroundColor: Brand.primary,
-    borderColor: Brand.primary,
+    backgroundColor: Brand.action,
+    borderColor: Brand.actionInk,
   },
   hourChipText: {
     fontFamily: AmbitFont.body,
@@ -563,7 +565,7 @@ const styles = StyleSheet.create({
     color: Brand.inkBody,
     fontWeight: '600',
   },
-  hourChipTextSelected: { color: Brand.inkOnBrand },
+  hourChipTextSelected: { color: Brand.actionInk, fontWeight: '700' },
 
   durationChip: {
     paddingHorizontal: 14,
@@ -574,15 +576,15 @@ const styles = StyleSheet.create({
     borderColor: Brand.borderDefault,
   },
   durationChipSelected: {
-    backgroundColor: Brand.primary,
-    borderColor: Brand.primary,
+    backgroundColor: Brand.action,
+    borderColor: Brand.actionInk,
   },
   durationChipText: {
     fontFamily: AmbitFont.body,
     fontSize: 13,
     color: Brand.inkBody,
   },
-  durationChipTextSelected: { color: Brand.inkOnBrand, fontWeight: '600' },
+  durationChipTextSelected: { color: Brand.actionInk, fontWeight: '700' },
 
   primaryBtn: {
     flexDirection: 'row',
@@ -590,14 +592,21 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     paddingVertical: 14,
-    borderRadius: Radii.md,
-    backgroundColor: Brand.primary,
+    borderRadius: 999,
+    backgroundColor: Brand.action,
+    borderWidth: 1.6,
+    borderColor: Brand.actionInk,
+    shadowColor: Brand.actionInk,
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 0,
   },
   primaryBtnText: {
     fontFamily: AmbitFont.body,
     fontSize: 15,
-    fontWeight: '600',
-    color: Brand.inkOnBrand,
+    fontWeight: '700',
+    color: Brand.actionInk,
   },
   secondaryBtn: {
     paddingVertical: 14,
@@ -632,7 +641,7 @@ const styles = StyleSheet.create({
     fontFamily: AmbitFont.body,
     fontSize: 13,
     fontWeight: '600',
-    color: Brand.accent,
+    color: Brand.inkBody,
     paddingTop: 0,
   },
   busyLoader: {
@@ -661,6 +670,6 @@ const styles = StyleSheet.create({
     fontFamily: AmbitFont.body,
     fontSize: 15,
     fontWeight: '600',
-    color: Brand.accent,
+    color: Brand.inkBody,
   },
 });

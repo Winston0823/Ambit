@@ -223,17 +223,17 @@ const styles = StyleSheet.create({
     opacity: 0.75,
   },
   cellMine: {
-    backgroundColor: Brand.primary,
+    backgroundColor: Brand.action, // Yours — teal
   },
   cellTheirs: {
     backgroundColor: Brand.canvas,
-    borderColor: Brand.primary,
+    borderColor: '#6E9CA1',
     borderWidth: 1.5,
     borderStyle: 'dashed',
   },
   cellBoth: {
-    backgroundColor: Brand.accent,
-    borderColor: Brand.accent,
+    backgroundColor: '#6E9CA1', // Both — deeper teal
+    borderColor: '#6E9CA1',
   },
 
   legend: {
@@ -256,9 +256,9 @@ const styles = StyleSheet.create({
     borderColor: Brand.borderDefault,
   },
   legendBusy:   { backgroundColor: Brand.surface2 },
-  legendMine:   { backgroundColor: Brand.primary, borderColor: Brand.primary },
-  legendTheirs: { backgroundColor: Brand.canvas, borderColor: Brand.primary, borderStyle: 'dashed' },
-  legendBoth:   { backgroundColor: Brand.accent, borderColor: Brand.accent },
+  legendMine:   { backgroundColor: Brand.action, borderColor: Brand.action },
+  legendTheirs: { backgroundColor: Brand.canvas, borderColor: '#6E9CA1', borderStyle: 'dashed' },
+  legendBoth:   { backgroundColor: '#6E9CA1', borderColor: '#6E9CA1' },
   legendLabel: {
     fontFamily: AmbitFont.body,
     fontSize: 11,
