@@ -282,7 +282,7 @@ export function ChatComposer({
           accessibilityLabel={editing ? 'Save edit' : 'Send'}
         >
           <Animated.View style={[styles.sendBtn, { opacity: sendOpacity, transform: [{ scale: sendScale }] }]}>
-            <PaperPlaneTilt size={16} color={Brand.inkOnBrand} weight="fill" />
+            <PaperPlaneTilt size={16} color={Brand.actionInk} weight="fill" />
           </Animated.View>
         </Pressable>
       </View>
@@ -543,7 +543,14 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#211D18',
+    backgroundColor: Brand.action,
+    borderWidth: 1.6,
+    borderColor: Brand.actionInk,
+    shadowColor: Brand.actionInk,
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 0,
     alignItems: 'center',
     justifyContent: 'center',
   },

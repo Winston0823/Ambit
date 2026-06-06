@@ -62,16 +62,16 @@ export const Brand = {
   // over the canvas, glass icon buttons, tactile bubbles with gradient + rim.
   hearthBgTop:        '#FAEAD0', // (legacy) top wash stop — kept for reference; no longer used
   hearthBgBottom:     '#F1DDB6', // (legacy) bottom wash stop — kept for reference; no longer used
-  hearthBgBase:       '#FFFFFF', // clean white — colored bubbles do all the warm work
-  hearthGlassBg:      'rgba(255,255,255,0.7)',
+  hearthBgBase:       '#F2EEE4', // eggshell paper — matches the app canvas
+  hearthGlassBg:      'rgba(251,250,245,0.8)',
   hearthGlassEdge:    'rgba(255,255,255,0.95)',
-  hearthGlassShadow:  'rgba(120,80,40,0.18)',
-  hearthBubbleMineTop:    '#C68F58', // mine bubble gradient — top stop (lighter tan)
-  hearthBubbleMineBottom: '#B48045', // mine bubble gradient — bottom stop (deeper accent tan)
-  hearthBubbleMineShadow: 'rgba(180,128,69,0.32)',
-  hearthBubbleTheirsShadow: 'rgba(60,40,20,0.13)', // bumped for white-on-white separation
-  hearthInkOnTan:     '#FFFFFF',
-  hearthPresenceGreen:'#6E8C3F',
+  hearthGlassShadow:  'rgba(28,28,26,0.12)',
+  hearthBubbleMineTop:    '#B0CFCB', // mine bubble — teal gradient top
+  hearthBubbleMineBottom: '#A6C7C2', // mine bubble — teal gradient bottom
+  hearthBubbleMineShadow: 'rgba(110,156,161,0.30)',
+  hearthBubbleTheirsShadow: 'rgba(28,28,26,0.10)',
+  hearthInkOnTan:     '#1C1C1A', // ink text on the teal "mine" bubble
+  hearthPresenceGreen:'#6E9CA1', // presence → teal to match the system
 
   // Inbox v5 — Stitch's "Clean Warm Chat Interface" direction. Warm
   // cream canvas, flat active rows divided by hairlines, pending
