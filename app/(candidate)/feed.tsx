@@ -40,7 +40,7 @@ import {
   MOCK_SEEKERS,
 } from '../../data/mock';
 import { supabase } from '../../lib/supabase';
-import { sendProjectAttachment, startConversationWithMessage } from '../../lib/messaging';
+import { sendPortfolioAttachment, sendProjectAttachment, startConversationWithMessage } from '../../lib/messaging';
 import { fetchPortfoliosByUser } from '../../lib/portfolio';
 import { useAuth } from '../../context/AuthContext';
 
@@ -477,12 +477,12 @@ export default function DiscoveryFeed() {
         body: text,
       });
       if (attachment) {
-        await sendProjectAttachment({
-          conversationId,
-          senderId: user.id,
-          projectId: attachment.id,
-          projectTitle: attachment.title,
-        }).catch(() => {});
+        // Reaching out to a seeker attaches a PROJECT; to a project attaches a
+        // PORTFOLIO highlight. (card.kind drives which.)
+        const send = card.kind === 'seeker'
+          ? sendProjectAttachment({ conversationId, senderId: user.id, projectId: attachment.id, projectTitle: attachment.title })
+          : sendPortfolioAttachment({ conversationId, senderId: user.id, portfolioId: attachment.id, portfolioTitle: attachment.title });
+        await send.catch((e: any) => console.warn('attachment send failed:', e?.message ?? e));
       }
       return true;
     } catch (e: any) {
@@ -607,8 +607,8 @@ export default function DiscoveryFeed() {
       <ReachOutComposer
         card={reachOutCard}
         onDismiss={() => setReachOutCard(null)}
-        onSend={async (card, text) => {
-          const ok = await handleMessage(card, text);
+        onSend={async (card, text, attachment) => {
+          const ok = await handleMessage(card, text, attachment);
           if (ok) recordReachOut().catch(() => {});
           return ok;
         }}
