@@ -16,7 +16,7 @@ import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Swipeable } from 'react-native-gesture-handler';
 import { NotePencil, PaperPlaneTilt, Trash, X } from 'phosphor-react-native';
-import { BackChevron, Tactile } from '../../components/atoms';
+import { BackChevron, HardShadow, Tactile } from '../../components/atoms';
 import { DiscoveryCard, DiscoveryRowSummary, ReachOutComposer, ReachOutLimitSheet, SavedCarousel } from '../../components/molecules';
 import { Motion } from '../../constants/motion';
 import { haptics } from '../../lib/haptics';
@@ -407,9 +407,11 @@ export default function SavedScreen() {
               maxLength={160}
               autoFocus
             />
-            <Tactile haptic="tap" onPress={saveNote} style={styles.noteSave}>
-              <Text style={styles.noteSaveText}>{noteDraft.trim() ? 'Save note' : 'Clear note'}</Text>
-            </Tactile>
+            <HardShadow radius={999} offset={4} style={styles.noteSaveWrap}>
+              <Tactile haptic="tap" onPress={saveNote} style={styles.noteSave}>
+                <Text style={styles.noteSaveText}>{noteDraft.trim() ? 'Save note' : 'Clear note'}</Text>
+              </Tactile>
+            </HardShadow>
           </View>
         </KeyboardAvoidingView>
       </Modal>
@@ -528,6 +530,7 @@ const styles = StyleSheet.create({
     color: Brand.inkBody,
     textAlignVertical: 'top',
   },
+  noteSaveWrap: { alignSelf: 'stretch', marginTop: 4 },
   noteSave: {
     alignSelf: 'stretch',
     alignItems: 'center',
@@ -536,12 +539,6 @@ const styles = StyleSheet.create({
     backgroundColor: Brand.action,
     borderWidth: 1.6,
     borderColor: Brand.actionInk,
-    shadowColor: Brand.actionInk,
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 0,
-    marginTop: 4,
   },
   noteSaveText: { fontFamily: AmbitFont.body, fontSize: 15, fontWeight: '700', color: Brand.actionInk },
 

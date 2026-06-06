@@ -25,7 +25,7 @@ import {
   SignOut,
   X,
 } from 'phosphor-react-native';
-import { Chip } from '../../components/atoms';
+import { Chip, HardShadow } from '../../components/atoms';
 import { router } from 'expo-router';
 import {
   AddPortfolioBubble,
@@ -697,14 +697,16 @@ function TextEditModal({
           />
 
           <View style={modalStyles.footer}>
-            <Pressable
-              onPress={() => canSave && onSave(draft.trim())}
-              disabled={!canSave}
-              style={[modalStyles.saveBtn, !canSave && { opacity: 0.45 }]}
-            >
-              <Check size={16} color={Brand.actionInk} weight="bold" />
-              <Text style={modalStyles.saveLabel}>Save</Text>
-            </Pressable>
+            <HardShadow radius={999} offset={3} style={!canSave ? { opacity: 0.45 } : undefined}>
+              <Pressable
+                onPress={() => canSave && onSave(draft.trim())}
+                disabled={!canSave}
+                style={modalStyles.saveBtn}
+              >
+                <Check size={16} color={Brand.actionInk} weight="bold" />
+                <Text style={modalStyles.saveLabel}>Save</Text>
+              </Pressable>
+            </HardShadow>
           </View>
         </View>
       </KeyboardAvoidingView>
@@ -810,10 +812,12 @@ function SkillsEditModal({
           </ScrollView>
 
           <View style={modalStyles.footer}>
-            <Pressable onPress={() => onSave(draft)} style={modalStyles.saveBtn}>
-              <Check size={16} color={Brand.actionInk} weight="bold" />
-              <Text style={modalStyles.saveLabel}>Save</Text>
-            </Pressable>
+            <HardShadow radius={999} offset={3}>
+              <Pressable onPress={() => onSave(draft)} style={modalStyles.saveBtn}>
+                <Check size={16} color={Brand.actionInk} weight="bold" />
+                <Text style={modalStyles.saveLabel}>Save</Text>
+              </Pressable>
+            </HardShadow>
           </View>
         </View>
       </View>
@@ -1166,13 +1170,6 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 20,
     backgroundColor: Brand.action,
-    borderWidth: 1.6,
-    borderColor: Brand.actionInk,
-    shadowColor: Brand.actionInk,
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 0,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1260,11 +1257,6 @@ const modalStyles = StyleSheet.create({
     borderRadius: 999,
     borderWidth: 1.6,
     borderColor: Brand.actionInk,
-    shadowColor: Brand.actionInk,
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 0,
   },
   saveLabel: {
     fontFamily: AmbitFont.body,

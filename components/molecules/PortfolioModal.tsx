@@ -16,6 +16,7 @@ import {
   View,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { HardShadow } from '../atoms';
 import { ArrowUpRight, Camera, PencilSimpleLine, Trash, X } from 'phosphor-react-native';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
@@ -382,9 +383,11 @@ export function PortfolioModal({ item, onDismiss, onSave, onDelete }: Props) {
                       </Pressable>
                     )}
                     <View style={{ flex: 1 }} />
-                    <Pressable onPress={handleSave} disabled={!canSave} style={[styles.saveBtn, !canSave && { opacity: 0.45 }]}>
-                      <Text style={styles.saveLabel}>Save</Text>
-                    </Pressable>
+                    <HardShadow radius={999} offset={3} style={!canSave ? { opacity: 0.45 } : undefined}>
+                      <Pressable onPress={handleSave} disabled={!canSave} style={styles.saveBtn}>
+                        <Text style={styles.saveLabel}>Save</Text>
+                      </Pressable>
+                    </HardShadow>
                   </View>
                 </>
               )}
@@ -557,6 +560,6 @@ const styles = StyleSheet.create({
   editFooter: { marginTop: 14, flexDirection: 'row', alignItems: 'center', gap: 12 },
   deleteBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 6, paddingHorizontal: 4 },
   deleteLabel: { fontFamily: AmbitFont.body, fontSize: 14, fontWeight: '600', color: '#C0392B' },
-  saveBtn: { paddingHorizontal: 20, paddingVertical: 11, backgroundColor: Brand.action, borderRadius: 999, borderWidth: 1.6, borderColor: Brand.actionInk, shadowColor: Brand.actionInk, shadowOpacity: 1, shadowRadius: 0, shadowOffset: { width: 0, height: 3 }, elevation: 0 },
+  saveBtn: { paddingHorizontal: 20, paddingVertical: 11, backgroundColor: Brand.action, borderRadius: 999, borderWidth: 1.6, borderColor: Brand.actionInk },
   saveLabel: { fontFamily: AmbitFont.body, fontSize: 14, fontWeight: '700', color: Brand.actionInk },
 });
