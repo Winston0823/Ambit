@@ -272,11 +272,21 @@ const styles = StyleSheet.create({
   // Active rows are flat — no fill, no border, just padding. The
   // hairline divider between rows is provided by the screen-level
   // ItemSeparatorComponent.
+  // Cream island cards — aligned with the Projects look (soft border + faint
+  // lift, no hard shadow since the list is long).
   card: {
-    backgroundColor: Brand.inboxCardActive, // 'transparent'
-    paddingVertical: 14,
-    paddingHorizontal: 4,
+    backgroundColor: Brand.cardCream,
+    borderWidth: 1,
+    borderColor: Brand.inboxHairline,
+    borderRadius: 18,
+    padding: 14,
+    marginBottom: 11,
     gap: 8,
+    shadowColor: '#2D2616',
+    shadowOpacity: 0.06,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 1,
   },
   // Pending rows become soft golden-cream cards with a generous radius.
   cardPending: {
@@ -387,8 +397,8 @@ const styles = StyleSheet.create({
   // Stitch chip family — pale neutral surfaces with bronze accents,
   // never solid ink. Countdown urgent flips to solid bronze.
   chipOutline: {
-    borderColor: 'rgba(118,90,38,0.15)',
-    backgroundColor: 'rgba(255,255,255,0.6)',
+    borderColor: 'rgba(28,28,26,0.12)',
+    backgroundColor: 'rgba(28,28,26,0.04)',
   },
   chipSolid: {
     borderColor: 'transparent',

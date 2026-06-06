@@ -231,16 +231,6 @@ export default function ChatTab() {
             />
           ) : null
         }
-        ItemSeparatorComponent={({ leadingItem }: { leadingItem: InboxItem }) => {
-          // No hairline below a pending card — they're full boxes that
-          // already terminate the row. Only flat active rows get the
-          // hairline divider, indented past the avatar.
-          const leadingPending =
-            user ? isReachedOutToYou(leadingItem, user.id) : false;
-          return leadingPending
-            ? <View style={styles.sepGap} />
-            : <View style={styles.sep} />;
-        }}
         contentContainerStyle={styles.listContent}
         ListHeaderComponent={
           <ListHeader
