@@ -40,7 +40,7 @@ export function CompleteScreen({ onDone }: Props) {
       <View style={{ flex: 1 }} />
 
       <Animated.View style={[styles.check, { transform: [{ scale }] }]}>
-        <Feather name="check" size={40} color={Brand.inkOnBrand} />
+        <Feather name="check" size={40} color={Brand.actionInk} />
       </Animated.View>
 
       <Animated.Text style={[styles.headline, { opacity }]}>You're in.</Animated.Text>
@@ -65,10 +65,10 @@ export function CompleteScreen({ onDone }: Props) {
         fallSpeed={2800}
         explosionSpeed={420}
         colors={[
-          Brand.primary,
-          Brand.accent,
-          Brand.seekerSurface,
-          Brand.seekerInk,
+          Brand.action,
+          Brand.actionDeep,
+          '#DDEEE3',
+          '#3E6B53',
         ]}
       />
     </SafeAreaView>
@@ -82,7 +82,9 @@ const styles = StyleSheet.create({
   },
   check: {
     width: 96, height: 96, borderRadius: 48,
-    backgroundColor: Brand.primary,
+    backgroundColor: Brand.action,
+    borderWidth: 1.6, borderColor: Brand.actionInk,
+    shadowColor: Brand.actionInk, shadowOpacity: 1, shadowRadius: 0, shadowOffset: { width: 0, height: 5 }, elevation: 0,
     alignItems: 'center', justifyContent: 'center',
   },
   headline: {
