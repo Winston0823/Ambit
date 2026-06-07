@@ -272,7 +272,7 @@ const styles = StyleSheet.create({
   secLabel: { fontFamily: AmbitFont.body, fontSize: 11, fontWeight: '700', letterSpacing: 1.2, color: Brand.inkLabel, marginTop: 36, marginBottom: 16 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   chip: { paddingHorizontal: 16, paddingVertical: 12, borderRadius: 999, backgroundColor: Brand.cardCream, borderWidth: 1.5, borderColor: Brand.inkEdge },
-  chipOn: { backgroundColor: Brand.action, borderWidth: 1.5, borderColor: Brand.actionInk, shadowColor: Brand.actionInk, shadowOpacity: 1, shadowRadius: 0, shadowOffset: { width: 0, height: 2 } },
+  chipOn: { backgroundColor: Brand.action, borderWidth: 1.5, borderColor: Brand.actionInk },
   chipText: { fontFamily: AmbitFont.body, fontSize: 14.5, fontWeight: '600', color: Brand.inkPrimary },
   chipTextOn: { color: Brand.actionInk, fontWeight: '700' },
 

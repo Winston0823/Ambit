@@ -123,7 +123,7 @@ const styles = StyleSheet.create({
   errorNote: {
     fontFamily: AmbitFont.body,
     fontSize: 13,
-    color: '#C0392B',
+    color: Brand.danger,
     marginTop: 12,
   },
 });

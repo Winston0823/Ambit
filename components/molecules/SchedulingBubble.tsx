@@ -146,7 +146,7 @@ export function SchedulingBubble({ request, meId, isMine }: Props) {
         <View style={styles.confirmedRow}>
           <CheckCircle
             size={18}
-            color={'#6E9CA1'}
+            color={Brand.actionDeep}
             weight="fill"
           />
           <Text style={[styles.confirmedText, isMine && styles.textOnBrand]}>
@@ -172,12 +172,12 @@ export function SchedulingBubble({ request, meId, isMine }: Props) {
             style={[styles.addBtn, isMine && styles.addBtnMine, busy && { opacity: 0.5 }]}
           >
             {busy ? (
-              <ActivityIndicator color={'#6E9CA1'} />
+              <ActivityIndicator color={Brand.actionDeep} />
             ) : (
               <>
                 <CalendarBlank
                   size={14}
-                  color={'#6E9CA1'}
+                  color={Brand.actionDeep}
                   weight="bold"
                 />
                 <Text style={[styles.addBtnText, isMine && styles.addBtnTextMine]}>
@@ -245,7 +245,7 @@ export function SchedulingBubble({ request, meId, isMine }: Props) {
 
       <View style={styles.actionRow}>
         {busy ? (
-          <ActivityIndicator color={'#6E9CA1'} />
+          <ActivityIndicator color={Brand.actionDeep} />
         ) : isProposer ? (
           <Pressable onPress={handleCancel}>
             <Text style={[styles.linkBtnMine]}>Cancel request</Text>
@@ -310,7 +310,7 @@ const styles = StyleSheet.create({
     fontFamily: AmbitFont.body,
     fontSize: 13,
     fontWeight: '700',
-    color: '#6E9CA1',
+    color: Brand.actionDeep,
     textTransform: 'uppercase',
     letterSpacing: 0.8,
   },
@@ -402,9 +402,9 @@ const styles = StyleSheet.create({
     fontFamily: AmbitFont.body,
     fontSize: 13,
     fontWeight: '600',
-    color: '#6E9CA1',
+    color: Brand.actionDeep,
   },
-  addBtnTextMine: { color: '#6E9CA1' },
+  addBtnTextMine: { color: Brand.actionDeep },
 
   actionRow: {
     marginTop: 2,
@@ -414,12 +414,12 @@ const styles = StyleSheet.create({
     fontFamily: AmbitFont.body,
     fontSize: 13,
     fontWeight: '600',
-    color: '#6E9CA1',
+    color: Brand.actionDeep,
   },
   linkBtnMine: {
     fontFamily: AmbitFont.body,
     fontSize: 13,
     fontWeight: '600',
-    color: '#6E9CA1',
+    color: Brand.actionDeep,
   },
 });

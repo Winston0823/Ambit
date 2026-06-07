@@ -68,7 +68,7 @@ export function OptionCard({ title, subtitle, selected = false, onPress, icon: I
   const checkScale = sel.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1] });
 
   return (
-    <HardShadow radius={Radii.lg} offset={4}>
+    <HardShadow radius={Radii.card} offset={4}>
       <Animated.View style={{ transform: [{ scale }] }}>
         <Pressable onPress={press}>
           <Animated.View style={[styles.card, { backgroundColor: bg }]}>
@@ -99,7 +99,7 @@ export function OptionCard({ title, subtitle, selected = false, onPress, icon: I
 const styles = StyleSheet.create({
   card: {
     minHeight: 88,
-    borderRadius: Radii.lg,
+    borderRadius: Radii.card,
     paddingHorizontal: 20,
     paddingVertical: 16,
     borderWidth: 1.5,

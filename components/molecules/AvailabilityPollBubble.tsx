@@ -117,11 +117,6 @@ const styles = StyleSheet.create({
     backgroundColor: Brand.action,
     borderWidth: 1.5,
     borderColor: Brand.actionInk,
-    shadowColor: Brand.actionInk,
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 0,
     alignItems: 'center',
   },
   openBtnMine: {

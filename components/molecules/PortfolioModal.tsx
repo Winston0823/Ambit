@@ -378,7 +378,7 @@ export function PortfolioModal({ item, onDismiss, onSave, onDelete }: Props) {
                   <View style={styles.editFooter}>
                     {onDelete && (
                       <Pressable onPress={handleDelete} style={styles.deleteBtn} hitSlop={6}>
-                        <Trash size={16} color="#C0392B" weight="regular" />
+                        <Trash size={16} color={Brand.danger} weight="regular" />
                         <Text style={styles.deleteLabel}>Delete</Text>
                       </Pressable>
                     )}
@@ -559,7 +559,7 @@ const styles = StyleSheet.create({
   },
   editFooter: { marginTop: 16, flexDirection: 'row', alignItems: 'center', gap: 12 },
   deleteBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8, paddingHorizontal: 4 },
-  deleteLabel: { fontFamily: AmbitFont.body, fontSize: 14, fontWeight: '600', color: '#C0392B' },
+  deleteLabel: { fontFamily: AmbitFont.body, fontSize: 14, fontWeight: '600', color: Brand.danger },
   saveBtn: { paddingHorizontal: 20, paddingVertical: 12, backgroundColor: Brand.action, borderRadius: 999, borderWidth: 1.6, borderColor: Brand.actionInk },
   saveLabel: { fontFamily: AmbitFont.body, fontSize: 14, fontWeight: '700', color: Brand.actionInk },
 });

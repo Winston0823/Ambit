@@ -197,7 +197,7 @@ const styles = StyleSheet.create({
   skillCatLabel: { fontFamily: AmbitFont.body, fontSize: 10.5, letterSpacing: 1, color: Brand.inkMuted, marginBottom: 12 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   chip: { paddingHorizontal: 16, paddingVertical: 12, borderRadius: 999, backgroundColor: Brand.cardCream, borderWidth: 1.5, borderColor: Brand.inkEdge },
-  chipOn: { backgroundColor: Brand.action, borderWidth: 1.5, borderColor: Brand.actionInk, shadowColor: Brand.actionInk, shadowOpacity: 1, shadowRadius: 0, shadowOffset: { width: 0, height: 2 } },
+  chipOn: { backgroundColor: Brand.action, borderWidth: 1.5, borderColor: Brand.actionInk },
   chipText: { fontFamily: AmbitFont.body, fontSize: 14.5, fontWeight: '600', color: Brand.inkPrimary },
   chipTextOn: { color: Brand.actionInk, fontWeight: '700' },
   skillChip: { flexDirection: 'row', alignItems: 'center', gap: 8 },

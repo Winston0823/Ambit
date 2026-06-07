@@ -4,7 +4,7 @@ import { Feather } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import ConfettiCannon from 'react-native-confetti-cannon';
-import { Button } from '../../atoms';
+import { Button, HardShadow } from '../../atoms';
 import { Brand, AmbitFont, Space } from '../../../constants/theme';
 
 interface Props { onDone: () => void; }
@@ -39,8 +39,12 @@ export function CompleteScreen({ onDone }: Props) {
     <SafeAreaView style={styles.root}>
       <View style={{ flex: 1 }} />
 
-      <Animated.View style={[styles.check, { transform: [{ scale }] }]}>
-        <Feather name="check" size={40} color={Brand.actionInk} />
+      <Animated.View style={{ transform: [{ scale }] }}>
+        <HardShadow radius={48} offset={5}>
+          <View style={styles.check}>
+            <Feather name="check" size={40} color={Brand.actionInk} />
+          </View>
+        </HardShadow>
       </Animated.View>
 
       <Animated.Text style={[styles.headline, { opacity }]}>You're in.</Animated.Text>
@@ -84,7 +88,6 @@ const styles = StyleSheet.create({
     width: 96, height: 96, borderRadius: 48,
     backgroundColor: Brand.action,
     borderWidth: 1.6, borderColor: Brand.actionInk,
-    shadowColor: Brand.actionInk, shadowOpacity: 1, shadowRadius: 0, shadowOffset: { width: 0, height: 5 }, elevation: 0,
     alignItems: 'center', justifyContent: 'center',
   },
   headline: {

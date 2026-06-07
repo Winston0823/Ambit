@@ -10,7 +10,7 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { CheckCircle, MapPin } from 'phosphor-react-native';
-import { BackChevron } from '../../atoms';
+import { BackChevron, HardShadow } from '../../atoms';
 import { OnboardingContinue } from '../../molecules';
 import { useOnboarding } from '../../../context/OnboardingContext';
 import { CAMPUSES } from '../../../data/mock';
@@ -96,8 +96,8 @@ export function CampusScreen({ onBack, onContinue }: Props) {
           {CAMPUSES.map((c) => {
             const selected = profile.campusId === c.id;
             return (
+              <HardShadow key={c.id} radius={Radii.md} offset={4} style={styles.rowShadow}>
               <Pressable
-                key={c.id}
                 onPress={() => update('campusId', c.id)}
                 style={[styles.row, selected && styles.rowSelected]}
                 accessibilityRole="button"
@@ -124,6 +124,7 @@ export function CampusScreen({ onBack, onContinue }: Props) {
                   <CheckCircle size={22} color={Brand.actionInk} weight="fill" />
                 )}
               </Pressable>
+              </HardShadow>
             );
           })}
         </Animated.ScrollView>
@@ -208,6 +209,9 @@ const styles = StyleSheet.create({
     right: 0,
     height: FADE_HEIGHT,
   },
+  rowShadow: {
+    marginBottom: 12,
+  },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -218,12 +222,6 @@ const styles = StyleSheet.create({
     borderRadius: Radii.md,
     borderWidth: 1.5,
     borderColor: Brand.actionInk,
-    marginBottom: 12,
-    shadowColor: Brand.actionInk,
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 0,
   },
   rowSelected: {
     backgroundColor: Brand.action,

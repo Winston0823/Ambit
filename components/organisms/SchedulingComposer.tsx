@@ -13,6 +13,7 @@ import {
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { CalendarPlus, Plus, X } from 'phosphor-react-native';
 import { buildSlot, proposeMeeting, type SchedulingSlot } from '../../lib/scheduling';
+import { HardShadow } from '../atoms';
 import { AmbitFont, Brand, Radii, Space } from '../../constants/theme';
 
 interface Props {
@@ -200,16 +201,18 @@ export function SchedulingComposer({
               </View>
             </Field>
 
-            <Pressable
-              onPress={send}
-              disabled={sending || !conversationId}
-              style={[styles.sendBtn, (sending || !conversationId) && styles.sendBtnDisabled]}
-            >
-              <CalendarPlus size={16} color={Brand.actionInk} weight="bold" />
-              <Text style={styles.sendBtnText}>
-                {sending ? 'Sending…' : 'Send request'}
-              </Text>
-            </Pressable>
+            <HardShadow radius={999} offset={4} style={styles.sendBtnShadow}>
+              <Pressable
+                onPress={send}
+                disabled={sending || !conversationId}
+                style={[styles.sendBtn, (sending || !conversationId) && styles.sendBtnDisabled]}
+              >
+                <CalendarPlus size={16} color={Brand.actionInk} weight="bold" />
+                <Text style={styles.sendBtnText}>
+                  {sending ? 'Sending…' : 'Send request'}
+                </Text>
+              </Pressable>
+            </HardShadow>
           </Pressable>
         </KeyboardAvoidingView>
       </Pressable>
@@ -392,8 +395,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
-  sendBtn: {
+  sendBtnShadow: {
     marginTop: Space.sm,
+  },
+  sendBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -403,11 +408,6 @@ const styles = StyleSheet.create({
     backgroundColor: Brand.action,
     borderWidth: 1.6,
     borderColor: Brand.actionInk,
-    shadowColor: Brand.actionInk,
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 0,
   },
   sendBtnDisabled: { opacity: 0.45 },
   sendBtnText: {

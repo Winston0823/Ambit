@@ -104,7 +104,7 @@ export function DiscoveryCard({
         },
       ]}
     >
-      <HardShadow radius={22} offset={7} style={styles.hsFill}>
+      <HardShadow radius={Radii.card} offset={7} style={styles.hsFill}>
       <View
         style={styles.card}
         onLayout={(e) => {
@@ -658,7 +658,7 @@ const styles = StyleSheet.create({
   card: {
     flex: 1,
     backgroundColor: '#2A1A0C',
-    borderRadius: 22,
+    borderRadius: Radii.card,
     borderWidth: 1.5,
     borderColor: Brand.actionInk,
     overflow: 'hidden', // photo + scrim need to clip to the rounded corners

@@ -1672,7 +1672,7 @@ const styles = StyleSheet.create({
     color: Brand.inkPrimary,
   },
   overflowLabelDanger: {
-    color: '#C0392B',
+    color: Brand.danger,
   },
   overflowLabelDisabled: {
     color: Brand.inkPlaceholder,

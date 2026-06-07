@@ -175,7 +175,7 @@ const styles = StyleSheet.create({
     backgroundColor: Brand.cardCream,
     borderWidth: 1,
     borderColor: Brand.borderSoft,
-    borderRadius: Radii.lg,
+    borderRadius: Radii.card,
     padding: 16,
     marginBottom: 12,
     gap: 4,

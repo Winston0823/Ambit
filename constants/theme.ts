@@ -16,6 +16,7 @@ export const Brand = {
   action:         '#A6C7C2',  // teal-blue button/selected fill
   actionDeep:     '#6E9CA1',  // deeper teal — links, the wave, icons/strokes on cream
   actionInk:      '#1C1C1A',  // text + border + the hard offset edge on `action`
+  danger:         '#C0392B',  // destructive / error (decline, withdraw, validation)
   // Mint "tag" (LIVE / New / status).
   tagMint:        '#DDEEE3',
   tagMintInk:     '#3E6B53',
@@ -137,6 +138,7 @@ export const Radii = {
   sm:    8,    // counter pill, small badge
   md:    12,   // CTA buttons, search input
   lg:    16,   // cards, textarea, option cards
+  card:  20,   // island cards (cream/gradient surfaces, swipe deck)
   pill:  100,  // skill chips
   full:  999,  // avatars
 } as const;

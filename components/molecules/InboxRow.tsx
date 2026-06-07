@@ -278,7 +278,7 @@ const styles = StyleSheet.create({
     backgroundColor: Brand.cardCream,
     borderWidth: 1,
     borderColor: Brand.inboxHairline,
-    borderRadius: 18,
+    borderRadius: 20,
     padding: 16,
     marginBottom: 12,
     gap: 8,
@@ -291,7 +291,7 @@ const styles = StyleSheet.create({
   // Pending rows become soft golden-cream cards with a generous radius.
   cardPending: {
     backgroundColor: Brand.inboxCardPending,
-    borderRadius: 24,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: Brand.inboxBorderTan,
     padding: 20,
@@ -417,7 +417,7 @@ const styles = StyleSheet.create({
     width: 80,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#C0392B',
+    backgroundColor: Brand.danger,
   },
   passAction: {
     width: '100%',

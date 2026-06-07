@@ -18,8 +18,8 @@ export const STRUCT_DARK = '#FBFAF5';
 /// Content colors, by surface. Both surfaces are light now, so both use dark
 /// ink with a teal eyebrow accent.
 export const structInk = {
-  light: { title: Brand.inkPrimary, eyebrow: '#6E9CA1', body: Brand.inkBody, muted: Brand.inkMuted },
-  dark:  { title: Brand.inkPrimary, eyebrow: '#6E9CA1', body: Brand.inkBody, muted: Brand.inkMuted },
+  light: { title: Brand.inkPrimary, eyebrow: Brand.actionDeep, body: Brand.inkBody, muted: Brand.inkMuted },
+  dark:  { title: Brand.inkPrimary, eyebrow: Brand.actionDeep, body: Brand.inkBody, muted: Brand.inkMuted },
 };
 
 export const structuredStyles = StyleSheet.create({

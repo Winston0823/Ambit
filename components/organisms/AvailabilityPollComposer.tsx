@@ -27,6 +27,7 @@ import {
 import { getBusyEvents } from '../../lib/deviceCalendar';
 import { AvailabilityGrid } from '../molecules/AvailabilityGrid';
 import { AmbitFont, Brand, Radii, Space } from '../../constants/theme';
+import { HardShadow } from '../atoms';
 
 interface Props {
   visible:        boolean;
@@ -288,9 +289,11 @@ export function AvailabilityPollComposer({
               </View>
             </Field>
 
-            <Pressable onPress={proceedToMark} style={styles.primaryBtn}>
-              <Text style={styles.primaryBtnText}>Continue</Text>
-            </Pressable>
+            <HardShadow radius={999} offset={4}>
+              <Pressable onPress={proceedToMark} style={styles.primaryBtn}>
+                <Text style={styles.primaryBtnText}>Continue</Text>
+              </Pressable>
+            </HardShadow>
           </ScrollView>
         ) : (
           <View style={{ flex: 1 }}>
@@ -332,16 +335,18 @@ export function AvailabilityPollComposer({
               >
                 <Text style={styles.secondaryBtnText}>Cancel</Text>
               </Pressable>
-              <Pressable
-                onPress={post}
-                disabled={posting}
-                style={[styles.primaryBtn, posting && { opacity: 0.5 }]}
-              >
-                <CalendarPlus size={16} color={Brand.actionInk} weight="bold" />
-                <Text style={styles.primaryBtnText}>
-                  {posting ? 'Posting…' : `Post poll  ·  ${mineKeys.size}`}
-                </Text>
-              </Pressable>
+              <HardShadow radius={999} offset={4} style={posting ? { opacity: 0.5 } : undefined}>
+                <Pressable
+                  onPress={post}
+                  disabled={posting}
+                  style={styles.primaryBtn}
+                >
+                  <CalendarPlus size={16} color={Brand.actionInk} weight="bold" />
+                  <Text style={styles.primaryBtnText}>
+                    {posting ? 'Posting…' : `Post poll  ·  ${mineKeys.size}`}
+                  </Text>
+                </Pressable>
+              </HardShadow>
             </View>
           </View>
         )}
@@ -596,11 +601,6 @@ const styles = StyleSheet.create({
     backgroundColor: Brand.action,
     borderWidth: 1.6,
     borderColor: Brand.actionInk,
-    shadowColor: Brand.actionInk,
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 0,
   },
   primaryBtnText: {
     fontFamily: AmbitFont.body,

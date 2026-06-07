@@ -176,9 +176,9 @@ export default function ProjectsTab() {
           projects.map((p, idx) => {
             const s = statsFor(p.id);
             return (
-              <HardShadow key={p.id} radius={Radii.lg} offset={4}>
+              <HardShadow key={p.id} radius={Radii.card} offset={4}>
               <SwipeRevealRow
-                radius={Radii.lg}
+                radius={Radii.card}
                 onPress={() => router.push({ pathname: '/project-manage', params: { id: p.id } })}
                 renderReveal={(close) => (
                   <Pressable
@@ -296,7 +296,7 @@ const styles = StyleSheet.create({
   content: { paddingHorizontal: Space.lg, paddingTop: Space.lg, gap: Space.md },
 
   // Skeleton (loading) cards — shaped like the real project cards.
-  skelCard: { backgroundColor: Brand.cardCream, borderWidth: 1.5, borderColor: Brand.borderSoft, borderRadius: Radii.lg, padding: 20 },
+  skelCard: { backgroundColor: Brand.cardCream, borderWidth: 1.5, borderColor: Brand.borderSoft, borderRadius: Radii.card, padding: 20 },
   skelHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
 
   kicker: {
@@ -368,7 +368,7 @@ const styles = StyleSheet.create({
   card: {
     flexDirection: 'row',
     backgroundColor: Brand.cardCream,
-    borderRadius: Radii.lg,
+    borderRadius: Radii.card,
     borderWidth: 1.5,
     borderColor: Brand.inkEdge,
     // The hard offset edge is provided by the <HardShadow> wrapper (a crisp

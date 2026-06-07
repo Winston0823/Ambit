@@ -1008,9 +1008,9 @@ const styles = StyleSheet.create({
   fieldRowEmpty: { color: Brand.inkMuted, fontWeight: '400' },
   editSection: { marginTop: Space.lg },
   editSectionHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
-  editLink: { fontFamily: AmbitFont.body, fontSize: 14, fontWeight: '600', color: '#6E9CA1' },
+  editLink: { fontFamily: AmbitFont.body, fontSize: 14, fontWeight: '600', color: Brand.actionDeep },
   projAddRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 16 },
-  projAddText: { fontFamily: AmbitFont.body, fontSize: 15, fontWeight: '600', color: '#6E9CA1' },
+  projAddText: { fontFamily: AmbitFont.body, fontSize: 15, fontWeight: '600', color: Brand.actionDeep },
   projEditRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1109,7 +1109,7 @@ const styles = StyleSheet.create({
     fontFamily: AmbitFont.body,
     fontSize: 12,
     fontWeight: '600',
-    color: '#6E9CA1',
+    color: Brand.actionDeep,
     letterSpacing: 0.2,
   },
 
@@ -1129,7 +1129,7 @@ const styles = StyleSheet.create({
     fontFamily: AmbitFont.body,
     fontSize: 11,
     fontWeight: '600',
-    color: '#6E9CA1',
+    color: Brand.actionDeep,
     letterSpacing: 0.2,
   },
 
@@ -1198,13 +1198,13 @@ const styles = StyleSheet.create({
     fontFamily: AmbitFont.body,
     fontSize: 14,
     fontWeight: '700',
-    color: '#6E9CA1',
+    color: Brand.actionDeep,
   },
   addChipLabel: {
     fontFamily: AmbitFont.body,
     fontSize: 13,
     fontWeight: '600',
-    color: '#6E9CA1',
+    color: Brand.actionDeep,
   },
 
   portfolioRow: {

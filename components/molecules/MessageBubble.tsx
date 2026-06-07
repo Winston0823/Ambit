@@ -443,8 +443,8 @@ export function MessageBubble({
             </>
           ) : status === 'failed' ? (
             <>
-              <Warning size={11} color="#C0392B" weight="fill" />
-              <Text style={[styles.statusText, { color: '#C0392B' }]}>
+              <Warning size={11} color={Brand.danger} weight="fill" />
+              <Text style={[styles.statusText, { color: Brand.danger }]}>
                 Not delivered · Tap to retry
               </Text>
             </>
@@ -646,7 +646,7 @@ const styles = StyleSheet.create({
   // translucent; on failure it shifts to a muted red so the user sees the
   // tap-to-retry affordance without breaking the brand palette completely.
   bubblePending: { opacity: 0.7 },
-  bubbleFailed:  { backgroundColor: '#C0392B' },
+  bubbleFailed:  { backgroundColor: Brand.danger },
 
   body: {
     fontFamily: AmbitFont.body,
