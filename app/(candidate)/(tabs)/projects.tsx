@@ -176,8 +176,8 @@ export default function ProjectsTab() {
           projects.map((p, idx) => {
             const s = statsFor(p.id);
             return (
+              <HardShadow key={p.id} radius={Radii.lg} offset={4}>
               <SwipeRevealRow
-                key={p.id}
                 radius={Radii.lg}
                 onPress={() => router.push({ pathname: '/project-manage', params: { id: p.id } })}
                 renderReveal={(close) => (
@@ -222,6 +222,7 @@ export default function ProjectsTab() {
                   </View>
                 </View>
               </SwipeRevealRow>
+              </HardShadow>
             );
           })
         )
@@ -370,12 +371,8 @@ const styles = StyleSheet.create({
     borderRadius: Radii.lg,
     borderWidth: 1.5,
     borderColor: Brand.inkEdge,
-    // hard black edge below — tactile, matches the buttons
-    shadowColor: Brand.inkEdge,
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 0,
+    // The hard offset edge is provided by the <HardShadow> wrapper (a crisp
+    // solid block) — SwipeRevealRow clips, so an RN shadow here never showed.
   },
   cardBody: { flex: 1, padding: 18, gap: 8 },
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 },

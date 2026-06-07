@@ -28,6 +28,7 @@ import {
 } from '../../constants/theme';
 import type { DiscoveryCardData, PortfolioItem } from '../../data/mock';
 import { CAMPUSES } from '../../data/mock';
+import { HardShadow } from '../atoms';
 
 interface Props {
   card: DiscoveryCardData;
@@ -96,17 +97,21 @@ export function DiscoveryCard({
   return (
     <Animated.View
       style={[
-        styles.card,
+        styles.cardOuter,
         {
           opacity: cardOpacity,
           transform: [{ translateY: cardTranslateY }],
         },
       ]}
-      onLayout={(e) => {
-        const h = e.nativeEvent.layout.height;
-        if (h > 0 && Math.abs(h - cardH) > 0.5) setCardH(h);
-      }}
     >
+      <HardShadow radius={22} offset={7} style={styles.hsFill}>
+      <View
+        style={styles.card}
+        onLayout={(e) => {
+          const h = e.nativeEvent.layout.height;
+          if (h > 0 && Math.abs(h - cardH) > 0.5) setCardH(h);
+        }}
+      >
       {card.kind === 'seeker' ? (
         <>
           <ScrollView
@@ -147,6 +152,8 @@ export function DiscoveryCard({
           onPress={() => onReachOut?.(card)}
         />
       )}
+      </View>
+      </HardShadow>
     </Animated.View>
   );
 }
@@ -646,10 +653,14 @@ function LinkIcon({
 const styles = StyleSheet.create({
   // Card frame — the H design uses a very dark backdrop behind the photo
   // (visible if the photo failed to load or is transparent at edges).
+  cardOuter: { flex: 1 },
+  hsFill: { flex: 1 },
   card: {
     flex: 1,
     backgroundColor: '#2A1A0C',
     borderRadius: 22,
+    borderWidth: 1.5,
+    borderColor: Brand.actionInk,
     overflow: 'hidden', // photo + scrim need to clip to the rounded corners
     position: 'relative',
   },
