@@ -19,7 +19,7 @@ interactive accent.
 
 ## Radius — `Radii`
 - **Scale:** sm 8 · md 12 · lg 16 · pill 100 · full 999
-- **Card (all island cards + the deck):** **20** (target — unify pending).
+- **Card (all island cards + the deck):** **20** (`Radii.card`).
 - **Pill / button:** 999 · **Input / small surface:** 12.
 
 ## Depth — three states, never mixed
@@ -37,10 +37,9 @@ interactive accent.
 - **Surfaces:** `canvas #F2EEE4` · `cardCream #FBFAF5` · `surface1 #F3EFE5` ·
   `surface2 #EBE6DA` · `borderSoft rgba(28,28,26,.07)` · `inkEdge #1C1C1A`.
 - **Ink:** `inkPrimary #1C1C1A` · `inkBody #212121` · `inkMuted #8C8C8C`.
-- **Danger:** `#C0392B` — **MISSING token**; currently inline ×11. Add `Brand.danger`.
+- **Danger:** `Brand.danger #C0392B` (delete/error).
 - **Decorative gradients:** `primary #D4B490`, `accent #B48045` (gradients only).
-- **Rule:** no inline hex for any palette color. `#6E9CA1` → `Brand.actionDeep`
-  (currently inline ×23).
+- **Rule:** no inline hex for any palette color — reference the `Brand` tokens.
 
 ## Patterns
 - **Button** (atom): pill 999, `action` fill, 1.6px `actionInk` border,
@@ -51,8 +50,11 @@ interactive accent.
 - **Chip (selected):** `action` fill, ink border. Small chips: fill only, no shadow.
 - **Tag (status):** mint pill, `tagMintInk` text.
 
-## Known drift (audit backlog)
-1. Spacing off-grid (6/10/14/18/22) — **being fixed now (grid-snap)**.
-2. Card radius inconsistent (16/18/20/22) → unify to 20.
-3. Depth: 11 files still on RN `shadowRadius:0` → migrate to `<HardShadow>`.
-4. `#6E9CA1` inline ×23 → `Brand.actionDeep`; add `Brand.danger` for `#C0392B` ×11.
+## Audit backlog — all clear ✅ (2026-06-07)
+1. ~~Spacing off-grid~~ — snapped to the 4px grid (324 values).
+2. ~~Card radius inconsistent~~ — unified to 20 (`Radii.card`).
+3. ~~RN `shadowRadius:0`~~ — removed (flat for small, `<HardShadow>` for tactile).
+4. ~~Inline `#6E9CA1` / missing danger token~~ — `Brand.actionDeep` + `Brand.danger`.
+
+Known intentional exceptions: small circular send buttons + small chips are flat
+(fill only), per the small-element convention.
