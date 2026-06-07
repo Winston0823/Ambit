@@ -182,10 +182,18 @@ export default function NewChatScreen() {
   const openComposer = (person: Person, option: ReachOption) => {
     chosenProjectId.current = option.projectId;
     chosenSeekerId.current  = option.seekerId;
-    setPickerOptions(null);
     // Keep `previewCard` mounted — the composer is a transparent sheet that
     // sits over the card, so the person's card stays visible behind it.
-    setReachCard(cardFromPerson(person));
+    if (pickerOptions) {
+      // Coming from the project picker (a Modal). Dismiss it first, then
+      // present the composer only AFTER it has animated out + unmounted
+      // (~220ms). Presenting one modal while another dismisses in the same
+      // tick deadlocks iOS nested-modal transitions → frozen UI.
+      setPickerOptions(null);
+      setTimeout(() => setReachCard(cardFromPerson(person)), 300);
+    } else {
+      setReachCard(cardFromPerson(person));
+    }
   };
 
   // Holds the new conversation id from a confirmed send so onSent can
