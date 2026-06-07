@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
   FlatList,
   Image,
@@ -14,7 +13,7 @@ import {
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MagnifyingGlass, X, CaretRight } from 'phosphor-react-native';
-import { BackChevron } from '../../../../components/atoms';
+import { BackChevron, Skeleton } from '../../../../components/atoms';
 import { BottomSheet, DiscoveryCard, ReachOutComposer } from '../../../../components/molecules';
 import { supabase } from '../../../../lib/supabase';
 import { sendProjectAttachment, startConversationWithMessage } from '../../../../lib/messaging';
@@ -263,8 +262,16 @@ export default function NewChatScreen() {
           </Text>
         </View>
       ) : searching ? (
-        <View style={styles.center}>
-          <ActivityIndicator color={Brand.accent} />
+        <View style={styles.results}>
+          {[0, 1, 2, 3].map((i) => (
+            <View key={i} style={styles.rowCard}>
+              <Skeleton width={48} height={48} radius={14} />
+              <View style={{ flex: 1, gap: 8 }}>
+                <Skeleton width="50%" height={15} radius={6} />
+                <Skeleton width="75%" height={12} radius={6} />
+              </View>
+            </View>
+          ))}
         </View>
       ) : results.length === 0 ? (
         <View style={styles.empty}>
@@ -275,12 +282,12 @@ export default function NewChatScreen() {
         <FlatList
           data={results}
           keyExtractor={(p) => p.id}
-          ItemSeparatorComponent={() => <View style={styles.sep} />}
+          contentContainerStyle={styles.results}
           keyboardShouldPersistTaps="handled"
           renderItem={({ item }) => (
             <Pressable
               onPress={() => openPreview(item)}
-              style={({ pressed }) => [styles.row, pressed && { opacity: 0.7 }]}
+              style={({ pressed }) => [styles.rowCard, pressed && { opacity: 0.7 }]}
               accessibilityRole="button"
               accessibilityLabel={`View ${item.name}'s profile`}
             >
@@ -327,11 +334,11 @@ export default function NewChatScreen() {
               />
             )}
           </View>
-        </View>
-      </Modal>
 
-      {/* Project picker — only when more than one project could anchor the chat */}
-      <BottomSheet visible={!!pickerOptions} onClose={() => setPickerOptions(null)}>
+          {/* Picker + composer render INSIDE the preview modal so they overlay
+              the card (same as Discovery). As siblings outside, they presented
+              behind the already-open preview — invisible until you backed out. */}
+          <BottomSheet visible={!!pickerOptions} onClose={() => setPickerOptions(null)}>
         <Text style={styles.pickerTitle}>Reach out about…</Text>
         {(pickerOptions ?? []).map((opt) => (
           <Pressable
@@ -352,12 +359,14 @@ export default function NewChatScreen() {
         ))}
       </BottomSheet>
 
-      <ReachOutComposer
-        card={reachCard}
-        onDismiss={() => setReachCard(null)}
-        onSend={(card, text, attachment) => handleSend(card as SeekerCardData, text, attachment)}
-        onSent={handleSent}
-      />
+          <ReachOutComposer
+            card={reachCard}
+            onDismiss={() => setReachCard(null)}
+            onSend={(card, text, attachment) => handleSend(card as SeekerCardData, text, attachment)}
+            onSent={handleSent}
+          />
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -378,9 +387,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    backgroundColor: Brand.surface1,
+    backgroundColor: Brand.cardCream,
+    borderWidth: 1,
+    borderColor: Brand.borderSoft,
     paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingVertical: 12,
     borderRadius: Radii.md,
   },
   input: {
@@ -405,13 +416,17 @@ const styles = StyleSheet.create({
     lineHeight: 19,
   },
 
-  sep: { height: 1, backgroundColor: Brand.borderDefault, marginLeft: Space.lg + 48 + 12 },
-  row: {
+  results: { paddingHorizontal: Space.lg, paddingTop: 10 },
+  rowCard: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    paddingHorizontal: Space.lg,
-    paddingVertical: 12,
+    backgroundColor: Brand.cardCream,
+    borderWidth: 1,
+    borderColor: Brand.borderSoft,
+    borderRadius: Radii.lg,
+    padding: 12,
+    marginBottom: 10,
   },
   rowAvatar: { width: 48, height: 48, borderRadius: 14 },
   rowAvatarFallback: {
@@ -459,7 +474,7 @@ const styles = StyleSheet.create({
   pickerTitle: {
     fontFamily: AmbitFont.display,
     fontSize: 18,
-    color: Brand.seekerInk,
+    color: Brand.inkPrimary,
     marginBottom: 6,
   },
   pickerRow: {
@@ -468,7 +483,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 14,
     paddingHorizontal: 14,
-    backgroundColor: Brand.surface1,
+    backgroundColor: Brand.cardCream,
+    borderWidth: 1,
+    borderColor: Brand.borderSoft,
     borderRadius: Radii.md,
     gap: 10,
     marginTop: 8,
