@@ -1,6 +1,5 @@
 import React, { useCallback, useState } from 'react';
 import {
-  ActivityIndicator,
   Image,
   Platform,
   Pressable,
@@ -195,7 +194,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     letterSpacing: 1.5,
     textTransform: 'uppercase',
-    color: Brand.accent,
+    color: Brand.actionDeep,
   },
   titleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
   title: {
@@ -230,22 +229,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 999,
-    backgroundColor: Brand.seekerSurface,
+    backgroundColor: Brand.tagMint,
   },
   statusPillPaused: { backgroundColor: Brand.surface2 },
-  statusDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: Brand.sage },
+  statusDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: Brand.tagMintInk },
   statusDotPaused: { backgroundColor: Brand.inkMuted },
   statusText: {
     fontFamily: AmbitFont.body,
     fontSize: 12,
-    fontWeight: '600',
-    color: Brand.seekerInk,
+    fontWeight: '700',
+    color: Brand.tagMintInk,
   },
   statusTextPaused: { color: Brand.inkLabel },
   countText: { fontFamily: AmbitFont.body, fontSize: 12, color: Brand.inkMuted },
 
   empty: {
-    backgroundColor: Brand.surface1,
+    backgroundColor: Brand.cardCream,
+    borderWidth: 1,
+    borderColor: Brand.borderSoft,
     borderRadius: Radii.lg,
     padding: Space.lg,
     marginTop: Space.sm,
@@ -308,7 +309,7 @@ const styles = StyleSheet.create({
     height: 20,
     borderRadius: 10,
     paddingHorizontal: 6,
-    backgroundColor: Brand.accent,
+    backgroundColor: Brand.action,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -316,6 +317,6 @@ const styles = StyleSheet.create({
     fontFamily: AmbitFont.body,
     fontSize: 11,
     fontWeight: '700',
-    color: Brand.inkOnBrand,
+    color: Brand.actionInk,
   },
 });

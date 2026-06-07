@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   FlatList,
   Pressable,
   StyleSheet,
@@ -11,7 +10,7 @@ import {
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MagnifyingGlass, X } from 'phosphor-react-native';
-import { BackChevron } from '../../../../components/atoms';
+import { BackChevron, Skeleton } from '../../../../components/atoms';
 import { searchMessages, type SearchHit } from '../../../../lib/messaging';
 import { AmbitFont, Brand, Radii, Space } from '../../../../constants/theme';
 
@@ -76,8 +75,14 @@ export default function SearchScreen() {
           </Text>
         </View>
       ) : searching ? (
-        <View style={styles.center}>
-          <ActivityIndicator color={Brand.accent} />
+        <View style={styles.results}>
+          {[0, 1, 2].map((i) => (
+            <View key={i} style={styles.hit}>
+              <Skeleton width="48%" height={12} radius={6} />
+              <Skeleton width="92%" height={14} radius={6} style={{ marginTop: 9 }} />
+              <Skeleton width="68%" height={14} radius={6} style={{ marginTop: 6 }} />
+            </View>
+          ))}
         </View>
       ) : hits.length === 0 ? (
         <View style={styles.empty}>
@@ -90,7 +95,7 @@ export default function SearchScreen() {
         <FlatList
           data={hits}
           keyExtractor={(h) => h.message_id}
-          ItemSeparatorComponent={() => <View style={styles.sep} />}
+          contentContainerStyle={styles.results}
           renderItem={({ item }) => (
             <Pressable
               onPress={() =>
@@ -132,9 +137,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    backgroundColor: Brand.surface1,
+    backgroundColor: Brand.cardCream,
+    borderWidth: 1,
+    borderColor: Brand.borderSoft,
     paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingVertical: 12,
     borderRadius: Radii.md,
   },
   input: {
@@ -163,17 +170,22 @@ const styles = StyleSheet.create({
     lineHeight: 19,
   },
 
-  sep: { height: 1, backgroundColor: Brand.borderDefault },
+  results: { paddingHorizontal: Space.lg, paddingTop: 10 },
   hit: {
-    paddingHorizontal: Space.lg,
-    paddingVertical: 14,
+    backgroundColor: Brand.cardCream,
+    borderWidth: 1,
+    borderColor: Brand.borderSoft,
+    borderRadius: Radii.lg,
+    padding: 14,
+    marginBottom: 10,
     gap: 4,
   },
   hitHeader: {
     fontFamily: AmbitFont.body,
     fontSize: 12,
-    fontWeight: '600',
-    color: Brand.accent,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+    color: Brand.actionDeep,
   },
   hitBody: {
     fontFamily: AmbitFont.body,
