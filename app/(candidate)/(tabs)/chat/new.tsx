@@ -369,6 +369,7 @@ export default function NewChatScreen() {
 
           <ReachOutComposer
             card={reachCard}
+            disableAttach
             onDismiss={() => setReachCard(null)}
             onSend={(card, text, attachment) => handleSend(card as SeekerCardData, text, attachment)}
             onSent={handleSent}

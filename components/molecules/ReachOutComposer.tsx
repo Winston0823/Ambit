@@ -32,6 +32,10 @@ interface Props {
     attachment?: { id: string; title: string } | null,
   ) => boolean | Promise<boolean>;
   onSent?: () => void;
+  /// Hide the attach-a-project/portfolio affordance entirely. Used when the
+  /// project is already chosen upstream (e.g. the new-chat flow picks the
+  /// anchoring project first), so attaching one in the composer is redundant.
+  disableAttach?: boolean;
 }
 
 interface AttachOption {
@@ -60,7 +64,7 @@ const ATTACH_GRADIENTS: [string, string][] = [
 /// From the keyboard up: the message bubble, then the attach media above it.
 /// Attachments start as a collapsed stack of the sender's projects /
 /// portfolio; tapping the stack expands the fan to pick a specific one.
-export function ReachOutComposer({ card, onDismiss, onSend, onSent }: Props) {
+export function ReachOutComposer({ card, onDismiss, onSend, onSent, disableAttach = false }: Props) {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const [text, setText] = useState('');
@@ -68,7 +72,7 @@ export function ReachOutComposer({ card, onDismiss, onSend, onSent }: Props) {
   const [phase, setPhase] = useState<'compose' | 'sending'>('compose');
 
   const attachMode: 'project' | 'portfolio' | null =
-    card ? (card.kind === 'seeker' ? 'project' : 'portfolio') : null;
+    card && !disableAttach ? (card.kind === 'seeker' ? 'project' : 'portfolio') : null;
   const [attachItems, setAttachItems] = useState<AttachOption[] | null>(null);
   const [selected, setSelected] = useState<AttachOption | null>(null);
   const [expanded, setExpanded] = useState(false);
@@ -172,11 +176,11 @@ export function ReachOutComposer({ card, onDismiss, onSend, onSent }: Props) {
   }, [kbAnim]);
 
   useEffect(() => {
-    if (!card || !user) { setAttachItems(null); return; }
+    if (!card || !user || !attachMode) { setAttachItems(null); return; }
     setAttachItems(null);
     let cancelled = false;
     (async () => {
-      if (card.kind === 'seeker') {
+      if (attachMode === 'project') {
         const { data } = await supabase
           .from('projects')
           .select('id, title')
@@ -206,7 +210,7 @@ export function ReachOutComposer({ card, onDismiss, onSend, onSent }: Props) {
       }
     })();
     return () => { cancelled = true; };
-  }, [card, user?.id]);
+  }, [card, user?.id, attachMode]);
 
   if (!card) return null;
 
