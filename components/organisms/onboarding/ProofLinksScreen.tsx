@@ -85,5 +85,5 @@ const styles = StyleSheet.create({
   },
   // ScrollView itself has marginBottom = insets.bottom + 130 to clear the
   // anchored CTA — content padding only needs top + gap here.
-  scroll: { paddingTop: Space.lg, gap: 18 },
+  scroll: { paddingTop: Space.lg, gap: 20 },
 });

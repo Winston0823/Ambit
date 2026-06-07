@@ -244,7 +244,7 @@ export default function NewChatScreen() {
 
       <Text style={[styles.headerTitle, { marginTop: insets.top + 14 }]}>New chat</Text>
 
-      <View style={[styles.searchBar, { marginTop: 18 }]}>
+      <View style={[styles.searchBar, { marginTop: 20 }]}>
         <MagnifyingGlass size={18} color={Brand.inkMuted} weight="regular" />
         <TextInput
           autoFocus
@@ -395,11 +395,11 @@ const styles = StyleSheet.create({
     marginHorizontal: Space.lg,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 12,
     backgroundColor: Brand.cardCream,
     borderWidth: 1,
     borderColor: Brand.borderSoft,
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
     paddingVertical: 12,
     borderRadius: Radii.md,
   },
@@ -411,7 +411,7 @@ const styles = StyleSheet.create({
     padding: 0,
   },
 
-  empty: { paddingHorizontal: Space.lg, paddingTop: Space.xl, gap: 6 },
+  empty: { paddingHorizontal: Space.lg, paddingTop: Space.xl, gap: 8 },
   emptyTitle: {
     fontFamily: AmbitFont.body,
     fontSize: 16,
@@ -425,7 +425,7 @@ const styles = StyleSheet.create({
     lineHeight: 19,
   },
 
-  results: { paddingHorizontal: Space.lg, paddingTop: 10 },
+  results: { paddingHorizontal: Space.lg, paddingTop: 12 },
   rowCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -435,7 +435,7 @@ const styles = StyleSheet.create({
     borderColor: Brand.borderSoft,
     borderRadius: Radii.lg,
     padding: 12,
-    marginBottom: 10,
+    marginBottom: 12,
   },
   rowAvatar: { width: 48, height: 48, borderRadius: 14 },
   rowAvatarFallback: {
@@ -484,19 +484,19 @@ const styles = StyleSheet.create({
     fontFamily: AmbitFont.display,
     fontSize: 18,
     color: Brand.inkPrimary,
-    marginBottom: 6,
+    marginBottom: 8,
   },
   pickerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 14,
-    paddingHorizontal: 14,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
     backgroundColor: Brand.cardCream,
     borderWidth: 1,
     borderColor: Brand.borderSoft,
     borderRadius: Radii.md,
-    gap: 10,
+    gap: 12,
     marginTop: 8,
   },
   pickerRowText: {

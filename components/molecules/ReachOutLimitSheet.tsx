@@ -213,7 +213,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     width: '100%',
-    paddingVertical: 15,
+    paddingVertical: 16,
     backgroundColor: Brand.primary,
     borderRadius: Radii.md,
     marginBottom: 12,
@@ -226,7 +226,7 @@ const styles = StyleSheet.create({
     color: Brand.inkOnBrand,
   },
   dismissBtn: {
-    paddingVertical: 10,
+    paddingVertical: 12,
     marginBottom: 4,
   },
   dismissText: {

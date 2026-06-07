@@ -100,13 +100,13 @@ const styles = StyleSheet.create({
   card: {
     minHeight: 88,
     borderRadius: Radii.lg,
-    paddingHorizontal: 18,
+    paddingHorizontal: 20,
     paddingVertical: 16,
     borderWidth: 1.5,
     borderColor: Brand.actionInk,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
+    gap: 16,
   },
   iconWrap: {
     width: 30,

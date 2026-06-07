@@ -67,11 +67,11 @@ export default function ProjectManageScreen() {
       <View style={styles.root}>
         <View style={{ paddingHorizontal: 24, paddingTop: insets.top + 64 }}>
           <Skeleton width={60} height={12} radius={6} />
-          <Skeleton width={200} height={30} radius={8} style={{ marginTop: 10, marginBottom: 28 }} />
+          <Skeleton width={200} height={30} radius={8} style={{ marginTop: 12, marginBottom: 28 }} />
           {[0, 1, 2].map((i) => (
             <View key={i} style={styles.skelRow}>
               <Skeleton width={48} height={48} radius={14} />
-              <View style={{ flex: 1, gap: 9 }}>
+              <View style={{ flex: 1, gap: 8 }}>
                 <Skeleton width="55%" height={16} radius={6} />
                 <Skeleton width="80%" height={12} radius={6} />
               </View>
@@ -184,10 +184,10 @@ export default function ProjectManageScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Brand.canvas },
   center: { alignItems: 'center', justifyContent: 'center' },
-  skelRow: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: Brand.borderSoft },
+  skelRow: { flexDirection: 'row', alignItems: 'center', gap: 16, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: Brand.borderSoft },
   content: { paddingHorizontal: Space.lg, gap: Space.md },
 
-  header: { gap: 10, marginTop: 8 },
+  header: { gap: 12, marginTop: 8 },
   kicker: {
     fontFamily: AmbitFont.body,
     fontSize: 12,
@@ -207,7 +207,7 @@ const styles = StyleSheet.create({
   editBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: 4,
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 999,
@@ -225,9 +225,9 @@ const styles = StyleSheet.create({
   statusPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     borderRadius: 999,
     backgroundColor: Brand.tagMint,
   },
@@ -261,7 +261,7 @@ const styles = StyleSheet.create({
     fontFamily: AmbitFont.body,
     fontSize: 13,
     color: Brand.inkMuted,
-    marginTop: 6,
+    marginTop: 8,
     lineHeight: 19,
   },
 
@@ -272,7 +272,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     letterSpacing: 1.2,
     color: Brand.inkLabel,
-    marginTop: 6,
+    marginTop: 8,
   },
   candidate: {
     flexDirection: 'row',
@@ -308,7 +308,7 @@ const styles = StyleSheet.create({
     minWidth: 20,
     height: 20,
     borderRadius: 10,
-    paddingHorizontal: 6,
+    paddingHorizontal: 8,
     backgroundColor: Brand.action,
     alignItems: 'center',
     justifyContent: 'center',

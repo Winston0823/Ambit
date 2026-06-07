@@ -39,7 +39,7 @@ const styles = StyleSheet.create({
   input: {
     height: 46,
     borderRadius: Radii.md,
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
     backgroundColor: Brand.surface1,
     borderWidth: 1.5,
     borderColor: Brand.borderDefault,
@@ -50,8 +50,8 @@ const styles = StyleSheet.create({
   textarea: {
     height: 114,
     borderRadius: Radii.lg,
-    paddingTop: 14,
-    paddingBottom: 14,
+    paddingTop: 16,
+    paddingBottom: 16,
     fontSize: 15,
   },
 });

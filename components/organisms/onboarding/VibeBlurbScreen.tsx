@@ -74,7 +74,7 @@ export function VibeBlurbScreen({ onBack, onContinue }: Props) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: Brand.canvas, paddingHorizontal: 25 },
+  root: { flex: 1, backgroundColor: Brand.canvas, paddingHorizontal: 24 },
   content: { flex: 1, justifyContent: 'center', paddingBottom: 60 },
   headline: { fontFamily: AmbitFont.display, fontSize: 30, color: Brand.inkPrimary },
   subtitle: {
@@ -83,8 +83,8 @@ const styles = StyleSheet.create({
   textArea: {
     height: 114, borderRadius: Radii.lg, marginTop: 24,
     paddingTop: 12,
-    paddingHorizontal: 14,
-    paddingBottom: 14,
+    paddingHorizontal: 16,
+    paddingBottom: 16,
     backgroundColor: Brand.surface1,
     borderWidth: 1.5, borderColor: Brand.borderDefault,
     fontFamily: AmbitFont.body, fontSize: 15, color: Brand.inkBody,

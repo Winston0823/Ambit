@@ -97,7 +97,7 @@ export function SocialAuthButtons({ onAppleSignIn, onGoogleSignIn, busy }: Props
 }
 
 const styles = StyleSheet.create({
-  column: { gap: 10 },
+  column: { gap: 12 },
   appleNative: {
     height: 52,
     width: '100%',
@@ -108,7 +108,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 10,
+    gap: 12,
     paddingHorizontal: 16,
   },
   btnDisabled: { opacity: 0.5 },

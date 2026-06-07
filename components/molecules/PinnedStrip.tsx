@@ -104,11 +104,11 @@ const AVATAR_S = 64;
 
 const styles = StyleSheet.create({
   wrap: {
-    paddingTop: 6,
+    paddingTop: 8,
     paddingBottom: 8,
   },
   label: {
-    paddingHorizontal: 22,
+    paddingHorizontal: 24,
     paddingBottom: 12,
     fontSize: 10.5,
     fontWeight: '700',
@@ -116,14 +116,14 @@ const styles = StyleSheet.create({
     color: Brand.inboxInkMute,
   },
   rowContent: {
-    paddingHorizontal: 22,
+    paddingHorizontal: 24,
     gap: 16,
     alignItems: 'flex-start',
   },
   tile: {
     width: TILE_W,
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
   },
   avatarWrap: {
     width: AVATAR_S,

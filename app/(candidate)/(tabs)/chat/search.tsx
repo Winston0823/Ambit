@@ -79,8 +79,8 @@ export default function SearchScreen() {
           {[0, 1, 2].map((i) => (
             <View key={i} style={styles.hit}>
               <Skeleton width="48%" height={12} radius={6} />
-              <Skeleton width="92%" height={14} radius={6} style={{ marginTop: 9 }} />
-              <Skeleton width="68%" height={14} radius={6} style={{ marginTop: 6 }} />
+              <Skeleton width="92%" height={14} radius={6} style={{ marginTop: 8 }} />
+              <Skeleton width="68%" height={14} radius={6} style={{ marginTop: 8 }} />
             </View>
           ))}
         </View>
@@ -136,11 +136,11 @@ const styles = StyleSheet.create({
     marginHorizontal: Space.lg,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 12,
     backgroundColor: Brand.cardCream,
     borderWidth: 1,
     borderColor: Brand.borderSoft,
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
     paddingVertical: 12,
     borderRadius: Radii.md,
   },
@@ -155,7 +155,7 @@ const styles = StyleSheet.create({
   empty: {
     paddingHorizontal: Space.lg,
     paddingTop: Space.xl,
-    gap: 6,
+    gap: 8,
   },
   emptyTitle: {
     fontFamily: AmbitFont.body,
@@ -170,14 +170,14 @@ const styles = StyleSheet.create({
     lineHeight: 19,
   },
 
-  results: { paddingHorizontal: Space.lg, paddingTop: 10 },
+  results: { paddingHorizontal: Space.lg, paddingTop: 12 },
   hit: {
     backgroundColor: Brand.cardCream,
     borderWidth: 1,
     borderColor: Brand.borderSoft,
     borderRadius: Radii.lg,
-    padding: 14,
-    marginBottom: 10,
+    padding: 16,
+    marginBottom: 12,
     gap: 4,
   },
   hitHeader: {

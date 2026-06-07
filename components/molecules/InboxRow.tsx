@@ -279,8 +279,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Brand.inboxHairline,
     borderRadius: 18,
-    padding: 14,
-    marginBottom: 11,
+    padding: 16,
+    marginBottom: 12,
     gap: 8,
     shadowColor: '#2D2616',
     shadowOpacity: 0.06,
@@ -294,7 +294,7 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     borderWidth: 1,
     borderColor: Brand.inboxBorderTan,
-    padding: 18,
+    padding: 20,
   },
   cardClosed: { opacity: 0.55 },
 
@@ -316,7 +316,7 @@ const styles = StyleSheet.create({
   // Indent past the avatar so preview + chip align under the name.
   subBlock: {
     paddingLeft: SUB_INDENT,
-    gap: 10,
+    gap: 12,
   },
 
   // Avatar — rounded square (Stitch direction), pale gray fill,
@@ -382,14 +382,14 @@ const styles = StyleSheet.create({
   chipRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
     flexWrap: 'wrap',
   },
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 10,
+    gap: 4,
+    paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 999,
     borderWidth: 1,

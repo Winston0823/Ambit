@@ -401,7 +401,7 @@ const styles = StyleSheet.create({
   center: { alignItems: 'center', justifyContent: 'center' },
 
   // ── Loading skeleton ──────────────────────────────────────────
-  skeletonWrap: { paddingHorizontal: 22, paddingTop: 28 },
+  skeletonWrap: { paddingHorizontal: 24, paddingTop: 28 },
   skeletonTitle: {
     width: 140,
     height: 28,
@@ -412,7 +412,7 @@ const styles = StyleSheet.create({
   skeletonRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
+    gap: 16,
     paddingVertical: 12,
   },
   skeletonAvatar: {
@@ -444,8 +444,8 @@ const styles = StyleSheet.create({
     paddingTop: 2,
   },
   filterChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 7,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
     borderRadius: 999,
     backgroundColor: Brand.inboxCardActive,
     borderWidth: StyleSheet.hairlineWidth,
@@ -459,8 +459,8 @@ const styles = StyleSheet.create({
   undoToast: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
-    paddingLeft: 18,
+    gap: 16,
+    paddingLeft: 20,
     paddingRight: 8,
     paddingVertical: 8,
     borderRadius: 999,
@@ -472,7 +472,7 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   undoToastText: { fontFamily: AmbitFont.body, fontSize: 14, fontWeight: '600', color: Brand.inboxCanvas },
-  undoBtn: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999, backgroundColor: Brand.action },
+  undoBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 999, backgroundColor: Brand.action },
   undoBtnText: { fontFamily: AmbitFont.body, fontSize: 14, fontWeight: '700', color: Brand.actionInk },
 
   topbar: {
@@ -514,7 +514,7 @@ const styles = StyleSheet.create({
 
   // ── List — flat rows with hairline separators ────────────────
   listContent: {
-    paddingHorizontal: 18,
+    paddingHorizontal: 20,
     paddingBottom: 100,
   },
   sep: {
@@ -528,7 +528,7 @@ const styles = StyleSheet.create({
   empty: {
     marginHorizontal: 4,
     marginTop: 8,
-    padding: 18,
+    padding: 20,
     backgroundColor: Brand.inboxCardActive,
     borderRadius: 18,
     borderWidth: 1,
@@ -543,7 +543,7 @@ const styles = StyleSheet.create({
   emptyBody: {
     fontSize: 13.5,
     color: Brand.inboxInkBody,
-    marginTop: 6,
+    marginTop: 8,
     lineHeight: 19,
   },
 });

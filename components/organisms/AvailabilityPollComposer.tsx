@@ -505,7 +505,7 @@ const styles = StyleSheet.create({
   input: {
     height: 44,
     borderRadius: Radii.md,
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
     backgroundColor: Brand.surface1,
     borderWidth: 1.5,
     borderColor: Brand.borderDefault,
@@ -514,12 +514,12 @@ const styles = StyleSheet.create({
     color: Brand.inkBody,
   },
 
-  row: { flexDirection: 'row', gap: 10 },
+  row: { flexDirection: 'row', gap: 12 },
 
   dateChip: {
     flex: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     borderRadius: Radii.md,
     backgroundColor: Brand.surface1,
     borderWidth: 1.5,
@@ -539,17 +539,17 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 
-  hourPickerWrap: { flex: 1, gap: 6 },
+  hourPickerWrap: { flex: 1, gap: 8 },
   hourPickerLabel: {
     fontFamily: AmbitFont.body,
     fontSize: 10,
     color: Brand.inkLabel,
     letterSpacing: 1,
   },
-  hourPickerRow: { gap: 6 },
+  hourPickerRow: { gap: 8 },
   hourChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 7,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     borderRadius: Radii.pill,
     backgroundColor: Brand.surface1,
     borderWidth: 1.5,
@@ -568,7 +568,7 @@ const styles = StyleSheet.create({
   hourChipTextSelected: { color: Brand.actionInk, fontWeight: '700' },
 
   durationChip: {
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: Radii.pill,
     backgroundColor: Brand.surface1,
@@ -591,7 +591,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    paddingVertical: 14,
+    paddingVertical: 16,
     borderRadius: 999,
     backgroundColor: Brand.action,
     borderWidth: 1.6,
@@ -609,8 +609,8 @@ const styles = StyleSheet.create({
     color: Brand.actionInk,
   },
   secondaryBtn: {
-    paddingVertical: 14,
-    paddingHorizontal: 22,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
     borderRadius: Radii.md,
     backgroundColor: Brand.surface1,
     borderWidth: 1.5,
@@ -645,13 +645,13 @@ const styles = StyleSheet.create({
     paddingTop: 0,
   },
   busyLoader: {
-    paddingVertical: 6,
+    paddingVertical: 8,
     alignItems: 'center',
   },
 
   footer: {
     flexDirection: 'row',
-    gap: 10,
+    gap: 12,
     paddingHorizontal: Space.lg,
     paddingVertical: Space.md,
     borderTopWidth: StyleSheet.hairlineWidth,

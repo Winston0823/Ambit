@@ -84,7 +84,7 @@ const styles = StyleSheet.create({
   list: {
     paddingHorizontal: Space.lg,
     paddingBottom: 120, // clears the CTA + nav bar
-    gap: 10,
+    gap: 12,
   },
   cta: {
     position: 'absolute',

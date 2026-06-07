@@ -171,7 +171,7 @@ const styles = StyleSheet.create({
     backgroundColor: Brand.canvas,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    paddingTop: 10,
+    paddingTop: 12,
     paddingHorizontal: Space.md,
     shadowColor: '#000',
     shadowOpacity: 0.18,
@@ -180,7 +180,7 @@ const styles = StyleSheet.create({
   },
   // Generous grab strip at the top — the whole zone (not just the 4px notch)
   // is draggable so the sheet is easy to resize.
-  grabZone: { paddingTop: 10, paddingBottom: 16, marginHorizontal: -Space.md, alignItems: 'center' },
+  grabZone: { paddingTop: 12, paddingBottom: 16, marginHorizontal: -Space.md, alignItems: 'center' },
   snapBody: { flex: 1 },
   handle: {
     alignSelf: 'center',

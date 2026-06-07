@@ -118,7 +118,7 @@ const styles = StyleSheet.create({
     width: '100%', height: '100%',
     backgroundColor: Brand.seekerSurface,
     alignItems: 'center', justifyContent: 'center',
-    gap: 10,
+    gap: 12,
   },
   avatarLabel: {
     fontFamily: AmbitFont.body, fontSize: 13, color: Brand.actionDeep,
@@ -126,7 +126,7 @@ const styles = StyleSheet.create({
   nameInput: {
     width: '100%',
     height: 46, borderRadius: Radii.md,
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
     backgroundColor: Brand.surface1,
     borderWidth: 1.5, borderColor: Brand.borderDefault,
     fontFamily: AmbitFont.body, fontSize: 16, color: Brand.inkBody,

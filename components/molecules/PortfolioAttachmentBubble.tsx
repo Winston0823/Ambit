@@ -93,7 +93,7 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.16)',
     letterSpacing: 1,
   },
-  stack: { gap: 9 },
+  stack: { gap: 8 },
   eyebrow: {
     fontFamily: AmbitFont.body,
     fontSize: 9.5,
@@ -132,10 +132,10 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     letterSpacing: -0.1,
   },
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 1 },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 1 },
   chip: {
-    paddingHorizontal: 11,
-    paddingVertical: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     borderRadius: 999,
     backgroundColor: 'rgba(255, 255, 255, 0.16)',
   },

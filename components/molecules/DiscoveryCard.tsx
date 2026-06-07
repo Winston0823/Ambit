@@ -695,10 +695,10 @@ const styles = StyleSheet.create({
   badge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 7,
-    paddingHorizontal: 11,
-    paddingVertical: 7,
-    paddingLeft: 9,
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    paddingLeft: 8,
     borderRadius: 999,
     backgroundColor: 'rgba(255, 255, 255, 0.92)',
   },
@@ -725,7 +725,7 @@ const styles = StyleSheet.create({
     // Reserve the bottom-right gutter so content never slides under the
     // floating reach-out button + its label.
     paddingRight: 72,
-    gap: 14,
+    gap: 16,
     zIndex: 3,
   },
   eyebrow: {
@@ -783,11 +783,11 @@ const styles = StyleSheet.create({
   rolesRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 6,
+    gap: 8,
     marginBottom: 2,
   },
   roleChip: {
-    paddingHorizontal: 10,
+    paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 999,
     backgroundColor: 'rgba(212, 180, 144, 0.28)',
@@ -806,13 +806,13 @@ const styles = StyleSheet.create({
   skillsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 6,
+    gap: 8,
   },
   // Modern frosted pills — no border. Matched skills get a warm-tan wash,
   // the rest a neutral frosted white; both read on the dark scrim.
   chip: {
-    paddingHorizontal: 11,
-    paddingVertical: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     borderRadius: 999,
     backgroundColor: 'rgba(255, 255, 255, 0.16)',
   },
@@ -836,10 +836,10 @@ const styles = StyleSheet.create({
     marginTop: 4,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    paddingLeft: 10,
-    paddingRight: 14,
-    paddingVertical: 10,
+    gap: 12,
+    paddingLeft: 12,
+    paddingRight: 16,
+    paddingVertical: 12,
     borderRadius: 16,
     backgroundColor: 'rgba(255, 255, 255, 0.16)',
     alignSelf: 'flex-start',
@@ -891,12 +891,12 @@ const styles = StyleSheet.create({
   // the photo). Screen 2 has no stack gap, so override to a positive margin
   // so the name clears the eyebrow instead of colliding with it.
   page2Name: {
-    marginTop: 6,
+    marginTop: 8,
   },
   page2Pad: {
     flex: 1,
-    paddingTop: 30,
-    paddingHorizontal: 22,
+    paddingTop: 32,
+    paddingHorizontal: 24,
     // leave room at the bottom so the last row / links clear the floating
     // reach-out button + its label.
     paddingBottom: 112,
@@ -907,14 +907,14 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: 'rgba(245, 233, 216, 0.6)',
     letterSpacing: 1.8,
-    marginTop: 18,
+    marginTop: 20,
     marginBottom: 12,
   },
   hlRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    marginBottom: 14,
+    marginBottom: 16,
   },
   hlThumb: {
     width: 78,
@@ -939,7 +939,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 17,
     color: 'rgba(245, 233, 216, 0.82)',
-    marginTop: 5,
+    marginTop: 4,
   },
   linkRow: {
     flexDirection: 'row',
@@ -964,7 +964,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 7,
+    gap: 8,
     zIndex: 4,
   },
   dot: {

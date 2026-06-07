@@ -303,7 +303,7 @@ const styles = StyleSheet.create({
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
   },
   headerText: {
     flex: 1,
@@ -323,11 +323,11 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
 
-  slotColumn: { gap: 6, marginTop: 4 },
+  slotColumn: { gap: 8, marginTop: 4 },
   slotBtn: {
     backgroundColor: Brand.canvas,
     paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingVertical: 12,
     borderRadius: Radii.md,
     borderWidth: 1.5,
     borderColor: Brand.borderDefault,
@@ -374,7 +374,7 @@ const styles = StyleSheet.create({
   addedRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
   },
   addedText: {
     fontFamily: AmbitFont.body,
@@ -387,7 +387,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
+    gap: 8,
     paddingVertical: 8,
     borderRadius: Radii.md,
     backgroundColor: Brand.canvas,

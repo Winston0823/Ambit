@@ -632,8 +632,8 @@ const styles = StyleSheet.create({
   },
   heroBubble: {
     maxWidth: '90%',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     borderRadius: 18,
     backgroundColor: Brand.seekerSurface,
   },
@@ -716,7 +716,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
   },
 
-  section: { gap: 10 },
+  section: { gap: 12 },
   eyebrow: {
     fontFamily: AmbitFont.body,
     fontSize: 11,
@@ -731,15 +731,15 @@ const styles = StyleSheet.create({
   // Sibling-chat cross-link rows. Visually distinct from the proof
   // links (warm-tan tint, no icon column) so the section reads as
   // "navigation between threads" rather than "more external info".
-  siblingColumn: { gap: 6 },
+  siblingColumn: { gap: 8 },
   siblingRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingVertical: 12,
     backgroundColor: Brand.seekerSurface,
     borderRadius: Radii.md,
-    gap: 10,
+    gap: 12,
   },
   siblingText: { flex: 1 },
   siblingTitle: {
@@ -759,7 +759,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
     paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingVertical: 12,
     backgroundColor: Brand.surface1,
     borderRadius: Radii.md,
   },

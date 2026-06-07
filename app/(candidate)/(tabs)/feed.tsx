@@ -778,15 +778,15 @@ const styles = StyleSheet.create({
   filterBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     borderRadius: 999, // only matters when the active tint shows
   },
   filterBtnActive: { backgroundColor: 'rgba(212, 180, 144, 0.18)' }, // soft warm tint, no border
   filterBtnText: { fontFamily: AmbitFont.body, fontSize: 14, fontWeight: '600', color: Brand.inkBody },
   filterBtnTextActive: { color: Brand.accent },
-  filterClear: { paddingHorizontal: 8, paddingVertical: 6 },
+  filterClear: { paddingHorizontal: 8, paddingVertical: 8 },
   filterClearText: { fontFamily: AmbitFont.body, fontSize: 13.5, fontWeight: '600', color: Brand.accent },
 
   // ── Filter sheet (searchable, tall + scrollable) ───────────────────────
@@ -802,7 +802,7 @@ const styles = StyleSheet.create({
     height: 44,
     borderRadius: 12,
     backgroundColor: Brand.surface1,
-    marginBottom: 14,
+    marginBottom: 16,
   },
   filterSearchInput: { flex: 1, fontFamily: AmbitFont.body, fontSize: 15, color: Brand.inkBody, padding: 0 },
   filterScroll: { flex: 1 },
@@ -810,9 +810,9 @@ const styles = StyleSheet.create({
   filterSheetChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     borderRadius: 999,
     backgroundColor: Brand.surface1,
     borderWidth: 1,

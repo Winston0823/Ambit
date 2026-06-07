@@ -124,6 +124,6 @@ const styles = StyleSheet.create({
     fontFamily: AmbitFont.body,
     fontSize: 13,
     color: '#C0392B',
-    marginTop: 10,
+    marginTop: 12,
   },
 });

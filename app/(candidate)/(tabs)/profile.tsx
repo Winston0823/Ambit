@@ -349,8 +349,8 @@ export default function ProfileTab() {
       <View style={styles.root}>
         <View style={{ paddingHorizontal: 24, paddingTop: insets.top + 64, alignItems: 'center' }}>
           <Skeleton width={96} height={96} radius={48} />
-          <Skeleton width={150} height={28} radius={8} style={{ marginTop: 18 }} />
-          <Skeleton width={100} height={14} radius={6} style={{ marginTop: 10 }} />
+          <Skeleton width={150} height={28} radius={8} style={{ marginTop: 20 }} />
+          <Skeleton width={100} height={14} radius={6} style={{ marginTop: 12 }} />
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center', marginTop: 28 }}>
             {[72, 96, 60, 84, 68].map((w, i) => (
               <Skeleton key={i} width={w} height={34} radius={999} />
@@ -775,7 +775,7 @@ function SkillsEditModal({
             keyboardShouldPersistTaps="handled"
           >
             {customSkills.length > 0 && (
-              <View style={{ gap: 10 }}>
+              <View style={{ gap: 12 }}>
                 <Text style={styles.sectionLabel}>ADDED BY YOU</Text>
                 <View style={styles.chipRow}>
                   {customSkills.map((s) => (
@@ -785,7 +785,7 @@ function SkillsEditModal({
               </View>
             )}
             {SKILL_CATEGORIES.map((cat) => (
-              <View key={cat.label} style={{ gap: 10 }}>
+              <View key={cat.label} style={{ gap: 12 }}>
                 <Text style={styles.sectionLabel}>{cat.label}</Text>
                 <View style={styles.chipRow}>
                   {cat.tags.map((tag) => (
@@ -995,27 +995,27 @@ const styles = StyleSheet.create({
   segmentTextActive: { color: Brand.actionInk, fontWeight: '700' },
 
   // Field-list editor (Tinder / Hinge convention).
-  photoRow: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14 },
+  photoRow: { flexDirection: 'row', alignItems: 'center', gap: 16, paddingVertical: 16 },
   photoThumb: { width: 56, height: 56, borderRadius: 16, backgroundColor: Brand.surface1, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   photoThumbImg: { width: '100%', height: '100%' },
   photoThumbInitial: { fontFamily: AmbitFont.display, fontSize: 24, color: Brand.inkMuted },
   fieldGroup: { backgroundColor: Brand.surface1, borderRadius: 16, paddingHorizontal: 16 },
-  fieldRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 15 },
+  fieldRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 16 },
   fieldRowDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: Brand.borderSoft },
   fieldRowLabel: { fontFamily: AmbitFont.body, fontSize: 15, fontWeight: '600', color: Brand.inkBody },
   fieldRowValue: { flex: 1, textAlign: 'right', fontFamily: AmbitFont.body, fontSize: 15, color: Brand.inkPrimary },
   fieldRowValueStacked: { fontFamily: AmbitFont.body, fontSize: 14, color: Brand.inkPrimary, lineHeight: 19 },
   fieldRowEmpty: { color: Brand.inkMuted, fontWeight: '400' },
   editSection: { marginTop: Space.lg },
-  editSectionHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
+  editSectionHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
   editLink: { fontFamily: AmbitFont.body, fontSize: 14, fontWeight: '600', color: '#6E9CA1' },
-  projAddRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 14 },
+  projAddRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 16 },
   projAddText: { fontFamily: AmbitFont.body, fontSize: 15, fontWeight: '600', color: '#6E9CA1' },
   projEditRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    paddingVertical: 14,
+    paddingVertical: 16,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: Brand.borderSoft,
   },
@@ -1034,7 +1034,7 @@ const styles = StyleSheet.create({
   topRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
+    gap: 16,
   },
   avatarPressable: {
     position: 'relative',
@@ -1074,7 +1074,7 @@ const styles = StyleSheet.create({
   fieldPress: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
   },
   name: {
     fontFamily: AmbitFont.display,
@@ -1095,9 +1095,9 @@ const styles = StyleSheet.create({
   rolePill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
     borderRadius: 999,
     backgroundColor: Brand.seekerSurface,
     borderWidth: 1,
@@ -1123,7 +1123,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     backgroundColor: Brand.surface1,
     alignSelf: 'flex-start',
-    marginTop: 6,
+    marginTop: 8,
   },
   responseText: {
     fontFamily: AmbitFont.body,
@@ -1147,7 +1147,7 @@ const styles = StyleSheet.create({
     lineHeight: 21,
   },
 
-  section: { gap: 10 },
+  section: { gap: 12 },
   sectionLabel: {
     ...TypeScale.labelSm,
     color: Brand.inkLabel,
@@ -1187,7 +1187,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: Radii.pill,
     borderWidth: 1.5,
@@ -1208,7 +1208,7 @@ const styles = StyleSheet.create({
   },
 
   portfolioRow: {
-    gap: 14,
+    gap: 16,
     paddingRight: Space.lg,
   },
 });
@@ -1245,7 +1245,7 @@ const modalStyles = StyleSheet.create({
     color: Brand.inkBody,
     backgroundColor: Brand.surface1,
     borderRadius: Radii.md,
-    padding: 14,
+    padding: 16,
     minHeight: 48,
   },
   inputMultiline: {
@@ -1259,9 +1259,9 @@ const modalStyles = StyleSheet.create({
   saveBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 18,
-    paddingVertical: 11,
+    gap: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
     backgroundColor: Brand.action,
     borderRadius: 999,
     borderWidth: 1.6,
@@ -1278,8 +1278,8 @@ const modalStyles = StyleSheet.create({
   campusRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
-    padding: 14,
+    gap: 16,
+    padding: 16,
     backgroundColor: Brand.surface1,
     borderRadius: Radii.md,
   },

@@ -105,7 +105,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1.5,
     textTransform: 'uppercase',
     color: Brand.actionDeep,
-    marginBottom: 10,
+    marginBottom: 12,
   },
   headline: {
     fontFamily: AmbitFont.display,

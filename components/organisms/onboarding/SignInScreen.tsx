@@ -185,7 +185,7 @@ const styles = StyleSheet.create({
   },
   socialWrap: {
     paddingHorizontal: Space.lg,
-    gap: 14,
+    gap: 16,
     marginBottom: Space.lg,
   },
   dividerRow: {

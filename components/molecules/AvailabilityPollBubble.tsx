@@ -68,7 +68,7 @@ const styles = StyleSheet.create({
     // pale. `cardMine` overrides to tan.
     backgroundColor: '#ECE9E2',
     padding: 12,
-    gap: 6,
+    gap: 8,
     shadowColor: '#000',
     shadowOpacity: 0.06,
     shadowRadius: 10,
@@ -90,7 +90,7 @@ const styles = StyleSheet.create({
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
   },
   headerText: {
     flex: 1,
@@ -112,7 +112,7 @@ const styles = StyleSheet.create({
 
   openBtn: {
     marginTop: 4,
-    paddingVertical: 10,
+    paddingVertical: 12,
     borderRadius: 999,
     backgroundColor: Brand.action,
     borderWidth: 1.5,

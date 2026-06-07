@@ -108,7 +108,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingHorizontal: Space.lg,
-    paddingTop: 10,
+    paddingTop: 12,
     paddingBottom: 32,
   },
   handle: {
@@ -117,7 +117,7 @@ const styles = StyleSheet.create({
     height: 4,
     borderRadius: 2,
     backgroundColor: Brand.borderDefault,
-    marginBottom: 14,
+    marginBottom: 16,
   },
   header: {
     flexDirection: 'row',
@@ -133,8 +133,8 @@ const styles = StyleSheet.create({
     fontFamily: AmbitFont.body,
     fontSize: 13,
     color: Brand.inkMuted,
-    marginTop: 6,
-    marginBottom: 14,
+    marginTop: 8,
+    marginBottom: 16,
     lineHeight: 18,
   },
   list: {
@@ -144,8 +144,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 14,
-    paddingVertical: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
     backgroundColor: Brand.surface1,
     borderRadius: Radii.md,
   },
@@ -160,7 +160,7 @@ const styles = StyleSheet.create({
     fontFamily: AmbitFont.body,
     fontSize: 13,
     color: '#C0392B',
-    marginTop: 10,
+    marginTop: 12,
   },
 });
 

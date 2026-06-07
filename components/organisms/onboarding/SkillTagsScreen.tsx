@@ -218,7 +218,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     justifyContent: 'space-between',
     paddingHorizontal: Space.lg,
-    marginTop: 6,
+    marginTop: 8,
   },
   headline: {
     fontFamily: AmbitFont.display,
@@ -229,10 +229,10 @@ const styles = StyleSheet.create({
   },
   counter: {
     backgroundColor: Brand.action,
-    paddingHorizontal: 10,
+    paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 8,
-    marginTop: 10,
+    marginTop: 12,
   },
   counterText: {
     fontFamily: AmbitFont.body,

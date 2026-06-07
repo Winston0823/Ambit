@@ -643,19 +643,19 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: Space.lg,
     paddingTop: 48,
-    paddingBottom: 14,
+    paddingBottom: 16,
   },
   // Solid-white extension below the input — the keyboard backer, same surface.
   tail: { height: TAIL_H, backgroundColor: Brand.canvas },
 
   // ── Message bubble + send ──────────────────────────────────────────────
-  inputRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 10, marginTop: 26 },
+  inputRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 12, marginTop: 28 },
   bubble: {
     flex: 1,
     backgroundColor: Brand.surface1,
     borderRadius: 22,
     paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingVertical: 12,
     minHeight: 44,
     justifyContent: 'center',
   },
@@ -688,8 +688,8 @@ const styles = StyleSheet.create({
   trayOpenHit: { zIndex: 20, elevation: 20 },
   trayTopPill: { zIndex: 6, marginBottom: -6 },
   collapsedLabel: {
-    paddingHorizontal: 13,
-    paddingVertical: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     borderRadius: 15,
     backgroundColor: '#1A1A1A',
   },
@@ -752,7 +752,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 12 },
     elevation: 10,
   },
-  fanLabel: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 15, backgroundColor: '#1A1A1A', maxWidth: 130 },
+  fanLabel: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 15, backgroundColor: '#1A1A1A', maxWidth: 130 },
   fanLabelText: { fontFamily: AmbitFont.body, fontSize: 12.5, fontWeight: '700', color: '#FFFFFF' },
   trayCaption: { fontFamily: AmbitFont.body, fontSize: 19, fontWeight: '700', color: Brand.inkLabel },
 

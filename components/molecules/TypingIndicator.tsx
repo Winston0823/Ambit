@@ -64,7 +64,7 @@ const styles = StyleSheet.create({
     backgroundColor: Brand.surface1,
     borderRadius: Radii.lg,
     paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingVertical: 12,
   },
   dot: {
     width: 6,

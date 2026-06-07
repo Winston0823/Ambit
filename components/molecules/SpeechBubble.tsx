@@ -61,8 +61,8 @@ const styles = StyleSheet.create({
   },
   bubble: {
     borderRadius: Radii.lg + 2,
-    paddingHorizontal: 18,
-    paddingVertical: 18,
+    paddingHorizontal: 20,
+    paddingVertical: 20,
   },
   tail: {
     position: 'absolute',

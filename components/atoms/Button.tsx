@@ -119,7 +119,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 10,
+    gap: 12,
   },
   label: {
     fontFamily: AmbitFont.body,
@@ -128,6 +128,6 @@ const styles = StyleSheet.create({
   arrow: {
     width: 52,
     height: 18,
-    marginLeft: 6,
+    marginLeft: 8,
   },
 });

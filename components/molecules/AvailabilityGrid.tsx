@@ -195,7 +195,7 @@ const styles = StyleSheet.create({
 
   timeCol: { width: TIME_COL_W },
   timeCell: {
-    paddingHorizontal: 6,
+    paddingHorizontal: 8,
     justifyContent: 'flex-start',
     alignItems: 'flex-end',
     borderTopWidth: StyleSheet.hairlineWidth,
@@ -246,7 +246,7 @@ const styles = StyleSheet.create({
   legendRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
   },
   legendSwatch: {
     width: 14,

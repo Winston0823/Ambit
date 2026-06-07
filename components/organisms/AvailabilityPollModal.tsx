@@ -348,9 +348,9 @@ const styles = StyleSheet.create({
   overlapRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 12,
     paddingVertical: 8,
-    paddingHorizontal: 10,
+    paddingHorizontal: 12,
     backgroundColor: Brand.canvas,
     borderRadius: Radii.md,
   },
@@ -362,8 +362,8 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   lockBtn: {
-    paddingHorizontal: 14,
-    paddingVertical: 7,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
     borderRadius: 999,
     backgroundColor: Brand.action,
   },

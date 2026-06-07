@@ -396,7 +396,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
     paddingHorizontal: Space.md,
-    paddingVertical: 10,
+    paddingVertical: 12,
     backgroundColor: Brand.surface1,
     borderTopWidth: 1,
     borderTopColor: Brand.borderDefault,
@@ -462,12 +462,12 @@ const styles = StyleSheet.create({
   inputRow: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    gap: 6,
+    gap: 8,
     marginHorizontal: Space.md,
     marginBottom: 8,
     paddingLeft: 12,
-    paddingRight: 6,
-    paddingVertical: 6,
+    paddingRight: 8,
+    paddingVertical: 8,
     backgroundColor: Brand.canvas,
     borderRadius: 26,
     shadowColor: '#3A2A1A',
@@ -492,7 +492,7 @@ const styles = StyleSheet.create({
   attachGrid: {
     height: 280,
     paddingHorizontal: Space.md,
-    paddingTop: 18,
+    paddingTop: 20,
     backgroundColor: Brand.hearthGlassBg,
     borderTopWidth: 1,
     borderTopColor: Brand.hearthGlassEdge,
@@ -500,7 +500,7 @@ const styles = StyleSheet.create({
   attachGridRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    rowGap: 14,
+    rowGap: 16,
   },
   // Fixed quarter-width so the grid is 4-up and wraps cleanly to a second
   // row (a partial last row stays left-aligned). Horizontal spacing comes
@@ -509,7 +509,7 @@ const styles = StyleSheet.create({
   attachTile: {
     width: '25%',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
     paddingVertical: 8,
   },
   attachTileDisabled: { opacity: 0.45 },
@@ -532,8 +532,8 @@ const styles = StyleSheet.create({
     flex: 1,
     minHeight: 38,
     maxHeight: 120,
-    paddingHorizontal: 6,
-    paddingVertical: 9,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
     fontFamily: AmbitFont.body,
     fontSize: 15,
     color: Brand.inkBody,

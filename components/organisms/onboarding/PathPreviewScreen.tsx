@@ -61,12 +61,12 @@ const styles = StyleSheet.create({
   path: {
     paddingHorizontal: Space.lg,
     paddingTop: 8,
-    gap: 14,
+    gap: 16,
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
+    gap: 16,
   },
   chip: {
     width: 44,

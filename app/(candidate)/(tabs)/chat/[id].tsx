@@ -1478,7 +1478,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    paddingVertical: 10,
+    paddingVertical: 12,
   },
   pickerThumb: {
     width: 52,
@@ -1507,7 +1507,7 @@ const styles = StyleSheet.create({
   // vertical space so the spinner is centered in what would otherwise
   // be the messages-list area. Keeps the header pinned at its final
   // position so there's no jump when meta resolves.
-  skeletonBody: { flex: 1, paddingHorizontal: 18, paddingTop: 22 },
+  skeletonBody: { flex: 1, paddingHorizontal: 20, paddingTop: 24 },
   loadingBody: {
     flex: 1,
     alignItems: 'center',
@@ -1566,7 +1566,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: Space.md,
-    paddingTop: 6,
+    paddingTop: 8,
     paddingBottom: Space.md,
   },
   // 40pt circular glass button used for back + overflow. Translucent
@@ -1597,9 +1597,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
     marginHorizontal: Space.md,
-    marginVertical: 6,
+    marginVertical: 8,
     paddingHorizontal: Space.md,
-    paddingVertical: 10,
+    paddingVertical: 12,
     borderRadius: 14,
     borderWidth: 1,
     borderColor: Brand.hearthGlassEdge,
@@ -1618,7 +1618,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   bannerCta: {
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 999,
     backgroundColor: Brand.inkPrimary,
@@ -1634,7 +1634,7 @@ const styles = StyleSheet.create({
   // Composer-lock placeholder shown when status is terminal
   composerLocked: {
     paddingHorizontal: Space.lg,
-    paddingVertical: 14,
+    paddingVertical: 16,
     marginHorizontal: Space.md,
     marginBottom: Space.md,
     backgroundColor: Brand.hearthGlassBg,
@@ -1658,11 +1658,11 @@ const styles = StyleSheet.create({
     height: 4,
     borderRadius: 2,
     backgroundColor: Brand.borderDefault,
-    marginBottom: 14,
+    marginBottom: 16,
   },
   overflowItem: {
-    paddingHorizontal: 14,
-    paddingVertical: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
     borderRadius: Radii.md,
   },
   overflowLabel: {
@@ -1722,7 +1722,7 @@ const styles = StyleSheet.create({
     marginVertical: 8,
   },
   menuBtn: {
-    paddingVertical: 14,
+    paddingVertical: 16,
     paddingHorizontal: 16,
     borderRadius: Radii.md,
   },

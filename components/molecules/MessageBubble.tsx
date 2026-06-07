@@ -570,12 +570,12 @@ const styles = StyleSheet.create({
   // System-message banner (closure-loop events). Centered, narrow, muted.
   systemRow: {
     paddingHorizontal: Space.lg,
-    marginVertical: 10,
+    marginVertical: 12,
     alignItems: 'center',
   },
   systemPill: {
     paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingVertical: 12,
     borderRadius: 14,
     maxWidth: '85%',
     borderWidth: 1,
@@ -600,7 +600,7 @@ const styles = StyleSheet.create({
     // iMessage rhythm — tight padding, no shadow, no internal meta row.
     maxWidth: '72%',
     borderRadius: 20,
-    paddingHorizontal: 13,
+    paddingHorizontal: 12,
     paddingVertical: 8,
     gap: 4,
     overflow: 'hidden',

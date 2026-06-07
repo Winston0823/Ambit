@@ -252,7 +252,7 @@ const styles = StyleSheet.create({
     backgroundColor: Brand.navBarBg,
     borderTopLeftRadius: 10,
     borderTopRightRadius: 10,
-    paddingTop: 14,
+    paddingTop: 16,
     paddingHorizontal: 8,
     borderTopWidth: 0.5,
     borderTopColor: Brand.navBarHairline,

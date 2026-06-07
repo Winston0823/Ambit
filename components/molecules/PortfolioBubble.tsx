@@ -116,7 +116,7 @@ const styles = StyleSheet.create({
   },
   thumbWrap: {
     alignItems: 'center',
-    gap: 10,
+    gap: 12,
     width: 104, // slightly wider than the bubble so title can wrap to 2 lines
   },
   thumb: {

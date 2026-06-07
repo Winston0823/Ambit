@@ -173,7 +173,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1.5,
     textTransform: 'uppercase',
     color: Brand.actionDeep,
-    marginBottom: 10,
+    marginBottom: 12,
   },
   headline: {
     fontFamily: AmbitFont.display,
@@ -192,7 +192,7 @@ const styles = StyleSheet.create({
   },
   list: {
     paddingHorizontal: Space.lg,
-    gap: 10,
+    gap: 12,
   },
   fadeTop: {
     position: 'absolute',
@@ -211,8 +211,8 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
-    paddingVertical: 14,
+    gap: 16,
+    paddingVertical: 16,
     paddingHorizontal: 16,
     backgroundColor: Brand.cardCream,
     borderRadius: Radii.md,

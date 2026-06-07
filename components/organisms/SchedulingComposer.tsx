@@ -318,7 +318,7 @@ const styles = StyleSheet.create({
   input: {
     height: 44,
     borderRadius: Radii.md,
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
     backgroundColor: Brand.surface1,
     borderWidth: 1.5,
     borderColor: Brand.borderDefault,
@@ -329,7 +329,7 @@ const styles = StyleSheet.create({
 
   durationRow: { flexDirection: 'row', gap: 8 },
   durationChip: {
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: Radii.pill,
     backgroundColor: Brand.surface1,
@@ -355,7 +355,7 @@ const styles = StyleSheet.create({
   slotChip: {
     flex: 1,
     paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingVertical: 12,
     borderRadius: Radii.md,
     backgroundColor: Brand.surface1,
     borderWidth: 1.5,
@@ -378,8 +378,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 10,
+    gap: 8,
+    paddingVertical: 12,
     borderRadius: Radii.md,
     borderWidth: 1.5,
     borderStyle: 'dashed',
@@ -398,7 +398,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    paddingVertical: 14,
+    paddingVertical: 16,
     borderRadius: 999,
     backgroundColor: Brand.action,
     borderWidth: 1.6,
@@ -429,7 +429,7 @@ const styles = StyleSheet.create({
   },
   iosPickerDoneBtn: {
     paddingHorizontal: 16,
-    paddingVertical: 6,
+    paddingVertical: 8,
   },
   iosPickerDoneText: {
     fontFamily: AmbitFont.body,

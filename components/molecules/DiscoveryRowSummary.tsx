@@ -75,9 +75,9 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
+    gap: 16,
     paddingVertical: 12,
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
     backgroundColor: Brand.surface1,
     borderRadius: Radii.md,
   },
@@ -119,7 +119,7 @@ const styles = StyleSheet.create({
 
   miniChipRow: {
     flexDirection: 'row',
-    gap: 6,
+    gap: 8,
     marginTop: 4,
     flexWrap: 'wrap',
   },

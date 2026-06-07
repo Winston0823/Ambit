@@ -94,8 +94,8 @@ export default function ProjectsTab() {
       <View style={styles.root}>
         <View style={[styles.content, { paddingTop: insets.top + 40 }]}>
           <Skeleton width={60} height={12} radius={6} />
-          <Skeleton width={180} height={34} radius={10} style={{ marginTop: 10, marginBottom: 24 }} />
-          <Skeleton height={52} radius={999} style={{ marginBottom: 18 }} />
+          <Skeleton width={180} height={34} radius={10} style={{ marginTop: 12, marginBottom: 24 }} />
+          <Skeleton height={52} radius={999} style={{ marginBottom: 20 }} />
           {[0, 1].map((i) => (
             <View key={i} style={styles.skelCard}>
               <View style={styles.skelHeader}>
@@ -296,7 +296,7 @@ const styles = StyleSheet.create({
   content: { paddingHorizontal: Space.lg, paddingTop: Space.lg, gap: Space.md },
 
   // Skeleton (loading) cards — shaped like the real project cards.
-  skelCard: { backgroundColor: Brand.cardCream, borderWidth: 1.5, borderColor: Brand.borderSoft, borderRadius: Radii.lg, padding: 18 },
+  skelCard: { backgroundColor: Brand.cardCream, borderWidth: 1.5, borderColor: Brand.borderSoft, borderRadius: Radii.lg, padding: 20 },
   skelHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
 
   kicker: {
@@ -345,7 +345,7 @@ const styles = StyleSheet.create({
     marginTop: Space.sm,
   },
   emptyTitle: { fontFamily: AmbitFont.body, fontSize: 16, fontWeight: '600', color: Brand.inkHigh },
-  emptyBody: { fontFamily: AmbitFont.body, fontSize: 13, color: Brand.inkMuted, marginTop: 6, lineHeight: 19 },
+  emptyBody: { fontFamily: AmbitFont.body, fontSize: 13, color: Brand.inkMuted, marginTop: 8, lineHeight: 19 },
 
   // ── Edit reveal (behind a swiped card) ─────────────────────────
   editReveal: {
@@ -374,8 +374,8 @@ const styles = StyleSheet.create({
     // The hard offset edge is provided by the <HardShadow> wrapper (a crisp
     // solid block) — SwipeRevealRow clips, so an RN shadow here never showed.
   },
-  cardBody: { flex: 1, padding: 18, gap: 8 },
-  cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  cardBody: { flex: 1, padding: 20, gap: 8 },
+  cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   cardTitle: {
     flex: 1,
     fontFamily: AmbitFont.display,
@@ -390,8 +390,8 @@ const styles = StyleSheet.create({
   liveBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 10,
+    gap: 4,
+    paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 999,
     backgroundColor: Brand.tagMint,
@@ -420,8 +420,8 @@ const styles = StyleSheet.create({
   },
   statusTextPaused: { color: Brand.inkLabel },
 
-  statRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
-  stat: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  statRow: { flexDirection: 'row', alignItems: 'center', gap: 16 },
+  stat: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   statText: { fontFamily: AmbitFont.body, fontSize: 13, color: Brand.inkBody, fontWeight: '600' },
   unreadPill: {
     paddingHorizontal: 8,
@@ -436,7 +436,7 @@ const styles = StyleSheet.create({
     color: Brand.inkOnBrand,
   },
 
-  facesRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  facesRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   facesText: { fontFamily: AmbitFont.body, fontSize: 12, color: Brand.inkMuted },
   facesEmpty: { fontFamily: AmbitFont.body, fontSize: 12, color: Brand.inkPlaceholder },
 
@@ -445,7 +445,7 @@ const styles = StyleSheet.create({
   stackAvatar: { width: 22, height: 22, borderRadius: 11, backgroundColor: Brand.surface2 },
 
   // ── Seeker engagements ─────────────────────────────────────────
-  exploreSection: { gap: 10, marginTop: Space.sm },
+  exploreSection: { gap: 12, marginTop: Space.sm },
   sectionLabel: {
     fontFamily: AmbitFont.body,
     fontSize: 11,

@@ -296,7 +296,7 @@ const styles = StyleSheet.create({
     paddingTop: Space.md,
     gap: Space.xl,
   },
-  section: { gap: 10 },
+  section: { gap: 12 },
   eyebrow: {
     fontFamily: AmbitFont.body,
     fontSize: 11,
@@ -307,7 +307,7 @@ const styles = StyleSheet.create({
   input: {
     height: 46,
     borderRadius: Radii.md,
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
     backgroundColor: Brand.surface1,
     borderWidth: 1.5,
     borderColor: Brand.borderDefault,
@@ -318,9 +318,9 @@ const styles = StyleSheet.create({
   textarea: {
     minHeight: 130,
     borderRadius: Radii.lg,
-    paddingTop: 14,
-    paddingHorizontal: 14,
-    paddingBottom: 14,
+    paddingTop: 16,
+    paddingHorizontal: 16,
+    paddingBottom: 16,
     backgroundColor: Brand.surface1,
     borderWidth: 1.5,
     borderColor: Brand.borderDefault,
@@ -333,7 +333,7 @@ const styles = StyleSheet.create({
   counterRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 12,
   },
   counterHelp: {
     flex: 1,
@@ -346,7 +346,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: Brand.inkMuted,
   },
-  category: { marginTop: 8, gap: 10 },
+  category: { marginTop: 8, gap: 12 },
   categoryLabel: {
     fontFamily: AmbitFont.body,
     fontSize: 11,
@@ -386,7 +386,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
     paddingVertical: 12,
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
     backgroundColor: Brand.surface2,
     borderRadius: Radii.md,
   },
