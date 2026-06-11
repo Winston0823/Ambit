@@ -424,10 +424,23 @@ export default function ThreadScreen() {
   useEffect(() => {
     if (!conversationId || !user) return;
 
-    const ch = supabase.channel(`conv:${conversationId}`, {
+    // realtime-js dedupes channels by topic, and removeChannel() tears the
+    // channel down asynchronously. A fast-refresh or a quick remount
+    // (navigate away + back, notification deep-link) can therefore hand us a
+    // channel that's STILL subscribed from the previous mount — and calling
+    // .on() after subscribe() throws ("cannot add postgres_changes callbacks
+    // after subscribe()"). So if a live channel for this topic already exists
+    // we adopt it as-is (its bindings already work) and skip the wiring; only
+    // a channel WE create gets bound, subscribed, and torn down here.
+    const topic = `conv:${conversationId}`;
+    const existing = supabase
+      .getChannels()
+      .find((c) => c.topic === `realtime:${topic}`);
+    const ch = existing ?? supabase.channel(topic, {
       config: { presence: { key: user.id } },
     });
 
+    if (!existing) {
     ch.on(
       'postgres_changes',
       {
@@ -551,10 +564,15 @@ export default function ThreadScreen() {
     });
 
     ch.subscribe();
+    }
     channelRef.current = ch;
 
     return () => {
-      ch.unsubscribe();
+      // Only tear down a channel we created. removeChannel (not unsubscribe)
+      // also drops it from the client's registry so a later
+      // supabase.channel(`conv:${id}`) builds a fresh one instead of returning
+      // this (soon-to-be-dead) instance.
+      if (!existing) supabase.removeChannel(ch);
       channelRef.current = null;
       if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
     };

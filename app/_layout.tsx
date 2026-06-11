@@ -109,7 +109,7 @@ function NotificationHandler() {
     }
     const isOwner = role === 'owner';
     router.push({
-      pathname: isOwner ? '/(founder)/chat/[id]' : '/(candidate)/chat/[id]',
+      pathname: isOwner ? '/(founder)/(tabs)/chat/[id]' : '/(candidate)/(tabs)/chat/[id]',
       params: { id: conversationId },
     });
     clearBadge();
@@ -168,8 +168,17 @@ function NotificationHandler() {
   useEffect(() => {
     if (!user || Constants.appOwnership !== 'expo') return;
 
+    // Adopt an existing live channel if one's already registered (fast-refresh
+    // / remount) — .on() after subscribe() throws, so only wire + subscribe +
+    // tear down a channel we create.
+    const topic = 'notification-local-fallback';
+    const existing = supabase
+      .getChannels()
+      .find((c) => c.topic === `realtime:${topic}`);
+    if (existing) return () => {};
+
     const ch = supabase
-      .channel('notification-local-fallback')
+      .channel(topic)
       .on(
         'postgres_changes',
         {
@@ -222,7 +231,7 @@ function NotificationHandler() {
       )
       .subscribe();
 
-    return () => { ch.unsubscribe(); };
+    return () => { supabase.removeChannel(ch); };
   }, [user?.id]);
 
   return null;
