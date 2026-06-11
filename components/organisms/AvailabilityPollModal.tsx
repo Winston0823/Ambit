@@ -4,21 +4,17 @@ import {
   Alert,
   Modal,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { RealtimeChannel } from '@supabase/supabase-js';
-import { CalendarCheck, X } from 'phosphor-react-native';
+import { X } from 'phosphor-react-native';
 import {
   buildGrid,
   busyCellKeys,
-  finalizeAvailabilityPoll,
-  formatCellLabel,
   listAvailabilityResponses,
-  overlapCellKeys,
   selectedCellKeys,
   setAvailabilityResponse,
   type AvailabilityPollRow,
@@ -27,7 +23,7 @@ import {
 import { getBusyEvents } from '../../lib/deviceCalendar';
 import { AvailabilityGrid } from '../molecules/AvailabilityGrid';
 import { supabase } from '../../lib/supabase';
-import { AmbitFont, Brand, Radii, Space } from '../../constants/theme';
+import { AmbitFont, Brand, Space } from '../../constants/theme';
 
 interface Props {
   visible: boolean;
@@ -47,11 +43,11 @@ export function AvailabilityPollModal({ visible, poll, meId, onClose }: Props) {
   const [responses, setResponses] = useState<AvailabilityResponseRow[]>([]);
   const [busyKeys, setBusyKeys]   = useState<Set<string>>(new Set());
   const [loading, setLoading]     = useState(true);
-  const [finalizing, setFinalizing] = useState(false);
   /// Mirror of my response while the user is editing — debounced into
   /// availability_responses. Realtime UPDATEs on my own row are ignored
   /// (caller is the source of truth for local state).
   const [mineKeys, setMineKeys]   = useState<Set<string>>(new Set());
+  const [saving, setSaving]       = useState(false);
 
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const channelRef   = useRef<RealtimeChannel | null>(null);
@@ -156,11 +152,6 @@ export function AvailabilityPollModal({ visible, poll, meId, onClose }: Props) {
     return theirs ? selectedCellKeys(theirs.selected_slots) : new Set<string>();
   }, [responses, meId, poll?.id]);
 
-  const overlapKeys = useMemo(
-    () => overlapCellKeys(mineKeys, theirKeys),
-    [mineKeys, theirKeys],
-  );
-
   const toggleCell = (key: string) => {
     setMineKeys((prev) => {
       const next = new Set(prev);
@@ -170,31 +161,22 @@ export function AvailabilityPollModal({ visible, poll, meId, onClose }: Props) {
     });
   };
 
-  const handleLockIn = async (cellKey: string) => {
-    if (!poll || finalizing) return;
-    const start = new Date(cellKey);
-    const end   = new Date(start.getTime() + poll.duration_min * 60_000);
-    Alert.alert(
-      'Lock in this time?',
-      `${formatCellLabel(start)} — ${formatTime(end)}\nThis closes the poll for both of you.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Lock in',
-          onPress: async () => {
-            setFinalizing(true);
-            try {
-              await finalizeAvailabilityPoll(poll.id, start, end);
-              onClose();
-            } catch (e: any) {
-              Alert.alert('Could not lock in', e?.message ?? '');
-            } finally {
-              setFinalizing(false);
-            }
-          },
-        },
-      ],
-    );
+  const handleSave = async () => {
+    if (!poll || saving) return;
+    setSaving(true);
+    try {
+      const slots = Array.from(mineKeys).map((key) => {
+        const start = new Date(key);
+        const end   = new Date(start.getTime() + poll.duration_min * 60_000);
+        return { start: start.toISOString(), end: end.toISOString() };
+      });
+      await setAvailabilityResponse(poll.id, slots);
+      onClose();
+    } catch (e: any) {
+      Alert.alert('Could not save', e?.message ?? 'Try again.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   if (!visible || !poll) return null;
@@ -235,33 +217,21 @@ export function AvailabilityPollModal({ visible, poll, meId, onClose }: Props) {
               />
             </View>
 
-            <ScrollView
-              style={styles.overlapPanel}
-              contentContainerStyle={styles.overlapContent}
-            >
-              <Text style={styles.overlapTitle}>
-                Overlapping times  ·  {overlapKeys.length}
-              </Text>
-              {overlapKeys.length === 0 ? (
-                <Text style={styles.overlapEmpty}>
-                  No overlap yet. Keep marking — they'll appear here when you both pick the same slot.
-                </Text>
-              ) : (
-                overlapKeys.map((key) => (
-                  <View key={key} style={styles.overlapRow}>
-                    <CalendarCheck size={16} color={Brand.accent} weight="bold" />
-                    <Text style={styles.overlapLabel}>{formatCellLabel(new Date(key))}</Text>
-                    <Pressable
-                      onPress={() => handleLockIn(key)}
-                      disabled={finalizing}
-                      style={[styles.lockBtn, finalizing && { opacity: 0.5 }]}
-                    >
-                      <Text style={styles.lockBtnText}>Lock in</Text>
-                    </Pressable>
-                  </View>
-                ))
-              )}
-            </ScrollView>
+            {poll.status === 'open' && (
+              <View style={styles.saveRow}>
+                <Pressable
+                  onPress={handleSave}
+                  disabled={saving}
+                  style={[styles.saveBtn, saving && styles.saveBtnDisabled]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Save your available times"
+                >
+                  <Text style={styles.saveBtnText}>
+                    {saving ? 'Saving…' : 'Save times'}
+                  </Text>
+                </Pressable>
+              </View>
+            )}
           </>
         )}
       </View>
@@ -280,9 +250,6 @@ function endOfDay(d: Date): Date {
   return out;
 }
 
-function formatTime(d: Date): string {
-  return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
-}
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Brand.canvas },
@@ -320,56 +287,28 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
 
-  overlapPanel: {
-    maxHeight: 220,
-    backgroundColor: Brand.surface1,
+  saveRow: {
+    paddingHorizontal: Space.lg,
+    paddingVertical: Space.md,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: Brand.borderDefault,
   },
-  overlapContent: {
-    paddingHorizontal: Space.lg,
-    paddingVertical: Space.md,
-    gap: 8,
-  },
-  overlapTitle: {
-    fontFamily: AmbitFont.body,
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 1.2,
-    color: Brand.inkLabel,
-  },
-  overlapEmpty: {
-    fontFamily: AmbitFont.body,
-    fontSize: 13,
-    color: Brand.inkMuted,
-    fontStyle: 'italic',
-    lineHeight: 18,
-  },
-  overlapRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    backgroundColor: Brand.canvas,
-    borderRadius: Radii.md,
-  },
-  overlapLabel: {
-    flex: 1,
-    fontFamily: AmbitFont.body,
-    fontSize: 14,
-    color: Brand.inkBody,
-    fontWeight: '600',
-  },
-  lockBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+  saveBtn: {
+    paddingVertical: 14,
     borderRadius: 999,
     backgroundColor: Brand.action,
+    alignItems: 'center',
+    borderWidth: 1.6,
+    borderColor: Brand.actionInk,
+    shadowColor: Brand.actionInk,
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    shadowOffset: { width: 0, height: 3 },
   },
-  lockBtnText: {
+  saveBtnDisabled: { opacity: 0.5 },
+  saveBtnText: {
     fontFamily: AmbitFont.body,
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: '700',
     color: Brand.actionInk,
   },

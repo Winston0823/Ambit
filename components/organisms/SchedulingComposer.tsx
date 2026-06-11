@@ -244,11 +244,7 @@ export function SchedulingComposer({
                 <Text style={styles.overlapHint}>
                   These slots work for both of you. Tap to deselect.
                 </Text>
-                <ScrollView
-                  style={styles.overlapList}
-                  showsVerticalScrollIndicator={false}
-                  keyboardShouldPersistTaps="handled"
-                >
+                <View style={styles.overlapList}>
                   {overlapDates.map((d) => {
                     const key = d.toISOString();
                     const isSelected = selectedKeys.has(key);
@@ -269,12 +265,12 @@ export function SchedulingComposer({
                           {formatCellLabel(d)}
                         </Text>
                         {isSelected && (
-                          <Check size={14} color={Brand.actionInk} weight="bold" />
+                          <Check size={12} color={Brand.actionInk} weight="bold" />
                         )}
                       </Pressable>
                     );
                   })}
-                </ScrollView>
+                </View>
                 <Pressable onPress={() => setUseOverlapMode(false)} style={styles.switchModeBtn}>
                   <Text style={styles.switchModeText}>or pick a different time</Text>
                 </Pressable>
@@ -583,18 +579,24 @@ const styles = StyleSheet.create({
     color: Brand.inkMuted,
     marginBottom: 6,
   },
-  overlapList: { maxHeight: 180 },
+  overlapList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
   overlapChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 14,
-    paddingVertical: 11,
-    borderRadius: Radii.md,
+    justifyContent: 'center',
+    gap: 4,
+    flexBasis: '48%',
+    flexGrow: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 999,
     backgroundColor: Brand.surface1,
     borderWidth: 1.5,
     borderColor: Brand.borderDefault,
-    marginBottom: 6,
   },
   overlapChipSelected: {
     backgroundColor: Brand.action,
@@ -603,11 +605,13 @@ const styles = StyleSheet.create({
   overlapChipDisabled: { opacity: 0.4 },
   overlapChipText: {
     fontFamily: AmbitFont.body,
-    fontSize: 14,
+    fontSize: 13,
     color: Brand.inkBody,
+  },
+  overlapChipTextSelected: {
+    color: Brand.actionInk,
     fontWeight: '600',
   },
-  overlapChipTextSelected: { color: Brand.actionInk },
 
   switchModeBtn: { alignSelf: 'flex-start', marginTop: 2 },
   switchModeText: {
