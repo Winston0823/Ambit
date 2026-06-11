@@ -43,8 +43,16 @@ export default function TabsLayout() {
       } catch {}
     };
     refresh();
+
+    // Adopt an existing live channel if already registered (fast-refresh /
+    // remount) — .on() after subscribe() throws, so only wire + subscribe +
+    // tear down a channel we create.
+    const topic = 'layout-badge-watch';
+    const existing = supabase.getChannels().find((c) => c.topic === `realtime:${topic}`);
+    if (existing) return () => { cancelled = true; };
+
     const ch = supabase
-      .channel('layout-badge-watch')
+      .channel(topic)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, refresh)
       .on(
         'postgres_changes',
@@ -54,7 +62,7 @@ export default function TabsLayout() {
       .subscribe();
     return () => {
       cancelled = true;
-      ch.unsubscribe();
+      supabase.removeChannel(ch);
     };
   }, [user?.id]);
 

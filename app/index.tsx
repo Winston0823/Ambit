@@ -17,7 +17,7 @@ export default function Index() {
   }
 
   const isOwner = role === 'owner';
-  return <Redirect href={isOwner ? '/(founder)/projects' : '/(candidate)/feed'} />;
+  return <Redirect href={isOwner ? '/(founder)/(tabs)/projects' : '/(candidate)/(tabs)/feed'} />;
 }
 
 const styles = StyleSheet.create({

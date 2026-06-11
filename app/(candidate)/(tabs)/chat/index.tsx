@@ -82,8 +82,16 @@ export default function ChatTab() {
 
   useEffect(() => {
     if (!user) return;
+
+    // Adopt an existing live channel if already registered (fast-refresh /
+    // remount) — .on() after subscribe() throws, so only wire + subscribe +
+    // tear down a channel we create.
+    const topic = 'inbox-watch';
+    const existing = supabase.getChannels().find((c) => c.topic === `realtime:${topic}`);
+    if (existing) return;
+
     const ch = supabase
-      .channel('inbox-watch')
+      .channel(topic)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'messages' },
@@ -95,7 +103,7 @@ export default function ChatTab() {
         () => { load(); },
       )
       .subscribe();
-    return () => { ch.unsubscribe(); };
+    return () => { supabase.removeChannel(ch); };
   }, [user?.id, load]);
 
   // Split pinned vs the rest. get_inbox already sorts pinned to the

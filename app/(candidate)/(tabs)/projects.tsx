@@ -197,9 +197,8 @@ export default function ProjectsTab() {
                     <View style={styles.cardHeader}>
                       <Text style={styles.cardTitle} numberOfLines={1}>{p.title}</Text>
                       {p.active ? (
-                        <View style={styles.liveBadge}>
-                          <View style={styles.liveDot} />
-                          <Text style={styles.liveText}>LIVE</Text>
+                        <View style={styles.statusPill}>
+                          <Text style={styles.statusText}>Live</Text>
                         </View>
                       ) : (
                         <View style={[styles.statusPill, styles.statusPillPaused]}>
@@ -386,23 +385,6 @@ const styles = StyleSheet.create({
     fontFamily: AmbitFont.body,
     fontSize: 13,
     color: Brand.inkMuted,
-  },
-  liveBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 999,
-    backgroundColor: Brand.tagMint,
-  },
-  liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: Brand.tagMintInk },
-  liveText: {
-    fontFamily: AmbitFont.body,
-    fontSize: 10,
-    fontWeight: '800',
-    color: Brand.tagMintInk,
-    letterSpacing: 0.6,
   },
   statusPill: {
     paddingHorizontal: 8,

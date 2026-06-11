@@ -88,9 +88,20 @@ export function AvailabilityPollModal({ visible, poll, meId, onClose, onProposeT
   // ── Realtime: partner's updates ──────────────────────────────
   useEffect(() => {
     if (!visible || !poll) return;
-    const ch = supabase
-      .channel(`poll:${poll.id}`)
-      .on(
+
+    // realtime-js dedupes channels by topic and removeChannel() tears down
+    // asynchronously, so a fast-refresh or quick remount can return a channel
+    // that's still subscribed — and .on() after subscribe() throws. Adopt an
+    // existing live channel as-is; only wire + subscribe + tear down one we
+    // create.
+    const topic = `poll:${poll.id}`;
+    const existing = supabase
+      .getChannels()
+      .find((c) => c.topic === `realtime:${topic}`);
+    const ch = existing ?? supabase.channel(topic);
+
+    if (!existing) {
+      ch.on(
         'postgres_changes',
         {
           event:  '*',
@@ -123,9 +134,10 @@ export function AvailabilityPollModal({ visible, poll, meId, onClose, onProposeT
         },
       )
       .subscribe();
+    }
     channelRef.current = ch;
     return () => {
-      ch.unsubscribe();
+      if (!existing) supabase.removeChannel(ch);
       channelRef.current = null;
     };
   }, [visible, poll?.id, meId, onClose]);
