@@ -22,6 +22,7 @@ import {
   X,
 } from 'phosphor-react-native';
 import type { MessageRow } from '../../lib/messaging';
+import { HardShadow } from '../atoms';
 import { AmbitFont, Brand, Radii, Space } from '../../constants/theme';
 import { Motion } from '../../constants/motion';
 
@@ -244,6 +245,7 @@ export function ChatComposer({
         </View>
       )}
 
+      <HardShadow radius={26} offset={4} style={styles.inputRowShadow}>
       <View style={styles.inputRow}>
         {!editing && (
           <Pressable
@@ -286,6 +288,7 @@ export function ChatComposer({
           </Animated.View>
         </Pressable>
       </View>
+      </HardShadow>
 
       {/* Attachment grid — WeChat pattern. Lives BELOW the input row in
           the keyboard's vacated footprint. Parent dismisses the keyboard
@@ -302,7 +305,7 @@ export function ChatComposer({
             {onOpenScheduling && (
               <AttachTile
                 Icon={CalendarPlus}
-                label="Meeting"
+                label="Propose time"
                 tint={Brand.primary}
                 onPress={() => {
                   onCloseAttachMenu();
@@ -313,7 +316,7 @@ export function ChatComposer({
             {onOpenAvailabilityPoll && (
               <AttachTile
                 Icon={Clock}
-                label="My times"
+                label="Find a time"
                 tint={Brand.primary}
                 onPress={() => {
                   onCloseAttachMenu();
@@ -375,8 +378,8 @@ function AttachTile({ Icon, label, tint, onPress, disabled }: AttachTileProps) {
 
 const styles = StyleSheet.create({
   root: {
-    // Hearth: transparent root sits over the screen's warm wash. The
-    // input row provides its own glassy surface.
+    // Transparent root sits over the eggshell canvas. The input row
+    // provides its own cream island surface.
     backgroundColor: 'transparent',
   },
   banner: {
@@ -457,24 +460,24 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
 
-  // Floating white pill that holds the +, input, and send. Soft shadow on
-  // the white canvas (modern, no hairlines) instead of a bordered bar.
+  // Floating cream pill that holds the +, input, and send. Crisp ink
+  // border + the hard offset edge (HardShadow wrapper) — the locked
+  // tactile language, replacing the old soft shadow.
+  inputRowShadow: {
+    marginHorizontal: Space.md,
+    marginBottom: 8,
+  },
   inputRow: {
     flexDirection: 'row',
     alignItems: 'flex-end',
     gap: 8,
-    marginHorizontal: Space.md,
-    marginBottom: 8,
     paddingLeft: 12,
     paddingRight: 8,
     paddingVertical: 8,
-    backgroundColor: Brand.canvas,
+    backgroundColor: Brand.cardCream,
     borderRadius: 26,
-    shadowColor: '#3A2A1A',
-    shadowOpacity: 0.12,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 6,
+    borderWidth: 1.5,
+    borderColor: Brand.inkEdge,
   },
   // Bare + tap target (no chip) — a clean tan glyph that darkens when the
   // attachment grid is open.
@@ -493,9 +496,9 @@ const styles = StyleSheet.create({
     height: 280,
     paddingHorizontal: Space.md,
     paddingTop: 20,
-    backgroundColor: Brand.hearthGlassBg,
-    borderTopWidth: 1,
-    borderTopColor: Brand.hearthGlassEdge,
+    backgroundColor: Brand.cardCream,
+    borderTopWidth: 1.5,
+    borderTopColor: Brand.inkEdge,
   },
   attachGridRow: {
     flexDirection: 'row',

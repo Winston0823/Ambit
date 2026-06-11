@@ -5,7 +5,8 @@ import { Archive, ArrowBendUpLeft, Bell, BellSlash, Clock, X } from 'phosphor-re
 import type { InboxItem } from '../../lib/messaging';
 import { inboxState, isReachedOutToYou } from '../../lib/messaging';
 import { getAutoCloseCountdown } from '../../lib/closureLoop';
-import { Brand } from '../../constants/theme';
+import { HardShadow } from '../atoms';
+import { AmbitFont, Brand, Radii } from '../../constants/theme';
 
 interface Props {
   item:    InboxItem;
@@ -73,7 +74,7 @@ export function InboxRow({ item, meId, onPress, onPassRequest, onLongPress, onMu
     return (
       <Animated.View style={[styles.actionWrap, { transform: [{ translateX }] }]}>
         <Pressable onPress={handlePass} style={styles.passAction} accessibilityLabel="Pass">
-          <X size={18} color="#FFFFFF" weight="bold" />
+          <X size={18} color={Brand.inkOnBrand} weight="bold" />
           <Text style={styles.passActionLabel}>Pass</Text>
         </Pressable>
       </Animated.View>
@@ -93,8 +94,8 @@ export function InboxRow({ item, meId, onPress, onPassRequest, onLongPress, onMu
             accessibilityLabel={item.is_muted ? 'Unmute' : 'Mute'}
           >
             {item.is_muted
-              ? <Bell size={18} color="#FFFFFF" weight="bold" />
-              : <BellSlash size={18} color="#FFFFFF" weight="bold" />}
+              ? <Bell size={18} color={Brand.inkOnBrand} weight="bold" />
+              : <BellSlash size={18} color={Brand.inkOnBrand} weight="bold" />}
             <Text style={styles.leftActionLabel}>{item.is_muted ? 'Unmute' : 'Mute'}</Text>
           </Pressable>
         )}
@@ -104,7 +105,7 @@ export function InboxRow({ item, meId, onPress, onPassRequest, onLongPress, onMu
             style={[styles.leftAction, styles.archiveAction]}
             accessibilityLabel="Archive"
           >
-            <Archive size={18} color="#FFFFFF" weight="bold" />
+            <Archive size={18} color={Brand.inkOnBrand} weight="bold" />
             <Text style={styles.leftActionLabel}>Archive</Text>
           </Pressable>
         )}
@@ -144,6 +145,15 @@ export function InboxRow({ item, meId, onPress, onPassRequest, onLongPress, onMu
   const showHiredChip = item.status === 'hired';
 
   return (
+    // Card language: crisp ink edge below each island card. Closed rows render
+    // at reduced opacity, so their backing block is transparent (a solid block
+    // would bleed through the translucent card).
+    <HardShadow
+      radius={Radii.card}
+      offset={4}
+      color={isClosed ? 'transparent' : undefined}
+      style={styles.rowWrap}
+    >
     <Swipeable
       ref={swipeRef}
       enabled={passable || !!onMute || !!onArchive}
@@ -201,7 +211,7 @@ export function InboxRow({ item, meId, onPress, onPassRequest, onLongPress, onMu
             </View>
           </View>
           <View style={styles.timeRow}>
-            {item.is_muted && <BellSlash size={12} color={Brand.inboxInkBody} weight="bold" />}
+            {item.is_muted && <BellSlash size={12} color={Brand.inkBody} weight="bold" />}
             <Text style={styles.time}>{formatRelative(item.last_message_at)}</Text>
           </View>
         </View>
@@ -228,7 +238,7 @@ export function InboxRow({ item, meId, onPress, onPassRequest, onLongPress, onMu
             <View style={styles.chipRow}>
               {countdown && (
                 <View style={[styles.chip, styles.chipOutline]}>
-                  <Clock size={11} color={Brand.inboxBronze} weight="bold" />
+                  <Clock size={11} color={Brand.inkLabel} weight="bold" />
                   <Text style={styles.chipText}>{countdown.label}</Text>
                 </View>
               )}
@@ -248,6 +258,7 @@ export function InboxRow({ item, meId, onPress, onPassRequest, onLongPress, onMu
         </View>
       </Pressable>
     </Swipeable>
+    </HardShadow>
   );
 }
 
@@ -269,31 +280,23 @@ const AVATAR_GAP  = 14;
 const SUB_INDENT  = AVATAR_SIZE + AVATAR_GAP;
 
 const styles = StyleSheet.create({
-  // Active rows are flat — no fill, no border, just padding. The
-  // hairline divider between rows is provided by the screen-level
-  // ItemSeparatorComponent.
-  // Cream island cards — aligned with the Projects look (soft border + faint
-  // lift, no hard shadow since the list is long).
+  // Spacing lives on the HardShadow wrapper so the offset edge hugs the card
+  // (a margin on the card itself would expose the backing block below it).
+  rowWrap: { marginBottom: 12 },
+  // Cream island cards — aligned with the Projects look: cream fill, crisp
+  // 1.5 ink border, hard offset edge from the <HardShadow> wrapper.
   card: {
     backgroundColor: Brand.cardCream,
-    borderWidth: 1,
-    borderColor: Brand.inboxHairline,
-    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: Brand.inkEdge,
+    borderRadius: Radii.card,
     padding: 16,
-    marginBottom: 12,
     gap: 8,
-    shadowColor: '#2D2616',
-    shadowOpacity: 0.06,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 1,
   },
-  // Pending rows become soft golden-cream cards with a generous radius.
+  // Pending rows share the island-card frame; the teal lives in the byline
+  // and countdown chip rather than a tinted fill. Extra padding keeps the
+  // "needs you" cards a touch more generous.
   cardPending: {
-    backgroundColor: Brand.inboxCardPending,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: Brand.inboxBorderTan,
     padding: 20,
   },
   cardClosed: { opacity: 0.55 },
@@ -324,49 +327,50 @@ const styles = StyleSheet.create({
   avatarWrap: { width: AVATAR_SIZE, height: AVATAR_SIZE },
   avatar: { width: AVATAR_SIZE, height: AVATAR_SIZE, borderRadius: 12 },
   avatarFallback: {
-    backgroundColor: Brand.inboxAvatarBg,
+    backgroundColor: Brand.surface2,
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarClosed: {},
   avatarInitial: {
-    fontFamily: 'Zodiak-Bold',
-    fontStyle: 'italic',
+    fontFamily: AmbitFont.display,
     fontSize: 18,
-    color: Brand.inboxBronzeDim,
+    color: Brand.inkLabel,
     letterSpacing: -0.2,
   },
   byline: {
     marginTop: 2,
+    fontFamily: AmbitFont.body,
     fontSize: 10,
     fontWeight: '700',
     letterSpacing: 1.6,
-    color: Brand.inboxBronze,
+    color: Brand.inkLabel,
   },
-  bylinePending: { color: Brand.inboxBronze },
-  bylineClosed:  { color: Brand.inboxInkMute },
-  bylineProject: { color: Brand.inboxBronze },
-  bylineSep:     { color: Brand.inboxBronze },
+  bylinePending: { color: Brand.actionDeep },
+  bylineClosed:  { color: Brand.inkMuted },
+  bylineProject: { color: Brand.inkLabel },
+  bylineSep:     { color: Brand.inkLabel },
   time: {
+    fontFamily: AmbitFont.body,
     fontSize: 11,
     fontWeight: '600',
-    color: Brand.inboxInkMute,
+    color: Brand.inkMuted,
     letterSpacing: 0.04,
   },
 
   name: {
-    fontFamily: 'Zodiak-Bold',
-    fontStyle: 'italic',
+    fontFamily: AmbitFont.display,
     fontSize: 20,
-    color: Brand.inboxInkPrimary,
+    color: Brand.inkPrimary,
     letterSpacing: -0.3,
     lineHeight: 24,
   },
-  nameClosed: { color: Brand.inboxInkMute },
+  nameClosed: { color: Brand.inkMuted },
 
   preview: {
+    fontFamily: AmbitFont.body,
     fontSize: 14,
-    color: Brand.inboxInkBody,
+    color: Brand.inkBody,
     lineHeight: 19,
   },
   previewPending: {
@@ -376,8 +380,8 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     fontSize: 14,
   },
-  previewClosed: { color: Brand.inboxInkMute },
-  previewPrefix: { fontWeight: '700', color: Brand.inboxInkPrimary },
+  previewClosed: { color: Brand.inkMuted },
+  previewPrefix: { fontWeight: '700', color: Brand.inkPrimary },
 
   chipRow: {
     flexDirection: 'row',
@@ -394,20 +398,21 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     borderWidth: 1,
   },
-  // Stitch chip family — pale neutral surfaces with bronze accents,
-  // never solid ink. Countdown urgent flips to solid bronze.
+  // Quiet chip family — pale neutral outline chip for the countdown,
+  // mint solid for status (Hired / Your turn).
   chipOutline: {
-    borderColor: 'rgba(28,28,26,0.12)',
-    backgroundColor: 'rgba(28,28,26,0.04)',
+    borderColor: Brand.borderSoft,
+    backgroundColor: Brand.surface1,
   },
   chipSolid: {
     borderColor: 'transparent',
-    backgroundColor: Brand.inboxChipHired,
+    backgroundColor: Brand.tagMint,
   },
   chipText: {
+    fontFamily: AmbitFont.body,
     fontSize: 11,
     fontWeight: '700',
-    color: Brand.inboxBronze,
+    color: Brand.inkLabel,
     letterSpacing: 0.02,
   },
   chipTextSolid: { color: Brand.tagMintInk },
@@ -427,18 +432,19 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   passActionLabel: {
+    fontFamily: AmbitFont.body,
     fontSize: 11,
     fontWeight: '700',
     letterSpacing: 0.5,
-    color: '#FFFFFF',
+    color: Brand.inkOnBrand,
   },
 
   // Left-swipe Mute / Archive.
   leftActions: { flexDirection: 'row' },
   leftAction: { width: 80, alignItems: 'center', justifyContent: 'center', gap: 4 },
-  muteAction: { backgroundColor: '#A8895E' },
-  archiveAction: { backgroundColor: '#6B7280' },
-  leftActionLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 0.5, color: '#FFFFFF' },
+  muteAction: { backgroundColor: Brand.accent },
+  archiveAction: { backgroundColor: Brand.inkLabel },
+  leftActionLabel: { fontFamily: AmbitFont.body, fontSize: 11, fontWeight: '700', letterSpacing: 0.5, color: Brand.inkOnBrand },
 
   timeRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
 });

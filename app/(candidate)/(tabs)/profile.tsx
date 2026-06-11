@@ -37,6 +37,7 @@ import {
 } from '../../../components/molecules';
 import type { OwnerProject } from '../../../components/molecules';
 import { useAuth } from '../../../context/AuthContext';
+import { setProfileRoleCache } from '../../../hooks/useProfileRole';
 import { supabase } from '../../../lib/supabase';
 import { readLocalFileAsArrayBuffer } from '../../../lib/messaging';
 import {
@@ -595,6 +596,10 @@ export default function ProfileTab() {
         onCancel={() => setRoleOpen(false)}
         onSave={(role) => {
           updateField('role', role);
+          // Write-through so the module-level role cache (and every mounted
+          // useProfileRole consumer — feed variant, routing) updates now
+          // instead of after an app restart.
+          if (user) setProfileRoleCache(user.id, role);
           setRoleOpen(false);
         }}
       />
@@ -1179,6 +1184,8 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 20,
     backgroundColor: Brand.action,
+    borderWidth: 1.6,
+    borderColor: Brand.actionInk,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1224,8 +1231,8 @@ const modalStyles = StyleSheet.create({
   },
   sheet: {
     backgroundColor: Brand.canvas,
-    borderTopLeftRadius: Radii.lg + 4,
-    borderTopRightRadius: Radii.lg + 4,
+    borderTopLeftRadius: Radii.card,
+    borderTopRightRadius: Radii.card,
     padding: Space.lg,
     gap: Space.md,
   },

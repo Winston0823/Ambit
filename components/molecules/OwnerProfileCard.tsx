@@ -2,8 +2,8 @@ import React from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { CaretRight } from 'phosphor-react-native';
-import { Chip } from '../atoms';
-import { AmbitFont, Brand } from '../../constants/theme';
+import { Chip, HardShadow } from '../atoms';
+import { AmbitFont, Brand, Radii } from '../../constants/theme';
 
 export interface OwnerProject {
   id: string;
@@ -42,6 +42,7 @@ export function OwnerProfileCard({ name, photoUri, campusName, vibe, skills, pro
     .join('  ·  ');
 
   return (
+    <HardShadow radius={Radii.card} offset={4} style={{ flex: 1 }}>
     <View style={styles.card}>
       <View style={styles.idz}>
         <View style={styles.idRow}>
@@ -103,28 +104,26 @@ export function OwnerProfileCard({ name, photoUri, campusName, vibe, skills, pro
         )}
       </ScrollView>
     </View>
+    </HardShadow>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
     flex: 1,
-    borderRadius: 26,
+    borderRadius: Radii.card,
     backgroundColor: Brand.cardCream,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: Brand.borderSoft,
+    borderWidth: 1.5,
+    borderColor: Brand.inkEdge,
     overflow: 'hidden',
-    shadowColor: '#3C2814',
-    shadowOpacity: 0.1,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: 4,
+    // Depth comes from the <HardShadow> wrapper (crisp offset block) — the
+    // vocabulary forbids soft RN shadows.
   },
   idz: { padding: 24 },
   idRow: { flexDirection: 'row', gap: 16, alignItems: 'center' },
   avatar: { width: 64, height: 64, borderRadius: 18, overflow: 'hidden' },
   avatarImg: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' },
-  avatarInitial: { fontFamily: AmbitFont.display, fontSize: 26, color: '#F5E9D8' },
+  avatarInitial: { fontFamily: AmbitFont.display, fontSize: 26, color: Brand.inkOnBrand },
   idText: { flex: 1, minWidth: 0 },
   name: { fontFamily: AmbitFont.display, fontSize: 25, color: Brand.inkPrimary, lineHeight: 28 },
   subtitle: { fontFamily: AmbitFont.body, fontSize: 13, color: Brand.inkMuted, marginTop: 4 },

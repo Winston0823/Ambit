@@ -163,25 +163,23 @@ export default function ProjectNewScreen() {
   );
 }
 
-const INK = '#2A2018';
-
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Brand.cardCream },
   scroll: { flex: 1 },
   scrollContent: { paddingHorizontal: 28, paddingTop: 28 },
   kicker: {
     fontFamily: AmbitFont.body,
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: 11,
+    fontWeight: '700',
     letterSpacing: 1.6,
-    color: Brand.accent,
+    color: Brand.inkMuted,
     marginBottom: 16,
   },
-  h: { fontFamily: AmbitFont.display, fontSize: 35, lineHeight: 41, color: Brand.inkPrimary },
+  h: { fontFamily: AmbitFont.display, fontSize: 34, lineHeight: 40, color: Brand.inkPrimary },
   sub: { fontFamily: AmbitFont.body, fontSize: 14.5, color: Brand.inkMuted, marginTop: 16, lineHeight: 21 },
 
   field: { marginTop: 36 },
-  fieldLabel: { fontFamily: AmbitFont.body, fontSize: 11, fontWeight: '600', letterSpacing: 1, color: Brand.inkLabel, marginBottom: 12 },
+  fieldLabel: { fontFamily: AmbitFont.body, fontSize: 11, fontWeight: '600', letterSpacing: 1.2, color: Brand.inkLabel, marginBottom: 12 },
   input: {
     fontFamily: AmbitFont.display,
     fontSize: 22,
@@ -192,7 +190,7 @@ const styles = StyleSheet.create({
   },
   inputMultiline: { fontSize: 18, lineHeight: 25, minHeight: 60, textAlignVertical: 'top' },
 
-  secLabel: { fontFamily: AmbitFont.body, fontSize: 11, fontWeight: '700', letterSpacing: 1.2, color: Brand.inkLabel, marginTop: 36, marginBottom: 16 },
+  secLabel: { fontFamily: AmbitFont.body, fontSize: 11, fontWeight: '600', letterSpacing: 1.2, color: Brand.inkLabel, marginTop: 36, marginBottom: 16 },
   skillCat: { marginTop: 20 },
   skillCatLabel: { fontFamily: AmbitFont.body, fontSize: 10.5, letterSpacing: 1, color: Brand.inkMuted, marginBottom: 12 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },

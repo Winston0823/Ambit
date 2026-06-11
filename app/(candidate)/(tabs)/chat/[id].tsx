@@ -43,7 +43,7 @@ import * as Haptics from 'expo-haptics';
 import { CaretDown, CaretLeft, CaretRight, DotsThree, X } from 'phosphor-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Motion } from '../../../../constants/motion';
-import { Tactile, Skeleton } from '../../../../components/atoms';
+import { HardShadow, Tactile, Skeleton } from '../../../../components/atoms';
 import { touchPresence } from '../../../../lib/presence';
 import {
   BottomSheet,
@@ -932,37 +932,41 @@ export default function ThreadScreen() {
           floating back button + island, keeping the borderless top readable
           without reintroducing a blur strip. */}
       <LinearGradient
-        colors={[Brand.hearthBgBase, 'rgba(255,255,255,0)']}
+        colors={[Brand.canvas, 'rgba(255,255,255,0)']}
         style={[styles.headerScrim, { height: insets.top + 88 }]}
         pointerEvents="none"
       />
 
       <View pointerEvents="box-none" style={[styles.headerOverlay, { top: insets.top }]}>
         <View style={styles.headerRow}>
-          <Pressable
-            onPress={() => {
-              if (Platform.OS !== 'web') Haptics.selectionAsync().catch(() => {});
-              router.back();
-            }}
-            hitSlop={8}
-            style={({ pressed }) => [styles.circleBtn, pressed && { opacity: 0.85 }]}
-            accessibilityRole="button"
-            accessibilityLabel="Back"
-          >
-            <CaretLeft size={18} color={Brand.inkPrimary} weight="bold" />
-          </Pressable>
+          <HardShadow radius={20} offset={4}>
+            <Pressable
+              onPress={() => {
+                if (Platform.OS !== 'web') Haptics.selectionAsync().catch(() => {});
+                router.back();
+              }}
+              hitSlop={8}
+              style={({ pressed }) => [styles.circleBtn, pressed && { opacity: 0.85 }]}
+              accessibilityRole="button"
+              accessibilityLabel="Back"
+            >
+              <CaretLeft size={18} color={Brand.inkPrimary} weight="bold" />
+            </Pressable>
+          </HardShadow>
 
           <View style={styles.headerSpacer} />
 
-          <Pressable
-            onPress={() => setOverflowOpen(true)}
-            hitSlop={8}
-            style={({ pressed }) => [styles.circleBtn, pressed && { opacity: 0.85 }]}
-            accessibilityRole="button"
-            accessibilityLabel="More options"
-          >
-            <DotsThree size={18} color={Brand.inkPrimary} weight="bold" />
-          </Pressable>
+          <HardShadow radius={20} offset={4}>
+            <Pressable
+              onPress={() => setOverflowOpen(true)}
+              hitSlop={8}
+              style={({ pressed }) => [styles.circleBtn, pressed && { opacity: 0.85 }]}
+              accessibilityRole="button"
+              accessibilityLabel="More options"
+            >
+              <DotsThree size={18} color={Brand.inkPrimary} weight="bold" />
+            </Pressable>
+          </HardShadow>
         </View>
 
         {/* Closure-loop status banner — sits just below the header row
@@ -1118,6 +1122,7 @@ export default function ThreadScreen() {
                 schedulingRequest={schedRequest}
                 availabilityPoll={availPoll}
                 onOpenAvailabilityPoll={setOpenPollId}
+                onProposeMeetingTime={() => setSchedulingOpen(true)}
                 projectRef={projRef}
                 onOpenProjectRef={(ref) => {
                   // Hydrate the SAME card the discovery deck renders, then show it.
@@ -1149,24 +1154,26 @@ export default function ThreadScreen() {
             { bottom: insets.bottom + 76, opacity: fabAnim, transform: [{ scale: fabAnim.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] }) }] },
           ]}
         >
-          <Tactile
-            haptic="tap"
-            onPress={() => {
-              userScrolledRef.current = false;
-              setUnseenCount(0);
-              setScrollFabVisible(false);
-              listRef.current?.scrollToEnd({ animated: true });
-            }}
-            style={styles.scrollFabBtn}
-            accessibilityLabel="Jump to newest messages"
-          >
-            <CaretDown size={18} color={Brand.inkPrimary} weight="bold" />
-            {unseenCount > 0 && (
-              <View style={styles.scrollFabBadge}>
-                <Text style={styles.scrollFabBadgeText}>{unseenCount > 9 ? '9+' : unseenCount}</Text>
-              </View>
-            )}
-          </Tactile>
+          <HardShadow radius={22} offset={4}>
+            <Tactile
+              haptic="tap"
+              onPress={() => {
+                userScrolledRef.current = false;
+                setUnseenCount(0);
+                setScrollFabVisible(false);
+                listRef.current?.scrollToEnd({ animated: true });
+              }}
+              style={styles.scrollFabBtn}
+              accessibilityLabel="Jump to newest messages"
+            >
+              <CaretDown size={18} color={Brand.inkPrimary} weight="bold" />
+              {unseenCount > 0 && (
+                <View style={styles.scrollFabBadge}>
+                  <Text style={styles.scrollFabBadgeText}>{unseenCount > 9 ? '9+' : unseenCount}</Text>
+                </View>
+              )}
+            </Tactile>
+          </HardShadow>
         </Animated.View>
 
         {meta.status === 'active' || meta.status === 'hired_pending' ? (
@@ -1264,6 +1271,13 @@ export default function ThreadScreen() {
         poll={openPoll}
         meId={user?.id ?? ''}
         onClose={() => setOpenPollId(null)}
+        // Save-with-overlap → continue straight into the propose step. The
+        // delay lets the fullscreen poll modal finish dismissing before the
+        // SchedulingComposer modal presents (iOS can't overlap the two).
+        onProposeTime={() => {
+          setOpenPollId(null);
+          setTimeout(() => setSchedulingOpen(true), 400);
+        }}
       />
 
       {/* Project preview — tapping a project-attachment bubble opens the SAME
@@ -1292,7 +1306,7 @@ export default function ThreadScreen() {
             accessibilityRole="button"
             accessibilityLabel="Close project"
           >
-            <X size={18} color="#FFFFFF" weight="bold" />
+            <X size={18} color={Brand.inkOnBrand} weight="bold" />
           </Pressable>
         </View>
       </Modal>
@@ -1377,7 +1391,7 @@ function MenuButton({
       styles.menuBtn,
       pressed && { backgroundColor: Brand.surface2 },
     ]}>
-      <Text style={[styles.menuLabel, destructive && { color: Brand.accent }]}>
+      <Text style={[styles.menuLabel, destructive && { color: Brand.danger }]}>
         {label}
       </Text>
     </Pressable>
@@ -1502,7 +1516,7 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
 
-  root: { flex: 1, backgroundColor: Brand.hearthBgBase },
+  root: { flex: 1, backgroundColor: Brand.canvas },
   // Loading body — sits below the header row and fills the remaining
   // vertical space so the spinner is centered in what would otherwise
   // be the messages-list area. Keeps the header pinned at its final
@@ -1538,16 +1552,11 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: Brand.canvas,
+    backgroundColor: Brand.cardCream,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: Brand.borderSoft,
-    shadowColor: '#000',
-    shadowOpacity: 0.16,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 5,
+    borderWidth: 1.5,
+    borderColor: Brand.inkEdge,
   },
   scrollFabBadge: {
     position: 'absolute',
@@ -1557,7 +1566,7 @@ const styles = StyleSheet.create({
     height: 18,
     borderRadius: 9,
     paddingHorizontal: 4,
-    backgroundColor: Brand.primary,
+    backgroundColor: Brand.accent,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1569,29 +1578,24 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     paddingBottom: Space.md,
   },
-  // 40pt circular glass button used for back + overflow. Translucent
-  // white surface over the warm wash reads as floating glass — pairs
-  // with the Dynamic-Island pill, the bubble shadows, and the composer.
+  // 40pt circular tactile button used for back + overflow. Cream island
+  // surface with the crisp ink border + hard offset edge (HardShadow
+  // wrapper) — matches the locked button language.
   circleBtn: {
     width: 40,
     height: 40,
     borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Brand.hearthGlassBg,
-    borderWidth: 1,
-    borderColor: Brand.hearthGlassEdge,
-    shadowColor: Brand.hearthGlassShadow,
-    shadowOpacity: 1,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 4,
+    backgroundColor: Brand.cardCream,
+    borderWidth: 1.5,
+    borderColor: Brand.inkEdge,
   },
   headerSpacer: {
     flex: 1,
   },
 
-  // Closure-loop banner — glass card variant of the system pill
+  // Closure-loop banner — cream island variant of the system pill
   banner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1601,12 +1605,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: Space.md,
     paddingVertical: 12,
     borderRadius: 14,
-    borderWidth: 1,
-    borderColor: Brand.hearthGlassEdge,
+    borderWidth: 1.5,
+    borderColor: Brand.inkEdge,
   },
-  bannerWarm:  { backgroundColor: 'rgba(255,243,222,0.9)' },
+  bannerWarm:  { backgroundColor: Brand.tagMint },
   bannerHired: { backgroundColor: Brand.accent },
-  bannerMuted: { backgroundColor: Brand.hearthGlassBg },
+  bannerMuted: { backgroundColor: Brand.cardCream },
   bannerText: {
     flex: 1,
     fontFamily: AmbitFont.body,
@@ -1621,13 +1625,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 999,
-    backgroundColor: Brand.inkPrimary,
+    backgroundColor: Brand.action,
+    borderWidth: 1.6,
+    borderColor: Brand.actionInk,
   },
   bannerCtaLabel: {
     fontFamily: AmbitFont.body,
     fontSize: 13,
     fontWeight: '700',
-    color: Brand.inkOnBrand,
+    color: Brand.actionInk,
     letterSpacing: 0.2,
   },
 
@@ -1637,10 +1643,10 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     marginHorizontal: Space.md,
     marginBottom: Space.md,
-    backgroundColor: Brand.hearthGlassBg,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: Brand.hearthGlassEdge,
+    backgroundColor: Brand.cardCream,
+    borderRadius: Radii.card,
+    borderWidth: 1.5,
+    borderColor: Brand.inkEdge,
     alignItems: 'center',
   },
   composerLockedText: {

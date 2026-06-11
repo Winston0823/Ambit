@@ -27,6 +27,7 @@ import { PathPreviewScreen } from './onboarding/PathPreviewScreen';
 import { SignInScreen } from './onboarding/SignInScreen';
 import { EduEmailScreen } from './onboarding/EduEmailScreen';
 import { DemographicScreen } from './onboarding/DemographicScreen';
+import { PhotoScreen } from './onboarding/PhotoScreen';
 import { CampusScreen } from './onboarding/CampusScreen';
 import { SkillTagsScreen } from './onboarding/SkillTagsScreen';
 import { RoleDeclarationScreen } from './onboarding/RoleDeclarationScreen';
@@ -48,10 +49,15 @@ interface InlineProps {
 /// completes to get into the app and receive a real deck: identity (.edu +
 /// student/professor), the role branch, campus, and (for seekers) skills.
 ///
-/// `vibe`, `photo`, and `proof` are intentionally NOT in this spine — they
-/// only matter once other people see the user's card, so they're deferred
-/// to in-app progressive completion (the Profile tab is already a fully
+/// `vibe` and `proof` are intentionally NOT in this spine — they only
+/// matter once other people see the user's card, so they're deferred to
+/// in-app progressive completion (the Profile tab is already a fully
 /// editable surface for them) rather than gating first launch.
+///
+/// `photo` IS in the spine because it's where the user's NAME is captured —
+/// without a name the user renders as "?" and is filtered out of everyone's
+/// deck (feed's `name`-presence filter), making them invisible. The photo
+/// itself stays optional on that screen.
 ///
 /// The user's branch (student vs. professor + the student's role pick)
 /// determines which of these actually render — see shouldShow + activeSteps
@@ -63,6 +69,7 @@ const STEPS = [
   'preview',
   'eduEmail',
   'demographic',
+  'photo',
   'role',
   'campus',
   'skills',
@@ -79,6 +86,7 @@ type Step = LinearStep | 'signIn';
 const PROGRESS_STEPS_ALL: LinearStep[] = [
   'eduEmail',
   'demographic',
+  'photo',
   'role',
   'campus',
   'skills',
@@ -113,6 +121,7 @@ function isComplete(step: LinearStep, profile: OnboardingProfile): boolean {
   switch (step) {
     case 'eduEmail':    return profile.eduEmail.toLowerCase().endsWith('.edu') && profile.eduEmail.includes('@');
     case 'demographic': return profile.demographic !== null;
+    case 'photo':       return profile.name.trim().length > 1;
     case 'campus':      return profile.campusId !== null;
     case 'role':        return profile.role !== null;
     case 'skills':      return profile.skills.length >= 2;
@@ -284,6 +293,8 @@ function Steps({ onDismiss }: { onDismiss: () => void }) {
         return <EduEmailScreen onBack={back} onContinue={advance} />;
       case 'demographic':
         return <DemographicScreen onBack={back} onContinue={advance} />;
+      case 'photo':
+        return <PhotoScreen onBack={back} onContinue={advance} />;
       case 'campus':
         return <CampusScreen onBack={back} onContinue={advance} />;
       case 'skills':

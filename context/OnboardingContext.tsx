@@ -1,6 +1,7 @@
 import React, { createContext, ReactNode, useContext, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { readLocalFileAsArrayBuffer } from '../lib/messaging';
+import { setProfileRoleCache } from '../hooks/useProfileRole';
 
 export type Role = 'owner' | 'seeker';
 
@@ -134,6 +135,11 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
       last_meaningful_action_at: new Date().toISOString(),
     });
     if (upsertError) throw upsertError;
+
+    // Write-through to the role cache so the app routes on the fresh role
+    // immediately (the cache may hold a stale `null` from before the
+    // profile row existed).
+    setProfileRoleCache(userId, profile.role);
 
     // Fire-and-forget: generate vibe embedding via Edge Function.
     // Failures are non-fatal — the profile is already saved.

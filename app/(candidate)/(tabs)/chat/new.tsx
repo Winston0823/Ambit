@@ -411,7 +411,14 @@ const styles = StyleSheet.create({
     padding: 0,
   },
 
-  empty: { paddingHorizontal: Space.lg, paddingTop: Space.xl, gap: 8 },
+  empty: {
+    marginHorizontal: Space.lg,
+    marginTop: Space.lg,
+    padding: Space.lg,
+    backgroundColor: Brand.surface1,
+    borderRadius: Radii.lg,
+    gap: 8,
+  },
   emptyTitle: {
     fontFamily: AmbitFont.body,
     fontSize: 16,
@@ -433,7 +440,7 @@ const styles = StyleSheet.create({
     backgroundColor: Brand.cardCream,
     borderWidth: 1,
     borderColor: Brand.borderSoft,
-    borderRadius: Radii.card,
+    borderRadius: Radii.lg,
     padding: 12,
     marginBottom: 12,
   },

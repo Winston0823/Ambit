@@ -173,10 +173,10 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 24,
     paddingTop: 12,
     paddingHorizontal: Space.md,
-    shadowColor: '#000',
-    shadowOpacity: 0.18,
-    shadowRadius: 24,
-    shadowOffset: { width: 0, height: -8 },
+    // Bottom-anchored sheet: crisp ink edge instead of a soft shadow.
+    borderWidth: 1.5,
+    borderBottomWidth: 0,
+    borderColor: Brand.inkEdge,
   },
   // Generous grab strip at the top — the whole zone (not just the 4px notch)
   // is draggable so the sheet is easy to resize.

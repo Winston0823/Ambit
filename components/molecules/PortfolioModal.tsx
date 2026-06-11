@@ -221,7 +221,7 @@ export function PortfolioModal({ item, onDismiss, onSave, onDelete }: Props) {
             {/* Change-photo affordance (edit mode). */}
             {mode === 'edit' && (
               <View style={styles.changePhoto} pointerEvents="none">
-                <Camera size={15} color="#FFFFFF" weight="fill" />
+                <Camera size={15} color={Brand.inkOnBrand} weight="fill" />
                 <Text style={styles.changePhotoText}>{coverUri ? 'Change photo' : 'Add photo'}</Text>
               </View>
             )}
@@ -282,7 +282,7 @@ export function PortfolioModal({ item, onDismiss, onSave, onDelete }: Props) {
                       accessibilityLabel="Open link"
                     >
                       <Text style={styles.linkText} numberOfLines={1}>{prettyUrl(displayItem.linkUrl as string)}</Text>
-                      <ArrowUpRight size={15} color={Brand.accent} weight="bold" />
+                      <ArrowUpRight size={15} color={Brand.actionDeep} weight="bold" />
                     </Pressable>
                   )}
                 </>
@@ -413,13 +413,12 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 360,
     backgroundColor: Brand.canvas,
-    borderRadius: Radii.lg + 4,
+    borderRadius: Radii.card,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOpacity: 0.18,
-    shadowOffset: { width: 0, height: 12 },
-    shadowRadius: 32,
-    elevation: 12,
+    // Crisp ink border instead of a soft shadow (vocabulary: no soft shadows;
+    // a HardShadow wrapper is impractical here since the sheet animates).
+    borderWidth: 1.5,
+    borderColor: Brand.inkEdge,
   },
 
   imgWrap: { width: '100%', height: 220, position: 'relative' },
@@ -448,7 +447,7 @@ const styles = StyleSheet.create({
     borderRadius: Radii.full,
     backgroundColor: 'rgba(20, 20, 20, 0.55)',
   },
-  changePhotoText: { fontFamily: AmbitFont.body, fontSize: 12.5, fontWeight: '600', color: '#FFFFFF' },
+  changePhotoText: { fontFamily: AmbitFont.body, fontSize: 12.5, fontWeight: '600', color: Brand.inkOnBrand },
 
   body: { padding: Space.lg, gap: 12 },
 
@@ -458,7 +457,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     letterSpacing: 1.6,
-    color: Brand.accent,
+    color: Brand.inkMuted,
   },
   title: { fontFamily: AmbitFont.display, fontSize: 26, color: Brand.inkPrimary, lineHeight: 32 },
   description: { ...TypeScale.body, fontSize: 15, color: Brand.inkBody, lineHeight: 22 },
@@ -487,7 +486,7 @@ const styles = StyleSheet.create({
     backgroundColor: Brand.surface1,
     maxWidth: '100%',
   },
-  linkText: { fontFamily: AmbitFont.body, fontSize: 13.5, fontWeight: '700', color: Brand.accent, flexShrink: 1 },
+  linkText: { fontFamily: AmbitFont.body, fontSize: 13.5, fontWeight: '700', color: Brand.actionDeep, flexShrink: 1 },
 
   // ── Edit mode ───────────────────────────────────────────────────────────
   fieldLabel: { ...TypeScale.labelSm, color: Brand.inkLabel },

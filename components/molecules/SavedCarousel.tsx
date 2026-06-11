@@ -2,7 +2,8 @@ import React, { useRef } from 'react';
 import { Animated, Dimensions, Pressable, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import type { DiscoveryCardData } from '../../data/mock';
-import { AmbitFont, Brand, Space } from '../../constants/theme';
+import { HardShadow } from '../atoms';
+import { AmbitFont, Brand, Radii, Space } from '../../constants/theme';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const CARD_W = 152;
@@ -56,6 +57,7 @@ export function SavedCarousel({ cards, onPress }: Props) {
               key={card.id}
               style={[styles.outer, { opacity, transform: [{ translateY }, { scale }, { rotate }] }]}
             >
+              <HardShadow radius={Radii.card} offset={4} style={styles.shadowFill}>
               <Pressable onPress={() => onPress(card)} style={styles.card} accessibilityLabel={`Open ${title}`}>
                 {isSeeker && card.photoUri ? (
                   <Animated.Image
@@ -76,6 +78,7 @@ export function SavedCarousel({ cards, onPress }: Props) {
                   <Text style={styles.title} numberOfLines={2}>{title}</Text>
                 </View>
               </Pressable>
+              </HardShadow>
             </Animated.View>
           );
         })}
@@ -96,16 +99,14 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   outer: { width: CARD_W, height: CARD_H, marginRight: GAP },
+  shadowFill: { flex: 1 },
   card: {
     flex: 1,
-    borderRadius: 20,
+    borderRadius: Radii.card,
     overflow: 'hidden',
     backgroundColor: Brand.seekerInk,
-    shadowColor: '#000',
-    shadowOpacity: 0.18,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 5,
+    borderWidth: 1.5,
+    borderColor: Brand.inkEdge,
   },
   photo: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },
   scrim: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '62%' },
@@ -118,5 +119,5 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.72)',
     marginBottom: 3,
   },
-  title: { fontFamily: AmbitFont.display, fontSize: 17, color: '#FFFFFF', lineHeight: 20 },
+  title: { fontFamily: AmbitFont.display, fontSize: 17, color: Brand.inkOnBrand, lineHeight: 20 },
 });

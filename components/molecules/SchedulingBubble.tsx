@@ -18,6 +18,7 @@ import {
   addAcceptedMeetingToCalendar,
   getStoredLocalEventId,
 } from '../../lib/deviceCalendar';
+import { settleOpenPolls } from '../../lib/availability';
 import { AmbitFont, Brand, Radii } from '../../constants/theme';
 import { StructuredHeader, structuredStyles } from './structuredCard';
 import { Tactile } from '../atoms';
@@ -66,6 +67,13 @@ export function SchedulingBubble({ request, meId, isMine }: Props) {
     setBusy(true);
     try {
       await acceptMeeting(request.id, slotIndex);
+      // An accepted meeting settles the "when can we meet?" question —
+      // close any open availability polls in this conversation so they
+      // stop collecting marks for a decision that's already made. Fire and
+      // forget: the accept itself must not fail on this.
+      settleOpenPolls(request.conversation_id, request.id).catch((e: any) =>
+        console.warn('settleOpenPolls failed:', e?.message ?? e),
+      );
       // Optimistically add the event using a synthesized "accepted" row.
       // The realtime UPDATE will re-render shortly with the same status.
       const accepted = {
@@ -273,30 +281,8 @@ function formatSlot(slot: SchedulingSlot): string {
 }
 
 const styles = StyleSheet.create({
-  card: {
-    width: 280,
-    borderRadius: Radii.lg,
-    // Incoming (theirs) fill — same warm gray as incoming text bubbles
-    // (#ECE9E2) so the card reads as a real bubble on the white canvas;
-    // surface1 (#F6F6F6) was too pale to see. `cardMine` overrides to tan.
-    backgroundColor: '#ECE9E2',
-    padding: 12,
-    gap: 8,
-    // Soft shadow instead of a hard hairline — sits cleanly on white
-    // without the boxed-in feel.
-    shadowColor: '#000',
-    shadowOpacity: 0.06,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
-  },
-  // Outgoing (mine) — dark nav-bar surface to match my message bubbles,
-  // with warm-tan accents (icon / eyebrow / checkmark / CTA) carrying the
-  // brand. Body text stays white via textOnBrand.
-  cardMine: {
-    backgroundColor: Brand.navBarBg,
-    borderColor: Brand.navBarBg,
-  },
+  // (Legacy soft-shadow `card` / `cardMine` styles removed — the bubble
+  // renders on structuredStyles.surfaceLight/Dark cream-island surfaces.)
   headerTextMine: { color: Brand.inkPrimary },
   cardTombstone: { opacity: 0.85 },
 
@@ -342,7 +328,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: Radii.md,
-    backgroundColor: 'rgba(255,255,255,0.18)',
+    backgroundColor: Brand.surface1,
   },
   slotText: {
     fontFamily: AmbitFont.body,
@@ -395,8 +381,8 @@ const styles = StyleSheet.create({
     borderColor: Brand.borderDefault,
   },
   addBtnMine: {
-    backgroundColor: 'rgba(166,199,194,0.22)',
-    borderColor: 'rgba(110,156,161,0.5)',
+    backgroundColor: Brand.surface1,
+    borderColor: Brand.actionDeep,
   },
   addBtnText: {
     fontFamily: AmbitFont.body,

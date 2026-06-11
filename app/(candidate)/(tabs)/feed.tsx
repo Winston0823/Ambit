@@ -16,7 +16,7 @@ import type { IconProps } from 'phosphor-react-native';
 import * as Haptics from 'expo-haptics';
 import { DiscoveryOverview, SwipeDeck } from '../../../components/organisms';
 import { PortfolioModal, ReachOutComposer, BottomSheet, ReachOutLimitSheet } from '../../../components/molecules';
-import { Tactile } from '../../../components/atoms';
+import { HardShadow, Tactile } from '../../../components/atoms';
 import { CAMPUSES } from '../../../data/mock';
 import {
   canReachOut,
@@ -57,25 +57,31 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const isRealUuid = (s: string | null | undefined): s is string =>
   !!s && UUID_RE.test(s);
 
+/// Demo decks are a DEV-ONLY affordance. In production an empty live deck
+/// must render the honest empty state — mock cards look 100% real but their
+/// non-UUID ids dead-end "Reach out" with a "Demo card" alert, so a new
+/// user's very first action would silently fail.
+const DEMO_FALLBACK = __DEV__;
+
 const CARD_GRADIENTS: [string, string][] = [
   [Brand.primary, Brand.accent],
   ['#C9A57A', Brand.seekerInk],
   [Brand.seekerSurface, Brand.accent],
   ['#E8C9A0', Brand.primary],
   [Brand.accent, '#7A5A38'],
-  ['#D4B490', '#4D361D'],
-  [Brand.seekerSurface, '#B48045'],
+  [Brand.primary, Brand.seekerInk],
+  [Brand.seekerSurface, Brand.accent],
 ];
 
 /// Fetches ranked projects for a seeker and maps them to ProjectCardData.
-/// Falls back to MOCK_PROJECTS if the RPC fails or returns nothing.
+/// Falls back to MOCK_PROJECTS (dev only) if the RPC fails or returns nothing.
 async function fetchProjectDeck(userId: string): Promise<ProjectCardData[]> {
   const { data: ranked, error } = await supabase.rpc(
     'compat_projects_for_seeker',
     { p_seeker_id: userId, p_limit: 30 }
   );
 
-  if (error || !ranked || ranked.length === 0) return MOCK_PROJECTS;
+  if (error || !ranked || ranked.length === 0) return DEMO_FALLBACK ? MOCK_PROJECTS : [];
 
   const rows = ranked as {
     project_id: string;
@@ -127,7 +133,7 @@ async function fetchProjectDeck(userId: string): Promise<ProjectCardData[]> {
 }
 
 /// Fetches compatible seekers for an owner's first active project.
-/// Falls back to MOCK_SEEKERS if none found.
+/// Falls back to MOCK_SEEKERS (dev only) if none found.
 async function fetchSeekerDeck(userId: string): Promise<SeekerCardData[]> {
   const { data: projects } = await supabase
     .from('projects')
@@ -137,7 +143,7 @@ async function fetchSeekerDeck(userId: string): Promise<SeekerCardData[]> {
     .order('created_at', { ascending: false })
     .limit(1);
 
-  if (!projects || projects.length === 0) return MOCK_SEEKERS;
+  if (!projects || projects.length === 0) return DEMO_FALLBACK ? MOCK_SEEKERS : [];
 
   const projectId = (projects[0] as { id: string }).id;
   const { data: ranked, error } = await supabase.rpc('compat_for_project', {
@@ -145,7 +151,7 @@ async function fetchSeekerDeck(userId: string): Promise<SeekerCardData[]> {
     p_limit: 30,
   });
 
-  if (error || !ranked || ranked.length === 0) return MOCK_SEEKERS;
+  if (error || !ranked || ranked.length === 0) return DEMO_FALLBACK ? MOCK_SEEKERS : [];
 
   const rows = ranked as { seeker_id: string; score: number }[];
   const seekerIds = rows.map((r) => r.seeker_id);
@@ -155,7 +161,7 @@ async function fetchSeekerDeck(userId: string): Promise<SeekerCardData[]> {
     .select('id, name, photo_url, campus_id, skills, vibe_blurb')
     .in('id', seekerIds);
 
-  if (!seekers || seekers.length === 0) return MOCK_SEEKERS;
+  if (!seekers || seekers.length === 0) return DEMO_FALLBACK ? MOCK_SEEKERS : [];
 
   const scoreMap = Object.fromEntries(rows.map((r) => [r.seeker_id, r.score]));
 
@@ -256,7 +262,9 @@ export default function DiscoveryFeed() {
   }, [fetchDeck]);
 
   const deck = useMemo<DiscoveryCardData[]>(
-    () => liveDeck ?? (role === 'owner' ? MOCK_SEEKERS : MOCK_PROJECTS),
+    () =>
+      liveDeck ??
+      (DEMO_FALLBACK ? (role === 'owner' ? MOCK_SEEKERS : MOCK_PROJECTS) : []),
     [liveDeck, role]
   );
 
@@ -597,7 +605,7 @@ export default function DiscoveryFeed() {
           onPortfolioPress={setActivePortfolio}
           activePortfolioId={activePortfolio?.id ?? null}
           gesturesDisabled={!!reachOutCard || !!activePortfolio}
-          emptyState={<DeckExhausted onRefresh={handleRefresh} isOwner={role === 'owner'} />}
+          emptyState={<DeckExhausted onRefresh={handleRefresh} isOwner={role === 'owner'} neverHadCards={activeDeck.length === 0} />}
         />
       )}
 
@@ -742,10 +750,30 @@ function Skeleton() {
   );
 }
 
-/// Empty-state shown by SwipeDeck once the deck is exhausted. The
-/// "Start over" CTA wires into feed.tsx's handleRefresh — clears the
-/// user's skipped matches so the RPC re-surfaces them.
-function DeckExhausted({ onRefresh, isOwner }: { onRefresh: () => void; isOwner: boolean }) {
+/// Empty-state shown by SwipeDeck. Two distinct situations share it:
+///   - exhausted (deck had cards, user swiped through them) — offer
+///     "Start over", which clears skipped matches so the RPC re-surfaces them
+///   - empty (no live matches at all — e.g. a brand-new campus) — be honest
+///     that nothing is here yet rather than implying they swiped everything
+function DeckExhausted({ onRefresh, isOwner, neverHadCards }: { onRefresh: () => void; isOwner: boolean; neverHadCards: boolean }) {
+  if (neverHadCards) {
+    return (
+      <View style={styles.emptyWrap}>
+        <Text style={styles.emptyTitle}>{isOwner ? 'No candidates yet.' : 'No projects yet.'}</Text>
+        <Text style={styles.emptySub}>
+          {isOwner
+            ? 'Compatible seekers show up here as they join. Make sure you have a live project so they can find you too.'
+            : 'New projects land here as people post them — check back soon.'}
+        </Text>
+        <HardShadow radius={999} offset={4} style={styles.refreshCtaWrap}>
+          <Pressable onPress={onRefresh} style={styles.refreshCta}>
+            <ArrowsClockwise size={18} color={Brand.actionInk} weight="bold" />
+            <Text style={styles.refreshCtaLabel}>Refresh</Text>
+          </Pressable>
+        </HardShadow>
+      </View>
+    );
+  }
   return (
     <View style={styles.emptyWrap}>
       <Text style={styles.emptyTitle}>You're all caught up.</Text>
@@ -754,10 +782,12 @@ function DeckExhausted({ onRefresh, isOwner }: { onRefresh: () => void; isOwner:
           ? "Want to see more candidates? Bring back the people you passed on and start fresh."
           : "Want another look? Bring back the projects you skipped and start fresh."}
       </Text>
-      <Pressable onPress={onRefresh} style={styles.refreshCta}>
-        <ArrowsClockwise size={18} color={Brand.inkOnBrand} weight="bold" />
-        <Text style={styles.refreshCtaLabel}>Start over</Text>
-      </Pressable>
+      <HardShadow radius={999} offset={4} style={styles.refreshCtaWrap}>
+        <Pressable onPress={onRefresh} style={styles.refreshCta}>
+          <ArrowsClockwise size={18} color={Brand.actionInk} weight="bold" />
+          <Text style={styles.refreshCtaLabel}>Start over</Text>
+        </Pressable>
+      </HardShadow>
     </View>
   );
 }
@@ -879,20 +909,22 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 20,
   },
+  refreshCtaWrap: { marginTop: 12 },
   refreshCta: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: Brand.primary,
+    backgroundColor: Brand.action,
     paddingHorizontal: 20,
     paddingVertical: 12,
-    borderRadius: Radii.md,
-    marginTop: 12,
+    borderRadius: 999,
+    borderWidth: 1.6,
+    borderColor: Brand.actionInk,
   },
   refreshCtaLabel: {
     fontFamily: AmbitFont.body,
     fontSize: 15,
-    fontWeight: '600',
-    color: Brand.inkOnBrand,
+    fontWeight: '700',
+    color: Brand.actionInk,
   },
 });
