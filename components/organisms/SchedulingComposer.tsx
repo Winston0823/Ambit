@@ -5,15 +5,23 @@ import {
   Modal,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { CalendarPlus, Plus, X } from 'phosphor-react-native';
+import { CalendarPlus, Check, Plus, X } from 'phosphor-react-native';
 import { buildSlot, proposeMeeting, type SchedulingSlot } from '../../lib/scheduling';
 import { HardShadow } from '../atoms';
+import {
+  formatCellLabel,
+  listAvailabilityPolls,
+  listAvailabilityResponses,
+  overlapCellKeys,
+  selectedCellKeys,
+} from '../../lib/availability';
 import { AmbitFont, Brand, Radii, Space } from '../../constants/theme';
 
 interface Props {
@@ -27,12 +35,15 @@ interface Props {
 
 const DURATIONS = [15, 30, 45, 60] as const;
 
-/// Bottom-sheet composer for proposing 1-3 meeting slots. Each slot is
-/// a single date+time pick (duration is shared across all slots). On
-/// send, calls propose_meeting RPC. The calendar permission ask happens
-/// later — on accept (recipient) or when tapping "Add to my calendar"
-/// (proposer) — so a propose-and-cancel flow never touches the user's
-/// calendar.
+/// Bottom-sheet composer for proposing 1-3 meeting slots.
+///
+/// If the conversation has an open availability poll where both users
+/// have responded, the "PROPOSE WHEN" section shows the overlapping
+/// slots as selectable chips (up to 3). The user can still tap
+/// "or pick a different time" to switch to the free-form date picker.
+///
+/// If there is no poll / only one user has responded / no overlap, the
+/// composer falls straight through to the existing date+time picker.
 export function SchedulingComposer({
   visible,
   conversationId,
@@ -44,19 +55,88 @@ export function SchedulingComposer({
   const [duration, setDuration]       = useState<number>(30);
   const [slotDates, setSlotDates]     = useState<Date[]>([defaultSlotStart()]);
   const [pickerOpenIdx, setPickerOpenIdx] = useState<number | null>(null);
-  const [pickerMode, setPickerMode]   = useState<'date' | 'time'>('date');
   const [sending, setSending]         = useState(false);
 
-  // Reset state when the sheet reopens with a new conversation.
+  // ── Availability overlap state ────────────────────────────────────
+  /// Dates derived from the intersection of both users' availability.
+  const [overlapDates, setOverlapDates]   = useState<Date[]>([]);
+  /// Duration from the poll — pre-fills the duration picker.
+  const [pollDuration, setPollDuration]   = useState<number | null>(null);
+  /// Whether we're showing the overlap chip list (true) or the
+  /// free-form date picker (false).
+  const [useOverlapMode, setUseOverlapMode] = useState(false);
+  /// Keys of the overlap chips the user has selected.
+  const [selectedKeys, setSelectedKeys]   = useState<Set<string>>(new Set());
+
+  // Reset UI state when the sheet reopens.
   useEffect(() => {
     if (visible) {
       setTitle(defaultTitle);
       setDuration(30);
       setSlotDates([defaultSlotStart()]);
       setPickerOpenIdx(null);
-      setPickerMode('date');
+      setOverlapDates([]);
+      setPollDuration(null);
+      setUseOverlapMode(false);
+      setSelectedKeys(new Set());
     }
   }, [visible, defaultTitle]);
+
+  // Fetch availability overlap when the sheet opens.
+  useEffect(() => {
+    if (!visible || !conversationId) return;
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const polls = await listAvailabilityPolls(conversationId);
+        // Most-recent open poll wins.
+        const openPoll = [...polls].reverse().find((p) => p.status === 'open');
+        if (!openPoll || cancelled) return;
+
+        const responses = await listAvailabilityResponses(openPoll.id);
+        if (cancelled) return;
+
+        // Need responses from both participants.
+        const r1 = responses.find((r) => r.user_id === openPoll.proposer_id);
+        const r2 = responses.find((r) => r.user_id === openPoll.recipient_id);
+        if (!r1 || !r2) return;
+
+        const keys1 = selectedCellKeys(r1.selected_slots);
+        const keys2 = selectedCellKeys(r2.selected_slots);
+        const overlapKeyList = overlapCellKeys(keys1, keys2);
+        if (overlapKeyList.length === 0) return;
+
+        const dates = overlapKeyList.map((k) => new Date(k));
+        if (!cancelled) {
+          setOverlapDates(dates);
+          setPollDuration(openPoll.duration_min);
+          setDuration(openPoll.duration_min);
+          setUseOverlapMode(true);
+          // Pre-select the first 3 overlap slots so the user can send
+          // immediately without having to tap anything.
+          setSelectedKeys(new Set(overlapKeyList.slice(0, 3)));
+        }
+      } catch (e) {
+        // Non-fatal — fall back to free-form picker silently.
+        console.warn('SchedulingComposer: could not load availability overlap:', e);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [visible, conversationId]);
+
+  const toggleOverlapSlot = (key: string) => {
+    setSelectedKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else if (next.size < 3) {
+        next.add(key);
+      }
+      return next;
+    });
+  };
 
   const updateSlotDate = (idx: number, newDate: Date) => {
     setSlotDates((prev) => prev.map((d, i) => (i === idx ? newDate : d)));
@@ -65,10 +145,7 @@ export function SchedulingComposer({
   const addSlot = () => {
     if (slotDates.length >= 3) return;
     const last = slotDates[slotDates.length - 1];
-    // Default the next slot to a day after the previous one so the user
-    // isn't proposing three identical times.
-    const next = new Date(last.getTime() + 24 * 60 * 60 * 1000);
-    setSlotDates((prev) => [...prev, next]);
+    setSlotDates((prev) => [...prev, new Date(last.getTime() + 24 * 60 * 60 * 1000)]);
   };
 
   const removeSlot = (idx: number) => {
@@ -76,16 +153,28 @@ export function SchedulingComposer({
     setSlotDates((prev) => prev.filter((_, i) => i !== idx));
   };
 
+  const canSend = useOverlapMode
+    ? selectedKeys.size > 0
+    : slotDates.length > 0;
+
   const send = async () => {
-    if (!conversationId || sending) return;
+    if (!conversationId || sending || !canSend) return;
     setSending(true);
     try {
-      const slots: SchedulingSlot[] = slotDates.map((d) => buildSlot(d, duration));
+      let slots: SchedulingSlot[];
+      const effectiveDuration = pollDuration ?? duration;
+
+      if (useOverlapMode && selectedKeys.size > 0) {
+        slots = Array.from(selectedKeys).map((key) => buildSlot(new Date(key), effectiveDuration));
+      } else {
+        slots = slotDates.map((d) => buildSlot(d, duration));
+      }
+
       const requestId = await proposeMeeting({
         conversationId,
         slots,
         title:       title.trim() || 'Quick chat',
-        durationMin: duration,
+        durationMin: effectiveDuration,
       });
       onProposed(requestId);
       onClose();
@@ -138,17 +227,9 @@ export function SchedulingComposer({
                     <Pressable
                       key={d}
                       onPress={() => setDuration(d)}
-                      style={[
-                        styles.durationChip,
-                        selected && styles.durationChipSelected,
-                      ]}
+                      style={[styles.durationChip, selected && styles.durationChipSelected]}
                     >
-                      <Text
-                        style={[
-                          styles.durationChipText,
-                          selected && styles.durationChipTextSelected,
-                        ]}
-                      >
+                      <Text style={[styles.durationChipText, selected && styles.durationChipTextSelected]}>
                         {d} min
                       </Text>
                     </Pressable>
@@ -157,55 +238,92 @@ export function SchedulingComposer({
               </View>
             </Field>
 
-            <Field label={`PROPOSE WHEN  ·  ${slotDates.length} / 3`}>
-              <View style={{ gap: 8 }}>
-                {slotDates.map((d, i) => (
-                  <View key={i} style={styles.slotRow}>
-                    <Pressable
-                      onPress={() => {
-                        setPickerMode('date');
-                        setPickerOpenIdx(i);
-                      }}
-                      style={styles.slotChip}
-                    >
-                      <Text style={styles.slotChipText}>{formatDate(d)}</Text>
-                    </Pressable>
-                    <Pressable
-                      onPress={() => {
-                        setPickerMode('time');
-                        setPickerOpenIdx(i);
-                      }}
-                      style={styles.slotChip}
-                    >
-                      <Text style={styles.slotChipText}>{formatTime(d)}</Text>
-                    </Pressable>
-                    {slotDates.length > 1 && (
+            {useOverlapMode ? (
+              // ── Overlap mode: both users have filled out availability ──
+              <Field label={`RECOMMENDED TIMES  ·  ${selectedKeys.size} / 3 selected`}>
+                <Text style={styles.overlapHint}>
+                  These slots work for both of you. Tap to deselect.
+                </Text>
+                <ScrollView
+                  style={styles.overlapList}
+                  showsVerticalScrollIndicator={false}
+                  keyboardShouldPersistTaps="handled"
+                >
+                  {overlapDates.map((d) => {
+                    const key = d.toISOString();
+                    const isSelected = selectedKeys.has(key);
+                    const atLimit = selectedKeys.size >= 3 && !isSelected;
+                    return (
                       <Pressable
-                        onPress={() => removeSlot(i)}
-                        hitSlop={6}
-                        style={styles.removeBtn}
-                        accessibilityLabel="Remove this slot"
+                        key={key}
+                        onPress={() => !atLimit && toggleOverlapSlot(key)}
+                        style={[
+                          styles.overlapChip,
+                          isSelected && styles.overlapChipSelected,
+                          atLimit && styles.overlapChipDisabled,
+                        ]}
+                        accessibilityRole="checkbox"
+                        accessibilityState={{ checked: isSelected, disabled: atLimit }}
                       >
-                        <X size={14} color={Brand.inkMuted} weight="bold" />
+                        <Text style={[styles.overlapChipText, isSelected && styles.overlapChipTextSelected]}>
+                          {formatCellLabel(d)}
+                        </Text>
+                        {isSelected && (
+                          <Check size={14} color={Brand.actionInk} weight="bold" />
+                        )}
                       </Pressable>
-                    )}
-                  </View>
-                ))}
+                    );
+                  })}
+                </ScrollView>
+                <Pressable onPress={() => setUseOverlapMode(false)} style={styles.switchModeBtn}>
+                  <Text style={styles.switchModeText}>or pick a different time</Text>
+                </Pressable>
+              </Field>
+            ) : (
+              // ── Free-form mode: single combined chip → bottom-sheet picker
+              <Field label={`PROPOSE WHEN  ·  ${slotDates.length} / 3`}>
+                <View style={{ gap: 8 }}>
+                  {slotDates.map((d, i) => (
+                    <View key={i} style={styles.slotRow}>
+                      <Pressable
+                        onPress={() => setPickerOpenIdx(i)}
+                        style={[styles.slotChip, styles.slotChipCombined]}
+                      >
+                        <Text style={styles.slotChipText}>
+                          {formatDate(d)}  ·  {formatTime(d)}
+                        </Text>
+                      </Pressable>
+                      {slotDates.length > 1 && (
+                        <Pressable onPress={() => removeSlot(i)} hitSlop={6} style={styles.removeBtn}>
+                          <X size={14} color={Brand.inkMuted} weight="bold" />
+                        </Pressable>
+                      )}
+                    </View>
+                  ))}
 
-                {slotDates.length < 3 && (
-                  <Pressable onPress={addSlot} style={styles.addBtn}>
-                    <Plus size={14} color={Brand.accent} weight="bold" />
-                    <Text style={styles.addBtnText}>Add another time</Text>
-                  </Pressable>
-                )}
-              </View>
-            </Field>
+                  {slotDates.length < 3 && (
+                    <Pressable onPress={addSlot} style={styles.addBtn}>
+                      <Plus size={14} color={Brand.accent} weight="bold" />
+                      <Text style={styles.addBtnText}>Add another time</Text>
+                    </Pressable>
+                  )}
+
+                  {overlapDates.length > 0 && (
+                    <Pressable onPress={() => setUseOverlapMode(true)} style={styles.switchModeBtn}>
+                      <Text style={styles.switchModeText}>
+                        ← Use matching times from availability poll
+                      </Text>
+                    </Pressable>
+                  )}
+                </View>
+              </Field>
+            )}
 
             <HardShadow radius={999} offset={4} style={styles.sendBtnShadow}>
               <Pressable
                 onPress={send}
-                disabled={sending || !conversationId}
-                style={[styles.sendBtn, (sending || !conversationId) && styles.sendBtnDisabled]}
+                disabled={sending || !conversationId || !canSend}
+                style={[styles.sendBtn, (sending || !conversationId || !canSend) && styles.sendBtnDisabled]}
               >
                 <CalendarPlus size={16} color={Brand.actionInk} weight="bold" />
                 <Text style={styles.sendBtnText}>
@@ -217,39 +335,157 @@ export function SchedulingComposer({
         </KeyboardAvoidingView>
       </Pressable>
 
-      {pickerOpenIdx !== null && (
-        <DateTimePicker
-          value={slotDates[pickerOpenIdx]}
-          mode={pickerMode}
-          minimumDate={new Date()}
-          onChange={(event, selected) => {
-            // Android: callback fires once with type 'set' or 'dismissed'
-            // and the picker auto-closes. iOS spinner: fires repeatedly
-            // and we close manually on user tap-away (handled elsewhere).
-            if (Platform.OS === 'android') {
-              setPickerOpenIdx(null);
-              if (event.type === 'set' && selected) {
-                updateSlotDate(pickerOpenIdx, selected);
-              }
-            } else if (selected) {
-              updateSlotDate(pickerOpenIdx, selected);
-            }
-          }}
-        />
-      )}
-      {Platform.OS === 'ios' && pickerOpenIdx !== null && (
-        <Pressable style={styles.iosPickerDoneOverlay} onPress={() => setPickerOpenIdx(null)}>
-          <View style={styles.iosPickerDoneBtn}>
-            <Text style={styles.iosPickerDoneText}>Done</Text>
-          </View>
-        </Pressable>
-      )}
+      <SlotPickerSheet
+        visible={pickerOpenIdx !== null}
+        value={pickerOpenIdx !== null ? slotDates[pickerOpenIdx] : new Date()}
+        onConfirm={(d) => {
+          if (pickerOpenIdx !== null) updateSlotDate(pickerOpenIdx, d);
+          setPickerOpenIdx(null);
+        }}
+        onClose={() => setPickerOpenIdx(null)}
+      />
     </Modal>
   );
 }
 
+/// Bottom-sheet popup for picking date + time for a single slot.
+/// iOS: shows a single inline datetime spinner (no extra taps).
+/// Android: two-step — date dialog then time dialog.
+function SlotPickerSheet({
+  visible,
+  value,
+  onConfirm,
+  onClose,
+}: {
+  visible:   boolean;
+  value:     Date;
+  onConfirm: (d: Date) => void;
+  onClose:   () => void;
+}) {
+  const [draft, setDraft]             = useState<Date>(value);
+  const [androidStep, setAndroidStep] = useState<'date' | 'time'>('date');
+
+  // Sync draft to the incoming value whenever the sheet opens.
+  useEffect(() => {
+    if (visible) {
+      setDraft(value);
+      setAndroidStep('date');
+    }
+  }, [visible]);
+
+  if (!visible) return null;
+
+  // ── Android: modal dialogs chained date → time ───────────────────
+  if (Platform.OS === 'android') {
+    return (
+      <DateTimePicker
+        value={draft}
+        mode={androidStep}
+        minimumDate={new Date()}
+        onChange={(event, selected) => {
+          if (event.type !== 'set' || !selected) {
+            onClose();
+            return;
+          }
+          if (androidStep === 'date') {
+            // Keep the existing time, update only the date portion.
+            const next = new Date(selected);
+            next.setHours(draft.getHours(), draft.getMinutes(), 0, 0);
+            setDraft(next);
+            setAndroidStep('time');
+          } else {
+            // Keep the date, update time portion.
+            const next = new Date(draft);
+            next.setHours(selected.getHours(), selected.getMinutes(), 0, 0);
+            onConfirm(next);
+          }
+        }}
+      />
+    );
+  }
+
+  // ── iOS: bottom sheet with inline datetime spinner ────────────────
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <Pressable style={pickerStyles.backdrop} onPress={() => { onConfirm(draft); onClose(); }}>
+        <Pressable style={pickerStyles.sheet} onPress={() => {}}>
+          <View style={pickerStyles.handle} />
+          <View style={pickerStyles.header}>
+            <Pressable onPress={onClose} hitSlop={10}>
+              <Text style={pickerStyles.cancel}>Cancel</Text>
+            </Pressable>
+            <Text style={pickerStyles.title}>Date & Time</Text>
+            <Pressable onPress={() => { onConfirm(draft); onClose(); }} hitSlop={10}>
+              <Text style={pickerStyles.done}>Done</Text>
+            </Pressable>
+          </View>
+          <DateTimePicker
+            value={draft}
+            mode="datetime"
+            display="spinner"
+            minimumDate={new Date()}
+            onChange={(_event, selected) => { if (selected) setDraft(selected); }}
+            style={pickerStyles.spinner}
+          />
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
+const pickerStyles = StyleSheet.create({
+  backdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'flex-end',
+  },
+  sheet: {
+    backgroundColor: Brand.canvas,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingBottom: 36,
+  },
+  handle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: Brand.borderDefault,
+    alignSelf: 'center',
+    marginTop: 10,
+    marginBottom: 4,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: Brand.borderDefault,
+  },
+  title: {
+    fontFamily: AmbitFont.body,
+    fontSize: 15,
+    fontWeight: '600',
+    color: Brand.inkPrimary,
+  },
+  cancel: {
+    fontFamily: AmbitFont.body,
+    fontSize: 15,
+    color: Brand.inkMuted,
+  },
+  done: {
+    fontFamily: AmbitFont.body,
+    fontSize: 15,
+    fontWeight: '700',
+    color: Brand.accent,
+  },
+  spinner: {
+    width: '100%',
+  },
+});
+
 function defaultSlotStart(): Date {
-  // Round up to the next half-hour at least 1 hour out.
   const d = new Date();
   d.setHours(d.getHours() + 1);
   const mins = d.getMinutes();
@@ -258,24 +494,14 @@ function defaultSlotStart(): Date {
 }
 
 function formatDate(d: Date): string {
-  return d.toLocaleDateString(undefined, {
-    weekday: 'short', month: 'short', day: 'numeric',
-  });
+  return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
 }
 
 function formatTime(d: Date): string {
-  return d.toLocaleTimeString(undefined, {
-    hour: 'numeric', minute: '2-digit',
-  });
+  return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
 }
 
-function Field({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <View style={styles.field}>
       <Text style={styles.label}>{label}</Text>
@@ -350,11 +576,49 @@ const styles = StyleSheet.create({
   },
   durationChipTextSelected: { color: Brand.actionInk, fontWeight: '700' },
 
-  slotRow: {
+  // ── Overlap chips ─────────────────────────────────────────────────
+  overlapHint: {
+    fontFamily: AmbitFont.body,
+    fontSize: 12,
+    color: Brand.inkMuted,
+    marginBottom: 6,
+  },
+  overlapList: { maxHeight: 180 },
+  overlapChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    borderRadius: Radii.md,
+    backgroundColor: Brand.surface1,
+    borderWidth: 1.5,
+    borderColor: Brand.borderDefault,
+    marginBottom: 6,
   },
+  overlapChipSelected: {
+    backgroundColor: Brand.action,
+    borderColor: Brand.actionInk,
+  },
+  overlapChipDisabled: { opacity: 0.4 },
+  overlapChipText: {
+    fontFamily: AmbitFont.body,
+    fontSize: 14,
+    color: Brand.inkBody,
+    fontWeight: '600',
+  },
+  overlapChipTextSelected: { color: Brand.actionInk },
+
+  switchModeBtn: { alignSelf: 'flex-start', marginTop: 2 },
+  switchModeText: {
+    fontFamily: AmbitFont.body,
+    fontSize: 13,
+    color: Brand.inkMuted,
+    textDecorationLine: 'underline',
+  },
+
+  // ── Free-form slots ───────────────────────────────────────────────
+  slotRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   slotChip: {
     flex: 1,
     paddingHorizontal: 12,
@@ -363,6 +627,10 @@ const styles = StyleSheet.create({
     backgroundColor: Brand.surface1,
     borderWidth: 1.5,
     borderColor: Brand.borderDefault,
+  },
+  slotChipCombined: {
+    // Slightly taller so the combined date · time reads comfortably.
+    paddingVertical: 13,
   },
   slotChipText: {
     fontFamily: AmbitFont.body,
@@ -376,7 +644,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-
   addBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -395,6 +662,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
+  // ── Send ─────────────────────────────────────────────────────────
   sendBtnShadow: {
     marginTop: Space.sm,
   },
