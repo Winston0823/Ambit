@@ -152,8 +152,9 @@ export default function ChatTab() {
     return () => clearTimeout(t);
   }, [archivedUndo]);
 
-  // Pin / unpin via long-press. Surfaces the `pin_limit_reached` error
-  // verbatim as a friendly alert; optimistic-updates the row so the
+  // Pin / unpin — triggered by the inbox row's swipe-left Pin action (and by
+  // long-pressing a pinned avatar in the strip). Surfaces the `pin_limit_reached`
+  // error verbatim as a friendly alert; optimistic-updates the row so the
   // pinned strip reflects the change before the next refetch.
   const handleTogglePin = useCallback(async (item: InboxItem) => {
     if (Platform.OS !== 'web') Haptics.selectionAsync().catch(() => {});
@@ -225,7 +226,7 @@ export default function ChatTab() {
               meId={user.id}
               onPress={() => openConversation(item.conversation_id)}
               onPassRequest={(id) => setPassTargetId(id)}
-              onLongPress={handleTogglePin}
+              onPin={handleTogglePin}
               onMute={handleMute}
               onArchive={handleArchive}
             />
