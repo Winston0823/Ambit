@@ -18,14 +18,11 @@ const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 /// exactly once (a new/sent message), never again on FlatList scroll-recycle.
 const animatedMsgIds = new Set<string>();
 
-// Screen-anchored gradient revealed through my (outgoing) bubbles. The
-// gradient is the size of the whole screen and stays pinned to the viewport;
-// each bubble clips it to its own rect, so a bubble shows whatever slice it
-// currently sits over — and that slice shifts as you scroll. Tweak the
-// colors / direction freely; everything else is positioning math.
-// Tonal warm-brown → espresso. Single hue family (no olive-gold), so the
-// windowed effect reads cleanly instead of muddy.
-const MINE_GRADIENT = ['#B6D2CE', '#A6C7C2', '#9BBFBA'] as const; // teal (dark ink text on top)
+// Screen-anchored "gradient" layer revealed through my (outgoing) bubbles.
+// Vocabulary-locked: outgoing bubbles are now a FLAT Brand.action fill, so
+// the stops are identical — the LinearGradient plumbing stays (positioning
+// math + clipping unchanged) but renders as one solid teal.
+const MINE_GRADIENT = [Brand.action, Brand.action] as const; // flat teal (dark ink text on top)
 const MINE_GRADIENT_START = { x: 0.4, y: 0 };
 const MINE_GRADIENT_END = { x: 0.6, y: 1 };
 import type { MessageRow, ReactionRow } from '../../lib/messaging';
@@ -90,6 +87,9 @@ interface Props {
   /// AvailabilityPollBubble. Tap on "Open" propagates up.
   availabilityPoll?: AvailabilityPollRow | null;
   onOpenAvailabilityPoll?: (pollId: string) => void;
+  /// Opens the SchedulingComposer (propose flow). Surfaced by the poll
+  /// bubble once both sides have marked times and overlap exists.
+  onProposeMeetingTime?: () => void;
   /// When the message carries an attached project, the parent provides the
   /// project row so the bubble renders a tappable project card. Tap opens
   /// the preview (propagated up via onOpenProjectRef).
@@ -192,6 +192,7 @@ export function MessageBubble({
   schedulingRequest,
   availabilityPoll,
   onOpenAvailabilityPoll,
+  onProposeMeetingTime,
   projectRef,
   onOpenProjectRef,
   portfolioRef,
@@ -272,7 +273,9 @@ export function MessageBubble({
         <AvailabilityPollBubble
           poll={availabilityPoll}
           isMine={isMine}
+          meId={meId}
           onOpen={() => onOpenAvailabilityPoll?.(availabilityPoll.id)}
+          onProposeTime={() => onProposeMeetingTime?.()}
         />
       </View>
     );
@@ -579,15 +582,10 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     maxWidth: '85%',
     borderWidth: 1,
-    borderColor: Brand.hearthGlassEdge,
-    shadowColor: Brand.hearthGlassShadow,
-    shadowOpacity: 1,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 2,
+    borderColor: Brand.borderSoft,
   },
-  systemPillMuted: { backgroundColor: Brand.hearthGlassBg },
-  systemPillWarm:  { backgroundColor: 'rgba(255,243,222,0.85)' },
+  systemPillMuted: { backgroundColor: Brand.cardCream },
+  systemPillWarm:  { backgroundColor: Brand.tagMint },
   systemText: {
     fontFamily: AmbitFont.body,
     fontSize: 13,
@@ -606,10 +604,9 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   bubbleMine: {
-    // Solid fallback (the midpoint taupe) — shown until the screen-anchored
-    // gradient measures + mounts, and on any bubble where the gradient is
-    // suppressed (failed / deleted).
-    backgroundColor: Brand.action, // teal fallback (matches the gradient)
+    // Flat teal fill, borderless — the hard ink border is reserved for
+    // tactile (pressable) surfaces; plain text bubbles stay quiet.
+    backgroundColor: Brand.action,
     borderBottomRightRadius: 4,
   },
   // Screen-sized gradient layer clipped by the bubble's rounded rect.
@@ -625,18 +622,12 @@ const styles = StyleSheet.create({
     height: SCREEN_H,
   },
   bubbleTheirs: {
-    // Warm incoming surface with real depth — a soft drop shadow + hairline so
-    // it reads as a crafted, lifted card on the white canvas (parity with the
-    // gradient mine bubble), tied into the warm-tan brand rather than neutral.
-    backgroundColor: Brand.cardCream, // lighter than the eggshell bg → lifts off it
+    // Incoming surface — cream on eggshell with only a soft hairline for
+    // separation; hard ink borders are reserved for interactive bubbles.
+    backgroundColor: Brand.cardCream,
     borderBottomLeftRadius: 4,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(28,28,26,0.08)',
-    shadowColor: Brand.hearthBubbleTheirsShadow,
-    shadowOpacity: 1,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 1,
+    borderWidth: 1,
+    borderColor: Brand.borderSoft,
   },
   // Mid-run bubbles round their tail corner (the tail belongs to the last one).
   bubbleTheirsGrouped: { borderBottomLeftRadius: 20 },
@@ -708,7 +699,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: Brand.inkMuted,
   },
-  replyBodyMine: { color: 'rgba(28,28,26,0.72)' },
+  replyBodyMine: { color: Brand.actionInk },
   replyBodyRow: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -92,6 +92,26 @@ export async function finalizeAvailabilityPoll(
   return data as string;
 }
 
+/// An accepted meeting answers "when can we meet?" — settle every still-open
+/// poll in the conversation by closing it and pointing it at the scheduling
+/// request that resolved it. Idempotent (only touches rows still 'open'),
+/// so it's safe if both participants' devices race to call it.
+export async function settleOpenPolls(
+  conversationId:      string,
+  schedulingRequestId: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from('availability_polls')
+    .update({
+      status:                        'closed',
+      settled_scheduling_request_id: schedulingRequestId,
+      updated_at:                    new Date().toISOString(),
+    })
+    .eq('conversation_id', conversationId)
+    .eq('status', 'open');
+  if (error) throw error;
+}
+
 export async function listAvailabilityPolls(
   conversationId: string,
 ): Promise<AvailabilityPollRow[]> {

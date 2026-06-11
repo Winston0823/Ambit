@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Images, PaperPlaneTilt, Stack, X } from 'phosphor-react-native';
 import * as Haptics from 'expo-haptics';
+import { HardShadow } from '../atoms';
 import { AmbitFont, Brand, Radii, Space } from '../../constants/theme';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
@@ -599,6 +600,7 @@ function TileFace({
   radius: number;
 }) {
   return (
+    <HardShadow radius={radius} offset={4}>
     <View style={[styles.tileFace, { width: size, height: size * 1.18, borderRadius: radius }]}>
       {item.imageUrl ? (
         <Image source={{ uri: item.imageUrl }} style={StyleSheet.absoluteFill} />
@@ -622,6 +624,7 @@ function TileFace({
       />
       <View style={[styles.tileRim, { borderRadius: radius }]} pointerEvents="none" />
     </View>
+    </HardShadow>
   );
 }
 
@@ -691,9 +694,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 15,
-    backgroundColor: '#1A1A1A',
+    backgroundColor: Brand.inkPrimary,
   },
-  collapsedLabelText: { fontFamily: AmbitFont.body, fontSize: 12.5, fontWeight: '700', color: '#FFFFFF' },
+  collapsedLabelText: { fontFamily: AmbitFont.body, fontSize: 12.5, fontWeight: '700', color: Brand.inkOnBrand },
   collapsedHint: { fontFamily: AmbitFont.body, fontSize: 13, color: Brand.inkMuted },
   // Cards are absolutely centered in this box; translateX spreads them apart.
   // Height ≈ a collapsed card; expanded cards overflow upward (not clipped).
@@ -725,11 +728,6 @@ const styles = StyleSheet.create({
   tileFace: {
     overflow: 'hidden',
     backgroundColor: Brand.surface2,
-    shadowColor: '#281810',
-    shadowOpacity: 0.3,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 12 },
-    elevation: 10,
   },
   tileRim: {
     ...StyleSheet.absoluteFillObject,
@@ -746,14 +744,9 @@ const styles = StyleSheet.create({
     height: 70,
     borderRadius: 120,
     backgroundColor: 'rgba(212,180,144,0.24)',
-    shadowColor: Brand.accent,
-    shadowOpacity: 0.5,
-    shadowRadius: 30,
-    shadowOffset: { width: 0, height: 12 },
-    elevation: 10,
   },
-  fanLabel: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 15, backgroundColor: '#1A1A1A', maxWidth: 130 },
-  fanLabelText: { fontFamily: AmbitFont.body, fontSize: 12.5, fontWeight: '700', color: '#FFFFFF' },
+  fanLabel: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 15, backgroundColor: Brand.inkPrimary, maxWidth: 130 },
+  fanLabelText: { fontFamily: AmbitFont.body, fontSize: 12.5, fontWeight: '700', color: Brand.inkOnBrand },
   trayCaption: { fontFamily: AmbitFont.body, fontSize: 19, fontWeight: '700', color: Brand.inkLabel },
 
   // ── Celebration ────────────────────────────────────────────────────────

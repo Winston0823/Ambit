@@ -253,7 +253,7 @@ export default function SavedScreen() {
                 style={styles.swipeRemove}
                 accessibilityLabel="Remove from saved"
               >
-                <Trash size={20} color="#FFFFFF" weight="bold" />
+                <Trash size={20} color={Brand.inkOnBrand} weight="bold" />
                 <Text style={styles.swipeRemoveText}>Remove</Text>
               </Pressable>
             )}
@@ -335,7 +335,7 @@ export default function SavedScreen() {
             accessibilityRole="button"
             accessibilityLabel="Close preview"
           >
-            <X size={20} color="#FFFFFF" weight="bold" />
+            <X size={20} color={Brand.inkOnBrand} weight="bold" />
           </Pressable>
         </View>
       </Modal>
@@ -368,6 +368,7 @@ export default function SavedScreen() {
           pointerEvents="box-none"
           style={[styles.toastWrap, { bottom: insets.bottom + 16 }]}
         >
+          <HardShadow radius={999} offset={4}>
           <Animated.View
             style={[
               styles.toast,
@@ -379,6 +380,7 @@ export default function SavedScreen() {
               <Text style={styles.toastBtnText}>Undo</Text>
             </Tactile>
           </Animated.View>
+          </HardShadow>
         </Animated.View>
       ) : null}
 
@@ -464,12 +466,12 @@ const styles = StyleSheet.create({
     width: 92,
     marginLeft: 8,
     borderRadius: 16,
-    backgroundColor: '#C2453B',
+    backgroundColor: Brand.danger,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 3,
   },
-  swipeRemoveText: { fontFamily: AmbitFont.body, fontSize: 12, fontWeight: '700', color: '#FFFFFF' },
+  swipeRemoveText: { fontFamily: AmbitFont.body, fontSize: 12, fontWeight: '700', color: Brand.inkOnBrand },
   noteTag: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -495,11 +497,8 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 999,
     backgroundColor: Brand.inkPrimary,
-    shadowColor: '#000',
-    shadowOpacity: 0.2,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 8,
+    borderWidth: 1.5,
+    borderColor: Brand.inkEdge,
   },
   toastText: { fontFamily: AmbitFont.body, fontSize: 14, fontWeight: '600', color: Brand.canvas },
   toastBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 999, backgroundColor: Brand.action },

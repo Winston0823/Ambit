@@ -520,24 +520,19 @@ function ProofLink({
 const styles = StyleSheet.create({
   backdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: '#000',
+    backgroundColor: Brand.inkEdge,
     zIndex: 20,
   },
 
   // The island itself — absolutely positioned, centered horizontally.
-  // Hearth: warm amber shadow + soft white edge so the pill reads as
-  // floating glass against the cream wash.
+  // Crisp ink border instead of the retired glass shadow — a HardShadow
+  // wrapper is impractical on an absolutely-positioned, size-animating view.
   island: {
     position: 'absolute',
     overflow: 'hidden',
     zIndex: 30,
-    borderWidth: 1,
-    borderColor: Brand.hearthGlassEdge,
-    shadowColor: Brand.hearthGlassShadow,
-    shadowOpacity: 1,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: 8,
+    borderWidth: 1.5,
+    borderColor: Brand.inkEdge,
   },
 
   // Collapsed pill content — Hearth direction. Glassy pill with photo
@@ -583,7 +578,7 @@ const styles = StyleSheet.create({
   pillStatusDot: {
     fontFamily: AmbitFont.body,
     fontSize: 10,
-    color: Brand.hearthPresenceGreen,
+    color: Brand.actionDeep,
     lineHeight: 14,
   },
   pillName: {

@@ -32,7 +32,7 @@ import {
   type InboxFilter,
   type InboxItem,
 } from '../../../../lib/messaging';
-import { AmbitFont, Brand, Space } from '../../../../constants/theme';
+import { AmbitFont, Brand, Radii, Space } from '../../../../constants/theme';
 
 /// S-050 Inbox v4. Editorial paper canvas. "ambit" wordmark + side
 /// icons up top, large italic "Chats" title, iMessage-style pinned
@@ -274,12 +274,14 @@ export default function ChatTab() {
 
       {archivedUndo && (
         <View style={[styles.undoToastWrap, { bottom: insets.bottom + 16 }]} pointerEvents="box-none">
-          <View style={styles.undoToast}>
-            <Text style={styles.undoToastText}>Archived</Text>
-            <Pressable onPress={undoArchive} hitSlop={8} style={styles.undoBtn} accessibilityLabel="Undo archive">
-              <Text style={styles.undoBtnText}>Undo</Text>
-            </Pressable>
-          </View>
+          <HardShadow radius={999} offset={4}>
+            <View style={styles.undoToast}>
+              <Text style={styles.undoToastText}>Archived</Text>
+              <Pressable onPress={undoArchive} hitSlop={8} style={styles.undoBtn} accessibilityLabel="Undo archive">
+                <Text style={styles.undoBtnText}>Undo</Text>
+              </Pressable>
+            </View>
+          </HardShadow>
         </View>
       )}
     </View>
@@ -325,7 +327,7 @@ function ListHeader({
           accessibilityRole="button"
           accessibilityLabel="New chat"
         >
-          <Plus size={22} color={Brand.inboxInkPrimary} weight="bold" />
+          <Plus size={22} color={Brand.inkPrimary} weight="bold" />
         </Pressable>
         <Text style={styles.title}>Messages</Text>
         <Pressable
@@ -335,7 +337,7 @@ function ListHeader({
           accessibilityRole="button"
           accessibilityLabel="Search messages"
         >
-          <MagnifyingGlass size={22} color={Brand.inboxInkPrimary} weight="regular" />
+          <MagnifyingGlass size={22} color={Brand.inkPrimary} weight="regular" />
         </Pressable>
       </View>
 
@@ -397,7 +399,7 @@ function InboxSkeleton() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: Brand.inboxCanvas },
+  root: { flex: 1, backgroundColor: Brand.canvas },
   center: { alignItems: 'center', justifyContent: 'center' },
 
   // ── Loading skeleton ──────────────────────────────────────────
@@ -406,7 +408,7 @@ const styles = StyleSheet.create({
     width: 140,
     height: 28,
     borderRadius: 8,
-    backgroundColor: Brand.inboxCardActive,
+    backgroundColor: Brand.surface2,
     marginBottom: 24,
   },
   skeletonRow: {
@@ -419,20 +421,20 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: Brand.inboxCardActive,
+    backgroundColor: Brand.surface2,
   },
   skeletonLines: { flex: 1, gap: 8 },
   skeletonLineWide: {
     width: '60%',
     height: 13,
     borderRadius: 6,
-    backgroundColor: Brand.inboxCardActive,
+    backgroundColor: Brand.surface2,
   },
   skeletonLineNarrow: {
     width: '40%',
     height: 11,
     borderRadius: 6,
-    backgroundColor: Brand.inboxCardActive,
+    backgroundColor: Brand.surface2,
   },
 
   // ── Top bar — mirrors the Discovery feed bar (44pt, centered title,
@@ -447,12 +449,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 999,
-    backgroundColor: Brand.inboxCardActive,
+    backgroundColor: 'transparent',
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: Brand.inboxHairline,
+    borderColor: Brand.borderSoft,
   },
   filterChipActive: { backgroundColor: Brand.action, borderWidth: 1.5, borderColor: Brand.actionInk },
-  filterChipText: { fontFamily: AmbitFont.body, fontSize: 13.5, fontWeight: '600', color: Brand.inboxInkBody },
+  filterChipText: { fontFamily: AmbitFont.body, fontSize: 13.5, fontWeight: '600', color: Brand.inkBody },
   filterChipTextActive: { color: Brand.actionInk, fontWeight: '700' },
 
   undoToastWrap: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
@@ -464,15 +466,12 @@ const styles = StyleSheet.create({
     paddingRight: 8,
     paddingVertical: 8,
     borderRadius: 999,
-    backgroundColor: Brand.inboxInkPrimary,
-    shadowColor: '#000',
-    shadowOpacity: 0.2,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 8,
+    backgroundColor: Brand.cardCream,
+    borderWidth: 1.5,
+    borderColor: Brand.inkEdge,
   },
-  undoToastText: { fontFamily: AmbitFont.body, fontSize: 14, fontWeight: '600', color: Brand.inboxCanvas },
-  undoBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 999, backgroundColor: Brand.action },
+  undoToastText: { fontFamily: AmbitFont.body, fontSize: 14, fontWeight: '600', color: Brand.inkPrimary },
+  undoBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 999, backgroundColor: Brand.action, borderWidth: 1.5, borderColor: Brand.actionInk },
   undoBtnText: { fontFamily: AmbitFont.body, fontSize: 14, fontWeight: '700', color: Brand.actionInk },
 
   topbar: {
@@ -505,10 +504,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   title: {
-    fontFamily: 'Zodiak-Bold',
-    fontStyle: 'italic',
+    fontFamily: AmbitFont.display,
     fontSize: 24,
-    color: Brand.inboxInkPrimary,
+    color: Brand.inkPrimary,
     letterSpacing: -0.5,
   },
 
@@ -519,7 +517,7 @@ const styles = StyleSheet.create({
   },
   sep: {
     height: 1,
-    backgroundColor: Brand.inboxHairline,
+    backgroundColor: Brand.borderSoft,
     marginLeft: 18 + 48 + 14, // align past avatar (card pad + avatar + gap)
   },
   sepGap: { height: 12 }, // breathing room below a pending card
@@ -528,21 +526,20 @@ const styles = StyleSheet.create({
   empty: {
     marginHorizontal: 4,
     marginTop: 8,
-    padding: 20,
-    backgroundColor: Brand.inboxCardActive,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: Brand.inboxHairline,
+    padding: Space.lg,
+    backgroundColor: Brand.surface1,
+    borderRadius: Radii.lg,
   },
   emptyTitle: {
-    fontFamily: 'Zodiak-Bold',
-    fontSize: 18,
-    color: Brand.inboxInkPrimary,
-    letterSpacing: -0.3,
+    fontFamily: AmbitFont.body,
+    fontSize: 16,
+    fontWeight: '600',
+    color: Brand.inkHigh,
   },
   emptyBody: {
-    fontSize: 13.5,
-    color: Brand.inboxInkBody,
+    fontFamily: AmbitFont.body,
+    fontSize: 13,
+    color: Brand.inkMuted,
     marginTop: 8,
     lineHeight: 19,
   },

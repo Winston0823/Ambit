@@ -1,48 +1,163 @@
-import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import type { AvailabilityPollRow } from '../../lib/availability';
-import { AmbitFont, Brand, Radii } from '../../constants/theme';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  listAvailabilityResponses,
+  overlapCellKeys,
+  selectedCellKeys,
+  type AvailabilityPollRow,
+  type AvailabilityResponseRow,
+} from '../../lib/availability';
+import { supabase } from '../../lib/supabase';
+import { AmbitFont, Brand } from '../../constants/theme';
 import { StructuredHeader, structuredStyles } from './structuredCard';
-import { Tactile } from '../atoms';
+import { HardShadow, Tactile } from '../atoms';
 
 interface Props {
   poll:   AvailabilityPollRow;
   isMine: boolean;
-  /// Tap "Open" → caller surfaces the full poll modal for marking
-  /// availability or finalizing an overlap slot.
+  meId:   string;
+  /// Tap on the mark/edit action → caller surfaces the full poll modal.
   onOpen: () => void;
+  /// Tap on "Propose a time" (shown once both sides marked and overlap
+  /// exists) → caller opens the SchedulingComposer, which pre-fills the
+  /// overlap slots from this poll.
+  onProposeTime: () => void;
 }
 
-/// Compact card representing an availability poll in the thread.
-/// Closed polls flatten to a static "Locked in" line; the real
-/// scheduling bubble (from settled_scheduling_request_id) sits in
-/// its own message right below and handles calendar add.
-export function AvailabilityPollBubble({ poll, isMine, onOpen }: Props) {
+/// In-thread card for an availability poll — the PIPELINE surface for the
+/// find-a-time flow. Rather than a static "Open poll" button, it tracks
+/// both responses live and always shows the current state + the single
+/// next action:
+///   you haven't marked      → "Mark your times"
+///   waiting on them         → status line + "Edit your times" link
+///   overlap exists          → "N times work for both" + "Propose a time"
+///   marked but no overlap   → "Edit your times"
+/// Closed polls flatten to a settled line; the confirmed meeting bubble
+/// (created via propose → accept) handles the calendar add.
+export function AvailabilityPollBubble({ poll, isMine, meId, onOpen, onProposeTime }: Props) {
   const isOpen   = poll.status === 'open';
   const isClosed = poll.status === 'closed';
 
+  // Live responses — fetched on mount, kept fresh via realtime while the
+  // poll is open. `null` = still loading (render the neutral state).
+  const [responses, setResponses] = useState<AvailabilityResponseRow[] | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    let cancelled = false;
+    listAvailabilityResponses(poll.id)
+      .then((r) => { if (!cancelled) setResponses(r); })
+      .catch(() => { if (!cancelled) setResponses([]); });
+
+    const ch = supabase
+      .channel(`poll-pipeline:${poll.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event:  '*',
+          schema: 'public',
+          table:  'availability_responses',
+          filter: `poll_id=eq.${poll.id}`,
+        },
+        (payload) => {
+          const row = (payload.new ?? payload.old) as AvailabilityResponseRow;
+          setResponses((prev) => {
+            const without = (prev ?? []).filter((r) => r.user_id !== row.user_id);
+            return payload.eventType === 'DELETE' ? without : [...without, row];
+          });
+        },
+      )
+      .subscribe();
+
+    return () => {
+      cancelled = true;
+      ch.unsubscribe();
+    };
+  }, [poll.id, isOpen]);
+
+  const { mineMarked, theirsMarked, overlapCount } = useMemo(() => {
+    const mine   = responses?.find((r) => r.user_id === meId);
+    const theirs = responses?.find((r) => r.user_id !== meId);
+    const mineMarked   = (mine?.selected_slots?.length ?? 0) > 0;
+    const theirsMarked = (theirs?.selected_slots?.length ?? 0) > 0;
+    const overlapCount = mineMarked && theirsMarked
+      ? overlapCellKeys(
+          selectedCellKeys(mine!.selected_slots),
+          selectedCellKeys(theirs!.selected_slots),
+        ).length
+      : 0;
+    return { mineMarked, theirsMarked, overlapCount };
+  }, [responses, meId]);
+
+  // ── Pipeline state → status line + actions ─────────────────────────
+  let statusLine: string | null = null;
+  let primary:   { label: string; onPress: () => void } | null = null;
+  let secondary: { label: string; onPress: () => void } | null = null;
+
+  if (isOpen) {
+    if (responses === null) {
+      // Loading — neutral entry, no premature status.
+      primary = { label: 'Mark your times', onPress: onOpen };
+    } else if (!mineMarked) {
+      statusLine = theirsMarked
+        ? 'They marked their times — your move'
+        : 'Your move — mark when you’re free';
+      primary = { label: 'Mark your times', onPress: onOpen };
+    } else if (!theirsMarked) {
+      statusLine = 'Waiting on them to mark their times';
+      secondary  = { label: 'Edit your times', onPress: onOpen };
+    } else if (overlapCount > 0) {
+      statusLine = overlapCount === 1
+        ? '1 time works for both of you'
+        : `${overlapCount} times work for both of you`;
+      primary   = { label: 'Propose a time', onPress: onProposeTime };
+      secondary = { label: 'Edit your times', onPress: onOpen };
+    } else {
+      statusLine = 'No overlap yet — try widening your times';
+      primary = { label: 'Edit your times', onPress: onOpen };
+    }
+  }
+
   return (
     <View style={[isMine ? structuredStyles.surfaceDark : structuredStyles.surfaceLight]}>
-      <StructuredHeader label="AVAILABILITY" title={poll.title} dark={isMine} />
+      <StructuredHeader label="FIND A TIME" title={poll.title} dark={isMine} />
 
-      <Text style={[styles.subline, isMine && styles.subTextOnBrand]}>
+      <Text style={styles.subline}>
         {formatRange(poll)} · {poll.day_start_hour}:00–{poll.day_end_hour}:00
       </Text>
 
-      {isOpen ? (
-        <Tactile
-          onPress={onOpen}
-          haptic="tap"
-          style={[styles.openBtn, isMine && styles.openBtnMine]}
-          accessibilityLabel="Open availability poll"
+      {statusLine !== null && (
+        <Text style={styles.statusLine}>{statusLine}</Text>
+      )}
+
+      {primary && (
+        <HardShadow radius={999} offset={4} style={styles.primaryShadow}>
+          <Tactile
+            onPress={primary.onPress}
+            haptic="tap"
+            style={styles.primaryBtn}
+            accessibilityLabel={primary.label}
+          >
+            <Text style={styles.primaryBtnText}>{primary.label}</Text>
+          </Tactile>
+        </HardShadow>
+      )}
+
+      {secondary && (
+        <Pressable
+          onPress={secondary.onPress}
+          hitSlop={6}
+          style={styles.secondaryBtn}
+          accessibilityRole="button"
+          accessibilityLabel={secondary.label}
         >
-          <Text style={[styles.openBtnText, isMine && styles.accentMine]}>
-            Open availability poll
-          </Text>
-        </Tactile>
-      ) : (
-        <Text style={[styles.statusText, isMine && styles.subTextOnBrand]}>
-          {isClosed ? 'Locked in — see meeting below' : 'Cancelled'}
+          <Text style={styles.secondaryBtnText}>{secondary.label}</Text>
+        </Pressable>
+      )}
+
+      {!isOpen && (
+        <Text style={styles.settledText}>
+          {isClosed ? 'Settled — meeting confirmed in this thread' : 'Cancelled'}
         </Text>
       )}
     </View>
@@ -60,77 +175,44 @@ function formatRange(poll: AvailabilityPollRow): string {
 }
 
 const styles = StyleSheet.create({
-  card: {
-    width: 280,
-    borderRadius: Radii.lg,
-    // Incoming (theirs) fill — matches incoming text bubbles (#ECE9E2) so
-    // the card is clearly a bubble on the white canvas; surface1 was too
-    // pale. `cardMine` overrides to tan.
-    backgroundColor: '#ECE9E2',
-    padding: 12,
-    gap: 8,
-    shadowColor: '#000',
-    shadowOpacity: 0.06,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
-  },
-  // Outgoing (mine) — dark nav-bar surface matching my message bubbles,
-  // tan accents on icon / eyebrow / CTA; body lines stay light via
-  // subTextOnBrand. Keeps a faint warm-tan lift shadow.
-  cardMine: {
-    backgroundColor: Brand.navBarBg,
-    shadowColor: Brand.accent,
-    shadowOpacity: 0.18,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 4 },
-  },
-  accentMine: { color: Brand.actionInk },
-
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  headerText: {
-    flex: 1,
-    fontFamily: AmbitFont.body,
-    fontSize: 13,
-    fontWeight: '700',
-    color: Brand.accent,
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-  },
-  textOnBrand: { color: Brand.canvas },
-
   subline: {
     fontFamily: AmbitFont.body,
     fontSize: 13,
     color: Brand.inkBody,
   },
-  subTextOnBrand: { color: Brand.inkBody },
+  statusLine: {
+    fontFamily: AmbitFont.body,
+    fontSize: 13,
+    fontWeight: '600',
+    color: Brand.inkPrimary,
+    marginTop: 2,
+  },
 
-  openBtn: {
-    marginTop: 4,
+  primaryShadow: { marginTop: 4 },
+  primaryBtn: {
     paddingVertical: 12,
     borderRadius: 999,
     backgroundColor: Brand.action,
-    borderWidth: 1.5,
+    borderWidth: 1.6,
     borderColor: Brand.actionInk,
     alignItems: 'center',
   },
-  openBtnMine: {
-    backgroundColor: Brand.action,
-    borderColor: Brand.actionInk,
-  },
-  openBtnText: {
+  primaryBtnText: {
     fontFamily: AmbitFont.body,
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: '700',
     color: Brand.actionInk,
   },
 
-  statusText: {
+  secondaryBtn: { alignSelf: 'center', paddingVertical: 4 },
+  secondaryBtnText: {
+    fontFamily: AmbitFont.body,
+    fontSize: 13,
+    fontWeight: '600',
+    color: Brand.actionDeep,
+  },
+
+  settledText: {
     fontFamily: AmbitFont.body,
     fontSize: 13,
     color: Brand.inkMuted,

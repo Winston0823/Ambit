@@ -225,11 +225,11 @@ export default function ProjectEditScreen() {
               {active ? "Showing in seekers' discovery feed." : 'Hidden from discovery until you reactivate.'}
             </Text>
           </View>
-          <Switch value={active} onValueChange={setActive} trackColor={{ false: Brand.borderDefault, true: Brand.primary }} thumbColor={Brand.canvas} />
+          <Switch value={active} onValueChange={setActive} trackColor={{ false: Brand.borderDefault, true: Brand.action }} thumbColor={Brand.canvas} />
         </View>
 
         <Pressable onPress={del} style={styles.deleteBtn}>
-          <Trash size={18} color={Brand.accent} weight="regular" />
+          <Trash size={18} color={Brand.danger} weight="regular" />
           <Text style={styles.deleteLabel}>Delete project</Text>
         </Pressable>
 
@@ -262,14 +262,14 @@ const styles = StyleSheet.create({
 
   scroll: { flex: 1 },
   content: { paddingHorizontal: 28 },
-  kicker: { fontFamily: AmbitFont.body, fontSize: 12, fontWeight: '600', letterSpacing: 1.6, color: Brand.accent, marginBottom: 4 },
+  kicker: { fontFamily: AmbitFont.body, fontSize: 11, fontWeight: '700', letterSpacing: 1.6, color: Brand.inkMuted, marginBottom: 4 },
 
   field: { marginTop: 32 },
-  fieldLabel: { fontFamily: AmbitFont.body, fontSize: 11, fontWeight: '600', letterSpacing: 1, color: Brand.inkLabel, marginBottom: 12 },
+  fieldLabel: { fontFamily: AmbitFont.body, fontSize: 11, fontWeight: '600', letterSpacing: 1.2, color: Brand.inkLabel, marginBottom: 12 },
   input: { fontFamily: AmbitFont.display, fontSize: 22, color: Brand.inkPrimary, borderBottomWidth: 1.5, borderBottomColor: Brand.borderDefault, paddingBottom: 12 },
   inputMultiline: { fontSize: 18, lineHeight: 25, minHeight: 60, textAlignVertical: 'top' },
 
-  secLabel: { fontFamily: AmbitFont.body, fontSize: 11, fontWeight: '700', letterSpacing: 1.2, color: Brand.inkLabel, marginTop: 36, marginBottom: 16 },
+  secLabel: { fontFamily: AmbitFont.body, fontSize: 11, fontWeight: '600', letterSpacing: 1.2, color: Brand.inkLabel, marginTop: 36, marginBottom: 16 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   chip: { paddingHorizontal: 16, paddingVertical: 12, borderRadius: 999, backgroundColor: Brand.cardCream, borderWidth: 1.5, borderColor: Brand.inkEdge },
   chipOn: { backgroundColor: Brand.action, borderWidth: 1.5, borderColor: Brand.actionInk },
@@ -281,7 +281,7 @@ const styles = StyleSheet.create({
   toggleHelp: { fontFamily: AmbitFont.body, fontSize: 12.5, color: Brand.inkMuted, marginTop: 3, lineHeight: 17 },
 
   deleteBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 16, marginTop: 8 },
-  deleteLabel: { fontFamily: AmbitFont.body, fontSize: 15, fontWeight: '600', color: Brand.accent },
+  deleteLabel: { fontFamily: AmbitFont.body, fontSize: 15, fontWeight: '600', color: Brand.danger },
 
   ctaWrap: { position: 'absolute', alignSelf: 'center' },
   cta: {

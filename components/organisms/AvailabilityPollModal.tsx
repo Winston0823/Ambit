@@ -15,6 +15,7 @@ import {
   buildGrid,
   busyCellKeys,
   listAvailabilityResponses,
+  overlapCellKeys,
   selectedCellKeys,
   setAvailabilityResponse,
   type AvailabilityPollRow,
@@ -22,6 +23,7 @@ import {
 } from '../../lib/availability';
 import { getBusyEvents } from '../../lib/deviceCalendar';
 import { AvailabilityGrid } from '../molecules/AvailabilityGrid';
+import { HardShadow } from '../atoms';
 import { supabase } from '../../lib/supabase';
 import { AmbitFont, Brand, Space } from '../../constants/theme';
 
@@ -30,26 +32,29 @@ interface Props {
   poll:    AvailabilityPollRow | null;
   meId:    string;
   onClose: () => void;
+  /// Offered after a Save that produces overlap with the partner's marks —
+  /// the caller opens the SchedulingComposer (pre-filled from this poll)
+  /// so finding times flows straight into proposing one.
+  onProposeTime?: () => void;
 }
 
-const SAVE_DEBOUNCE_MS = 500;
-
-/// Fullscreen modal for viewing / responding to / finalizing an
-/// availability poll. Loads both participants' responses, subscribes to
-/// realtime updates, debounces my own response saves, and exposes a
-/// "Lock in" action per overlap slot.
-export function AvailabilityPollModal({ visible, poll, meId, onClose }: Props) {
+/// Fullscreen modal for viewing / responding to an availability poll.
+/// Loads both participants' responses, subscribes to realtime updates,
+/// and commits my marks on an explicit "Save times" (no auto-save — a
+/// half-finished grid should never be visible to the partner, and the
+/// old debounced save could race the initial load and wipe a response).
+/// If the save produces overlap, it hands off into the propose step.
+export function AvailabilityPollModal({ visible, poll, meId, onClose, onProposeTime }: Props) {
   const insets = useSafeAreaInsets();
   const [responses, setResponses] = useState<AvailabilityResponseRow[]>([]);
   const [busyKeys, setBusyKeys]   = useState<Set<string>>(new Set());
   const [loading, setLoading]     = useState(true);
-  /// Mirror of my response while the user is editing — debounced into
-  /// availability_responses. Realtime UPDATEs on my own row are ignored
-  /// (caller is the source of truth for local state).
+  /// Mirror of my response while the user is editing — committed to
+  /// availability_responses on Save. Realtime UPDATEs on my own row are
+  /// ignored (local state is the source of truth while editing).
   const [mineKeys, setMineKeys]   = useState<Set<string>>(new Set());
   const [saving, setSaving]       = useState(false);
 
-  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const channelRef   = useRef<RealtimeChannel | null>(null);
 
   // ── Initial load ─────────────────────────────────────────────
@@ -125,25 +130,6 @@ export function AvailabilityPollModal({ visible, poll, meId, onClose }: Props) {
     };
   }, [visible, poll?.id, meId, onClose]);
 
-  // ── Debounced save of my response ───────────────────────────
-  useEffect(() => {
-    if (!visible || !poll) return;
-    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    saveTimerRef.current = setTimeout(() => {
-      const slots = Array.from(mineKeys).map((key) => {
-        const start = new Date(key);
-        const end   = new Date(start.getTime() + poll.duration_min * 60_000);
-        return { start: start.toISOString(), end: end.toISOString() };
-      });
-      setAvailabilityResponse(poll.id, slots).catch((e) =>
-        console.warn('set_availability_response failed:', e?.message),
-      );
-    }, SAVE_DEBOUNCE_MS);
-    return () => {
-      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    };
-  }, [mineKeys, visible, poll?.id]);
-
   const cells = useMemo(() => (poll ? buildGrid(poll) : []), [poll]);
 
   const theirKeys = useMemo(() => {
@@ -171,7 +157,24 @@ export function AvailabilityPollModal({ visible, poll, meId, onClose }: Props) {
         return { start: start.toISOString(), end: end.toISOString() };
       });
       await setAvailabilityResponse(poll.id, slots);
-      onClose();
+
+      // Continue the flow: if my saved marks overlap the partner's, offer
+      // to propose one of those times right now instead of dead-ending.
+      const overlap = overlapCellKeys(mineKeys, theirKeys);
+      if (overlap.length > 0 && onProposeTime) {
+        Alert.alert(
+          overlap.length === 1
+            ? '1 time works for both of you'
+            : `${overlap.length} times work for both of you`,
+          'Propose one now? You can pick from the matching times.',
+          [
+            { text: 'Later', style: 'cancel', onPress: onClose },
+            { text: 'Propose a time', onPress: onProposeTime },
+          ],
+        );
+      } else {
+        onClose();
+      }
     } catch (e: any) {
       Alert.alert('Could not save', e?.message ?? 'Try again.');
     } finally {
@@ -219,17 +222,19 @@ export function AvailabilityPollModal({ visible, poll, meId, onClose }: Props) {
 
             {poll.status === 'open' && (
               <View style={styles.saveRow}>
-                <Pressable
-                  onPress={handleSave}
-                  disabled={saving}
-                  style={[styles.saveBtn, saving && styles.saveBtnDisabled]}
-                  accessibilityRole="button"
-                  accessibilityLabel="Save your available times"
-                >
-                  <Text style={styles.saveBtnText}>
-                    {saving ? 'Saving…' : 'Save times'}
-                  </Text>
-                </Pressable>
+                <HardShadow radius={999} offset={4} style={saving ? styles.saveBtnDisabled : undefined}>
+                  <Pressable
+                    onPress={handleSave}
+                    disabled={saving}
+                    style={styles.saveBtn}
+                    accessibilityRole="button"
+                    accessibilityLabel="Save your available times"
+                  >
+                    <Text style={styles.saveBtnText}>
+                      {saving ? 'Saving…' : 'Save times'}
+                    </Text>
+                  </Pressable>
+                </HardShadow>
               </View>
             )}
           </>
@@ -300,10 +305,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1.6,
     borderColor: Brand.actionInk,
-    shadowColor: Brand.actionInk,
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    shadowOffset: { width: 0, height: 3 },
+    // Hard offset edge comes from the <HardShadow> wrapper — RN shadow
+    // props render nothing on Android and were off-vocabulary anyway.
   },
   saveBtnDisabled: { opacity: 0.5 },
   saveBtnText: {

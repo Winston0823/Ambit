@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import type { InboxItem } from '../../lib/messaging';
 import { isReachedOutToYou } from '../../lib/messaging';
-import { Brand } from '../../constants/theme';
+import { AmbitFont, Brand } from '../../constants/theme';
 
 interface Props {
   items:   InboxItem[];
@@ -110,10 +110,11 @@ const styles = StyleSheet.create({
   label: {
     paddingHorizontal: 24,
     paddingBottom: 12,
-    fontSize: 10.5,
-    fontWeight: '700',
-    letterSpacing: 2.4,
-    color: Brand.inboxInkMute,
+    fontFamily: AmbitFont.body,
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 1.2,
+    color: Brand.inkLabel,
   },
   rowContent: {
     paddingHorizontal: 24,
@@ -136,17 +137,16 @@ const styles = StyleSheet.create({
     borderRadius: AVATAR_S / 2,
   },
   avatarFallback: {
-    backgroundColor: Brand.inboxAvatarBg,
+    backgroundColor: Brand.surface2,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(196,199,199,0.3)',
+    borderColor: Brand.borderSoft,
   },
   avatarInitial: {
-    fontFamily: 'Zodiak-Bold',
-    fontStyle: 'italic',
+    fontFamily: AmbitFont.display,
     fontSize: 20,
-    color: Brand.inboxBronzeDim,
+    color: Brand.inkLabel,
     letterSpacing: -0.2,
   },
   // Floating preview pip on the top-left of the tile — iMessage cue
@@ -158,22 +158,24 @@ const styles = StyleSheet.create({
     maxWidth: 96,
     paddingHorizontal: 8,
     paddingVertical: 4,
-    backgroundColor: Brand.inboxCanvas,
+    backgroundColor: Brand.cardCream,
     borderRadius: 12,
     borderBottomLeftRadius: 4,
-    borderWidth: 1,
-    borderColor: Brand.inboxHairline,
+    borderWidth: 1.5,
+    borderColor: Brand.inkEdge,
     zIndex: 2,
   },
   bubbleText: {
+    fontFamily: AmbitFont.body,
     fontSize: 10.5,
-    color: Brand.inboxInkBody,
+    color: Brand.inkBody,
     lineHeight: 12,
   },
   name: {
+    fontFamily: AmbitFont.body,
     fontSize: 12,
     fontWeight: '500',
-    color: Brand.inboxInkBody,
+    color: Brand.inkBody,
     letterSpacing: -0.1,
     textAlign: 'center',
     width: '100%',
