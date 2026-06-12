@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -46,6 +46,28 @@ export default function ResumeImportScreen() {
   const [pasteText, setPasteText] = useState('');
   const [parsed, setParsed] = useState<ParsedResume | null>(null);
 
+  // The user's CURRENT profile — import is additive, so we merge against this
+  // and never overwrite a name/blurb they've already written or drop existing
+  // skills.
+  const [existing, setExisting] = useState<{ name: string; blurb: string; skills: string[] }>({
+    name: '', blurb: '', skills: [],
+  });
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('name, vibe_blurb, skills')
+        .eq('id', user.id)
+        .maybeSingle();
+      if (cancelled || !data) return;
+      const d = data as { name: string | null; vibe_blurb: string | null; skills: string[] | null };
+      setExisting({ name: d.name ?? '', blurb: d.vibe_blurb ?? '', skills: d.skills ?? [] });
+    })();
+    return () => { cancelled = true; };
+  }, [user?.id]);
+
   // Editable review state (seeded from the parse).
   const [name, setName] = useState('');
   const [blurb, setBlurb] = useState('');
@@ -56,11 +78,14 @@ export default function ResumeImportScreen() {
 
   const seedReview = (r: ParsedResume) => {
     setParsed(r);
-    setName(r.name ?? '');
-    setBlurb(r.headline ?? '');
-    const norm = normalizeResumeSkills(r.skills ?? []);
-    setSkills(norm);
-    setSkillsOn(new Set(norm.slice(0, MAX_SKILLS))); // pre-select up to the cap
+    // Non-destructive: keep an existing name/blurb the user already wrote;
+    // only use the imported one to fill a blank. (Still editable below.)
+    setName(existing.name.trim() ? existing.name : (r.name ?? ''));
+    setBlurb(existing.blurb.trim() ? existing.blurb : (r.headline ?? ''));
+    // Skills MERGE — existing first (so they're never dropped), then imported.
+    const merged = normalizeResumeSkills([...existing.skills, ...(r.skills ?? [])]);
+    setSkills(merged);
+    setSkillsOn(new Set(merged.slice(0, MAX_SKILLS))); // existing kept; imported fills up to the cap
     setExpOn(new Set()); // experiences are opt-in (user's call)
     setProjOn(new Set((r.portfolio ?? []).map((_, i) => i))); // projects default on
   };
