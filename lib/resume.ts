@@ -2,6 +2,31 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { supabase } from './supabase';
 import { readLocalFileAsArrayBuffer } from './messaging';
+import { SKILL_CATEGORIES } from '../data/mock';
+
+// The app's canonical skill chips (what the profile skill picker offers).
+const CANON_SKILLS = SKILL_CATEGORIES.flatMap((c) => c.tags);
+
+/// Normalize free-text résumé skills against the app's skill taxonomy so they
+/// snap to real chips: case-insensitive match → canonical chip; otherwise keep
+/// the trimmed free-text (the picker allows customs). De-duplicated, order
+/// preserved. The "AI proposes, code verifies" QC step.
+export function normalizeResumeSkills(raw: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const s of raw) {
+    const trimmed = (s ?? '').trim();
+    if (!trimmed) continue;
+    const match = CANON_SKILLS.find((c) => c.toLowerCase() === trimmed.toLowerCase());
+    const skill = match ?? trimmed;
+    const key = skill.toLowerCase();
+    if (!seen.has(key)) {
+      seen.add(key);
+      out.push(skill);
+    }
+  }
+  return out;
+}
 
 /// Structured result of a résumé parse — mirrors the parse-resume edge
 /// function's output schema. All fields present; "" / [] means absent.

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -27,9 +27,8 @@ import {
   SignOut,
   X,
 } from 'phosphor-react-native';
-import { parseResumeText, pickAndParseDocument, pickAndParsePhoto, type ParsedResume } from '../../../lib/resume';
 import { Chip, HardShadow, Skeleton } from '../../../components/atoms';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import {
   AddPortfolioBubble,
   DiscoveryCard,
@@ -106,66 +105,8 @@ export default function ProfileTab() {
   const insets = useSafeAreaInsets();
   const [profile, setProfile] = useState<ProfileRow | null>(null);
   const [loading, setLoading] = useState(true);
-  const [resumeBusy, setResumeBusy] = useState(false);
-
-  // TEMP (M1 dev trigger): import a résumé via paste / file / photo and parse
-  // it through the parse-resume edge function — surfaces the extracted JSON so
-  // we can verify extraction on real résumés before building the M2 review UI.
-  const showResumeResult = (parsed: ParsedResume) => {
-    const exp = parsed.experience.length
-      ? parsed.experience.map((e) => `• ${e.title || '—'} @ ${e.org || '—'}`).join('\n')
-      : '—';
-    const edu = parsed.education.length
-      ? parsed.education.map((e) => `• ${e.degree || '—'} — ${e.school || '—'}`).join('\n')
-      : '—';
-    const port = parsed.portfolio.length
-      ? parsed.portfolio.map((p) => `• ${p.title || '—'}`).join('\n')
-      : '—';
-    Alert.alert(
-      'Résumé parsed',
-      `NAME\n${parsed.name || '—'}\n\n` +
-      `HEADLINE\n${parsed.headline || '—'}\n\n` +
-      `SKILLS\n${parsed.skills.join(', ') || '—'}\n\n` +
-      `LINKS\n${[parsed.links.github, parsed.links.linkedin, parsed.links.portfolio].filter(Boolean).join('\n') || '—'}\n\n` +
-      `EXPERIENCE\n${exp}\n\n` +
-      `EDUCATION\n${edu}\n\n` +
-      `PORTFOLIO\n${port}`,
-    );
-  };
-
-  const runResumeImport = async (fn: () => Promise<ParsedResume | null>) => {
-    if (resumeBusy) return;
-    setResumeBusy(true);
-    try {
-      const parsed = await fn();
-      if (parsed) showResumeResult(parsed);
-    } catch (e: any) {
-      Alert.alert("Couldn't parse résumé", e?.message ?? 'Try again.');
-    } finally {
-      setResumeBusy(false);
-    }
-  };
-
-  const handleResumeImportDev = () => {
-    if (!user || resumeBusy) return;
-    Alert.alert('Import résumé (dev)', 'Choose a source', [
-      {
-        text: 'Paste text',
-        onPress: () => {
-          if (Platform.OS === 'ios') {
-            Alert.prompt('Paste résumé text', 'Paste the full text of your résumé', (text) => {
-              if (text && text.trim()) runResumeImport(() => parseResumeText(text.trim()));
-            });
-          } else {
-            Alert.alert('Paste', 'Paste is iOS-only in this dev trigger — use File or Photo on Android.');
-          }
-        },
-      },
-      { text: 'File (PDF / Word)', onPress: () => runResumeImport(() => pickAndParseDocument(user.id)) },
-      { text: 'Photo', onPress: () => runResumeImport(() => pickAndParsePhoto(user.id)) },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
-  };
+  // Résumé import → the review/apply screen (paste / file / photo live there).
+  const openResumeImport = () => router.push('/resume-import');
 
   // Portfolio is now persisted in Supabase via lib/portfolio.ts.
   // Local state mirrors the DB for snappy UI; mutations write through
@@ -194,48 +135,37 @@ export default function ProfileTab() {
   // every field as "Tap to add…". So we fall back to the baseline
   // select that's guaranteed to work, and just leave the response-rate
   // pill hidden.
-  useEffect(() => {
+  const loadProfile = useCallback(async () => {
     if (!user) { setLoading(false); return; }
-    let cancelled = false;
-    (async () => {
-      const full = await supabase
-        .from('profiles')
-        .select('id, name, vibe_blurb, skills, role, campus_id, photo_url, response_rate, avg_response_minutes')
-        .eq('id', user.id)
-        .maybeSingle();
-      if (cancelled) return;
-
-      if (!full.error) {
-        setProfile(full.data as ProfileRow | null);
-        setLoading(false);
-        return;
-      }
-
-      // Likely a missing column — log it once, then retry with the
-      // baseline columns so the rest of the editor still works.
-      console.warn(
-        'profile fetch (full) failed, retrying baseline:',
-        full.error.message,
-      );
-      const base = await supabase
-        .from('profiles')
-        .select('id, name, vibe_blurb, skills, role, campus_id, photo_url')
-        .eq('id', user.id)
-        .maybeSingle();
-      if (cancelled) return;
-      if (base.error) {
-        console.warn('profile fetch (baseline) also failed:', base.error.message);
-        setProfile(null);
-      } else {
-        setProfile(
-          base.data
-            ? ({ ...(base.data as object), response_rate: null, avg_response_minutes: null } as ProfileRow)
-            : null,
-        );
-      }
+    const full = await supabase
+      .from('profiles')
+      .select('id, name, vibe_blurb, skills, role, campus_id, photo_url, response_rate, avg_response_minutes')
+      .eq('id', user.id)
+      .maybeSingle();
+    if (!full.error) {
+      setProfile(full.data as ProfileRow | null);
       setLoading(false);
-    })();
-    return () => { cancelled = true; };
+      return;
+    }
+    // Likely a missing column — log it once, then retry with the baseline
+    // columns so the rest of the editor still works.
+    console.warn('profile fetch (full) failed, retrying baseline:', full.error.message);
+    const base = await supabase
+      .from('profiles')
+      .select('id, name, vibe_blurb, skills, role, campus_id, photo_url')
+      .eq('id', user.id)
+      .maybeSingle();
+    if (base.error) {
+      console.warn('profile fetch (baseline) also failed:', base.error.message);
+      setProfile(null);
+    } else {
+      setProfile(
+        base.data
+          ? ({ ...(base.data as object), response_rate: null, avg_response_minutes: null } as ProfileRow)
+          : null,
+      );
+    }
+    setLoading(false);
   }, [user?.id]);
 
   const campus = useMemo(
@@ -295,16 +225,21 @@ export default function ProfileTab() {
 
   // ── Portfolio CRUD (Supabase-backed) ──────────────────────────────────────
 
-  // Initial portfolio load — runs once when the user becomes known.
-  useEffect(() => {
+  const loadPortfolio = useCallback(async () => {
     if (!user) return;
-    let cancelled = false;
-    (async () => {
-      const items = await fetchPortfolioForUser(user.id);
-      if (!cancelled) setPortfolio(items);
-    })();
-    return () => { cancelled = true; };
+    const items = await fetchPortfolioForUser(user.id);
+    setPortfolio(items);
   }, [user?.id]);
+
+  // Reload profile + portfolio every time the tab regains focus — so edits
+  // made on a pushed screen (e.g. résumé import) show on return, not just on
+  // a cold app start.
+  useFocusEffect(
+    useCallback(() => {
+      loadProfile();
+      loadPortfolio();
+    }, [loadProfile, loadPortfolio]),
+  );
 
   // Owner's live (active) projects — drives the owner profile preview card.
   useEffect(() => {
@@ -465,18 +400,18 @@ export default function ProfileTab() {
             <Text style={[styles.segmentText, !editing && styles.segmentTextActive]}>Preview</Text>
           </Pressable>
         </View>
-        {/* TEMP M1 dev trigger — résumé import test. Remove when M2 review UI lands.
-            Offset left of the sign-out icon so the two don't overlap. */}
-        <Pressable
-          onPress={handleResumeImportDev}
-          style={[styles.signOutBtn, styles.resumeDevBtn]}
-          hitSlop={10}
-          accessibilityLabel="Import résumé (dev)"
-        >
-          {resumeBusy
-            ? <ActivityIndicator size="small" color={Brand.inkMuted} />
-            : <FileArrowUp size={18} color={Brand.inkMuted} weight="regular" />}
-        </Pressable>
+        {/* Résumé import — a talent-profile feature, so seekers only. Owners'
+            profiles are project-centric (Live Projects, not a portfolio). */}
+        {profile?.role === 'seeker' && (
+          <Pressable
+            onPress={openResumeImport}
+            style={[styles.signOutBtn, styles.resumeDevBtn]}
+            hitSlop={10}
+            accessibilityLabel="Import résumé"
+          >
+            <FileArrowUp size={18} color={Brand.inkMuted} weight="regular" />
+          </Pressable>
+        )}
         <Pressable
           onPress={() => { signOut().catch(() => {}); }}
           style={styles.signOutBtn}

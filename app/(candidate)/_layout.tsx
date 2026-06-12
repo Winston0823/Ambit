@@ -12,6 +12,7 @@ export default function CandidateLayout() {
       <Stack.Screen name="project-new" />
       <Stack.Screen name="project-edit" />
       <Stack.Screen name="project-manage" />
+      <Stack.Screen name="resume-import" />
     </Stack>
   );
 }
