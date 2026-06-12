@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Image,
   KeyboardAvoidingView,
   Modal,
@@ -19,12 +20,14 @@ import {
   Camera,
   Chat,
   Check,
+  FileArrowUp,
   MapPin,
   PencilSimpleLine,
   Plus,
   SignOut,
   X,
 } from 'phosphor-react-native';
+import { parseResumeText, pickAndParseDocument, pickAndParsePhoto, type ParsedResume } from '../../../lib/resume';
 import { Chip, HardShadow, Skeleton } from '../../../components/atoms';
 import { router } from 'expo-router';
 import {
@@ -103,6 +106,66 @@ export default function ProfileTab() {
   const insets = useSafeAreaInsets();
   const [profile, setProfile] = useState<ProfileRow | null>(null);
   const [loading, setLoading] = useState(true);
+  const [resumeBusy, setResumeBusy] = useState(false);
+
+  // TEMP (M1 dev trigger): import a résumé via paste / file / photo and parse
+  // it through the parse-resume edge function — surfaces the extracted JSON so
+  // we can verify extraction on real résumés before building the M2 review UI.
+  const showResumeResult = (parsed: ParsedResume) => {
+    const exp = parsed.experience.length
+      ? parsed.experience.map((e) => `• ${e.title || '—'} @ ${e.org || '—'}`).join('\n')
+      : '—';
+    const edu = parsed.education.length
+      ? parsed.education.map((e) => `• ${e.degree || '—'} — ${e.school || '—'}`).join('\n')
+      : '—';
+    const port = parsed.portfolio.length
+      ? parsed.portfolio.map((p) => `• ${p.title || '—'}`).join('\n')
+      : '—';
+    Alert.alert(
+      'Résumé parsed',
+      `NAME\n${parsed.name || '—'}\n\n` +
+      `HEADLINE\n${parsed.headline || '—'}\n\n` +
+      `SKILLS\n${parsed.skills.join(', ') || '—'}\n\n` +
+      `LINKS\n${[parsed.links.github, parsed.links.linkedin, parsed.links.portfolio].filter(Boolean).join('\n') || '—'}\n\n` +
+      `EXPERIENCE\n${exp}\n\n` +
+      `EDUCATION\n${edu}\n\n` +
+      `PORTFOLIO\n${port}`,
+    );
+  };
+
+  const runResumeImport = async (fn: () => Promise<ParsedResume | null>) => {
+    if (resumeBusy) return;
+    setResumeBusy(true);
+    try {
+      const parsed = await fn();
+      if (parsed) showResumeResult(parsed);
+    } catch (e: any) {
+      Alert.alert("Couldn't parse résumé", e?.message ?? 'Try again.');
+    } finally {
+      setResumeBusy(false);
+    }
+  };
+
+  const handleResumeImportDev = () => {
+    if (!user || resumeBusy) return;
+    Alert.alert('Import résumé (dev)', 'Choose a source', [
+      {
+        text: 'Paste text',
+        onPress: () => {
+          if (Platform.OS === 'ios') {
+            Alert.prompt('Paste résumé text', 'Paste the full text of your résumé', (text) => {
+              if (text && text.trim()) runResumeImport(() => parseResumeText(text.trim()));
+            });
+          } else {
+            Alert.alert('Paste', 'Paste is iOS-only in this dev trigger — use File or Photo on Android.');
+          }
+        },
+      },
+      { text: 'File (PDF / Word)', onPress: () => runResumeImport(() => pickAndParseDocument(user.id)) },
+      { text: 'Photo', onPress: () => runResumeImport(() => pickAndParsePhoto(user.id)) },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  };
 
   // Portfolio is now persisted in Supabase via lib/portfolio.ts.
   // Local state mirrors the DB for snappy UI; mutations write through
@@ -402,6 +465,18 @@ export default function ProfileTab() {
             <Text style={[styles.segmentText, !editing && styles.segmentTextActive]}>Preview</Text>
           </Pressable>
         </View>
+        {/* TEMP M1 dev trigger — résumé import test. Remove when M2 review UI lands.
+            Offset left of the sign-out icon so the two don't overlap. */}
+        <Pressable
+          onPress={handleResumeImportDev}
+          style={[styles.signOutBtn, styles.resumeDevBtn]}
+          hitSlop={10}
+          accessibilityLabel="Import résumé (dev)"
+        >
+          {resumeBusy
+            ? <ActivityIndicator size="small" color={Brand.inkMuted} />
+            : <FileArrowUp size={18} color={Brand.inkMuted} weight="regular" />}
+        </Pressable>
         <Pressable
           onPress={() => { signOut().catch(() => {}); }}
           style={styles.signOutBtn}
@@ -985,6 +1060,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  // Sits just left of the sign-out icon (36pt wide + 8pt gap) so they don't stack.
+  resumeDevBtn: { right: Space.lg + 44 },
 
   scroll: { flex: 1 },
   scrollContent: { paddingHorizontal: Space.lg, paddingTop: Space.md },
