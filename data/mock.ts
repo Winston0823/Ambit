@@ -183,9 +183,16 @@ export interface ProjectCardData {
   skillsSought: string[];
   /// Open positions the founder is recruiting for. Empty = not set / any role.
   rolesSought: string[];
-  /// Two-stop gradient drawn from the warm-tan palette family. Each project
-  /// gets a unique fingerprint until real banner uploads land.
+  /// Two-stop gradient drawn from the warm-tan palette family. Used as the
+  /// hero fallback when the project has no cover image.
   gradient: [string, string];
+  /// Optional founder-uploaded cover image. When set it becomes the card's
+  /// hero (over the owner avatar / gradient). Public URL from the
+  /// `project-images` bucket; undefined/null = fall back.
+  imageUri?: string | null;
+  /// Optional deadline ("needs someone by ___"). ISO date string `YYYY-MM-DD`
+  /// from `projects.needed_by`. Drives the top-right urgency badge.
+  neededBy?: string | null;
 }
 
 export type DiscoveryCardData = SeekerCardData | ProjectCardData;

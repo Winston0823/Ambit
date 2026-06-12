@@ -12,8 +12,10 @@ import {
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BackChevron, HardShadow, OnboardingProgress } from '../../components/atoms';
+import { ProjectCoverField, ProjectDeadlineField } from '../../components/molecules';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
+import { uploadProjectImage, toDateOnly } from '../../lib/projects';
 import { ROLE_CATEGORIES, skillsForRoles } from '../../data/mock';
 import { AmbitFont, Brand, Space } from '../../constants/theme';
 
@@ -41,6 +43,8 @@ export default function ProjectNewScreen() {
   const [vibe, setVibe] = useState('');
   const [roles, setRoles] = useState<string[]>([]);
   const [campusId, setCampusId] = useState<string | null>(null);
+  const [coverUri, setCoverUri] = useState<string | null>(null);
+  const [neededBy, setNeededBy] = useState<Date | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -75,6 +79,7 @@ export default function ProjectNewScreen() {
           required_skills: skillsForRoles(roles),
           roles_sought: roles,
           campus_id: campusId,
+          needed_by: neededBy ? toDateOnly(neededBy) : null,
         })
         .select('id')
         .single();
@@ -82,6 +87,16 @@ export default function ProjectNewScreen() {
       supabase.functions
         .invoke('embed-vibe', { body: { table: 'projects', id: data.id, text: `${title.trim()}\n\n${vibe.trim()}` } })
         .catch((e) => console.warn('embed-vibe failed:', e?.message ?? e));
+      // Cover is best-effort: the project already exists, so a failed upload
+      // shouldn't block creation — log and continue.
+      if (coverUri) {
+        try {
+          const url = await uploadProjectImage(user.id, data.id, coverUri, Date.now());
+          await supabase.from('projects').update({ image_url: url }).eq('id', data.id);
+        } catch (e: any) {
+          console.warn('project cover upload failed:', e?.message ?? e);
+        }
+      }
       router.back();
     } catch (e: any) {
       Alert.alert("Couldn't create project", e?.message ?? 'Try again.');
@@ -133,6 +148,8 @@ export default function ProjectNewScreen() {
                 maxLength={140}
               />
             </View>
+            <ProjectCoverField uri={coverUri} onChange={setCoverUri} />
+            <ProjectDeadlineField value={neededBy} onChange={setNeededBy} />
           </>
         ) : (
           <>

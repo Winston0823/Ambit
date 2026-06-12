@@ -343,6 +343,8 @@ export async function fetchProjectCard(projectId: string): Promise<ProjectCardDa
     vibe_blurb: string | null;
     required_skills: string[] | null;
     roles_sought: string[] | null;
+    image_url: string | null;
+    needed_by: string | null;
     campus_id: string | null;
     owner_id: string;
   };
@@ -365,6 +367,8 @@ export async function fetchProjectCard(projectId: string): Promise<ProjectCardDa
     skillsSought: (r.required_skills ?? []).slice(0, 5),
     rolesSought: r.roles_sought ?? [],
     gradient: projectGradient(r.id),
+    imageUri: r.image_url ?? null,
+    neededBy: r.needed_by ?? null,
   };
 }
 

@@ -996,7 +996,7 @@ const styles = StyleSheet.create({
   segment: { flexDirection: 'row', backgroundColor: Brand.cardCream, borderRadius: 999, padding: 4 }, // light grouping bubble (card color, no outline)
   segmentBtn: { paddingHorizontal: 20, paddingVertical: 8, borderRadius: 999 },
   segmentBtnActive: { backgroundColor: Brand.action }, // just the teal indicator — no outline
-  segmentText: { fontFamily: AmbitFont.body, fontSize: 14, fontWeight: '600', color: Brand.inkMuted },
+  segmentText: { fontFamily: AmbitFont.body, fontSize: 14, lineHeight: 20, textAlign: 'center', includeFontPadding: false, fontWeight: '600', color: Brand.inkMuted },
   segmentTextActive: { color: Brand.actionInk, fontWeight: '700' },
 
   // Field-list editor (Tinder / Hinge convention).

@@ -15,8 +15,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import {
   AppStoreLogo,
+  ArrowClockwise,
   GithubLogo,
   Globe,
+  Lightning,
   PaperPlaneTilt,
   type IconProps,
 } from 'phosphor-react-native';
@@ -27,6 +29,7 @@ import {
   Radii,
 } from '../../constants/theme';
 import type { DiscoveryCardData, PortfolioItem } from '../../data/mock';
+import { responseTier } from '../../lib/responseRate';
 import { CAMPUSES } from '../../data/mock';
 import { HardShadow } from '../atoms';
 
@@ -284,8 +287,37 @@ function Scrim() {
 function MatchBadge({ text }: { text: string }) {
   return (
     <View style={styles.badge}>
-      <View style={styles.badgeDot} />
-      <Text style={styles.badgeText}>{text}</Text>
+      <Text style={styles.badgeText} numberOfLines={2}>{text}</Text>
+    </View>
+  );
+}
+
+/// Format a `YYYY-MM-DD` deadline into a short "Apr 30" for the badge. Parsed
+/// from local calendar parts to avoid a UTC day-shift.
+function formatNeededBy(iso: string): string {
+  const [y, m, d] = iso.split('-').map(Number);
+  if (!y || !m || !d) return '';
+  return new Date(y, m - 1, d).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
+// ─── Reply-tier badge ─────────────────────────────────────────────────────
+// Warm, public-facing trust signal against the 72h reach-out SLA. Renders a
+// worded tier ("Replies fast" / "Responsive") instead of a raw percentage —
+// the number lives on the owner's private management card. Returns null below
+// the threshold so a weak rate is simply absent, never punishing. Keyed by the
+// entity whose responsiveness is shown (project id or seeker id).
+function ReplyTierBadge({ id }: { id: string }) {
+  const tier = responseTier(id);
+  if (!tier) return null;
+  const Icon = tier.kind === 'fast' ? Lightning : ArrowClockwise;
+  return (
+    <View style={styles.replyBadge}>
+      <Icon
+        size={12}
+        color="#FFFFFF"
+        weight={tier.kind === 'fast' ? 'fill' : 'bold'}
+      />
+      <Text style={styles.replyBadgeText}>{tier.label}</Text>
     </View>
   );
 }
@@ -413,10 +445,8 @@ function SeekerContent({
   const featured = card.portfolio[0];
 
   // Top-right badge text — synthesized from match data
-  const badgeParts: string[] = [];
-  if (sharedCount > 0) badgeParts.push(`${sharedCount} shared`);
-  if (campus) badgeParts.push(campus.name.toUpperCase());
-  const badgeText = badgeParts.join(' · ');
+  // Fit signal only — campus is already shown in the eyebrow below.
+  const badgeText = sharedCount > 0 ? `${sharedCount} skill${sharedCount !== 1 ? 's' : ''} match` : '';
 
   // Eyebrow — built only from data we actually have (major / campus / grad
   // year). Anything missing is simply omitted; no fabricated "Computer
@@ -445,6 +475,7 @@ function SeekerContent({
           <Text style={styles.eyebrow} numberOfLines={1}>{eyebrowText}</Text>
         )}
         <Text style={styles.name} numberOfLines={1}>{card.name.trim() || 'Someone on Ambit'}</Text>
+        <ReplyTierBadge id={card.id} />
         {card.vibeBlurb !== '' && <VibeBlock text={card.vibeBlurb} />}
         <View style={styles.skillsRow}>
           {ordered.slice(0, 4).map((s) => (
@@ -489,10 +520,19 @@ function ProjectContent({ card, matchedSkills }: ProjectContentProps) {
     return am - bm;
   });
 
-  const badgeParts: string[] = [];
-  if (sharedCount > 0) badgeParts.push(`${sharedCount} shared`);
-  if (campus) badgeParts.push(campus.name.toUpperCase());
-  const badgeText = badgeParts.join(' · ');
+  // Top-right urgency badge: the open need + deadline ("Needs Frontend · by
+  // Apr 30"). Both are optional — fall back to deadline-only, need-only, then
+  // a quiet skill-fit signal. Campus is intentionally omitted (it's already in
+  // the eyebrow below).
+  const headlineRole = card.rolesSought?.[0];
+  const byDate = card.neededBy ? formatNeededBy(card.neededBy) : '';
+  const by = byDate ? `by ${byDate}` : null;
+  const badgeText =
+    headlineRole && by ? `Needs ${headlineRole} · ${by}`
+    : headlineRole      ? `Needs ${headlineRole}`
+    : by                ? `Needs someone ${by}`
+    : sharedCount > 0   ? `${sharedCount} skill${sharedCount !== 1 ? 's' : ''} match`
+    : '';
 
   const eyebrowText = campus
     ? `BY ${card.ownerName.toUpperCase()} · ${campus.name.toUpperCase()}`
@@ -501,7 +541,7 @@ function ProjectContent({ card, matchedSkills }: ProjectContentProps) {
   return (
     <>
       <PhotoBackdrop
-        uri={card.ownerPhotoUri ?? null}
+        uri={card.imageUri ?? card.ownerPhotoUri ?? null}
         fallbackGradient={card.gradient}
         fallbackInitials={initials}
       />
@@ -525,6 +565,7 @@ function ProjectContent({ card, matchedSkills }: ProjectContentProps) {
           </View>
         )}
         <Text style={styles.name} numberOfLines={2}>{card.title}</Text>
+        <ReplyTierBadge id={card.id} />
         {card.pitch !== '' && <VibeBlock text={card.pitch} />}
         <View style={styles.skillsRow}>
           {ordered.slice(0, 4).map((s) => (
@@ -693,27 +734,43 @@ const styles = StyleSheet.create({
     zIndex: 4,
   },
   badge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+    maxWidth: 190,
     paddingHorizontal: 12,
-    paddingVertical: 8,
-    paddingLeft: 8,
-    borderRadius: 999,
+    paddingVertical: 7,
+    borderRadius: 14,
     backgroundColor: 'rgba(255, 255, 255, 0.92)',
-  },
-  badgeDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: Brand.sage,
   },
   badgeText: {
     fontFamily: AmbitFont.body,
-    fontSize: 11,
-    fontWeight: '600',
+    fontSize: 11.5,
+    fontWeight: '700',
     color: '#3A332A',
     letterSpacing: 0.2,
+    lineHeight: 15,
+    textAlign: 'right',
+  },
+
+  // ── Reply-tier badge (sage-frosted trust pill) ─────────────────────────
+  // Sage ties it to the card's existing trust vocabulary (the match-badge
+  // dot + the Venn sage), reading as a calm "good" signal distinct from the
+  // neutral white skill chips below it.
+  replyBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    alignSelf: 'flex-start',
+    marginTop: -4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    backgroundColor: 'rgba(138, 155, 122, 0.46)',
+  },
+  replyBadgeText: {
+    fontFamily: AmbitFont.body,
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    letterSpacing: 0.3,
   },
 
   // ── Bottom content stack ───────────────────────────────────────────────

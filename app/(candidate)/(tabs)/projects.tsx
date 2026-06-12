@@ -12,6 +12,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
+  ArrowClockwise,
   ChatCircle,
   Compass,
   Handshake,
@@ -22,6 +23,7 @@ import { useAuth } from '../../../context/AuthContext';
 import { useProfileRole } from '../../../hooks/useProfileRole';
 import { supabase } from '../../../lib/supabase';
 import { getInbox, type InboxItem } from '../../../lib/messaging';
+import { responseRate } from '../../../lib/responseRate';
 import { SwipeRevealRow } from '../../../components/molecules/SwipeRevealRow';
 import { HardShadow, Skeleton } from '../../../components/atoms';
 import { AmbitFont, Brand, Radii, Space } from '../../../constants/theme';
@@ -209,6 +211,15 @@ export default function ProjectsTab() {
                       )}
                     </View>
 
+                    {/* Reply-rate chip against the 72h SLA (mock until
+                        reach-out timestamps land). */}
+                    <View style={styles.rateChip}>
+                      <ArrowClockwise size={11} color={Brand.inkLabel} weight="bold" />
+                      <Text style={styles.rateChipText}>
+                        {responseRate(p.id)}% within 72h
+                      </Text>
+                    </View>
+
                     {/* Single calm summary line (Vocabulary restraint) */}
                     <Text style={styles.cardSummary}>
                       {[
@@ -386,18 +397,35 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: Brand.inkMuted,
   },
+  rateChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    alignSelf: 'flex-start',
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: Brand.surface2,
+  },
+  rateChipText: {
+    fontFamily: AmbitFont.body,
+    fontSize: 11,
+    fontWeight: '600',
+    color: Brand.inkLabel,
+    letterSpacing: 0.2,
+  },
   statusPill: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: Radii.sm,
-    backgroundColor: Brand.primary,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: Brand.tagMint,
   },
   statusPillPaused: { backgroundColor: Brand.surface2 },
   statusText: {
     fontFamily: AmbitFont.body,
-    fontSize: 10,
-    fontWeight: '600',
-    color: Brand.inkOnBrand,
+    fontSize: 11,
+    fontWeight: '700',
+    color: Brand.tagMintInk,
     letterSpacing: 0.4,
   },
   statusTextPaused: { color: Brand.inkLabel },

@@ -14,9 +14,10 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Trash } from 'phosphor-react-native';
 import { BackChevron, HardShadow } from '../../components/atoms';
-import { DiscoveryCard } from '../../components/molecules';
+import { DiscoveryCard, ProjectCoverField, ProjectDeadlineField } from '../../components/molecules';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
+import { uploadProjectImage, toDateOnly } from '../../lib/projects';
 import { ROLE_CATEGORIES, skillsForRoles, type ProjectCardData } from '../../data/mock';
 import { AmbitFont, Brand } from '../../constants/theme';
 
@@ -35,6 +36,15 @@ const gradFor = (s: string): [string, string] => {
 };
 
 const BLURB_MIN = 10;
+
+/// Parse a `YYYY-MM-DD` date-only string into a local Date (avoids the UTC
+/// day-shift of `new Date('2026-04-30')`). Null/empty → null.
+function parseDateOnly(s: string | null | undefined): Date | null {
+  if (!s) return null;
+  const [y, m, d] = s.split('-').map(Number);
+  if (!y || !m || !d) return null;
+  return new Date(y, m - 1, d);
+}
 
 function SteerChip({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) {
   return (
@@ -59,6 +69,9 @@ export default function ProjectEditScreen() {
   const [campusId, setCampusId] = useState<string | null>(null);
   const [active, setActive] = useState(true);
   const [owner, setOwner] = useState<{ name: string; photo: string | null }>({ name: '', photo: null });
+  const [coverUrl, setCoverUrl] = useState<string | null>(null); // saved cover (remote)
+  const [pickedUri, setPickedUri] = useState<string | null>(null); // new local pick, uploaded on save
+  const [neededBy, setNeededBy] = useState<Date | null>(null);
   const [origText, setOrigText] = useState({ title: '', vibe: '' });
   const [saving, setSaving] = useState(false);
 
@@ -70,7 +83,7 @@ export default function ProjectEditScreen() {
     (async () => {
       const { data, error } = await supabase
         .from('projects')
-        .select('owner_id, title, vibe_blurb, roles_sought, campus_id, active')
+        .select('owner_id, title, vibe_blurb, roles_sought, image_url, needed_by, campus_id, active')
         .eq('id', id)
         .maybeSingle();
       if (cancelled) return;
@@ -89,6 +102,8 @@ export default function ProjectEditScreen() {
       setVibe(d.vibe_blurb ?? '');
       setRoles(d.roles_sought ?? []);
       setCampusId(d.campus_id ?? null);
+      setCoverUrl(d.image_url ?? null);
+      setNeededBy(parseDateOnly(d.needed_by));
       setActive(d.active);
       setOrigText({ title: d.title ?? '', vibe: d.vibe_blurb ?? '' });
       setLoading(false);
@@ -109,9 +124,14 @@ export default function ProjectEditScreen() {
   const valid = title.trim().length > 0 && vibe.trim().length >= BLURB_MIN && roles.length >= 1;
 
   const save = async () => {
-    if (!id) return;
+    if (!id || !user) return;
     setSaving(true);
     try {
+      // Upload a freshly-picked cover first so its public URL goes in the same
+      // update. If nothing new was picked, leave image_url untouched.
+      const nextImageUrl = pickedUri
+        ? await uploadProjectImage(user.id, id, pickedUri, Date.now())
+        : undefined;
       const { error } = await supabase
         .from('projects')
         .update({
@@ -121,6 +141,8 @@ export default function ProjectEditScreen() {
           roles_sought: roles,
           campus_id: campusId,
           active,
+          needed_by: neededBy ? toDateOnly(neededBy) : null,
+          ...(nextImageUrl ? { image_url: nextImageUrl } : {}),
         })
         .eq('id', id);
       if (error) throw error;
@@ -167,7 +189,9 @@ export default function ProjectEditScreen() {
     skillsSought: skillsForRoles(roles),
     rolesSought: roles,
     gradient: gradFor(id ?? 'preview'),
-  }), [id, user?.id, title, vibe, owner, campusId, roles]);
+    imageUri: pickedUri ?? coverUrl,
+    neededBy: neededBy ? toDateOnly(neededBy) : null,
+  }), [id, user?.id, title, vibe, owner, campusId, roles, pickedUri, coverUrl, neededBy]);
 
   if (loading) {
     return (
@@ -210,6 +234,9 @@ export default function ProjectEditScreen() {
           <Text style={styles.fieldLabel}>ONE LINE THAT CAPTURES IT</Text>
           <TextInput value={vibe} onChangeText={setVibe} style={[styles.input, styles.inputMultiline]} multiline maxLength={140} placeholderTextColor={Brand.inkPlaceholder} />
         </View>
+
+        <ProjectCoverField uri={pickedUri ?? coverUrl} onChange={setPickedUri} />
+        <ProjectDeadlineField value={neededBy} onChange={setNeededBy} />
 
         <Text style={styles.secLabel}>ROLES YOU'RE HIRING</Text>
         <View style={styles.chips}>

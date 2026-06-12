@@ -21,3 +21,5 @@ export { AvailabilityGrid } from './AvailabilityGrid';
 export { AvailabilityPollBubble } from './AvailabilityPollBubble';
 export { BottomSheet } from './BottomSheet';
 export { ReachOutLimitSheet } from './ReachOutLimitSheet';
+export { ProjectCoverField } from './ProjectCoverField';
+export { ProjectDeadlineField } from './ProjectDeadlineField';

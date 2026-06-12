@@ -84,6 +84,7 @@ export function ReachOutComposer({ card, onDismiss, onSend, onSent, disableAttac
   const planeY       = useRef(new Animated.Value(0)).current;
   const planeOpacity = useRef(new Animated.Value(0)).current;
   const successOpacity = useRef(new Animated.Value(0)).current;
+  const successRise  = useRef(new Animated.Value(8)).current;
   const tintOpacity  = useRef(new Animated.Value(0)).current;
   // Attachments animate in AFTER the white surface has risen.
   const attachOpacity = useRef(new Animated.Value(0)).current;
@@ -118,6 +119,7 @@ export function ReachOutComposer({ card, onDismiss, onSend, onSent, disableAttac
       planeY.setValue(0);
       planeOpacity.setValue(0);
       successOpacity.setValue(0);
+      successRise.setValue(8);
       tintOpacity.setValue(0);
       attachOpacity.setValue(0);
       attachRise.setValue(14);
@@ -129,7 +131,7 @@ export function ReachOutComposer({ card, onDismiss, onSend, onSent, disableAttac
     } else {
       enter.setValue(0);
     }
-  }, [card, enter, formOpacity, planeX, planeY, planeOpacity, successOpacity, tintOpacity, attachOpacity, attachRise, expand, selectIn, exit]);
+  }, [card, enter, formOpacity, planeX, planeY, planeOpacity, successOpacity, successRise, tintOpacity, attachOpacity, attachRise, expand, selectIn, exit]);
 
   // Spring the stack open/closed whenever `expanded` flips. Opening uses a
   // looser spring (soft overshoot = the airy separation); closing is tighter.
@@ -264,8 +266,12 @@ export function ReachOutComposer({ card, onDismiss, onSend, onSent, disableAttac
 
     if (ok) {
       if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-      Animated.timing(successOpacity, { toValue: 1, duration: 360, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
-      setTimeout(() => onSent?.(), 850);
+      Animated.parallel([
+        Animated.timing(successOpacity, { toValue: 1, duration: 360, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+        Animated.timing(successRise, { toValue: 0, duration: 460, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+      ]).start();
+      // Hold the affirmation long enough to actually land before dismissing.
+      setTimeout(() => onSent?.(), 1250);
     } else {
       if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
       planeX.setValue(0);
@@ -402,7 +408,7 @@ export function ReachOutComposer({ card, onDismiss, onSend, onSent, disableAttac
               </Animated.View>
             )}
             {phase === 'sending' && (
-              <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.successWrap, { opacity: successOpacity }]}>
+              <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.successWrap, { opacity: successOpacity, transform: [{ translateY: successRise }] }]}>
                 <Text style={styles.successText}>Your message is on its way to {firstName}.</Text>
               </Animated.View>
             )}

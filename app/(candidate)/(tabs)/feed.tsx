@@ -89,6 +89,8 @@ async function fetchProjectDeck(userId: string): Promise<ProjectCardData[]> {
     vibe_blurb: string;
     required_skills: string[];
     roles_sought: string[];
+    image_url: string | null;
+    needed_by: string | null;
     campus_id: string | null;
     owner_id: string;
     score: number;
@@ -128,6 +130,8 @@ async function fetchProjectDeck(userId: string): Promise<ProjectCardData[]> {
       skillsSought: r.required_skills.slice(0, 5),
       rolesSought: r.roles_sought ?? [],
       gradient: CARD_GRADIENTS[i % CARD_GRADIENTS.length],
+      imageUri: r.image_url ?? null,
+      neededBy: r.needed_by ?? null,
     };
   });
 }
@@ -712,7 +716,8 @@ export default function DiscoveryFeed() {
 }
 
 /// Borderless icon + label filter trigger. No bubble/outline when inactive;
-/// a soft warm-tan tint (no border) + accent + count when it has selections.
+/// a soft teal tint (no border) + teal accent + count when it has selections —
+/// matching the blue selection fill used by the filter-sheet chips.
 function FilterButton({
   Icon,
   label,
@@ -725,7 +730,7 @@ function FilterButton({
   onPress: () => void;
 }) {
   const active = count > 0;
-  const tint = active ? Brand.accent : Brand.inkLabel;
+  const tint = active ? Brand.actionDeep : Brand.inkLabel;
   return (
     <Tactile
       haptic="tap"
@@ -737,7 +742,7 @@ function FilterButton({
       <Text style={[styles.filterBtnText, active && styles.filterBtnTextActive]}>
         {label}{active ? ` · ${count}` : ''}
       </Text>
-      <CaretDown size={11} color={active ? Brand.accent : Brand.inkMuted} weight="bold" />
+      <CaretDown size={11} color={active ? Brand.actionDeep : Brand.inkMuted} weight="bold" />
     </Tactile>
   );
 }
@@ -813,11 +818,11 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 999, // only matters when the active tint shows
   },
-  filterBtnActive: { backgroundColor: 'rgba(212, 180, 144, 0.18)' }, // soft warm tint, no border
+  filterBtnActive: { backgroundColor: 'rgba(166, 199, 194, 0.22)' }, // soft teal tint, no border
   filterBtnText: { fontFamily: AmbitFont.body, fontSize: 14, fontWeight: '600', color: Brand.inkBody },
-  filterBtnTextActive: { color: Brand.accent },
+  filterBtnTextActive: { color: Brand.actionDeep },
   filterClear: { paddingHorizontal: 8, paddingVertical: 8 },
-  filterClearText: { fontFamily: AmbitFont.body, fontSize: 13.5, fontWeight: '600', color: Brand.accent },
+  filterClearText: { fontFamily: AmbitFont.body, fontSize: 13.5, fontWeight: '600', color: Brand.actionDeep },
 
   // ── Filter sheet (searchable, tall + scrollable) ───────────────────────
   filterSheetHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, paddingHorizontal: 4 },
