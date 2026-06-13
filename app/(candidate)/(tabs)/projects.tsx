@@ -95,17 +95,29 @@ export default function ProjectsTab() {
     return (
       <View style={styles.root}>
         <View style={[styles.content, { paddingTop: insets.top + 40 }]}>
-          <Skeleton width={60} height={12} radius={6} />
-          <Skeleton width={180} height={34} radius={10} style={{ marginTop: 12, marginBottom: 24 }} />
-          <Skeleton height={52} radius={999} style={{ marginBottom: 20 }} />
-          {[0, 1].map((i) => (
-            <View key={i} style={styles.skelCard}>
-              <View style={styles.skelHeader}>
-                <Skeleton width={110} height={20} radius={6} />
-                <Skeleton width={46} height={18} radius={999} />
+          {/* Header: kicker → title → summary line. */}
+          <View>
+            <Skeleton width={60} height={12} radius={6} />
+            <Skeleton width={180} height={32} radius={8} style={{ marginTop: 8 }} />
+            <Skeleton width={150} height={13} radius={6} style={{ marginTop: 8 }} />
+          </View>
+          {/* New-project button — pill on a hard offset edge. */}
+          <HardShadow radius={999} offset={4}>
+            <Skeleton height={52} radius={999} />
+          </HardShadow>
+          {/* Project cards — cream island, ink border, hard edge; header
+              (title + status pill), a rate chip, then the summary line. */}
+          {[0, 1, 2].map((i) => (
+            <HardShadow key={i} radius={Radii.card} offset={4}>
+              <View style={styles.skelCard}>
+                <View style={styles.skelHeader}>
+                  <Skeleton width={110} height={20} radius={6} />
+                  <Skeleton width={52} height={20} radius={999} />
+                </View>
+                <Skeleton width={96} height={20} radius={999} />
+                <Skeleton width="68%" height={13} radius={6} />
               </View>
-              <Skeleton width="68%" height={13} radius={6} style={{ marginTop: 12 }} />
-            </View>
+            </HardShadow>
           ))}
         </View>
       </View>
@@ -306,7 +318,7 @@ const styles = StyleSheet.create({
   content: { paddingHorizontal: Space.lg, paddingTop: Space.lg, gap: Space.md },
 
   // Skeleton (loading) cards — shaped like the real project cards.
-  skelCard: { backgroundColor: Brand.cardCream, borderWidth: 1.5, borderColor: Brand.borderSoft, borderRadius: Radii.card, padding: 20 },
+  skelCard: { backgroundColor: Brand.cardCream, borderWidth: 1.5, borderColor: Brand.inkEdge, borderRadius: Radii.card, padding: 20, gap: 8 },
   skelHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
 
   kicker: {

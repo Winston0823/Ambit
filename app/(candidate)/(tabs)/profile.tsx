@@ -344,17 +344,36 @@ export default function ProfileTab() {
   };
 
   if (loading) {
+    // Mirror the real screen: a header band with the centered Edit|Preview
+    // segment + sign-out stub, then the full-bleed preview card silhouette
+    // (the profile opens in Preview mode).
     return (
       <View style={styles.root}>
-        <View style={{ paddingHorizontal: 24, paddingTop: insets.top + 64, alignItems: 'center' }}>
-          <Skeleton width={96} height={96} radius={48} />
-          <Skeleton width={150} height={28} radius={8} style={{ marginTop: 20 }} />
-          <Skeleton width={100} height={14} radius={6} style={{ marginTop: 12 }} />
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center', marginTop: 28 }}>
-            {[72, 96, 60, 84, 68].map((w, i) => (
-              <Skeleton key={i} width={w} height={34} radius={999} />
-            ))}
+        <View style={[styles.header, { marginTop: insets.top + 6 }]}>
+          <Skeleton width={156} height={40} radius={999} />
+          <View style={styles.signOutBtn}>
+            <Skeleton width={20} height={20} radius={6} />
           </View>
+        </View>
+        <View style={styles.previewWrap}>
+          <HardShadow radius={Radii.card} offset={7} style={{ flex: 1 }}>
+            <View style={styles.skelCard}>
+              <Skeleton width={120} height={30} radius={14} style={styles.skelBadge} />
+              <View style={styles.skelStack}>
+                <Skeleton width={120} height={11} radius={5} />
+                <Skeleton width="68%" height={30} radius={8} />
+                <View style={{ gap: 7 }}>
+                  <Skeleton width="90%" height={15} radius={6} />
+                  <Skeleton width="62%" height={15} radius={6} />
+                </View>
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  {[70, 92, 64].map((w, i) => (
+                    <Skeleton key={i} width={w} height={33} radius={999} />
+                  ))}
+                </View>
+              </View>
+            </View>
+          </HardShadow>
         </View>
       </View>
     );
@@ -1003,6 +1022,18 @@ const styles = StyleSheet.create({
 
   // Preview mode — the real discovery card, filling the screen like the deck.
   previewWrap: { flex: 1, paddingHorizontal: Space.lg, paddingTop: Space.sm, paddingBottom: Space.md },
+
+  // Loading skeleton — mirrors the DiscoveryCard preview silhouette.
+  skelCard: {
+    flex: 1,
+    backgroundColor: Brand.surface1,
+    borderRadius: Radii.card,
+    borderWidth: 1.5,
+    borderColor: Brand.inkEdge,
+    overflow: 'hidden',
+  },
+  skelBadge: { position: 'absolute', top: 16, right: 16 },
+  skelStack: { position: 'absolute', left: 22, right: 22, bottom: 22, paddingRight: 72, gap: 16 },
 
   // Segmented Edit | Preview control (centered in the header band).
   segment: { flexDirection: 'row', backgroundColor: Brand.cardCream, borderRadius: 999, padding: 4 }, // light grouping bubble (card color, no outline)

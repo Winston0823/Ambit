@@ -275,9 +275,10 @@ export default function NewChatScreen() {
             <View key={i} style={styles.rowCard}>
               <Skeleton width={48} height={48} radius={14} />
               <View style={{ flex: 1, gap: 8 }}>
-                <Skeleton width="50%" height={15} radius={6} />
-                <Skeleton width="75%" height={12} radius={6} />
+                <Skeleton width="42%" height={15} radius={6} />
+                <Skeleton width="72%" height={12} radius={6} />
               </View>
+              <Skeleton width={8} height={14} radius={3} />
             </View>
           ))}
         </View>

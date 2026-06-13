@@ -1020,23 +1020,42 @@ export default function ThreadScreen() {
       )}
 
       {loading || !meta || !user ? (
-        <View style={styles.skeletonBody}>
+        // Mirror the real thread: each bubble sits in a row with a 32px avatar
+        // gutter (theirs left, mine right) + 8px gap, a 72% max width, and the
+        // asymmetric tail corner. Same top offset as the list so bubbles don't
+        // slide under the floating header.
+        <View style={[styles.skeletonBody, { paddingTop: insets.top + 96 }]}>
           {[
-            { mine: false, w: '62%', h: 46 },
+            { mine: false, w: '62%', h: 44 },
             { mine: true, w: '48%', h: 40 },
-            { mine: false, w: '72%', h: 58 },
+            { mine: false, w: '70%', h: 58 },
             { mine: false, w: '40%', h: 40 },
             { mine: true, w: '58%', h: 50 },
             { mine: true, w: '34%', h: 40 },
             { mine: false, w: '54%', h: 46 },
           ].map((b, i) => (
-            <Skeleton
+            <View
               key={i}
-              width={b.w as any}
-              height={b.h}
-              radius={20}
-              style={{ alignSelf: b.mine ? 'flex-end' : 'flex-start', marginBottom: 12 }}
-            />
+              style={{
+                flexDirection: 'row',
+                alignItems: 'flex-end',
+                gap: 8,
+                marginBottom: 6,
+                justifyContent: b.mine ? 'flex-end' : 'flex-start',
+              }}
+            >
+              {!b.mine && <Skeleton width={32} height={32} radius={8} />}
+              <Skeleton
+                width={b.w as any}
+                height={b.h}
+                radius={18}
+                style={{
+                  borderBottomLeftRadius: b.mine ? 18 : 4,
+                  borderBottomRightRadius: b.mine ? 4 : 18,
+                }}
+              />
+              {b.mine && <Skeleton width={32} height={32} radius={8} />}
+            </View>
           ))}
         </View>
       ) : (

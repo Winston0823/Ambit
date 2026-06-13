@@ -16,7 +16,7 @@ import type { IconProps } from 'phosphor-react-native';
 import * as Haptics from 'expo-haptics';
 import { DiscoveryOverview, SwipeDeck } from '../../../components/organisms';
 import { PortfolioModal, ReachOutComposer, BottomSheet, ReachOutLimitSheet } from '../../../components/molecules';
-import { HardShadow, Tactile } from '../../../components/atoms';
+import { HardShadow, Skeleton as SkeletonBlock, Tactile } from '../../../components/atoms';
 import { CAMPUSES } from '../../../data/mock';
 import {
   canReachOut,
@@ -748,9 +748,30 @@ function FilterButton({
 }
 
 function Skeleton() {
+  // Mirror the DiscoveryCard silhouette: one big rounded-20 card on a 7px hard
+  // shadow, with a badge top-right, a bottom-left stack (eyebrow → big title →
+  // ~2-line vibe → chip row), and the reach-out circle bottom-right.
   return (
     <View style={styles.skeletonWrap}>
-      <View style={styles.skeletonCard} />
+      <HardShadow radius={Radii.card} offset={7} style={{ flex: 1 }}>
+        <View style={styles.skeletonCard}>
+          <SkeletonBlock width={120} height={30} radius={14} style={styles.skelBadge} />
+          <View style={styles.skelStack}>
+            <SkeletonBlock width={120} height={11} radius={5} />
+            <SkeletonBlock width="68%" height={30} radius={8} />
+            <View style={{ gap: 7 }}>
+              <SkeletonBlock width="90%" height={15} radius={6} />
+              <SkeletonBlock width="62%" height={15} radius={6} />
+            </View>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              {[70, 92, 64].map((w, i) => (
+                <SkeletonBlock key={i} width={w} height={33} radius={999} />
+              ))}
+            </View>
+          </View>
+          <SkeletonBlock width={58} height={58} radius={29} style={styles.skelReach} />
+        </View>
+      </HardShadow>
     </View>
   );
 }
@@ -892,8 +913,15 @@ const styles = StyleSheet.create({
   skeletonCard: {
     flex: 1,
     backgroundColor: Brand.surface1,
-    borderRadius: Radii.lg,
+    borderRadius: Radii.card,
+    borderWidth: 1.5,
+    borderColor: Brand.inkEdge,
+    overflow: 'hidden',
+    position: 'relative',
   },
+  skelBadge: { position: 'absolute', top: 16, right: 16 },
+  skelStack: { position: 'absolute', left: 22, right: 22, bottom: 22, paddingRight: 72, gap: 16 },
+  skelReach: { position: 'absolute', bottom: 22, right: 22 },
   emptyWrap: {
     flex: 1,
     alignItems: 'center',

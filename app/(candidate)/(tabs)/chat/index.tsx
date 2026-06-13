@@ -392,17 +392,43 @@ function ListHeader({
 /// speak the same loading language.
 function InboxSkeleton() {
   return (
-    <View style={styles.skeletonWrap}>
-      <Skeleton width={140} height={28} radius={8} style={{ marginBottom: 24 }} />
-      {Array.from({ length: 6 }).map((_, i) => (
-        <View key={i} style={styles.skeletonRow}>
-          <Skeleton width={48} height={48} radius={24} />
-          <View style={styles.skeletonLines}>
-            <Skeleton width="60%" height={14} radius={6} />
-            <Skeleton width="40%" height={12} radius={6} />
-          </View>
-        </View>
-      ))}
+    <View style={{ flex: 1 }}>
+      {/* Header: 44pt bar with side icons + centered "Messages" title. */}
+      <View style={styles.skelTopbar}>
+        <Skeleton width={36} height={36} radius={18} />
+        <Skeleton width={120} height={24} radius={8} />
+        <Skeleton width={36} height={36} radius={18} />
+      </View>
+      {/* Filter chips row (All / Unread / Your turn / Hired). */}
+      <View style={styles.skelFilters}>
+        {[56, 74, 84, 64].map((w, i) => (
+          <Skeleton key={i} width={w} height={34} radius={999} />
+        ))}
+      </View>
+      {/* Inbox-row cards — cream island, ink border, hard offset edge, a
+          48 rounded-square avatar, name + tiny byline + time, and an indented
+          preview line (under the name, like the real row). */}
+      <View style={styles.skelList}>
+        {Array.from({ length: 5 }).map((_, i) => (
+          <HardShadow key={i} radius={Radii.card} offset={4} style={styles.skelRowShadow}>
+            <View style={styles.skelCard}>
+              <View style={styles.skelTopRow}>
+                <View style={styles.skelTopLeft}>
+                  <Skeleton width={48} height={48} radius={12} />
+                  <View style={styles.skelNameBlock}>
+                    <Skeleton width={130} height={18} radius={6} />
+                    <Skeleton width={92} height={9} radius={4} style={{ marginTop: 7 }} />
+                  </View>
+                </View>
+                <Skeleton width={28} height={11} radius={5} />
+              </View>
+              <View style={styles.skelSubBlock}>
+                <Skeleton width="74%" height={13} radius={6} />
+              </View>
+            </View>
+          </HardShadow>
+        ))}
+      </View>
     </View>
   );
 }
@@ -411,40 +437,36 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Brand.canvas },
   center: { alignItems: 'center', justifyContent: 'center' },
 
-  // ── Loading skeleton ──────────────────────────────────────────
-  skeletonWrap: { paddingHorizontal: 24, paddingTop: 28 },
-  skeletonTitle: {
-    width: 140,
-    height: 28,
-    borderRadius: 8,
-    backgroundColor: Brand.surface2,
-    marginBottom: 24,
-  },
-  skeletonRow: {
+  // ── Loading skeleton — mirrors the real header + InboxRow island cards ──
+  skelTopbar: {
+    height: 44,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
-    paddingVertical: 12,
+    justifyContent: 'space-between',
+    paddingHorizontal: Space.lg,
+    marginBottom: 8,
   },
-  skeletonAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: Brand.surface2,
+  skelFilters: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 20,
+    paddingTop: 2,
+    paddingBottom: 12,
   },
-  skeletonLines: { flex: 1, gap: 8 },
-  skeletonLineWide: {
-    width: '60%',
-    height: 13,
-    borderRadius: 6,
-    backgroundColor: Brand.surface2,
+  skelList: { paddingHorizontal: 20 },
+  skelRowShadow: { marginBottom: 12 },
+  skelCard: {
+    backgroundColor: Brand.cardCream,
+    borderWidth: 1.5,
+    borderColor: Brand.inkEdge,
+    borderRadius: Radii.card,
+    padding: 16,
+    gap: 8,
   },
-  skeletonLineNarrow: {
-    width: '40%',
-    height: 11,
-    borderRadius: 6,
-    backgroundColor: Brand.surface2,
-  },
+  skelTopRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 },
+  skelTopLeft: { flexDirection: 'row', alignItems: 'center', gap: 14, flex: 1 },
+  skelNameBlock: { flex: 1 },
+  skelSubBlock: { paddingLeft: 62 }, // SUB_INDENT — preview aligns under the name
 
   // ── Top bar — mirrors the Discovery feed bar (44pt, centered title,
   //    absolutely-positioned icons at Space.lg from each edge).

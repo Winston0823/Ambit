@@ -78,9 +78,13 @@ export default function SearchScreen() {
         <View style={styles.results}>
           {[0, 1, 2].map((i) => (
             <View key={i} style={styles.hit}>
-              <Skeleton width="48%" height={12} radius={6} />
-              <Skeleton width="92%" height={14} radius={6} style={{ marginTop: 8 }} />
-              <Skeleton width="68%" height={14} radius={6} style={{ marginTop: 8 }} />
+              {/* header (name · project) → 3-line snippet → time, mirroring the
+                  real hit card's gap:4 rhythm and numberOfLines={3} body. */}
+              <Skeleton width="46%" height={12} radius={6} />
+              <Skeleton width="92%" height={14} radius={6} />
+              <Skeleton width="86%" height={14} radius={6} />
+              <Skeleton width="54%" height={14} radius={6} />
+              <Skeleton width={64} height={11} radius={6} style={{ marginTop: 4 }} />
             </View>
           ))}
         </View>

@@ -63,18 +63,33 @@ export default function ProjectManageScreen() {
   };
 
   if (candidates === null) {
+    // Mirror the real pipeline: back chevron + header (kicker, title, a status
+    // pill + count meta row), then stage groups (label + bordered candidate
+    // cards with a 44 avatar). Reuses styles.candidate for an exact row match.
     return (
       <View style={styles.root}>
-        <View style={{ paddingHorizontal: 24, paddingTop: insets.top + 64 }}>
-          <Skeleton width={60} height={12} radius={6} />
-          <Skeleton width={200} height={30} radius={8} style={{ marginTop: 12, marginBottom: 28 }} />
-          {[0, 1, 2].map((i) => (
-            <View key={i} style={styles.skelRow}>
-              <Skeleton width={48} height={48} radius={14} />
-              <View style={{ flex: 1, gap: 8 }}>
-                <Skeleton width="55%" height={16} radius={6} />
-                <Skeleton width="80%" height={12} radius={6} />
-              </View>
+        <BackChevron onPress={() => router.back()} />
+        <View style={[styles.content, { paddingTop: insets.top + 12 }]}>
+          <View style={styles.header}>
+            <Skeleton width={64} height={11} radius={5} />
+            <Skeleton width="70%" height={34} radius={8} />
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <Skeleton width={130} height={32} radius={999} />
+              <Skeleton width={90} height={12} radius={6} />
+            </View>
+          </View>
+          {[0, 1].map((s) => (
+            <View key={s} style={{ gap: 8 }}>
+              <Skeleton width={150} height={11} radius={5} style={{ marginTop: 8 }} />
+              {[0, 1].map((r) => (
+                <View key={r} style={styles.candidate}>
+                  <Skeleton width={44} height={44} radius={14} />
+                  <View style={{ flex: 1, gap: 6 }}>
+                    <Skeleton width="55%" height={15} radius={6} />
+                    <Skeleton width="80%" height={12} radius={6} />
+                  </View>
+                </View>
+              ))}
             </View>
           ))}
         </View>
