@@ -9,6 +9,10 @@ interface Props {
   /// Total number of in-flow steps (eduEmail through role, not counting
   /// splash/welcome/signIn/complete).
   total: number;
+  /// Extra left inset (px) so the wave's left end clears a back chevron that
+  /// shares the top-left corner. Default 0 — onboarding screens that don't
+  /// overlap a chevron keep the original full-bleed start.
+  leadInset?: number;
 }
 
 const H         = 16;    // band height (fits amplitude + dot)
@@ -39,7 +43,7 @@ function buildWave(width: number, amp: number): string {
 /// the phase scroll is a native-driver `translateX` on a wave drawn one
 /// wavelength wider than the track (so the loop is seamless), clipped to the
 /// JS-animated fill width.
-export function OnboardingProgress({ current, total }: Props) {
+export function OnboardingProgress({ current, total, leadInset = 0 }: Props) {
   const [w, setW] = useState(0);
   const progress = Math.max(0, Math.min(1, total > 0 ? current / total : 0));
   const amp = MAX_AMP * (1 - progress);
@@ -72,7 +76,10 @@ export function OnboardingProgress({ current, total }: Props) {
   const path = useMemo(() => buildWave(w + WL * 2, amp), [w, amp]);
 
   return (
-    <View style={styles.root} onLayout={(e) => setW(e.nativeEvent.layout.width)}>
+    <View
+      style={[styles.root, leadInset > 0 && { marginLeft: 24 + leadInset }]}
+      onLayout={(e) => setW(e.nativeEvent.layout.width)}
+    >
       {/* Unfilled track — picks up just past the leading dot. */}
       <Animated.View style={[styles.track, { left: Animated.add(clip, 12) }]} />
 

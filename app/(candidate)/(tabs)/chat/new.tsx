@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Alert,
   FlatList,
@@ -21,6 +21,7 @@ import { fetchPortfoliosByUser } from '../../../../lib/portfolio';
 import { useAuth } from '../../../../context/AuthContext';
 import { CAMPUSES, type SeekerCardData } from '../../../../data/mock';
 import { AmbitFont, Brand, Radii, Space } from '../../../../constants/theme';
+import { toast } from '../../../../lib/toast';
 
 /// S-051 People search. Find another user by display name, preview the same
 /// discovery card an owner would see, then reach out. Every conversation is
@@ -88,37 +89,51 @@ export default function NewChatScreen() {
 
   // Card handed to the ReachOutComposer. Non-null = composer open.
   const [reachCard, setReachCard] = useState<SeekerCardData | null>(null);
+  // Guards the reach-out button against a double-tap firing two project
+  // lookups (and potentially two composers) before the first resolves.
+  const [reachingOut, setReachingOut] = useState(false);
   const chosenProjectId = useRef<string | null>(null);
   // Seeker on the new thread — derived from the chosen project's owner.
   const chosenSeekerId = useRef<string | null>(null);
 
-  // ── Debounced name search ──────────────────────────────────────
+  // ── Name search (stable so the error-toast Retry can re-run it) ────────
+  const runSearch = useCallback(async (term: string) => {
+    setSearching(true);
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, name, photo_url, campus_id, skills, vibe_blurb')
+        .ilike('name', `%${term}%`)
+        .neq('id', user?.id ?? '')
+        .limit(30);
+      if (error) throw error;
+      setResults((data as Person[] | null) ?? []);
+    } catch {
+      // A failed search must not read as "No one found." Keep prior results
+      // (or the empty prompt) and surface a retryable error.
+      setResults((prev) => prev ?? null);
+      toast.error("Couldn't search right now.", {
+        actionLabel: 'Retry',
+        onAction: () => { void runSearch(term); },
+      });
+    } finally {
+      setSearching(false);
+    }
+  }, [user?.id]);
+
+  // ── Debounced trigger ──────────────────────────────────────────
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    if (query.trim().length < 2) {
+    const term = query.trim();
+    if (term.length < 2) {
       setResults(null);
       return;
     }
-    debounceRef.current = setTimeout(async () => {
-      setSearching(true);
-      try {
-        const { data } = await supabase
-          .from('profiles')
-          .select('id, name, photo_url, campus_id, skills, vibe_blurb')
-          .ilike('name', `%${query.trim()}%`)
-          .neq('id', user?.id ?? '')
-          .limit(30);
-        setResults((data as Person[] | null) ?? []);
-      } catch {
-        setResults([]);
-      } finally {
-        setSearching(false);
-      }
-    }, 250);
+    debounceRef.current = setTimeout(() => { void runSearch(term); }, 250);
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [query, user?.id]);
+  }, [query, runSearch]);
 
   // ── Open the full discovery card for a tapped result ───────────
   const openPreview = async (person: Person) => {
@@ -143,7 +158,9 @@ export default function NewChatScreen() {
   // No role gate — a chat can hang off one of my projects (they're the
   // seeker) OR one of theirs (I'm the seeker), so anyone can reach anyone.
   const beginReachOut = async (person: Person) => {
-    if (!user) return;
+    if (!user || reachingOut) return;
+    setReachingOut(true);
+    try {
     const [mineRes, theirsRes] = await Promise.all([
       supabase.from('projects').select('id, title')
         .eq('owner_id', user.id).eq('active', true)
@@ -152,6 +169,13 @@ export default function NewChatScreen() {
         .eq('owner_id', person.id).eq('active', true)
         .order('created_at', { ascending: false }),
     ]);
+    if (mineRes.error || theirsRes.error) {
+      toast.error("Couldn't start that reach-out.", {
+        actionLabel: 'Retry',
+        onAction: () => { void beginReachOut(person); },
+      });
+      return;
+    }
     const mine   = (mineRes.data   as ProjectRow[] | null) ?? [];
     const theirs = (theirsRes.data as ProjectRow[] | null) ?? [];
 
@@ -177,6 +201,9 @@ export default function NewChatScreen() {
       return;
     }
     setPickerOptions(options);
+    } finally {
+      setReachingOut(false);
+    }
   };
 
   const openComposer = (person: Person, option: ReachOption) => {

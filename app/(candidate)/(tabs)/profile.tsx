@@ -49,6 +49,8 @@ import {
   upsertPortfolioItem,
 } from '../../../lib/portfolio';
 import { randomUUID } from 'expo-crypto';
+import { toast } from '../../../lib/toast';
+import { optimistic } from '../../../lib/mutation';
 import { formatResponseRate, formatResponseTime } from '../../../lib/closureLoop';
 import { CAMPUSES, SKILL_CATEGORIES } from '../../../data/mock';
 import type { PortfolioItem, SeekerCardData } from '../../../data/mock';
@@ -174,17 +176,25 @@ export default function ProfileTab() {
   );
 
   /// Update a single Supabase column and mirror the change locally for
-  /// immediate UI feedback. We don't wait for the round-trip — optimistic
-  /// updates feel snappy. Errors are logged so silent failures (RLS
-  /// denial, schema mismatch, etc.) show up in the dev console instead
-  /// of producing a UI that pretends the save worked.
+  /// immediate UI feedback. Optimistic via the shared helper: the UI moves
+  /// instantly, and if the write fails (RLS denial, schema mismatch, etc.)
+  /// the local mirror snaps back and the user gets a toast — instead of a UI
+  /// that pretends the save worked.
   const updateField = async (field: keyof ProfileRow, value: ProfileRow[keyof ProfileRow]) => {
     if (!user) return;
-    setProfile((p) => (p ? { ...p, [field]: value } : p));
-    const { error } = await supabase.from('profiles').update({ [field]: value }).eq('id', user.id);
-    if (error) {
-      console.warn(`profile.${String(field)} update failed:`, error.message);
-    }
+    await optimistic<ProfileRow | null>({
+      apply: () => {
+        const prev = profile;
+        setProfile((p) => (p ? { ...p, [field]: value } : p));
+        return prev;
+      },
+      commit: async () => {
+        const { error } = await supabase.from('profiles').update({ [field]: value }).eq('id', user.id);
+        if (error) throw error;
+      },
+      revert: (prev) => setProfile(prev),
+      errorMessage: "Couldn't save that change",
+    });
   };
 
   const pickPhoto = async () => {
@@ -192,7 +202,10 @@ export default function ProfileTab() {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     }
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) return;
+    if (!perm.granted) {
+      toast.error('Enable photo access in Settings to add a photo.');
+      return;
+    }
     const result = await ImagePicker.launchImageLibraryAsync({
       allowsEditing: true,
       aspect: [1, 1],
@@ -220,6 +233,10 @@ export default function ProfileTab() {
       setProfile((p) => (p ? { ...p, photo_url: data.publicUrl } : p));
     } catch (e: any) {
       console.warn('Avatar upload failed:', e?.message ?? e);
+      toast.error("Couldn't upload your photo. Tap to try again.", {
+        actionLabel: 'Retry',
+        onAction: () => { void pickPhoto(); },
+      });
     }
   };
 
@@ -290,6 +307,7 @@ export default function ProfileTab() {
           setPortfolio((prev) => prev.map((p) => (p.id === updated.id ? { ...p, imageUri: remote } : p)));
         } catch (imgErr: any) {
           console.warn('portfolio image upload failed:', imgErr?.message ?? imgErr);
+          toast.error("Couldn't upload that image — saved the rest.");
           imageUrl = exists ? portfolio.find((p) => p.id === updated.id)?.imageUri ?? null : null;
         }
       }
@@ -307,6 +325,7 @@ export default function ProfileTab() {
       });
     } catch (e: any) {
       console.warn('portfolio upsert failed:', e?.message ?? e);
+      toast.error("Couldn't save that project. We've reverted it.");
       // Refetch to reconcile if the write actually failed.
       const items = await fetchPortfolioForUser(user.id);
       setPortfolio(items);

@@ -282,26 +282,46 @@ export default function ThreadScreen() {
     return () => { cancelled = true; };
   }, [messages]);
 
-  const handleProposeHire = async () => {
+  // Propose hire notifies the other party — confirm the intent on the single
+  // tap before firing, so an accidental menu tap can't propose a hire.
+  const handleProposeHire = () => {
     setOverflowOpen(false);
     if (!conversationId) return;
-    try {
-      await proposeHire(conversationId);
-      // Optimistic: bump status locally so the banner reflects right away.
-      setMeta((m) => (m ? { ...m, status: 'hired_pending', hired_proposed_by: user?.id ?? null } : m));
-    } catch (e: any) {
-      Alert.alert('Could not propose hire', e?.message ?? 'Try again.');
-    }
+    Alert.alert('Propose hire?', "They'll be notified that you want to hire them.", [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Propose',
+        onPress: async () => {
+          try {
+            await proposeHire(conversationId);
+            // Optimistic: bump status locally so the banner reflects right away.
+            setMeta((m) => (m ? { ...m, status: 'hired_pending', hired_proposed_by: user?.id ?? null } : m));
+          } catch (e: any) {
+            Alert.alert('Could not propose hire', e?.message ?? 'Try again.');
+          }
+        },
+      },
+    ]);
   };
 
-  const handleConfirmHire = async () => {
+  // Confirm hire is irreversible (terminal 'hired' state) — gate it behind a
+  // confirmation so the receiving party can't close the loop on one stray tap.
+  const handleConfirmHire = () => {
     if (!conversationId) return;
-    try {
-      await confirmHire(conversationId);
-      setMeta((m) => (m ? { ...m, status: 'hired', hired_at: new Date().toISOString() } : m));
-    } catch (e: any) {
-      Alert.alert('Could not confirm hire', e?.message ?? 'Try again.');
-    }
+    Alert.alert('Confirm hire?', "This finalizes the hire and can't be undone.", [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Confirm hire',
+        onPress: async () => {
+          try {
+            await confirmHire(conversationId);
+            setMeta((m) => (m ? { ...m, status: 'hired', hired_at: new Date().toISOString() } : m));
+          } catch (e: any) {
+            Alert.alert('Could not confirm hire', e?.message ?? 'Try again.');
+          }
+        },
+      },
+    ]);
   };
 
   const handleOpenPass = () => {
@@ -1238,14 +1258,14 @@ export default function ThreadScreen() {
                 ? 'This conversation has been marked as Hired.'
                 : meta.status === 'passed'
                   ? 'This conversation has been passed.'
-                  : 'No response — conversation auto-declined.'}
+                  : 'This conversation closed without a hire.'}
             </Text>
           </View>
         )}
       </KeyboardAvoidingView>
       )}
 
-      {/* Overflow menu — hire / pass / block. Lives above the
+      {/* Overflow menu — hire / pass. Lives above the
           keyboard so it stays usable even with the composer focused. */}
       <BottomSheet visible={overflowOpen} onClose={() => setOverflowOpen(false)}>
         <Pressable
@@ -1265,15 +1285,6 @@ export default function ThreadScreen() {
           <Text style={[styles.overflowLabel, !!meta && meta.status !== 'active' && styles.overflowLabelDisabled]}>
             Pass on this chat
           </Text>
-        </Pressable>
-        <Pressable
-          style={styles.overflowItem}
-          onPress={() => {
-            setOverflowOpen(false);
-            Alert.alert('Block', 'Block flow coming soon.');
-          }}
-        >
-          <Text style={[styles.overflowLabel, styles.overflowLabelDanger]}>Block</Text>
         </Pressable>
       </BottomSheet>
 
@@ -1496,7 +1507,7 @@ function StatusBanner({
     return (
       <View style={[styles.banner, styles.bannerMuted]}>
         <Text style={styles.bannerText}>
-          Reviewing other candidates right now.
+          This conversation closed without a hire. Both sides are free to explore other matches.
         </Text>
       </View>
     );

@@ -43,6 +43,7 @@ import { supabase } from '../../../lib/supabase';
 import { sendPortfolioAttachment, sendProjectAttachment, startConversationWithMessage } from '../../../lib/messaging';
 import { fetchPortfoliosByUser } from '../../../lib/portfolio';
 import { useAuth } from '../../../context/AuthContext';
+import { toast } from '../../../lib/toast';
 
 const SKIP_OVERVIEW_THRESHOLD = 5;
 // Stable reference so the filter BottomSheet doesn't see a new array each render.
@@ -100,14 +101,16 @@ async function fetchProjectDeck(userId: string): Promise<ProjectCardData[]> {
   const ownerIds = [...new Set(rows.map((r) => r.owner_id))];
   const { data: owners } = await supabase
     .from('profiles')
-    .select('id, name, photo_url')
+    .select('id, name, photo_url, response_rate')
     .in('id', ownerIds);
 
   const ownerMap = Object.fromEntries(
-    (owners ?? []).map((o: { id: string; name: string; photo_url: string | null }) => [
-      o.id,
-      { name: o.name, photoUri: o.photo_url },
-    ])
+    (owners ?? []).map(
+      (o: { id: string; name: string; photo_url: string | null; response_rate: number | null }) => [
+        o.id,
+        { name: o.name, photoUri: o.photo_url, responseRate: o.response_rate },
+      ]
+    )
   );
 
   return rows.map((r, i): ProjectCardData => {
@@ -132,6 +135,8 @@ async function fetchProjectDeck(userId: string): Promise<ProjectCardData[]> {
       gradient: CARD_GRADIENTS[i % CARD_GRADIENTS.length],
       imageUri: r.image_url ?? null,
       neededBy: r.needed_by ?? null,
+      // Reply-tier reflects the founder answering reach-outs, not the project.
+      responseRate: ownerMap[r.owner_id]?.responseRate ?? null,
     };
   });
 }
@@ -162,7 +167,7 @@ async function fetchSeekerDeck(userId: string): Promise<SeekerCardData[]> {
 
   const { data: seekers } = await supabase
     .from('profiles')
-    .select('id, name, photo_url, campus_id, skills, vibe_blurb')
+    .select('id, name, photo_url, campus_id, skills, vibe_blurb, response_rate')
     .in('id', seekerIds);
 
   if (!seekers || seekers.length === 0) return DEMO_FALLBACK ? MOCK_SEEKERS : [];
@@ -181,6 +186,7 @@ async function fetchSeekerDeck(userId: string): Promise<SeekerCardData[]> {
     campus_id: string | null;
     skills: string[];
     vibe_blurb: string;
+    response_rate: number | null;
   }[])
     // Skip incomplete profiles — a seeker with no usable name hasn't finished
     // onboarding, and rendered a blank discovery card (`?? 'Unknown'` only
@@ -196,6 +202,7 @@ async function fetchSeekerDeck(userId: string): Promise<SeekerCardData[]> {
       skills: s.skills ?? [],
       vibeBlurb: s.vibe_blurb ?? '',
       portfolio: portfolioMap.get(s.id) ?? [],
+      responseRate: s.response_rate ?? null,
     }));
 }
 
@@ -224,6 +231,10 @@ export default function DiscoveryFeed() {
 
   const [liveDeck, setLiveDeck] = useState<DiscoveryCardData[] | null>(null);
   const [deckLoading, setDeckLoading] = useState(false);
+  // Distinct from "empty": a failed load. An outage must NOT read as an empty
+  // deck (theme 1/10 — "errors look like emptiness"). When true we render a
+  // retry affordance instead of cards or the honest empty state.
+  const [deckError, setDeckError] = useState(false);
 
   // Viewer's own skills — drives the matched-first ordering, the SHARED
   // tags, and the shared-count in the OverlapVenn on every card. Loaded
@@ -250,12 +261,23 @@ export default function DiscoveryFeed() {
   const fetchDeck = useCallback(async () => {
     if (!user || roleLoading) return;
     setDeckLoading(true);
+    setDeckError(false);
     try {
       const data =
         role === 'owner'
           ? await fetchSeekerDeck(user.id)
           : await fetchProjectDeck(user.id);
       setLiveDeck(data);
+    } catch (e: any) {
+      // A thrown error here is a real outage (network down, query rejected) —
+      // NOT an empty result. Surface it distinctly so the deck doesn't quietly
+      // fall back to a misleading empty/demo state with no signal.
+      console.warn('deck fetch failed:', e?.message ?? e);
+      setDeckError(true);
+      toast.error("Couldn't load your deck.", {
+        actionLabel: 'Retry',
+        onAction: () => { void fetchDeck(); },
+      });
     } finally {
       setDeckLoading(false);
     }
@@ -270,6 +292,14 @@ export default function DiscoveryFeed() {
       liveDeck ??
       (DEMO_FALLBACK ? (role === 'owner' ? MOCK_SEEKERS : MOCK_PROJECTS) : []),
     [liveDeck, role]
+  );
+
+  // Demo cards carry non-UUID placeholder ids ('seeker-2', 'project-1') and
+  // dead-end "Reach out". When the deck is the dev-only mock fallback, show a
+  // visible banner so the cards don't look like real, actionable matches.
+  const showingDemo = useMemo(
+    () => deck.length > 0 && deck.some((c) => !isRealUuid(c.id)),
+    [deck],
   );
 
   const [consecutiveSkips, setConsecutiveSkips] = useState(0);
@@ -589,8 +619,20 @@ export default function DiscoveryFeed() {
         </View>
       )}
 
+      {/* Demo banner — only when the dev-only mock fallback is showing, so the
+          placeholder cards (which dead-end "Reach out") read as demo data, not
+          real matches. */}
+      {!loading && !overviewVisible && !deckError && showingDemo && (
+        <View style={styles.demoBanner}>
+          <Sparkle size={13} color={Brand.actionDeep} weight="fill" />
+          <Text style={styles.demoBannerText}>Demo cards — sample data, not live matches</Text>
+        </View>
+      )}
+
       {loading ? (
         <Skeleton />
+      ) : deckError && !liveDeck ? (
+        <DeckError onRetry={fetchDeck} />
       ) : overviewVisible ? (
         <DiscoveryOverview
           seen={lastFiveSeen}
@@ -781,6 +823,25 @@ function Skeleton() {
 ///     "Start over", which clears skipped matches so the RPC re-surfaces them
 ///   - empty (no live matches at all — e.g. a brand-new campus) — be honest
 ///     that nothing is here yet rather than implying they swiped everything
+/// Distinct from the empty/exhausted states: a failed load. Reads as a problem
+/// to fix (with Retry), not as "there's nothing here."
+function DeckError({ onRetry }: { onRetry: () => void }) {
+  return (
+    <View style={styles.emptyWrap}>
+      <Text style={styles.emptyTitle}>Couldn't load your deck.</Text>
+      <Text style={styles.emptySub}>
+        Something went wrong reaching the server. Check your connection and try again.
+      </Text>
+      <HardShadow radius={999} offset={4} style={styles.refreshCtaWrap}>
+        <Pressable onPress={onRetry} style={styles.refreshCta}>
+          <ArrowsClockwise size={18} color={Brand.actionInk} weight="bold" />
+          <Text style={styles.refreshCtaLabel}>Retry</Text>
+        </Pressable>
+      </HardShadow>
+    </View>
+  );
+}
+
 function DeckExhausted({ onRefresh, isOwner, neverHadCards }: { onRefresh: () => void; isOwner: boolean; neverHadCards: boolean }) {
   if (neverHadCards) {
     return (
@@ -844,6 +905,20 @@ const styles = StyleSheet.create({
   filterBtnTextActive: { color: Brand.actionDeep },
   filterClear: { paddingHorizontal: 8, paddingVertical: 8 },
   filterClearText: { fontFamily: AmbitFont.body, fontSize: 13.5, fontWeight: '600', color: Brand.actionDeep },
+
+  // Demo-fallback banner (dev-only) — soft teal tint, sits above the deck.
+  demoBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    alignSelf: 'center',
+    marginBottom: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 999,
+    backgroundColor: 'rgba(166, 199, 194, 0.22)',
+  },
+  demoBannerText: { fontFamily: AmbitFont.body, fontSize: 12, fontWeight: '600', color: Brand.actionDeep },
 
   // ── Filter sheet (searchable, tall + scrollable) ───────────────────────
   filterSheetHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, paddingHorizontal: 4 },

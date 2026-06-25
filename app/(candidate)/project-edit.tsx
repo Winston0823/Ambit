@@ -19,6 +19,7 @@ import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { uploadProjectImage, toDateOnly } from '../../lib/projects';
 import { ROLE_CATEGORIES, skillsForRoles, type ProjectCardData } from '../../data/mock';
+import { useDirtyGuard } from '../../hooks/useDirtyGuard';
 import { AmbitFont, Brand } from '../../constants/theme';
 
 /// Deterministic warm gradient per project id (matches the discovery deck's
@@ -62,6 +63,7 @@ export default function ProjectEditScreen() {
   const { user } = useAuth();
 
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [editing, setEditing] = useState(true); // Edit first; Preview is a tap away
   const [title, setTitle] = useState('');
   const [vibe, setVibe] = useState('');
@@ -72,13 +74,30 @@ export default function ProjectEditScreen() {
   const [coverUrl, setCoverUrl] = useState<string | null>(null); // saved cover (remote)
   const [pickedUri, setPickedUri] = useState<string | null>(null); // new local pick, uploaded on save
   const [neededBy, setNeededBy] = useState<Date | null>(null);
-  const [origText, setOrigText] = useState({ title: '', vibe: '' });
+  // Full snapshot of the loaded project — used both for the embed-vibe
+  // re-embed check and for the back dirty-guard. `neededBy` is compared via
+  // its date-only string form so a re-parsed Date object doesn't read dirty.
+  const [orig, setOrig] = useState<{
+    title: string;
+    vibe: string;
+    roles: string[];
+    coverUrl: string | null;
+    neededBy: string | null;
+    active: boolean;
+  } | null>(null);
   const [saving, setSaving] = useState(false);
 
   const allRoles = useMemo(() => ROLE_CATEGORIES.flatMap((c) => c.roles), []);
 
   useEffect(() => {
-    if (!id || !user) return;
+    // No id (bad deep-link / param drop): don't sit on an endless spinner —
+    // surface an error state with a back affordance.
+    if (!id) {
+      setLoading(false);
+      setLoadError('This project link is invalid.');
+      return;
+    }
+    if (!user) return;
     let cancelled = false;
     (async () => {
       const { data, error } = await supabase
@@ -88,24 +107,35 @@ export default function ProjectEditScreen() {
         .maybeSingle();
       if (cancelled) return;
       if (error || !data) {
-        Alert.alert('Project not found', 'It may have been deleted.');
-        router.back();
+        setLoading(false);
+        setLoadError('Project not found. It may have been deleted.');
         return;
       }
       if ((data as any).owner_id !== user.id) {
-        Alert.alert("Can't edit", "You don't own this project.");
-        router.back();
+        setLoading(false);
+        setLoadError("You don't own this project, so it can't be edited.");
         return;
       }
       const d = data as any;
+      const loadedRoles: string[] = d.roles_sought ?? [];
+      const loadedNeededBy: string | null = d.needed_by ?? null;
+      const loadedActive: boolean = d.active;
+      const loadedCover: string | null = d.image_url ?? null;
       setTitle(d.title ?? '');
       setVibe(d.vibe_blurb ?? '');
-      setRoles(d.roles_sought ?? []);
+      setRoles(loadedRoles);
       setCampusId(d.campus_id ?? null);
-      setCoverUrl(d.image_url ?? null);
-      setNeededBy(parseDateOnly(d.needed_by));
-      setActive(d.active);
-      setOrigText({ title: d.title ?? '', vibe: d.vibe_blurb ?? '' });
+      setCoverUrl(loadedCover);
+      setNeededBy(parseDateOnly(loadedNeededBy));
+      setActive(loadedActive);
+      setOrig({
+        title: d.title ?? '',
+        vibe: d.vibe_blurb ?? '',
+        roles: loadedRoles,
+        coverUrl: loadedCover,
+        neededBy: loadedNeededBy,
+        active: loadedActive,
+      });
       setLoading(false);
       // Owner identity for the Preview card (how seekers see the project).
       const { data: prof } = await supabase
@@ -122,6 +152,21 @@ export default function ProjectEditScreen() {
     setRoles((rs) => (rs.includes(r) ? rs.filter((x) => x !== r) : [...rs, r]));
 
   const valid = title.trim().length > 0 && vibe.trim().length >= BLURB_MIN && roles.length >= 1;
+
+  // Dirty when any editable field differs from the loaded project. The pause
+  // toggle (`active`) is part of the form, so flipping it counts as unsaved.
+  // A freshly-picked cover (pickedUri) is always a change.
+  const sameRoles = (a: string[], b: string[]) =>
+    a.length === b.length && a.every((r) => b.includes(r));
+  const isDirty =
+    !!orig &&
+    (title.trim() !== orig.title.trim() ||
+      vibe.trim() !== orig.vibe.trim() ||
+      !sameRoles(roles, orig.roles) ||
+      (neededBy ? toDateOnly(neededBy) : null) !== orig.neededBy ||
+      active !== orig.active ||
+      pickedUri !== null);
+  const guardBack = useDirtyGuard(isDirty);
 
   const save = async () => {
     if (!id || !user) return;
@@ -146,7 +191,7 @@ export default function ProjectEditScreen() {
         })
         .eq('id', id);
       if (error) throw error;
-      const textChanged = title.trim() !== origText.title || vibe.trim() !== origText.vibe;
+      const textChanged = title.trim() !== (orig?.title ?? '') || vibe.trim() !== (orig?.vibe ?? '');
       if (textChanged) {
         supabase.functions
           .invoke('embed-vibe', { body: { table: 'projects', id, text: `${title.trim()}\n\n${vibe.trim()}` } })
@@ -202,9 +247,26 @@ export default function ProjectEditScreen() {
     );
   }
 
+  // Invalid id / not found / not owner → honest error state with a way back,
+  // never an endless spinner.
+  if (loadError) {
+    return (
+      <View style={[styles.root, styles.center]}>
+        <BackChevron onPress={() => router.back()} />
+        <View style={styles.errorWrap}>
+          <Text style={styles.errorTitle}>Can't open this project</Text>
+          <Text style={styles.errorBody}>{loadError}</Text>
+          <Pressable onPress={() => router.back()} style={styles.errorBtn} accessibilityRole="button">
+            <Text style={styles.errorBtnText}>Go back</Text>
+          </Pressable>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.root}>
-      <BackChevron onPress={() => router.back()} />
+      <BackChevron onPress={() => guardBack(() => router.back())} />
       <View style={[styles.segHeader, { marginTop: insets.top + 6 }]}>
         <View style={styles.segment}>
           <Pressable onPress={() => setEditing(true)} style={[styles.segmentBtn, editing && styles.segmentBtnActive]} accessibilityLabel="Edit project">
@@ -218,7 +280,10 @@ export default function ProjectEditScreen() {
 
       {!editing ? (
         <View style={styles.previewWrap}>
-          <DiscoveryCard card={previewCard} showReachButton={false} />
+          {/* Show the reach button half-transparent + non-interactive: fills the
+              bottom-right gutter so the content stack isn't squished left, and
+              previews the seeker's reach-out CTA (owner can't tap their own). */}
+          <DiscoveryCard card={previewCard} showReachButton reachDisabled />
         </View>
       ) : (
         <>
@@ -277,6 +342,19 @@ export default function ProjectEditScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Brand.cardCream },
   center: { alignItems: 'center', justifyContent: 'center' },
+  errorWrap: { paddingHorizontal: 40, alignItems: 'center' },
+  errorTitle: { fontFamily: AmbitFont.display, fontSize: 24, color: Brand.inkPrimary, textAlign: 'center' },
+  errorBody: { fontFamily: AmbitFont.body, fontSize: 14.5, color: Brand.inkMuted, textAlign: 'center', marginTop: 12, lineHeight: 21 },
+  errorBtn: {
+    marginTop: 28,
+    backgroundColor: Brand.action,
+    borderWidth: 1.6,
+    borderColor: Brand.actionInk,
+    paddingHorizontal: 40,
+    paddingVertical: 14,
+    borderRadius: 999,
+  },
+  errorBtnText: { fontFamily: AmbitFont.body, fontSize: 15, fontWeight: '700', color: Brand.actionInk },
 
   // Edit | Preview segment (mirrors profile)
   segHeader: { alignItems: 'center', paddingBottom: 12 },

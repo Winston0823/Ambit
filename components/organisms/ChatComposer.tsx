@@ -293,7 +293,7 @@ export function ChatComposer({
       {/* Attachment grid — WeChat pattern. Lives BELOW the input row in
           the keyboard's vacated footprint. Parent dismisses the keyboard
           before flipping attachMenuOpen=true. Order follows the natural flow:
-          Photos, then Find a time (pick when you're both free) → Propose time
+          Photos, then Find a time (pick when you're both free) → Propose meeting
           (offer a slot), then Highlight. */}
       {attachMenuOpen && !editing && (
         <View style={styles.attachGrid}>
@@ -316,7 +316,7 @@ export function ChatComposer({
             {onOpenScheduling && (
               <AttachTile
                 Icon={CalendarPlus}
-                label="Propose time"
+                label="Propose meeting"
                 onPress={() => {
                   onCloseAttachMenu();
                   onOpenScheduling();
@@ -534,6 +534,9 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     color: Brand.inkPrimary,
+    // Center each line so a wrapping label ("Propose / meeting") stays centered
+    // under its tile instead of left-aligning the second line.
+    textAlign: 'center',
   },
   attachTileLabelDisabled: { color: Brand.inkMuted },
   // Transparent — the surrounding pill provides the surface now.

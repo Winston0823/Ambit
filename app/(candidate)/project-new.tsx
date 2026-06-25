@@ -17,6 +17,7 @@ import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { uploadProjectImage, toDateOnly } from '../../lib/projects';
 import { ROLE_CATEGORIES, skillsForRoles } from '../../data/mock';
+import { useDirtyGuard } from '../../hooks/useDirtyGuard';
 import { AmbitFont, Brand, Space } from '../../constants/theme';
 
 const BLURB_MIN = 10;
@@ -106,12 +107,27 @@ export default function ProjectNewScreen() {
 
   const advance = () => (step === 0 ? setStep(1) : submit());
 
+  // Dirty when any field has diverged from its empty initial state — so a back
+  // tap that would discard typed edits prompts a confirm first.
+  const isDirty =
+    title.trim().length > 0 ||
+    vibe.trim().length > 0 ||
+    roles.length > 0 ||
+    coverUri !== null ||
+    neededBy !== null;
+  const guardBack = useDirtyGuard(isDirty);
+
+  // Step 0 back leaves the screen (guarded); step 1 back just returns to step 0
+  // without losing anything, so it needs no guard.
+  const onBack = () => (step === 0 ? guardBack(() => router.back()) : setStep(0));
+
   return (
     <View style={styles.root}>
       <View style={{ marginTop: insets.top + 14 }}>
-        <OnboardingProgress current={step + 1} total={2} />
+        {/* leadInset clears the back chevron so the wave doesn't crash into it. */}
+        <OnboardingProgress current={step + 1} total={2} leadInset={36} />
       </View>
-      <BackChevron onPress={() => (step === 0 ? router.back() : setStep(0))} />
+      <BackChevron onPress={onBack} />
 
       <ScrollView
         style={styles.scroll}

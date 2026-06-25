@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   FlatList,
   Pressable,
@@ -13,6 +13,7 @@ import { MagnifyingGlass, X } from 'phosphor-react-native';
 import { BackChevron, Skeleton } from '../../../../components/atoms';
 import { searchMessages, type SearchHit } from '../../../../lib/messaging';
 import { AmbitFont, Brand, Radii, Space } from '../../../../constants/theme';
+import { toast } from '../../../../lib/toast';
 
 /// S-052 Message Search. Full-text search across all messages in
 /// conversations the signed-in user is part of. Debounced 250ms so
@@ -24,27 +25,37 @@ export default function SearchScreen() {
   const [searching, setSearching] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Stable so the error-toast Retry can re-run the exact same query.
+  const runSearch = useCallback(async (term: string) => {
+    setSearching(true);
+    try {
+      const results = await searchMessages(term, 50);
+      setHits(results);
+    } catch {
+      // A failed search must not read as "No matches." Keep prior hits (or
+      // the empty prompt) and surface a retryable error instead.
+      setHits((prev) => prev ?? null);
+      toast.error("Couldn't search your messages.", {
+        actionLabel: 'Retry',
+        onAction: () => { void runSearch(term); },
+      });
+    } finally {
+      setSearching(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    if (query.trim().length < 2) {
+    const term = query.trim();
+    if (term.length < 2) {
       setHits(null);
       return;
     }
-    debounceRef.current = setTimeout(async () => {
-      setSearching(true);
-      try {
-        const results = await searchMessages(query, 50);
-        setHits(results);
-      } catch {
-        setHits([]);
-      } finally {
-        setSearching(false);
-      }
-    }, 250);
+    debounceRef.current = setTimeout(() => { void runSearch(term); }, 250);
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [query]);
+  }, [query, runSearch]);
 
   return (
     <View style={styles.root}>

@@ -22,6 +22,9 @@ interface AuthContextValue {
   signInWithEduOtp: (email: string) => Promise<void>;
   signUpWithEmail: (email: string, password: string) => Promise<void>;
   signInWithEmail: (email: string, password: string) => Promise<void>;
+  /// Send a password-reset email. Gives existing users an account-recovery
+  /// path (audit P0: SignIn "Forgot password?" was a dead button).
+  sendPasswordReset: (email: string) => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -191,6 +194,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (error) throw error;
   };
 
+  const sendPasswordReset = async (email: string) => {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo,
+    });
+    if (error) throw error;
+  };
+
   const signOut = async () => {
     const uid = session?.user?.id;
     if (uid) {
@@ -214,6 +224,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signInWithEduOtp,
       signUpWithEmail,
       signInWithEmail,
+      sendPasswordReset,
       signOut,
     }}>
       {children}

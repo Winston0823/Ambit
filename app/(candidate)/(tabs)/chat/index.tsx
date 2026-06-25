@@ -33,6 +33,7 @@ import {
   type InboxItem,
 } from '../../../../lib/messaging';
 import { AmbitFont, Brand, Radii, Space } from '../../../../constants/theme';
+import { toast } from '../../../../lib/toast';
 
 /// S-050 Inbox v4. Editorial paper canvas. "ambit" wordmark + side
 /// icons up top, large italic "Chats" title, iMessage-style pinned
@@ -61,7 +62,14 @@ export default function ChatTab() {
       setItems(data);
     } catch (e) {
       console.warn('inbox load failed:', e);
-      setItems([]);
+      // Don't clobber to [] — a failed load must not read as "no conversations
+      // yet." Keep whatever we already had (or leave the skeleton on a cold
+      // load) and surface a retryable error.
+      setItems((prev) => prev ?? []);
+      toast.error("Couldn't load your messages.", {
+        actionLabel: 'Retry',
+        onAction: () => { void load(); },
+      });
     }
   }, [user?.id]);
 
@@ -254,14 +262,28 @@ export default function ChatTab() {
         }
         ListEmptyComponent={
           pinned.length === 0 ? (
-            <View style={styles.empty}>
-              <Text style={styles.emptyTitle}>Nothing here yet</Text>
-              <Text style={styles.emptyBody}>
-                {segments[0] === '(founder)'
-                  ? 'Reach out to a candidate in Discovery and start a conversation. Replies land here.'
-                  : 'Swipe up on a project in Discovery and send a hello. Replies land here.'}
-              </Text>
-            </View>
+            // A non-empty inbox with an active filter (or pinned-only rows)
+            // that yields no list rows is a filter MISS, not a truly empty
+            // inbox — say so rather than the onboarding "nothing yet" copy.
+            (items?.length ?? 0) > 0 ? (
+              <View style={styles.empty}>
+                <Text style={styles.emptyTitle}>No matches</Text>
+                <Text style={styles.emptyBody}>
+                  {filter === 'all'
+                    ? 'Nothing to show here right now.'
+                    : `No conversations under “${INBOX_TABS.find((t) => t.key === filter)?.label ?? filter}.” Try another filter.`}
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.empty}>
+                <Text style={styles.emptyTitle}>Nothing here yet</Text>
+                <Text style={styles.emptyBody}>
+                  {segments[0] === '(founder)'
+                    ? 'Reach out to a candidate in Discovery and start a conversation. Replies land here.'
+                    : 'Swipe up on a project in Discovery and send a hello. Replies land here.'}
+                </Text>
+              </View>
+            )
           ) : null
         }
       />

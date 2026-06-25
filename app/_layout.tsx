@@ -11,7 +11,7 @@ import { RoleProvider } from '../context/RoleContext';
 import { AuthProvider, useAuth } from '../context/AuthContext';
 import { SavedDeckProvider } from '../context/SavedDeckContext';
 import { Brand } from '../constants/theme';
-import { OnboardingInline } from '../components/organisms';
+import { OnboardingInline, ToastHost } from '../components/organisms';
 import Constants from 'expo-constants';
 import { useProfileRole } from '../hooks/useProfileRole';
 import { clearBadge } from '../lib/pushNotifications';
@@ -43,6 +43,9 @@ export default function RootLayout() {
             <SavedDeckProvider>
               <StatusBar style="dark" />
               <Gate />
+              {/* Single app-wide toast surface — overlays onboarding + app so
+                  any layer's toast.error(...) is visible (audit theme 1). */}
+              <ToastHost />
             </SavedDeckProvider>
           </RoleProvider>
         </AuthProvider>

@@ -15,6 +15,7 @@ import * as Haptics from 'expo-haptics';
 import { BackChevron, Skeleton } from '../../components/atoms';
 import { getInbox, type InboxItem } from '../../lib/messaging';
 import { supabase } from '../../lib/supabase';
+import { optimistic } from '../../lib/mutation';
 import { AmbitFont, Brand, Radii, Space } from '../../constants/theme';
 
 type Stage = { key: string; label: string; statuses: InboxItem['status'][] };
@@ -58,8 +59,15 @@ export default function ProjectManageScreen() {
   const toggleActive = async () => {
     if (Platform.OS !== 'web') Haptics.selectionAsync().catch(() => {});
     const next = !active;
-    setActive(next);
-    await supabase.from('projects').update({ active: next }).eq('id', id);
+    await optimistic<boolean>({
+      apply: () => { const prev = active; setActive(next); return prev; },
+      commit: async () => {
+        const { error } = await supabase.from('projects').update({ active: next }).eq('id', id);
+        if (error) throw error;
+      },
+      revert: (prev) => setActive(prev),
+      errorMessage: next ? "Couldn't activate this project" : "Couldn't pause this project",
+    });
   };
 
   if (candidates === null) {
@@ -107,7 +115,6 @@ export default function ProjectManageScreen() {
       <BackChevron onPress={() => router.back()} />
 
       <View style={styles.header}>
-        <Text style={styles.kicker}>Pipeline</Text>
         <View style={styles.titleRow}>
           <Text style={styles.title} numberOfLines={2}>{title || 'Project'}</Text>
           <Pressable
@@ -202,15 +209,9 @@ const styles = StyleSheet.create({
   skelRow: { flexDirection: 'row', alignItems: 'center', gap: 16, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: Brand.borderSoft },
   content: { paddingHorizontal: Space.lg, gap: Space.md },
 
-  header: { gap: 12, marginTop: 8 },
-  kicker: {
-    fontFamily: AmbitFont.body,
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 1.6,
-    textTransform: 'uppercase',
-    color: Brand.inkMuted,
-  },
+  // marginTop clears the absolutely-positioned BackChevron so the title sits
+  // on its own row below it (the "PIPELINE" eyebrow used to occupy this line).
+  header: { gap: 12, marginTop: 40 },
   titleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
   title: {
     flex: 1,
