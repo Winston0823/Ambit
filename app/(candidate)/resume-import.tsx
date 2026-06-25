@@ -24,6 +24,7 @@ import {
   pickAndParseDocument,
   pickAndParsePhoto,
   normalizeResumeSkills,
+  resumeLinksPatch,
   type ParsedResume,
 } from '../../lib/resume';
 import { AmbitFont, Brand, Radii, Space } from '../../constants/theme';
@@ -130,6 +131,10 @@ export default function ResumeImportScreen() {
       if (name.trim()) patch.name = name.trim();
       if (blurb.trim()) patch.vibe_blurb = blurb.trim().slice(0, 140);
       if (selectedSkills.length) patch.skills = selectedSkills;
+      // Links the résumé actually carried → profile URL columns. Absent links
+      // are omitted (not nulled), so this never wipes a link the user already
+      // has; present ones fill/refresh from their own résumé.
+      Object.assign(patch, resumeLinksPatch(parsed.links));
       if (Object.keys(patch).length) {
         const { error } = await supabase.from('profiles').update(patch).eq('id', user.id);
         if (error) throw error;
@@ -310,7 +315,7 @@ export default function ResumeImportScreen() {
             <View style={styles.field}>
               <Text style={styles.fieldLabel}>LINKS WE SPOTTED</Text>
               {linksFound.map((l) => <Text key={l} style={styles.linkText} numberOfLines={1}>{l}</Text>)}
-              <Text style={styles.fieldHint}>Saved to your profile once links land — captured for now.</Text>
+              <Text style={styles.fieldHint}>Added to your profile’s links when you tap below.</Text>
             </View>
           )}
 

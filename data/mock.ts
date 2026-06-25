@@ -163,6 +163,9 @@ export interface SeekerCardData {
   /// Optional external links — GitHub / personal site / App Store. Rendered
   /// as icon buttons on the Portfolio Highlights screen.
   links?: SeekerLinks;
+  /// Real reply-within-72h rate (0–1) from `profiles.response_rate`. Drives
+  /// the reply-tier badge. Undefined/null = no rate computed yet (badge hidden).
+  responseRate?: number | null;
 }
 
 export interface ProjectCardData {
@@ -193,6 +196,10 @@ export interface ProjectCardData {
   /// Optional deadline ("needs someone by ___"). ISO date string `YYYY-MM-DD`
   /// from `projects.needed_by`. Drives the top-right urgency badge.
   neededBy?: string | null;
+  /// Real reply-within-72h rate (0–1) of the OWNER (the founder answering
+  /// reach-outs), from their `profiles.response_rate`. Drives the reply-tier
+  /// badge. Undefined/null = no rate computed yet (badge hidden).
+  responseRate?: number | null;
 }
 
 export type DiscoveryCardData = SeekerCardData | ProjectCardData;

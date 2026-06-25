@@ -28,6 +28,35 @@ export function normalizeResumeSkills(raw: string[]): string[] {
   return out;
 }
 
+/// Normalize a résumé-extracted URL for storage: trim, drop if empty, and
+/// prefix `https://` when the model returned a bare host ("github.com/x").
+/// Returns null when there's nothing usable (empty, or a bare handle with no
+/// dot) — callers use null to mean "the résumé didn't carry this link", so an
+/// absent link never overwrites one the user already has.
+export function normalizeResumeUrl(raw: string | null | undefined): string | null {
+  const t = (raw ?? '').trim();
+  if (!t) return null;
+  if (/^https?:\/\//i.test(t)) return t;
+  if (!t.includes('.')) return null;
+  return `https://${t}`;
+}
+
+/// Map a parsed résumé's links onto the `profiles` URL columns, keeping only
+/// the ones the résumé actually carried. Absent links are omitted entirely
+/// (not nulled) so applying a résumé never wipes an existing profile link.
+export function resumeLinksPatch(
+  links: ParsedResume['links'],
+): Partial<{ github_url: string; linkedin_url: string; portfolio_url: string }> {
+  const patch: Record<string, string> = {};
+  const gh = normalizeResumeUrl(links.github);
+  const li = normalizeResumeUrl(links.linkedin);
+  const pf = normalizeResumeUrl(links.portfolio);
+  if (gh) patch.github_url = gh;
+  if (li) patch.linkedin_url = li;
+  if (pf) patch.portfolio_url = pf;
+  return patch;
+}
+
 /// Structured result of a résumé parse — mirrors the parse-resume edge
 /// function's output schema. All fields present; "" / [] means absent.
 export interface ParsedResume {
