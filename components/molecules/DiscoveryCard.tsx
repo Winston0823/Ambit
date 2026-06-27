@@ -52,6 +52,10 @@ interface Props {
   /// (content no longer squished) and the seeker CTA is honestly shown without
   /// being tappable. Requires showReachButton.
   reachDisabled?: boolean;
+  /// Play the entry fade/slide on mount. Default true. The SwipeDeck sets this
+  /// false: it keeps each card instance alive across an advance (keyed list, no
+  /// remount), so a per-card mount fade would only ever read as a flash.
+  animateIn?: boolean;
 }
 
 /// Discovery card — H-overlay redesign. Photo fills the card edge-to-edge,
@@ -69,15 +73,22 @@ export function DiscoveryCard({
   onReachOut,
   showReachButton = true,
   reachDisabled = false,
+  animateIn = true,
 }: Props) {
   const firstName = card.kind === 'seeker'
     ? card.name.split(' ')[0]
     : card.ownerName.split(' ')[0];
 
-  // Entry fade — masks any layout flicker when SwipeDeck mounts a new card.
-  const cardOpacity = useRef(new Animated.Value(0)).current;
-  const cardTranslateY = useRef(new Animated.Value(8)).current;
+  // Entry fade/slide on mount. Skipped when animateIn is false (the deck keeps
+  // the card mounted across advances, so a replayed fade would just be a flash).
+  const cardOpacity = useRef(new Animated.Value(animateIn ? 0 : 1)).current;
+  const cardTranslateY = useRef(new Animated.Value(animateIn ? 8 : 0)).current;
   useLayoutEffect(() => {
+    if (!animateIn) {
+      cardOpacity.setValue(1);
+      cardTranslateY.setValue(0);
+      return;
+    }
     cardOpacity.setValue(0);
     cardTranslateY.setValue(8);
     Animated.parallel([
@@ -94,7 +105,7 @@ export function DiscoveryCard({
         useNativeDriver: true,
       }),
     ]).start();
-  }, [card.id, cardOpacity, cardTranslateY]);
+  }, [card.id, animateIn, cardOpacity, cardTranslateY]);
 
   // Seeker cards are a vertical 2-page pager: screen 1 = overview (the
   // photo card), screen 2 = portfolio highlights. We measure the card
@@ -273,6 +284,9 @@ function PhotoBackdrop({
         source={{ uri }}
         style={styles.photo}
         resizeMode="cover"
+        // Android fades images in over 300ms by default — reads as a flash when
+        // a card is (re)mounted. The URI is already cached from the peek render.
+        fadeDuration={0}
       />
     );
   }

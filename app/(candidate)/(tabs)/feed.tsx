@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Platform,
@@ -15,6 +15,7 @@ import { ArrowsClockwise, BookmarkSimple, CaretDown, Check, GraduationCap, Magni
 import type { IconProps } from 'phosphor-react-native';
 import * as Haptics from 'expo-haptics';
 import { DiscoveryOverview, SwipeDeck } from '../../../components/organisms';
+import type { SwipeDeckHandle } from '../../../components/organisms';
 import { PortfolioModal, ReachOutComposer, BottomSheet, ReachOutLimitSheet } from '../../../components/molecules';
 import { HardShadow, Skeleton as SkeletonBlock, Tactile } from '../../../components/atoms';
 import { CAMPUSES } from '../../../data/mock';
@@ -306,6 +307,8 @@ export default function DiscoveryFeed() {
   const [lastFiveSeen, setLastFiveSeen] = useState<DiscoveryCardData[]>([]);
   const [deckResetKey, setDeckResetKey] = useState(0);
   const [reinserted, setReinserted] = useState<DiscoveryCardData[]>([]);
+  // Imperative handle so a confirmed reach-out can fly the current card up.
+  const swipeDeckRef = useRef<SwipeDeckHandle>(null);
 
   /// Card whose Reach Out button was tapped. Non-null = modal composer open.
   /// SwipeDeck pauses its PanResponder via gesturesDisabled while non-null so
@@ -533,12 +536,17 @@ export default function DiscoveryFeed() {
     }
   };
 
-  /// Called by the composer after a confirmed send. Resets the skip
-  /// counters and closes the composer; we stay in the deck.
+  /// Called by the composer after a confirmed send. Resets the skip counters,
+  /// closes the composer, and flies the messaged card up off the deck —
+  /// reaching out is the third terminal exit (up = sent), so you advance to the
+  /// next card and can't pass/save the same person you just messaged. No-op if
+  /// the reach came from a context where the deck isn't mounted (e.g. overview).
   const handleReachSent = () => {
+    const reached = reachOutCard;
     setConsecutiveSkips(0);
     setLastFiveSeen([]);
     setReachOutCard(null);
+    if (reached) swipeDeckRef.current?.commitReach(reached.id);
   };
 
   const handleOverviewPick = (card: DiscoveryCardData) => {
@@ -641,6 +649,7 @@ export default function DiscoveryFeed() {
         />
       ) : (
         <SwipeDeck
+          ref={swipeDeckRef}
           key={`${deckResetKey}-${filterSkills.join(',')}-${filterCampus.join(',')}`}
           deck={filteredDeck}
           matchedSkills={viewerSkills}
