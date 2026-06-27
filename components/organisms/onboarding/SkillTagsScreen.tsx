@@ -15,7 +15,7 @@ import { BackChevron, Chip } from '../../atoms';
 import { OnboardingContinue, ResumeImportSheet } from '../../molecules';
 import { useOnboarding } from '../../../context/OnboardingContext';
 import { useAuth } from '../../../context/AuthContext';
-import { normalizeResumeSkills, type ParsedResume } from '../../../lib/resume';
+import { canonicalizeSkill, normalizeResumeSkills, type ParsedResume } from '../../../lib/resume';
 import { SKILL_CATEGORIES } from '../../../data/mock';
 import { Brand, AmbitFont, Space } from '../../../constants/theme';
 
@@ -61,7 +61,10 @@ export function SkillTagsScreen({ onBack, onContinue }: Props) {
   };
 
   const addCustom = () => {
-    const skill = customInput.trim();
+    // Snap a typed skill to its canonical chip ("typescript" → "TypeScript")
+    // so a known skill lands in its real category section; novel skills stay
+    // custom (rendered under "ADDED BY YOU").
+    const skill = canonicalizeSkill(customInput);
     if (!skill || selected.includes(skill) || selected.length >= MAX_SELECTED) return;
     update('skills', [...selected, skill]);
     setCustomInput('');

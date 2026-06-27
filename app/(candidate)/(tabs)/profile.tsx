@@ -52,6 +52,7 @@ import { randomUUID } from 'expo-crypto';
 import { toast } from '../../../lib/toast';
 import { optimistic } from '../../../lib/mutation';
 import { formatResponseRate, formatResponseTime } from '../../../lib/closureLoop';
+import { canonicalizeSkill } from '../../../lib/resume';
 import { CAMPUSES, SKILL_CATEGORIES } from '../../../data/mock';
 import type { PortfolioItem, SeekerCardData } from '../../../data/mock';
 import {
@@ -805,7 +806,9 @@ function SkillsEditModal({
   };
 
   const addCustom = () => {
-    const skill = customInput.trim();
+    // Snap to canonical chip so a known skill lands in its real category;
+    // novel skills stay custom ("ADDED BY YOU").
+    const skill = canonicalizeSkill(customInput);
     if (!skill || draft.includes(skill) || draft.length >= MAX_SKILLS) return;
     setDraft((d) => [...d, skill]);
     setCustomInput('');

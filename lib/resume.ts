@@ -7,18 +7,28 @@ import { SKILL_CATEGORIES } from '../data/mock';
 // The app's canonical skill chips (what the profile skill picker offers).
 const CANON_SKILLS = SKILL_CATEGORIES.flatMap((c) => c.tags);
 
+/// Snap one free-text skill to the app's canonical chip when it matches the
+/// taxonomy case-insensitively ("typescript" → "TypeScript"); otherwise return
+/// the trimmed input unchanged (the picker allows genuine customs). Returns ''
+/// for empty input. Used by the résumé import AND the manual "add a skill"
+/// fields so a typed-but-known skill lands in its real category section instead
+/// of the catch-all "ADDED BY YOU" bucket.
+export function canonicalizeSkill(raw: string): string {
+  const trimmed = (raw ?? '').trim();
+  if (!trimmed) return '';
+  const match = CANON_SKILLS.find((c) => c.toLowerCase() === trimmed.toLowerCase());
+  return match ?? trimmed;
+}
+
 /// Normalize free-text résumé skills against the app's skill taxonomy so they
-/// snap to real chips: case-insensitive match → canonical chip; otherwise keep
-/// the trimmed free-text (the picker allows customs). De-duplicated, order
-/// preserved. The "AI proposes, code verifies" QC step.
+/// snap to real chips. De-duplicated, order preserved. The "AI proposes, code
+/// verifies" QC step.
 export function normalizeResumeSkills(raw: string[]): string[] {
   const seen = new Set<string>();
   const out: string[] = [];
   for (const s of raw) {
-    const trimmed = (s ?? '').trim();
-    if (!trimmed) continue;
-    const match = CANON_SKILLS.find((c) => c.toLowerCase() === trimmed.toLowerCase());
-    const skill = match ?? trimmed;
+    const skill = canonicalizeSkill(s);
+    if (!skill) continue;
     const key = skill.toLowerCase();
     if (!seen.has(key)) {
       seen.add(key);
