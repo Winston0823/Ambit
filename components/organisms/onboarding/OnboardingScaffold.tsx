@@ -43,7 +43,11 @@ export function OnboardingScaffold({
   children,
 }: Props) {
   return (
-    <SafeAreaView style={styles.root}>
+    // Drop the bottom safe-area edge: the anchored footer (OnboardingContinue)
+    // and the OnboardingFlow progress overlay both add insets.bottom themselves,
+    // so a bottom inset here double-counts — floating the CTA an inset too high
+    // and pushing the progress wave down onto it.
+    <SafeAreaView style={styles.root} edges={['top', 'left', 'right']}>
       {wash && (
         <LinearGradient
           colors={[Brand.canvas, Brand.cardCream]}
