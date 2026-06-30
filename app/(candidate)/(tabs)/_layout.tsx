@@ -86,7 +86,10 @@ export default function TabsLayout() {
       }}
     >
       <MaterialTopTabs.Screen name="feed" options={{ swipeEnabled: false } as any} />
-      <MaterialTopTabs.Screen name="chat" />
+      {/* Disable tab-swipe inside a thread: a horizontal drag there is the
+          stage rail (or just shouldn't page you out to Discovery). The inbox
+          (not inThread) keeps swipe-nav. */}
+      <MaterialTopTabs.Screen name="chat" options={{ swipeEnabled: !inThread } as any} />
       <MaterialTopTabs.Screen name="projects" />
       <MaterialTopTabs.Screen name="profile" />
     </MaterialTopTabs>

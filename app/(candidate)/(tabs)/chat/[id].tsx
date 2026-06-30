@@ -62,14 +62,18 @@ import {
 import {
   confirmHire,
   proposeHire,
+  updateOwnerStage,
   type ConversationStatus,
+  type OwnerStage,
 } from '../../../../lib/closureLoop';
 import { useAuth } from '../../../../context/AuthContext';
 import { supabase } from '../../../../lib/supabase';
+import { toast } from '../../../../lib/toast';
 import {
   deleteMessage,
   editMessage,
   fetchProjectCard,
+  fetchSeekerCard,
   fetchProjectRefs,
   listMessages,
   listReactions,
@@ -116,6 +120,8 @@ interface ConvoMeta {
   pass_reason:       string | null;
   hired_at:          string | null;
   hired_proposed_by: string | null;
+  /// Owner's private funnel stage (owner-only; null until first set).
+  owner_stage:       OwnerStage | null;
 }
 
 /// S-051 Message Thread. Wires together:
@@ -130,6 +136,7 @@ export default function ThreadScreen() {
   const insets = useSafeAreaInsets();
 
   const [meta, setMeta] = useState<ConvoMeta | null>(null);
+  const isOwner = !!user && !!meta && meta.owner_id === user.id;
   /// Signed-in user's avatar URL, fetched once on screen mount and
   /// passed to MessageBubble so my own bubbles get an avatar too.
   const [myPhotoUrl, setMyPhotoUrl] = useState<string | null>(null);
@@ -329,6 +336,25 @@ export default function ThreadScreen() {
     setPassSheetOpen(true);
   };
 
+  // Owner's private funnel stage — optimistic local set + owner-only RPC.
+  const handleSetStage = (stage: OwnerStage) => {
+    if (!conversationId) return;
+    setMeta((m) => (m ? { ...m, owner_stage: stage } : m));
+    updateOwnerStage(conversationId, stage).catch((e: any) => {
+      toast.error(e?.message ?? "Couldn't save the stage.");
+    });
+  };
+
+  // Card icon → peek the partner's full discovery card (half-opaque reach).
+  // Owner sees the seeker's card; the seeker sees the founder's project card.
+  const handleOpenPartnerCard = async () => {
+    if (!meta) return;
+    const card = isOwner
+      ? await fetchSeekerCard(meta.partner_id)
+      : await fetchProjectCard(meta.project_id);
+    if (card) setPreviewCard(card);
+  };
+
   // ── Initial load ─────────────────────────────────────────────
   useEffect(() => {
     if (!conversationId || !user) return;
@@ -349,7 +375,7 @@ export default function ThreadScreen() {
       let convo: any = null;
       const full = await supabase
         .from('conversations')
-        .select('id, project_id, owner_id, seeker_id, status, pass_reason, hired_at, hired_proposed_by, projects(title)')
+        .select('id, project_id, owner_id, seeker_id, status, pass_reason, hired_at, hired_proposed_by, owner_stage, projects(title)')
         .eq('id', conversationId)
         .single();
       if (full.error) {
@@ -401,6 +427,7 @@ export default function ThreadScreen() {
         pass_reason:       (convo as any).pass_reason ?? null,
         hired_at:          (convo as any).hired_at ?? null,
         hired_proposed_by: (convo as any).hired_proposed_by ?? null,
+        owner_stage:       ((convo as any).owner_stage as OwnerStage | null) ?? null,
       };
 
       const [msgs, reacts, schedReqs, availPolls, partnerRead, selfProfile] = await Promise.all([
@@ -1036,6 +1063,12 @@ export default function ThreadScreen() {
           top={insets.top + 6}
           currentConversationId={meta.id}
           meUserId={user?.id}
+          status={meta.status}
+          meetingAgreed={schedulingRequests.some((r) => r.accepted_slot != null)}
+          isOwner={isOwner}
+          ownerStage={meta.owner_stage}
+          onSetStage={handleSetStage}
+          onOpenCard={handleOpenPartnerCard}
         />
       )}
 
@@ -1343,7 +1376,9 @@ export default function ThreadScreen() {
           <View style={[styles.previewFrame, { paddingTop: insets.top + Space.md, paddingBottom: insets.bottom + Space.md }]}>
             {previewCard && (
               <View style={styles.previewCardArea}>
-                <DiscoveryCard card={previewCard} showReachButton={false} />
+                {/* Half-opaque, non-interactive reach button — you're already
+                    in the conversation, so reaching out again is moot. */}
+                <DiscoveryCard card={previewCard} showReachButton reachDisabled />
               </View>
             )}
           </View>
