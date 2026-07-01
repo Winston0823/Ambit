@@ -25,6 +25,8 @@ export function BackChevron({ onPress }: Props) {
   return (
     <Pressable
       onPress={press}
+      accessibilityRole="button"
+      accessibilityLabel="Back"
       hitSlop={8}
       style={[styles.btn, { top: insets.top + 8 }]}
     >

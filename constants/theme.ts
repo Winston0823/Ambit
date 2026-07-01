@@ -37,7 +37,7 @@ export const Brand = {
   inkHigh:        '#141414',
   inkBody:        '#212121',
   inkLabel:       '#737373',
-  inkMuted:       '#8C8C8C',
+  inkMuted:       '#6E6A62',  // warm muted grey — WCAG AA: 5.38:1 on #FFF, 4.65:1 on canvas, 5.15:1 on cardCream
   inkPlaceholder: '#B8B8B8',
   inkDisabled:    '#E0E0E0',
   inkOnBrand:     '#FFFFFF',  // text on warm-tan CTAs

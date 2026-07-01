@@ -36,6 +36,10 @@ export function Chip({ label, selected = false, onPress }: Props) {
     <Animated.View style={{ transform: [{ scale }] }}>
       <Pressable
         onPress={press}
+        accessibilityRole="button"
+        accessibilityState={{ selected }}
+        // 40px visual height + 2px top/bottom → 44pt effective touch target.
+        hitSlop={{ top: 2, bottom: 2 }}
         style={[styles.base, selected ? styles.selected : styles.unselected]}
       >
         <Text style={[styles.label, selected ? styles.labelOn : styles.labelOff]}>

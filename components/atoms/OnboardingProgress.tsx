@@ -79,6 +79,9 @@ export function OnboardingProgress({ current, total, leadInset = 0 }: Props) {
     <View
       style={[styles.root, leadInset > 0 && { marginLeft: 24 + leadInset }]}
       onLayout={(e) => setW(e.nativeEvent.layout.width)}
+      accessibilityRole="progressbar"
+      accessibilityLabel={`Step ${current} of ${total}`}
+      accessibilityValue={{ min: 0, max: total, now: current }}
     >
       {/* Unfilled track — picks up just past the leading dot. */}
       <Animated.View style={[styles.track, { left: Animated.add(clip, 12) }]} />
