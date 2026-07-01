@@ -62,14 +62,18 @@ import {
 import {
   confirmHire,
   proposeHire,
+  updateOwnerStage,
   type ConversationStatus,
+  type OwnerStage,
 } from '../../../../lib/closureLoop';
 import { useAuth } from '../../../../context/AuthContext';
 import { supabase } from '../../../../lib/supabase';
+import { toast } from '../../../../lib/toast';
 import {
   deleteMessage,
   editMessage,
   fetchProjectCard,
+  fetchSeekerCard,
   fetchProjectRefs,
   listMessages,
   listReactions,
@@ -116,6 +120,8 @@ interface ConvoMeta {
   pass_reason:       string | null;
   hired_at:          string | null;
   hired_proposed_by: string | null;
+  /// Owner's private funnel stage (owner-only; null until first set).
+  owner_stage:       OwnerStage | null;
 }
 
 /// S-051 Message Thread. Wires together:
@@ -130,6 +136,7 @@ export default function ThreadScreen() {
   const insets = useSafeAreaInsets();
 
   const [meta, setMeta] = useState<ConvoMeta | null>(null);
+  const isOwner = !!user && !!meta && meta.owner_id === user.id;
   /// Signed-in user's avatar URL, fetched once on screen mount and
   /// passed to MessageBubble so my own bubbles get an avatar too.
   const [myPhotoUrl, setMyPhotoUrl] = useState<string | null>(null);
@@ -282,31 +289,70 @@ export default function ThreadScreen() {
     return () => { cancelled = true; };
   }, [messages]);
 
-  const handleProposeHire = async () => {
+  // Propose hire notifies the other party — confirm the intent on the single
+  // tap before firing, so an accidental menu tap can't propose a hire.
+  const handleProposeHire = () => {
     setOverflowOpen(false);
     if (!conversationId) return;
-    try {
-      await proposeHire(conversationId);
-      // Optimistic: bump status locally so the banner reflects right away.
-      setMeta((m) => (m ? { ...m, status: 'hired_pending', hired_proposed_by: user?.id ?? null } : m));
-    } catch (e: any) {
-      Alert.alert('Could not propose hire', e?.message ?? 'Try again.');
-    }
+    Alert.alert('Propose hire?', "They'll be notified that you want to hire them.", [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Propose',
+        onPress: async () => {
+          try {
+            await proposeHire(conversationId);
+            // Optimistic: bump status locally so the banner reflects right away.
+            setMeta((m) => (m ? { ...m, status: 'hired_pending', hired_proposed_by: user?.id ?? null } : m));
+          } catch (e: any) {
+            Alert.alert('Could not propose hire', e?.message ?? 'Try again.');
+          }
+        },
+      },
+    ]);
   };
 
-  const handleConfirmHire = async () => {
+  // Confirm hire is irreversible (terminal 'hired' state) — gate it behind a
+  // confirmation so the receiving party can't close the loop on one stray tap.
+  const handleConfirmHire = () => {
     if (!conversationId) return;
-    try {
-      await confirmHire(conversationId);
-      setMeta((m) => (m ? { ...m, status: 'hired', hired_at: new Date().toISOString() } : m));
-    } catch (e: any) {
-      Alert.alert('Could not confirm hire', e?.message ?? 'Try again.');
-    }
+    Alert.alert('Confirm hire?', "This finalizes the hire and can't be undone.", [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Confirm hire',
+        onPress: async () => {
+          try {
+            await confirmHire(conversationId);
+            setMeta((m) => (m ? { ...m, status: 'hired', hired_at: new Date().toISOString() } : m));
+          } catch (e: any) {
+            Alert.alert('Could not confirm hire', e?.message ?? 'Try again.');
+          }
+        },
+      },
+    ]);
   };
 
   const handleOpenPass = () => {
     setOverflowOpen(false);
     setPassSheetOpen(true);
+  };
+
+  // Owner's private funnel stage — optimistic local set + owner-only RPC.
+  const handleSetStage = (stage: OwnerStage) => {
+    if (!conversationId) return;
+    setMeta((m) => (m ? { ...m, owner_stage: stage } : m));
+    updateOwnerStage(conversationId, stage).catch((e: any) => {
+      toast.error(e?.message ?? "Couldn't save the stage.");
+    });
+  };
+
+  // Card icon → peek the partner's full discovery card (half-opaque reach).
+  // Owner sees the seeker's card; the seeker sees the founder's project card.
+  const handleOpenPartnerCard = async () => {
+    if (!meta) return;
+    const card = isOwner
+      ? await fetchSeekerCard(meta.partner_id)
+      : await fetchProjectCard(meta.project_id);
+    if (card) setPreviewCard(card);
   };
 
   // ── Initial load ─────────────────────────────────────────────
@@ -329,7 +375,7 @@ export default function ThreadScreen() {
       let convo: any = null;
       const full = await supabase
         .from('conversations')
-        .select('id, project_id, owner_id, seeker_id, status, pass_reason, hired_at, hired_proposed_by, projects(title)')
+        .select('id, project_id, owner_id, seeker_id, status, pass_reason, hired_at, hired_proposed_by, owner_stage, projects(title)')
         .eq('id', conversationId)
         .single();
       if (full.error) {
@@ -381,6 +427,7 @@ export default function ThreadScreen() {
         pass_reason:       (convo as any).pass_reason ?? null,
         hired_at:          (convo as any).hired_at ?? null,
         hired_proposed_by: (convo as any).hired_proposed_by ?? null,
+        owner_stage:       ((convo as any).owner_stage as OwnerStage | null) ?? null,
       };
 
       const [msgs, reacts, schedReqs, availPolls, partnerRead, selfProfile] = await Promise.all([
@@ -1016,27 +1063,52 @@ export default function ThreadScreen() {
           top={insets.top + 6}
           currentConversationId={meta.id}
           meUserId={user?.id}
+          status={meta.status}
+          meetingAgreed={schedulingRequests.some((r) => r.accepted_slot != null)}
+          isOwner={isOwner}
+          ownerStage={meta.owner_stage}
+          onSetStage={handleSetStage}
+          onOpenCard={handleOpenPartnerCard}
         />
       )}
 
       {loading || !meta || !user ? (
-        <View style={styles.skeletonBody}>
+        // Mirror the real thread: each bubble sits in a row with a 32px avatar
+        // gutter (theirs left, mine right) + 8px gap, a 72% max width, and the
+        // asymmetric tail corner. Same top offset as the list so bubbles don't
+        // slide under the floating header.
+        <View style={[styles.skeletonBody, { paddingTop: insets.top + 96 }]}>
           {[
-            { mine: false, w: '62%', h: 46 },
+            { mine: false, w: '62%', h: 44 },
             { mine: true, w: '48%', h: 40 },
-            { mine: false, w: '72%', h: 58 },
+            { mine: false, w: '70%', h: 58 },
             { mine: false, w: '40%', h: 40 },
             { mine: true, w: '58%', h: 50 },
             { mine: true, w: '34%', h: 40 },
             { mine: false, w: '54%', h: 46 },
           ].map((b, i) => (
-            <Skeleton
+            <View
               key={i}
-              width={b.w as any}
-              height={b.h}
-              radius={20}
-              style={{ alignSelf: b.mine ? 'flex-end' : 'flex-start', marginBottom: 12 }}
-            />
+              style={{
+                flexDirection: 'row',
+                alignItems: 'flex-end',
+                gap: 8,
+                marginBottom: 6,
+                justifyContent: b.mine ? 'flex-end' : 'flex-start',
+              }}
+            >
+              {!b.mine && <Skeleton width={32} height={32} radius={8} />}
+              <Skeleton
+                width={b.w as any}
+                height={b.h}
+                radius={18}
+                style={{
+                  borderBottomLeftRadius: b.mine ? 18 : 4,
+                  borderBottomRightRadius: b.mine ? 4 : 18,
+                }}
+              />
+              {b.mine && <Skeleton width={32} height={32} radius={8} />}
+            </View>
           ))}
         </View>
       ) : (
@@ -1219,14 +1291,14 @@ export default function ThreadScreen() {
                 ? 'This conversation has been marked as Hired.'
                 : meta.status === 'passed'
                   ? 'This conversation has been passed.'
-                  : 'No response — conversation auto-declined.'}
+                  : 'This conversation closed without a hire.'}
             </Text>
           </View>
         )}
       </KeyboardAvoidingView>
       )}
 
-      {/* Overflow menu — hire / pass / block. Lives above the
+      {/* Overflow menu — hire / pass. Lives above the
           keyboard so it stays usable even with the composer focused. */}
       <BottomSheet visible={overflowOpen} onClose={() => setOverflowOpen(false)}>
         <Pressable
@@ -1246,15 +1318,6 @@ export default function ThreadScreen() {
           <Text style={[styles.overflowLabel, !!meta && meta.status !== 'active' && styles.overflowLabelDisabled]}>
             Pass on this chat
           </Text>
-        </Pressable>
-        <Pressable
-          style={styles.overflowItem}
-          onPress={() => {
-            setOverflowOpen(false);
-            Alert.alert('Block', 'Block flow coming soon.');
-          }}
-        >
-          <Text style={[styles.overflowLabel, styles.overflowLabelDanger]}>Block</Text>
         </Pressable>
       </BottomSheet>
 
@@ -1313,7 +1376,9 @@ export default function ThreadScreen() {
           <View style={[styles.previewFrame, { paddingTop: insets.top + Space.md, paddingBottom: insets.bottom + Space.md }]}>
             {previewCard && (
               <View style={styles.previewCardArea}>
-                <DiscoveryCard card={previewCard} showReachButton={false} />
+                {/* Half-opaque, non-interactive reach button — you're already
+                    in the conversation, so reaching out again is moot. */}
+                <DiscoveryCard card={previewCard} showReachButton reachDisabled />
               </View>
             )}
           </View>
@@ -1477,7 +1542,7 @@ function StatusBanner({
     return (
       <View style={[styles.banner, styles.bannerMuted]}>
         <Text style={styles.bannerText}>
-          Reviewing other candidates right now.
+          This conversation closed without a hire. Both sides are free to explore other matches.
         </Text>
       </View>
     );

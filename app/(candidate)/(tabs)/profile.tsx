@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -20,6 +20,7 @@ import {
   Camera,
   Chat,
   Check,
+  FileArrowUp,
   Gear,
   MapPin,
   PencilSimpleLine,
@@ -29,7 +30,7 @@ import {
   X,
 } from 'phosphor-react-native';
 import { Chip, HardShadow, Skeleton } from '../../../components/atoms';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import {
   AddPortfolioBubble,
   DiscoveryCard,
@@ -50,7 +51,10 @@ import {
   upsertPortfolioItem,
 } from '../../../lib/portfolio';
 import { randomUUID } from 'expo-crypto';
+import { toast } from '../../../lib/toast';
+import { optimistic } from '../../../lib/mutation';
 import { formatResponseRate, formatResponseTime } from '../../../lib/closureLoop';
+import { canonicalizeSkill } from '../../../lib/resume';
 import { CAMPUSES, SKILL_CATEGORIES } from '../../../data/mock';
 import type { PortfolioItem, SeekerCardData } from '../../../data/mock';
 import {
@@ -133,6 +137,8 @@ export default function ProfileTab() {
   const insets = useSafeAreaInsets();
   const [profile, setProfile] = useState<ProfileRow | null>(null);
   const [loading, setLoading] = useState(true);
+  // Résumé import → the review/apply screen (paste / file / photo live there).
+  const openResumeImport = () => router.push('/resume-import');
 
   // Portfolio is now persisted in Supabase via lib/portfolio.ts.
   // Local state mirrors the DB for snappy UI; mutations write through
@@ -161,48 +167,37 @@ export default function ProfileTab() {
   // every field as "Tap to add…". So we fall back to the baseline
   // select that's guaranteed to work, and just leave the response-rate
   // pill hidden.
-  useEffect(() => {
+  const loadProfile = useCallback(async () => {
     if (!user) { setLoading(false); return; }
-    let cancelled = false;
-    (async () => {
-      const full = await supabase
-        .from('profiles')
-        .select('id, name, vibe_blurb, skills, role, campus_id, photo_url, response_rate, avg_response_minutes')
-        .eq('id', user.id)
-        .maybeSingle();
-      if (cancelled) return;
-
-      if (!full.error) {
-        setProfile(full.data as ProfileRow | null);
-        setLoading(false);
-        return;
-      }
-
-      // Likely a missing column — log it once, then retry with the
-      // baseline columns so the rest of the editor still works.
-      console.warn(
-        'profile fetch (full) failed, retrying baseline:',
-        full.error.message,
-      );
-      const base = await supabase
-        .from('profiles')
-        .select('id, name, vibe_blurb, skills, role, campus_id, photo_url')
-        .eq('id', user.id)
-        .maybeSingle();
-      if (cancelled) return;
-      if (base.error) {
-        console.warn('profile fetch (baseline) also failed:', base.error.message);
-        setProfile(null);
-      } else {
-        setProfile(
-          base.data
-            ? ({ ...(base.data as object), response_rate: null, avg_response_minutes: null } as ProfileRow)
-            : null,
-        );
-      }
+    const full = await supabase
+      .from('profiles')
+      .select('id, name, vibe_blurb, skills, role, campus_id, photo_url, response_rate, avg_response_minutes')
+      .eq('id', user.id)
+      .maybeSingle();
+    if (!full.error) {
+      setProfile(full.data as ProfileRow | null);
       setLoading(false);
-    })();
-    return () => { cancelled = true; };
+      return;
+    }
+    // Likely a missing column — log it once, then retry with the baseline
+    // columns so the rest of the editor still works.
+    console.warn('profile fetch (full) failed, retrying baseline:', full.error.message);
+    const base = await supabase
+      .from('profiles')
+      .select('id, name, vibe_blurb, skills, role, campus_id, photo_url')
+      .eq('id', user.id)
+      .maybeSingle();
+    if (base.error) {
+      console.warn('profile fetch (baseline) also failed:', base.error.message);
+      setProfile(null);
+    } else {
+      setProfile(
+        base.data
+          ? ({ ...(base.data as object), response_rate: null, avg_response_minutes: null } as ProfileRow)
+          : null,
+      );
+    }
+    setLoading(false);
   }, [user?.id]);
 
   const campus = useMemo(
@@ -211,17 +206,25 @@ export default function ProfileTab() {
   );
 
   /// Update a single Supabase column and mirror the change locally for
-  /// immediate UI feedback. We don't wait for the round-trip — optimistic
-  /// updates feel snappy. Errors are logged so silent failures (RLS
-  /// denial, schema mismatch, etc.) show up in the dev console instead
-  /// of producing a UI that pretends the save worked.
+  /// immediate UI feedback. Optimistic via the shared helper: the UI moves
+  /// instantly, and if the write fails (RLS denial, schema mismatch, etc.)
+  /// the local mirror snaps back and the user gets a toast — instead of a UI
+  /// that pretends the save worked.
   const updateField = async (field: keyof ProfileRow, value: ProfileRow[keyof ProfileRow]) => {
     if (!user) return;
-    setProfile((p) => (p ? { ...p, [field]: value } : p));
-    const { error } = await supabase.from('profiles').update({ [field]: value }).eq('id', user.id);
-    if (error) {
-      console.warn(`profile.${String(field)} update failed:`, error.message);
-    }
+    await optimistic<ProfileRow | null>({
+      apply: () => {
+        const prev = profile;
+        setProfile((p) => (p ? { ...p, [field]: value } : p));
+        return prev;
+      },
+      commit: async () => {
+        const { error } = await supabase.from('profiles').update({ [field]: value }).eq('id', user.id);
+        if (error) throw error;
+      },
+      revert: (prev) => setProfile(prev),
+      errorMessage: "Couldn't save that change",
+    });
   };
 
   const pickPhoto = async () => {
@@ -229,7 +232,10 @@ export default function ProfileTab() {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     }
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) return;
+    if (!perm.granted) {
+      toast.error('Enable photo access in Settings to add a photo.');
+      return;
+    }
     const result = await ImagePicker.launchImageLibraryAsync({
       allowsEditing: true,
       aspect: [1, 1],
@@ -257,21 +263,30 @@ export default function ProfileTab() {
       setProfile((p) => (p ? { ...p, photo_url: data.publicUrl } : p));
     } catch (e: any) {
       console.warn('Avatar upload failed:', e?.message ?? e);
+      toast.error("Couldn't upload your photo. Tap to try again.", {
+        actionLabel: 'Retry',
+        onAction: () => { void pickPhoto(); },
+      });
     }
   };
 
   // ── Portfolio CRUD (Supabase-backed) ──────────────────────────────────────
 
-  // Initial portfolio load — runs once when the user becomes known.
-  useEffect(() => {
+  const loadPortfolio = useCallback(async () => {
     if (!user) return;
-    let cancelled = false;
-    (async () => {
-      const items = await fetchPortfolioForUser(user.id);
-      if (!cancelled) setPortfolio(items);
-    })();
-    return () => { cancelled = true; };
+    const items = await fetchPortfolioForUser(user.id);
+    setPortfolio(items);
   }, [user?.id]);
+
+  // Reload profile + portfolio every time the tab regains focus — so edits
+  // made on a pushed screen (e.g. résumé import) show on return, not just on
+  // a cold app start.
+  useFocusEffect(
+    useCallback(() => {
+      loadProfile();
+      loadPortfolio();
+    }, [loadProfile, loadPortfolio]),
+  );
 
   // Owner's live (active) projects — drives the owner profile preview card.
   useEffect(() => {
@@ -322,6 +337,7 @@ export default function ProfileTab() {
           setPortfolio((prev) => prev.map((p) => (p.id === updated.id ? { ...p, imageUri: remote } : p)));
         } catch (imgErr: any) {
           console.warn('portfolio image upload failed:', imgErr?.message ?? imgErr);
+          toast.error("Couldn't upload that image — saved the rest.");
           imageUrl = exists ? portfolio.find((p) => p.id === updated.id)?.imageUri ?? null : null;
         }
       }
@@ -339,6 +355,7 @@ export default function ProfileTab() {
       });
     } catch (e: any) {
       console.warn('portfolio upsert failed:', e?.message ?? e);
+      toast.error("Couldn't save that project. We've reverted it.");
       // Refetch to reconcile if the write actually failed.
       const items = await fetchPortfolioForUser(user.id);
       setPortfolio(items);
@@ -376,17 +393,36 @@ export default function ProfileTab() {
   };
 
   if (loading) {
+    // Mirror the real screen: a header band with the centered Edit|Preview
+    // segment + sign-out stub, then the full-bleed preview card silhouette
+    // (the profile opens in Preview mode).
     return (
       <View style={styles.root}>
-        <View style={{ paddingHorizontal: 24, paddingTop: insets.top + 64, alignItems: 'center' }}>
-          <Skeleton width={96} height={96} radius={48} />
-          <Skeleton width={150} height={28} radius={8} style={{ marginTop: 20 }} />
-          <Skeleton width={100} height={14} radius={6} style={{ marginTop: 12 }} />
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center', marginTop: 28 }}>
-            {[72, 96, 60, 84, 68].map((w, i) => (
-              <Skeleton key={i} width={w} height={34} radius={999} />
-            ))}
+        <View style={[styles.header, { marginTop: insets.top + 6 }]}>
+          <Skeleton width={156} height={40} radius={999} />
+          <View style={styles.signOutBtn}>
+            <Skeleton width={20} height={20} radius={6} />
           </View>
+        </View>
+        <View style={styles.previewWrap}>
+          <HardShadow radius={Radii.card} offset={7} style={{ flex: 1 }}>
+            <View style={styles.skelCard}>
+              <Skeleton width={120} height={30} radius={14} style={styles.skelBadge} />
+              <View style={styles.skelStack}>
+                <Skeleton width={120} height={11} radius={5} />
+                <Skeleton width="68%" height={30} radius={8} />
+                <View style={{ gap: 7 }}>
+                  <Skeleton width="90%" height={15} radius={6} />
+                  <Skeleton width="62%" height={15} radius={6} />
+                </View>
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  {[70, 92, 64].map((w, i) => (
+                    <Skeleton key={i} width={w} height={33} radius={999} />
+                  ))}
+                </View>
+              </View>
+            </View>
+          </HardShadow>
         </View>
       </View>
     );
@@ -432,6 +468,18 @@ export default function ProfileTab() {
             <Text style={[styles.segmentText, !editing && styles.segmentTextActive]}>Preview</Text>
           </Pressable>
         </View>
+        {/* Résumé import — a talent-profile feature, so seekers only. Owners'
+            profiles are project-centric (Live Projects, not a portfolio). */}
+        {profile?.role === 'seeker' && (
+          <Pressable
+            onPress={openResumeImport}
+            style={[styles.signOutBtn, styles.resumeDevBtn]}
+            hitSlop={10}
+            accessibilityLabel="Import résumé"
+          >
+            <FileArrowUp size={18} color={Brand.inkMuted} weight="regular" />
+          </Pressable>
+        )}
         <Pressable
           onPress={() => { if (Platform.OS !== 'web') Haptics.selectionAsync().catch(() => {}); setAccountOpen(true); }}
           style={styles.signOutBtn}
@@ -862,7 +910,9 @@ function SkillsEditModal({
   };
 
   const addCustom = () => {
-    const skill = customInput.trim();
+    // Snap to canonical chip so a known skill lands in its real category;
+    // novel skills stay custom ("ADDED BY YOU").
+    const skill = canonicalizeSkill(customInput);
     if (!skill || draft.includes(skill) || draft.length >= MAX_SKILLS) return;
     setDraft((d) => [...d, skill]);
     setCustomInput('');
@@ -1090,6 +1140,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  // Sits just left of the sign-out icon (36pt wide + 8pt gap) so they don't stack.
+  resumeDevBtn: { right: Space.lg + 44 },
 
   // ── Account settings sheet rows ────────────────────────────────────
   accountRow: {
@@ -1121,11 +1173,23 @@ const styles = StyleSheet.create({
   // Preview mode — the real discovery card, filling the screen like the deck.
   previewWrap: { flex: 1, paddingHorizontal: Space.lg, paddingTop: Space.sm, paddingBottom: Space.md },
 
+  // Loading skeleton — mirrors the DiscoveryCard preview silhouette.
+  skelCard: {
+    flex: 1,
+    backgroundColor: Brand.surface1,
+    borderRadius: Radii.card,
+    borderWidth: 1.5,
+    borderColor: Brand.inkEdge,
+    overflow: 'hidden',
+  },
+  skelBadge: { position: 'absolute', top: 16, right: 16 },
+  skelStack: { position: 'absolute', left: 22, right: 22, bottom: 22, paddingRight: 72, gap: 16 },
+
   // Segmented Edit | Preview control (centered in the header band).
   segment: { flexDirection: 'row', backgroundColor: Brand.cardCream, borderRadius: 999, padding: 4 }, // light grouping bubble (card color, no outline)
   segmentBtn: { paddingHorizontal: 20, paddingVertical: 8, borderRadius: 999 },
   segmentBtnActive: { backgroundColor: Brand.action }, // just the teal indicator — no outline
-  segmentText: { fontFamily: AmbitFont.body, fontSize: 14, fontWeight: '600', color: Brand.inkMuted },
+  segmentText: { fontFamily: AmbitFont.body, fontSize: 14, lineHeight: 20, textAlign: 'center', includeFontPadding: false, fontWeight: '600', color: Brand.inkMuted },
   segmentTextActive: { color: Brand.actionInk, fontWeight: '700' },
 
   // Field-list editor (Tinder / Hinge convention).

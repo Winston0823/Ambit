@@ -1,7 +1,8 @@
 import { randomUUID } from 'expo-crypto';
 import { File } from 'expo-file-system';
 import { supabase } from './supabase';
-import type { ProjectCardData } from '../data/mock';
+import { fetchPortfoliosByUser } from './portfolio';
+import type { ProjectCardData, SeekerCardData } from '../data/mock';
 
 /// Read a local file URI (file:// or content://) as an ArrayBuffer ready
 /// to hand to Supabase Storage. Why not `fetch(uri).blob()`? On React
@@ -343,6 +344,8 @@ export async function fetchProjectCard(projectId: string): Promise<ProjectCardDa
     vibe_blurb: string | null;
     required_skills: string[] | null;
     roles_sought: string[] | null;
+    image_url: string | null;
+    needed_by: string | null;
     campus_id: string | null;
     owner_id: string;
   };
@@ -365,6 +368,46 @@ export async function fetchProjectCard(projectId: string): Promise<ProjectCardDa
     skillsSought: (r.required_skills ?? []).slice(0, 5),
     rolesSought: r.roles_sought ?? [],
     gradient: projectGradient(r.id),
+    imageUri: r.image_url ?? null,
+    neededBy: r.needed_by ?? null,
+  };
+}
+
+/// Hydrate a full discovery-style SeekerCardData for a user id — used to
+/// preview a chat partner as the SAME seeker card the discovery deck renders
+/// (with portfolio + links on page 2). Mirrors feed.tsx's seeker mapper.
+export async function fetchSeekerCard(userId: string): Promise<SeekerCardData | null> {
+  const { data } = await supabase
+    .from('profiles')
+    .select('id, name, photo_url, campus_id, skills, vibe_blurb, response_rate, github_url, portfolio_url')
+    .eq('id', userId)
+    .maybeSingle();
+  if (!data) return null;
+  const s = data as {
+    id: string;
+    name: string | null;
+    photo_url: string | null;
+    campus_id: string | null;
+    skills: string[] | null;
+    vibe_blurb: string | null;
+    response_rate: number | null;
+    github_url: string | null;
+    portfolio_url: string | null;
+  };
+  const portfolioMap = await fetchPortfoliosByUser([userId]);
+  return {
+    kind: 'seeker',
+    id: s.id,
+    name: (s.name ?? '').trim() || 'Someone on Ambit',
+    photoUri: s.photo_url,
+    campusId: s.campus_id ?? '',
+    skills: s.skills ?? [],
+    vibeBlurb: s.vibe_blurb ?? '',
+    portfolio: portfolioMap.get(s.id) ?? [],
+    responseRate: s.response_rate ?? null,
+    links: (s.github_url || s.portfolio_url)
+      ? { github: s.github_url ?? undefined, site: s.portfolio_url ?? undefined }
+      : undefined,
   };
 }
 

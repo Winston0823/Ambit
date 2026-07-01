@@ -19,16 +19,23 @@ import {
   FileText,
   GithubLogo,
   Globe,
+  IdentificationCard,
   LinkedinLogo,
   MapPin,
 } from 'phosphor-react-native';
 import * as Haptics from 'expo-haptics';
 import { Chip } from '../atoms';
+import { StageRail } from '../molecules';
 import { supabase } from '../../lib/supabase';
 import { CAMPUSES } from '../../data/mock';
-import { formatResponseRate, formatResponseTime } from '../../lib/closureLoop';
+import {
+  formatResponseRate,
+  formatResponseTime,
+  ConversationStatus,
+  OwnerStage,
+} from '../../lib/closureLoop';
 import { isOnline, presenceLabel } from '../../lib/presence';
-import { AmbitFont, Brand, Radii, Space } from '../../constants/theme';
+import { AmbitFont, Brand, Radii, Space, StageColor } from '../../constants/theme';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 
@@ -60,6 +67,18 @@ interface Props {
   /// Signed-in user id — used to query for sibling conversations in
   /// either participant orientation.
   meUserId?:        string;
+  /// Shared closure-loop status of THIS conversation → the rail's top ladder.
+  status:           ConversationStatus;
+  /// Whether a meeting time has been agreed (lights the Meeting milestone).
+  meetingAgreed:    boolean;
+  /// Whether the signed-in user is the owner (gets the private draggable tag).
+  isOwner:          boolean;
+  /// The owner's private funnel stage for this conversation (null → 'new').
+  ownerStage:       OwnerStage | null;
+  /// Persist a new private stage (owner only).
+  onSetStage:       (stage: OwnerStage) => void;
+  /// Open the partner's discovery-card peek (full photo/vibe/skills/links).
+  onOpenCard:       () => void;
 }
 
 /// One sibling conversation summary used to render the "Other chats"
@@ -106,6 +125,12 @@ export function PartnerProfileIsland({
   top,
   currentConversationId,
   meUserId,
+  status,
+  meetingAgreed,
+  isOwner,
+  ownerStage,
+  onSetStage,
+  onOpenCard,
 }: Props) {
   const [expanded, setExpanded] = useState(false);
   const [profile, setProfile] = useState<PartnerProfile | null>(null);
@@ -314,6 +339,10 @@ export function PartnerProfileIsland({
               <Text style={styles.pillName} numberOfLines={1}>
                 {(partnerName ?? '').split(' ')[0] || 'Profile'}
               </Text>
+              {/* Ambient cue: the owner's private funnel-stage color. */}
+              {isOwner && (
+                <View style={[styles.pillStageDot, { backgroundColor: StageColor[ownerStage ?? 'new'] }]} />
+              )}
             </View>
             {presenceLabel(partnerLastActiveAt) && (
               <Text style={styles.pillPresence} numberOfLines={1}>{presenceLabel(partnerLastActiveAt)}</Text>
@@ -339,80 +368,33 @@ export function PartnerProfileIsland({
             contentContainerStyle={styles.cardContent}
             showsVerticalScrollIndicator={false}
           >
-            {/* Contact-card hero: bubble (vibe) on top → tail pointing
-                down at the avatar → name → meta row. Vertical, centered
-                stack. The bubble is omitted when the partner has no
-                vibe; the tail is omitted with it. */}
-            <View style={styles.heroStack}>
-              {profile?.vibe_blurb ? (
-                <>
-                  <View style={styles.heroBubble}>
-                    <Text style={styles.heroBubbleText}>{profile.vibe_blurb}</Text>
-                  </View>
-                  <View style={styles.heroBubbleTail} />
-                </>
-              ) : null}
+            {/* Identity header — name only; the full card (photo/vibe/skills/
+                links) lives in the discovery-card peek via the button below. */}
+            <Text style={styles.cardName} numberOfLines={1}>{partnerName}</Text>
 
-              <View style={styles.heroAvatarWrap}>
-                {partnerPhotoUrl ? (
-                  <Image source={{ uri: partnerPhotoUrl }} style={styles.heroAvatar} />
-                ) : (
-                  <View style={[styles.heroAvatar, styles.heroAvatarFallback]}>
-                    <Text style={styles.heroAvatarInitial}>
-                      {(partnerName ?? '?').slice(0, 1).toUpperCase()}
-                    </Text>
-                  </View>
-                )}
-              </View>
+            {/* The island's primary content is now the conversation-stage rail:
+                shared status ladder + (owner) the private draggable funnel tag. */}
+            <StageRail
+              status={status}
+              meetingAgreed={meetingAgreed}
+              isOwner={isOwner}
+              ownerStage={ownerStage}
+              onSetStage={onSetStage}
+            />
 
-              <Text style={styles.heroName} numberOfLines={1}>{partnerName}</Text>
-
-              {(campus || (profile && (profile.response_rate != null || profile.avg_response_minutes != null))) && (
-                <View style={styles.heroMetaRow}>
-                  {campus && (
-                    <View style={styles.heroMetaItem}>
-                      <MapPin size={12} color={Brand.inkLabel} weight="regular" />
-                      <Text style={styles.heroMetaText}>{campus.name}</Text>
-                    </View>
-                  )}
-                  {profile && (profile.response_rate != null || profile.avg_response_minutes != null) && (
-                    <View style={styles.responseBadge}>
-                      <Chat size={11} color={Brand.accent} weight="regular" />
-                      <Text style={styles.responseBadgeText}>
-                        {[
-                          formatResponseTime(profile.avg_response_minutes) &&
-                            `Responds ${formatResponseTime(profile.avg_response_minutes)}`,
-                          formatResponseRate(profile.response_rate),
-                        ]
-                          .filter(Boolean)
-                          .join(' · ')}
-                      </Text>
-                    </View>
-                  )}
-                </View>
-              )}
-            </View>
-
-            {profile?.skills && profile.skills.length > 0 && (
-              <View style={styles.section}>
-                <Text style={styles.eyebrow}>GOOD AT</Text>
-                <View style={styles.chipRow}>
-                  {profile.skills.map((s) => (
-                    <Chip key={s} label={s} selected={false} onPress={() => {}} />
-                  ))}
-                </View>
-              </View>
-            )}
-
-            <View style={styles.section}>
-              <Text style={styles.eyebrow}>LINKS</Text>
-              <View style={styles.linkColumn}>
-                <ProofLink Icon={GithubLogo}   label="GitHub"    url={profile?.github_url} />
-                <ProofLink Icon={LinkedinLogo} label="LinkedIn"  url={profile?.linkedin_url} />
-                <ProofLink Icon={Globe}        label="Portfolio" url={profile?.portfolio_url} />
-                <ProofLink Icon={FileText}     label="Resume"    url={profile?.resume_url} />
-              </View>
-            </View>
+            {/* Card icon → peek the partner's full discovery card. */}
+            <Pressable
+              onPress={() => { setExpanded(false); onOpenCard(); }}
+              style={({ pressed }) => [styles.viewCardBtn, pressed && { opacity: 0.85 }]}
+              accessibilityRole="button"
+              accessibilityLabel={`View ${(partnerName ?? '').split(' ')[0] || 'their'} card`}
+            >
+              <IdentificationCard size={18} color={Brand.actionInk} weight="regular" />
+              <Text style={styles.viewCardLabel}>
+                View {(partnerName ?? '').split(' ')[0] || 'their'}'s card
+              </Text>
+              <CaretRight size={14} color={Brand.inkLabel} weight="regular" />
+            </Pressable>
 
             {/* "Other chats with X" cross-link — sibling conversations
                 between me and this partner anchored to different
@@ -618,6 +600,32 @@ const styles = StyleSheet.create({
     paddingTop: 24,
     paddingBottom: Space.lg,
     gap: Space.lg,
+  },
+  cardName: {
+    fontFamily: AmbitFont.display,
+    fontSize: 22,
+    color: Brand.inkPrimary,
+  },
+  pillStageDot: {
+    width: 7, height: 7, borderRadius: 3.5, marginLeft: 6,
+  },
+  viewCardBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: Radii.md,
+    backgroundColor: Brand.surface1,
+    borderWidth: 1.5,
+    borderColor: Brand.borderDefault,
+  },
+  viewCardLabel: {
+    flex: 1,
+    fontFamily: AmbitFont.body,
+    fontSize: 14,
+    fontWeight: '600',
+    color: Brand.inkBody,
   },
 
   // Vertical contact-card hero: bubble → tail-down → photo → name → meta.

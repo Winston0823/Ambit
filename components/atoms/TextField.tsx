@@ -7,10 +7,15 @@ interface Props extends TextInputProps {
   multiline?: boolean;
   /// When true, applies the 16pt radius + textarea height for vibe-blurb style fields.
   textarea?: boolean;
+  /// Inline validation error — red copy + red border. Takes precedence over helper.
+  error?: string;
+  /// Neutral inline helper / "why" copy (audit theme 3 — never a silent gate).
+  helper?: string;
 }
 
 /// Single-line or multiline input field. Spec § design tokens — Input field.
-export function TextField({ label, multiline, textarea, style, ...rest }: Props) {
+export function TextField({ label, multiline, textarea, error, helper, style, ...rest }: Props) {
+  const note = error || helper;
   return (
     <View style={styles.wrap}>
       {label ? <Text style={styles.label}>{label}</Text> : null}
@@ -22,9 +27,13 @@ export function TextField({ label, multiline, textarea, style, ...rest }: Props)
         style={[
           styles.input,
           textarea && styles.textarea,
+          error ? styles.inputError : null,
           style,
         ]}
       />
+      {note ? (
+        <Text style={[styles.note, error ? styles.noteError : null]}>{note}</Text>
+      ) : null}
     </View>
   );
 }
@@ -53,5 +62,17 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     paddingBottom: 16,
     fontSize: 15,
+  },
+  inputError: {
+    borderColor: Brand.danger,
+  },
+  note: {
+    fontFamily: AmbitFont.body,
+    fontSize: 12,
+    color: Brand.inkMuted,
+    marginTop: 2,
+  },
+  noteError: {
+    color: Brand.danger,
   },
 });

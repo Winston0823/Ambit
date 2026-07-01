@@ -15,6 +15,7 @@ import * as Haptics from 'expo-haptics';
 import { BackChevron, Skeleton } from '../../components/atoms';
 import { getInbox, type InboxItem } from '../../lib/messaging';
 import { supabase } from '../../lib/supabase';
+import { optimistic } from '../../lib/mutation';
 import { AmbitFont, Brand, Radii, Space } from '../../constants/theme';
 
 type Stage = { key: string; label: string; statuses: InboxItem['status'][] };
@@ -58,23 +59,45 @@ export default function ProjectManageScreen() {
   const toggleActive = async () => {
     if (Platform.OS !== 'web') Haptics.selectionAsync().catch(() => {});
     const next = !active;
-    setActive(next);
-    await supabase.from('projects').update({ active: next }).eq('id', id);
+    await optimistic<boolean>({
+      apply: () => { const prev = active; setActive(next); return prev; },
+      commit: async () => {
+        const { error } = await supabase.from('projects').update({ active: next }).eq('id', id);
+        if (error) throw error;
+      },
+      revert: (prev) => setActive(prev),
+      errorMessage: next ? "Couldn't activate this project" : "Couldn't pause this project",
+    });
   };
 
   if (candidates === null) {
+    // Mirror the real pipeline: back chevron + header (kicker, title, a status
+    // pill + count meta row), then stage groups (label + bordered candidate
+    // cards with a 44 avatar). Reuses styles.candidate for an exact row match.
     return (
       <View style={styles.root}>
-        <View style={{ paddingHorizontal: 24, paddingTop: insets.top + 64 }}>
-          <Skeleton width={60} height={12} radius={6} />
-          <Skeleton width={200} height={30} radius={8} style={{ marginTop: 12, marginBottom: 28 }} />
-          {[0, 1, 2].map((i) => (
-            <View key={i} style={styles.skelRow}>
-              <Skeleton width={48} height={48} radius={14} />
-              <View style={{ flex: 1, gap: 8 }}>
-                <Skeleton width="55%" height={16} radius={6} />
-                <Skeleton width="80%" height={12} radius={6} />
-              </View>
+        <BackChevron onPress={() => router.back()} />
+        <View style={[styles.content, { paddingTop: insets.top + 12 }]}>
+          <View style={styles.header}>
+            <Skeleton width={64} height={11} radius={5} />
+            <Skeleton width="70%" height={34} radius={8} />
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <Skeleton width={130} height={32} radius={999} />
+              <Skeleton width={90} height={12} radius={6} />
+            </View>
+          </View>
+          {[0, 1].map((s) => (
+            <View key={s} style={{ gap: 8 }}>
+              <Skeleton width={150} height={11} radius={5} style={{ marginTop: 8 }} />
+              {[0, 1].map((r) => (
+                <View key={r} style={styles.candidate}>
+                  <Skeleton width={44} height={44} radius={14} />
+                  <View style={{ flex: 1, gap: 6 }}>
+                    <Skeleton width="55%" height={15} radius={6} />
+                    <Skeleton width="80%" height={12} radius={6} />
+                  </View>
+                </View>
+              ))}
             </View>
           ))}
         </View>
@@ -92,7 +115,6 @@ export default function ProjectManageScreen() {
       <BackChevron onPress={() => router.back()} />
 
       <View style={styles.header}>
-        <Text style={styles.kicker}>Pipeline</Text>
         <View style={styles.titleRow}>
           <Text style={styles.title} numberOfLines={2}>{title || 'Project'}</Text>
           <Pressable
@@ -187,15 +209,9 @@ const styles = StyleSheet.create({
   skelRow: { flexDirection: 'row', alignItems: 'center', gap: 16, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: Brand.borderSoft },
   content: { paddingHorizontal: Space.lg, gap: Space.md },
 
-  header: { gap: 12, marginTop: 8 },
-  kicker: {
-    fontFamily: AmbitFont.body,
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 1.6,
-    textTransform: 'uppercase',
-    color: Brand.inkMuted,
-  },
+  // marginTop clears the absolutely-positioned BackChevron so the title sits
+  // on its own row below it (the "PIPELINE" eyebrow used to occupy this line).
+  header: { gap: 12, marginTop: 40 },
   titleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
   title: {
     flex: 1,

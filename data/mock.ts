@@ -163,6 +163,9 @@ export interface SeekerCardData {
   /// Optional external links — GitHub / personal site / App Store. Rendered
   /// as icon buttons on the Portfolio Highlights screen.
   links?: SeekerLinks;
+  /// Real reply-within-72h rate (0–1) from `profiles.response_rate`. Drives
+  /// the reply-tier badge. Undefined/null = no rate computed yet (badge hidden).
+  responseRate?: number | null;
 }
 
 export interface ProjectCardData {
@@ -183,9 +186,20 @@ export interface ProjectCardData {
   skillsSought: string[];
   /// Open positions the founder is recruiting for. Empty = not set / any role.
   rolesSought: string[];
-  /// Two-stop gradient drawn from the warm-tan palette family. Each project
-  /// gets a unique fingerprint until real banner uploads land.
+  /// Two-stop gradient drawn from the warm-tan palette family. Used as the
+  /// hero fallback when the project has no cover image.
   gradient: [string, string];
+  /// Optional founder-uploaded cover image. When set it becomes the card's
+  /// hero (over the owner avatar / gradient). Public URL from the
+  /// `project-images` bucket; undefined/null = fall back.
+  imageUri?: string | null;
+  /// Optional deadline ("needs someone by ___"). ISO date string `YYYY-MM-DD`
+  /// from `projects.needed_by`. Drives the top-right urgency badge.
+  neededBy?: string | null;
+  /// Real reply-within-72h rate (0–1) of the OWNER (the founder answering
+  /// reach-outs), from their `profiles.response_rate`. Drives the reply-tier
+  /// badge. Undefined/null = no rate computed yet (badge hidden).
+  responseRate?: number | null;
 }
 
 export type DiscoveryCardData = SeekerCardData | ProjectCardData;

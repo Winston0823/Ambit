@@ -1,7 +1,8 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { forwardRef, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   Dimensions,
+  Easing,
   PanResponder,
   PanResponderGestureState,
   Platform,
@@ -26,7 +27,7 @@ import {
 } from '../../constants/theme';
 import type { DiscoveryCardData, PortfolioItem } from '../../data/mock';
 
-const { width: SCREEN_W } = Dimensions.get('window');
+const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 
 /// Pan thresholds — hit either distance OR velocity to commit.
 const SWIPE_X_DISTANCE = 120;   // pt
@@ -34,6 +35,17 @@ const SWIPE_X_VELOCITY = 0.75;  // pt/ms
 const COMMIT_DURATION  = 240;   // ms — fly-off animation length
 
 type SwipeAction = 'pass' | 'save';
+
+/// Imperative actions the parent can drive on the deck. Reach-out lives in the
+/// parent (it opens the composer + sends the message), so the parent calls
+/// `commitReach()` once the send is confirmed to fly the card off.
+export interface SwipeDeckHandle {
+  /// Shoot the current card up off the top and advance — the terminal "reached
+  /// out" exit (left = pass, right = save, up = reach). Pass the reached card's
+  /// id; it's a no-op if that card is no longer the top one (e.g. the deck
+  /// advanced underneath a limit sheet) or there's no card.
+  commitReach: (cardId?: string) => void;
+}
 
 interface Props {
   deck: DiscoveryCardData[];
@@ -62,7 +74,7 @@ interface Props {
 ///
 /// Animation idiom: Animated.ValueXY + PanResponder + native driver (no
 /// Reanimated; Expo Go can't host the worklet runtime).
-export function SwipeDeck({
+export const SwipeDeck = forwardRef<SwipeDeckHandle, Props>(function SwipeDeck({
   deck,
   onPass,
   onSave,
@@ -73,10 +85,26 @@ export function SwipeDeck({
   onPortfolioPress,
   activePortfolioId,
   gesturesDisabled,
-}: Props) {
+}: Props, ref) {
   const [index, setIndex] = useState(0);
   const [history, setHistory] = useState<{ card: DiscoveryCardData; action: SwipeAction }[]>([]);
   const position = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
+  // Rewind drives `position` itself (fly-in from the side), so it opts out of
+  // the index-change recenter below.
+  const skipRecenter = useRef(false);
+
+  // Recenter the shared drag value when the active card changes. Done in a
+  // layout effect (after the index commit, before paint) rather than inside
+  // the fly-off callback — otherwise setValue(0) snaps the still-active
+  // outgoing card back to center for one frame before the swap commits, which
+  // reads as the previous card flashing back in.
+  useLayoutEffect(() => {
+    if (skipRecenter.current) {
+      skipRecenter.current = false;
+      return;
+    }
+    position.setValue({ x: 0, y: 0 });
+  }, [index, position]);
 
   const current = deck[index];
   const next = deck[index + 1];
@@ -119,7 +147,8 @@ export function SwipeDeck({
 
   // ─── Commit handlers ─────────────────────────────────────────────────────
   const advance = () => {
-    position.setValue({ x: 0, y: 0 });
+    // Recenter happens in the index-change layout effect (pre-paint), not here,
+    // so the outgoing card is never snapped back to center mid-swap.
     setIndex((i) => i + 1);
   };
 
@@ -169,8 +198,10 @@ export function SwipeDeck({
     if (Platform.OS !== 'web') Haptics.selectionAsync().catch(() => {});
     const last = history[history.length - 1];
     setHistory((h) => h.slice(0, -1));
+    // Opt out of the index-change recenter — we position the restored card
+    // ourselves and spring it back in from the side it left.
+    skipRecenter.current = true;
     setIndex((i) => Math.max(0, i - 1));
-    // Fly the restored card back in from the side it left.
     position.setValue({ x: last.action === 'pass' ? -SCREEN_W : SCREEN_W, y: 0 });
     Animated.spring(position, {
       toValue: { x: 0, y: 0 },
@@ -186,6 +217,31 @@ export function SwipeDeck({
     if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     onReachOut?.(current);
   };
+
+  // Terminal "reached out" exit: the card launches straight up off the top
+  // (paper-plane sent), then the deck advances. Reaching out is a commit point
+  // — you can't pass/save someone you've messaged, and you can't rewind past
+  // them — so we clear the undo history. Driven by the parent once the send is
+  // confirmed (see SwipeDeckHandle).
+  const commitReach = (cardId?: string) => {
+    // Only consume the card if it's still the top one (the deck may have moved
+    // on if gestures were live behind a limit sheet).
+    if (!current || (cardId !== undefined && current.id !== cardId)) return;
+    if (Platform.OS !== 'web') {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    }
+    Animated.timing(position, {
+      toValue: { x: 0, y: -SCREEN_H * 1.15 },
+      duration: COMMIT_DURATION,
+      easing: Easing.in(Easing.cubic), // accelerate away — a launch, not a drift
+      useNativeDriver: true,
+    }).start(() => {
+      setHistory([]);
+      advance();
+    });
+  };
+
+  useImperativeHandle(ref, () => ({ commitReach }), [current]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ─── PanResponder ─────────────────────────────────────────────────────────
   const panResponder = useMemo(
@@ -227,67 +283,76 @@ export function SwipeDeck({
   return (
     <View style={styles.root}>
       <View style={styles.cardArea}>
-        {/* Peeking next card — depth cue behind the active card. */}
-        {next && (
-          <Animated.View
-            pointerEvents="none"
-            style={[styles.cardLayer, { transform: [{ scale: peekScale }, { translateY: peekTranslateY }] }]}
-          >
-            <DiscoveryCard key={next.id} card={next} matchedSkills={matchedSkills} showReachButton={false} />
-          </Animated.View>
-        )}
+        {/* Peek (next) behind + active card on top, rendered as ONE keyed
+            list. On advance the promoted card matches its key and is REORDERED
+            rather than remounted — so its photo, measured height, and entry
+            state persist instead of flashing back in. The next card is loaded
+            (behind, scaled) one ahead, so by the time it's promoted it's painted.
+            Render order [next, current] keeps the active card on top. */}
+        {[next, current].map((card) => {
+          if (!card) return null;
+          const isActive = card.id === current.id;
+          return (
+            <Animated.View
+              key={card.id}
+              pointerEvents={isActive ? 'auto' : 'none'}
+              style={[
+                styles.cardLayer,
+                isActive
+                  ? { transform: [{ translateX: position.x }, { translateY: position.y }, { rotate }] }
+                  : { transform: [{ scale: peekScale }, { translateY: peekTranslateY }] },
+              ]}
+              {...(isActive ? panResponder.panHandlers : {})}
+              accessible={isActive || undefined}
+              accessibilityLabel={isActive ? a11yLabel : undefined}
+              accessibilityHint={isActive ? 'Swipe right to save, left to pass' : undefined}
+              accessibilityActions={isActive ? [
+                { name: 'save', label: 'Save' },
+                { name: 'pass', label: 'Pass' },
+                { name: 'reach', label: 'Reach out' },
+                { name: 'rewind', label: 'Undo last' },
+              ] : undefined}
+              onAccessibilityAction={isActive ? (e) => {
+                switch (e.nativeEvent.actionName) {
+                  case 'save': commitSave(); break;
+                  case 'pass': commitPass(); break;
+                  case 'reach': reach(); break;
+                  case 'rewind': rewind(); break;
+                }
+              } : undefined}
+            >
+              <DiscoveryCard
+                card={card}
+                matchedSkills={matchedSkills}
+                onPortfolioPress={isActive ? onPortfolioPress : undefined}
+                activePortfolioId={isActive ? activePortfolioId : undefined}
+                onReachOut={isActive ? onReachOut : undefined}
+                showReachButton={isActive}
+                animateIn={false}
+              />
 
-        {/* Active card. Swipe = pass/save; the card's own glass button =
-            reach. No separate control band. */}
-        <Animated.View
-          style={[
-            styles.cardLayer,
-            { transform: [{ translateX: position.x }, { translateY: position.y }, { rotate }] },
-          ]}
-          {...panResponder.panHandlers}
-          accessible
-          accessibilityLabel={a11yLabel}
-          accessibilityHint="Swipe right to save, left to pass"
-          accessibilityActions={[
-            { name: 'save', label: 'Save' },
-            { name: 'pass', label: 'Pass' },
-            { name: 'reach', label: 'Reach out' },
-            { name: 'rewind', label: 'Undo last' },
-          ]}
-          onAccessibilityAction={(e) => {
-            switch (e.nativeEvent.actionName) {
-              case 'save': commitSave(); break;
-              case 'pass': commitPass(); break;
-              case 'reach': reach(); break;
-              case 'rewind': rewind(); break;
-            }
-          }}
-        >
-          <DiscoveryCard
-            key={current.id}
-            card={current}
-            matchedSkills={matchedSkills}
-            onPortfolioPress={onPortfolioPress}
-            activePortfolioId={activePortfolioId}
-            onReachOut={onReachOut}
-          />
-
-          {/* Bold drag stamps. */}
-          <Animated.View
-            pointerEvents="none"
-            style={[styles.stamp, styles.stampPass, { opacity: passStampOpacity, transform: [{ rotate: '14deg' }, { scale: passStampScale }] }]}
-          >
-            <X size={30} color={Brand.inkOnBrand} weight="bold" />
-            <Text style={styles.stampLabel}>PASS</Text>
-          </Animated.View>
-          <Animated.View
-            pointerEvents="none"
-            style={[styles.stamp, styles.stampSave, { opacity: saveStampOpacity, transform: [{ rotate: '-14deg' }, { scale: saveStampScale }] }]}
-          >
-            <BookmarkSimple size={30} color={Brand.seekerInk} weight="fill" />
-            <Text style={[styles.stampLabel, styles.stampLabelSave]}>SAVE</Text>
-          </Animated.View>
-        </Animated.View>
+              {/* Bold drag stamps — active card only. */}
+              {isActive && (
+                <>
+                  <Animated.View
+                    pointerEvents="none"
+                    style={[styles.stamp, styles.stampPass, { opacity: passStampOpacity, transform: [{ rotate: '14deg' }, { scale: passStampScale }] }]}
+                  >
+                    <X size={30} color={Brand.inkOnBrand} weight="bold" />
+                    <Text style={styles.stampLabel}>PASS</Text>
+                  </Animated.View>
+                  <Animated.View
+                    pointerEvents="none"
+                    style={[styles.stamp, styles.stampSave, { opacity: saveStampOpacity, transform: [{ rotate: '-14deg' }, { scale: saveStampScale }] }]}
+                  >
+                    <BookmarkSimple size={30} color={Brand.seekerInk} weight="fill" />
+                    <Text style={[styles.stampLabel, styles.stampLabelSave]}>SAVE</Text>
+                  </Animated.View>
+                </>
+              )}
+            </Animated.View>
+          );
+        })}
 
         {/* Low-profile rewind — fades in only after the first decision, so
             an empty deck stays pristine. */}
@@ -305,7 +370,7 @@ export function SwipeDeck({
       </View>
     </View>
   );
-}
+});
 
 // ─── Empty state ───────────────────────────────────────────────────────────
 

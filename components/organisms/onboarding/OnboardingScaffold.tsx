@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import type { IconProps } from 'phosphor-react-native';
@@ -43,7 +43,11 @@ export function OnboardingScaffold({
   children,
 }: Props) {
   return (
-    <SafeAreaView style={styles.root}>
+    // Drop the bottom safe-area edge: the anchored footer (OnboardingContinue)
+    // and the OnboardingFlow progress overlay both add insets.bottom themselves,
+    // so a bottom inset here double-counts — floating the CTA an inset too high
+    // and pushing the progress wave down onto it.
+    <SafeAreaView style={styles.root} edges={['top', 'left', 'right']}>
       {wash && (
         <LinearGradient
           colors={[Brand.canvas, Brand.cardCream]}
@@ -62,31 +66,41 @@ export function OnboardingScaffold({
 
       {onBack && <BackChevron onPress={onBack} />}
 
-      <View style={styles.header}>
-        {kicker ? (
-          <Entrance index={0}>
-            <Text style={styles.kicker}>{kicker}</Text>
+      {/* KeyboardAvoidingView lifts the header/body AND the absolutely-anchored
+          footer (it's the footer's positioning parent) so the CTA and lower
+          fields never hide behind the keyboard — the root cause the audit
+          flagged for VibeBlurb/ProofLinks/EduEmail/SignIn (theme 2). */}
+      <KeyboardAvoidingView
+        style={styles.kav}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <View style={styles.header}>
+          {kicker ? (
+            <Entrance index={0}>
+              <Text style={styles.kicker}>{kicker}</Text>
+            </Entrance>
+          ) : null}
+          <Entrance index={kicker ? 1 : 0}>
+            <Text style={styles.headline}>{headline}</Text>
           </Entrance>
-        ) : null}
-        <Entrance index={kicker ? 1 : 0}>
-          <Text style={styles.headline}>{headline}</Text>
-        </Entrance>
-        {subtitle ? (
-          <Entrance index={kicker ? 2 : 1}>
-            <Text style={styles.subtitle}>{subtitle}</Text>
-          </Entrance>
-        ) : null}
-      </View>
+          {subtitle ? (
+            <Entrance index={kicker ? 2 : 1}>
+              <Text style={styles.subtitle}>{subtitle}</Text>
+            </Entrance>
+          ) : null}
+        </View>
 
-      <View style={styles.body}>{children}</View>
+        <View style={styles.body}>{children}</View>
 
-      {footer}
+        {footer}
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Brand.canvas },
+  kav: { flex: 1 },
   watermark: {
     position: 'absolute',
     top: 110,

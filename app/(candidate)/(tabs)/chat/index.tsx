@@ -33,6 +33,7 @@ import {
   type InboxItem,
 } from '../../../../lib/messaging';
 import { AmbitFont, Brand, Radii, Space } from '../../../../constants/theme';
+import { toast } from '../../../../lib/toast';
 
 /// S-050 Inbox v4. Editorial paper canvas. "ambit" wordmark + side
 /// icons up top, large italic "Chats" title, iMessage-style pinned
@@ -61,7 +62,14 @@ export default function ChatTab() {
       setItems(data);
     } catch (e) {
       console.warn('inbox load failed:', e);
-      setItems([]);
+      // Don't clobber to [] — a failed load must not read as "no conversations
+      // yet." Keep whatever we already had (or leave the skeleton on a cold
+      // load) and surface a retryable error.
+      setItems((prev) => prev ?? []);
+      toast.error("Couldn't load your messages.", {
+        actionLabel: 'Retry',
+        onAction: () => { void load(); },
+      });
     }
   }, [user?.id]);
 
@@ -160,8 +168,9 @@ export default function ChatTab() {
     return () => clearTimeout(t);
   }, [archivedUndo]);
 
-  // Pin / unpin via long-press. Surfaces the `pin_limit_reached` error
-  // verbatim as a friendly alert; optimistic-updates the row so the
+  // Pin / unpin — triggered by the inbox row's swipe-left Pin action (and by
+  // long-pressing a pinned avatar in the strip). Surfaces the `pin_limit_reached`
+  // error verbatim as a friendly alert; optimistic-updates the row so the
   // pinned strip reflects the change before the next refetch.
   const handleTogglePin = useCallback(async (item: InboxItem) => {
     if (Platform.OS !== 'web') Haptics.selectionAsync().catch(() => {});
@@ -233,7 +242,7 @@ export default function ChatTab() {
               meId={user.id}
               onPress={() => openConversation(item.conversation_id)}
               onPassRequest={(id) => setPassTargetId(id)}
-              onLongPress={handleTogglePin}
+              onPin={handleTogglePin}
               onMute={handleMute}
               onArchive={handleArchive}
             />
@@ -253,14 +262,28 @@ export default function ChatTab() {
         }
         ListEmptyComponent={
           pinned.length === 0 ? (
-            <View style={styles.empty}>
-              <Text style={styles.emptyTitle}>Nothing here yet</Text>
-              <Text style={styles.emptyBody}>
-                {segments[0] === '(founder)'
-                  ? 'Reach out to a candidate in Discovery and start a conversation. Replies land here.'
-                  : 'Swipe up on a project in Discovery and send a hello. Replies land here.'}
-              </Text>
-            </View>
+            // A non-empty inbox with an active filter (or pinned-only rows)
+            // that yields no list rows is a filter MISS, not a truly empty
+            // inbox — say so rather than the onboarding "nothing yet" copy.
+            (items?.length ?? 0) > 0 ? (
+              <View style={styles.empty}>
+                <Text style={styles.emptyTitle}>No matches</Text>
+                <Text style={styles.emptyBody}>
+                  {filter === 'all'
+                    ? 'Nothing to show here right now.'
+                    : `No conversations under “${INBOX_TABS.find((t) => t.key === filter)?.label ?? filter}.” Try another filter.`}
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.empty}>
+                <Text style={styles.emptyTitle}>Nothing here yet</Text>
+                <Text style={styles.emptyBody}>
+                  {segments[0] === '(founder)'
+                    ? 'Reach out to a candidate in Discovery and start a conversation. Replies land here.'
+                    : 'Swipe up on a project in Discovery and send a hello. Replies land here.'}
+                </Text>
+              </View>
+            )
           ) : null
         }
       />
@@ -391,17 +414,43 @@ function ListHeader({
 /// speak the same loading language.
 function InboxSkeleton() {
   return (
-    <View style={styles.skeletonWrap}>
-      <Skeleton width={140} height={28} radius={8} style={{ marginBottom: 24 }} />
-      {Array.from({ length: 6 }).map((_, i) => (
-        <View key={i} style={styles.skeletonRow}>
-          <Skeleton width={48} height={48} radius={24} />
-          <View style={styles.skeletonLines}>
-            <Skeleton width="60%" height={14} radius={6} />
-            <Skeleton width="40%" height={12} radius={6} />
-          </View>
-        </View>
-      ))}
+    <View style={{ flex: 1 }}>
+      {/* Header: 44pt bar with side icons + centered "Messages" title. */}
+      <View style={styles.skelTopbar}>
+        <Skeleton width={36} height={36} radius={18} />
+        <Skeleton width={120} height={24} radius={8} />
+        <Skeleton width={36} height={36} radius={18} />
+      </View>
+      {/* Filter chips row (All / Unread / Your turn / Hired). */}
+      <View style={styles.skelFilters}>
+        {[56, 74, 84, 64].map((w, i) => (
+          <Skeleton key={i} width={w} height={34} radius={999} />
+        ))}
+      </View>
+      {/* Inbox-row cards — cream island, ink border, hard offset edge, a
+          48 rounded-square avatar, name + tiny byline + time, and an indented
+          preview line (under the name, like the real row). */}
+      <View style={styles.skelList}>
+        {Array.from({ length: 5 }).map((_, i) => (
+          <HardShadow key={i} radius={Radii.card} offset={4} style={styles.skelRowShadow}>
+            <View style={styles.skelCard}>
+              <View style={styles.skelTopRow}>
+                <View style={styles.skelTopLeft}>
+                  <Skeleton width={48} height={48} radius={12} />
+                  <View style={styles.skelNameBlock}>
+                    <Skeleton width={130} height={18} radius={6} />
+                    <Skeleton width={92} height={9} radius={4} style={{ marginTop: 7 }} />
+                  </View>
+                </View>
+                <Skeleton width={28} height={11} radius={5} />
+              </View>
+              <View style={styles.skelSubBlock}>
+                <Skeleton width="74%" height={13} radius={6} />
+              </View>
+            </View>
+          </HardShadow>
+        ))}
+      </View>
     </View>
   );
 }
@@ -410,40 +459,36 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Brand.canvas },
   center: { alignItems: 'center', justifyContent: 'center' },
 
-  // ── Loading skeleton ──────────────────────────────────────────
-  skeletonWrap: { paddingHorizontal: 24, paddingTop: 28 },
-  skeletonTitle: {
-    width: 140,
-    height: 28,
-    borderRadius: 8,
-    backgroundColor: Brand.surface2,
-    marginBottom: 24,
-  },
-  skeletonRow: {
+  // ── Loading skeleton — mirrors the real header + InboxRow island cards ──
+  skelTopbar: {
+    height: 44,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
-    paddingVertical: 12,
+    justifyContent: 'space-between',
+    paddingHorizontal: Space.lg,
+    marginBottom: 8,
   },
-  skeletonAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: Brand.surface2,
+  skelFilters: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 20,
+    paddingTop: 2,
+    paddingBottom: 12,
   },
-  skeletonLines: { flex: 1, gap: 8 },
-  skeletonLineWide: {
-    width: '60%',
-    height: 13,
-    borderRadius: 6,
-    backgroundColor: Brand.surface2,
+  skelList: { paddingHorizontal: 20 },
+  skelRowShadow: { marginBottom: 12 },
+  skelCard: {
+    backgroundColor: Brand.cardCream,
+    borderWidth: 1.5,
+    borderColor: Brand.inkEdge,
+    borderRadius: Radii.card,
+    padding: 16,
+    gap: 8,
   },
-  skeletonLineNarrow: {
-    width: '40%',
-    height: 11,
-    borderRadius: 6,
-    backgroundColor: Brand.surface2,
-  },
+  skelTopRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 },
+  skelTopLeft: { flexDirection: 'row', alignItems: 'center', gap: 14, flex: 1 },
+  skelNameBlock: { flex: 1 },
+  skelSubBlock: { paddingLeft: 62 }, // SUB_INDENT — preview aligns under the name
 
   // ── Top bar — mirrors the Discovery feed bar (44pt, centered title,
   //    absolutely-positioned icons at Space.lg from each edge).

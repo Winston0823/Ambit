@@ -15,8 +15,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import {
   AppStoreLogo,
+  ArrowClockwise,
+  CaretUp,
   GithubLogo,
   Globe,
+  Lightning,
   PaperPlaneTilt,
   type IconProps,
 } from 'phosphor-react-native';
@@ -26,7 +29,8 @@ import {
   AmbitFont,
   Radii,
 } from '../../constants/theme';
-import type { DiscoveryCardData, PortfolioItem } from '../../data/mock';
+import type { DiscoveryCardData, PortfolioItem, SeekerLinks } from '../../data/mock';
+import { responseTier } from '../../lib/responseRate';
 import { CAMPUSES } from '../../data/mock';
 import { HardShadow } from '../atoms';
 
@@ -43,6 +47,15 @@ interface Props {
   /// The swipe deck handles reach via its action row, so it hides the card's
   /// own floating button. Other contexts (saved preview) keep it (default).
   showReachButton?: boolean;
+  /// Render the reach button in a non-interactive, half-transparent preview
+  /// state — used by the owner's project-edit Preview so the gutter is filled
+  /// (content no longer squished) and the seeker CTA is honestly shown without
+  /// being tappable. Requires showReachButton.
+  reachDisabled?: boolean;
+  /// Play the entry fade/slide on mount. Default true. The SwipeDeck sets this
+  /// false: it keeps each card instance alive across an advance (keyed list, no
+  /// remount), so a per-card mount fade would only ever read as a flash.
+  animateIn?: boolean;
 }
 
 /// Discovery card — H-overlay redesign. Photo fills the card edge-to-edge,
@@ -59,15 +72,23 @@ export function DiscoveryCard({
   activePortfolioId,
   onReachOut,
   showReachButton = true,
+  reachDisabled = false,
+  animateIn = true,
 }: Props) {
   const firstName = card.kind === 'seeker'
     ? card.name.split(' ')[0]
     : card.ownerName.split(' ')[0];
 
-  // Entry fade — masks any layout flicker when SwipeDeck mounts a new card.
-  const cardOpacity = useRef(new Animated.Value(0)).current;
-  const cardTranslateY = useRef(new Animated.Value(8)).current;
+  // Entry fade/slide on mount. Skipped when animateIn is false (the deck keeps
+  // the card mounted across advances, so a replayed fade would just be a flash).
+  const cardOpacity = useRef(new Animated.Value(animateIn ? 0 : 1)).current;
+  const cardTranslateY = useRef(new Animated.Value(animateIn ? 8 : 0)).current;
   useLayoutEffect(() => {
+    if (!animateIn) {
+      cardOpacity.setValue(1);
+      cardTranslateY.setValue(0);
+      return;
+    }
     cardOpacity.setValue(0);
     cardTranslateY.setValue(8);
     Animated.parallel([
@@ -84,7 +105,7 @@ export function DiscoveryCard({
         useNativeDriver: true,
       }),
     ]).start();
-  }, [card.id, cardOpacity, cardTranslateY]);
+  }, [card.id, animateIn, cardOpacity, cardTranslateY]);
 
   // Seeker cards are a vertical 2-page pager: screen 1 = overview (the
   // photo card), screen 2 = portfolio highlights. We measure the card
@@ -131,6 +152,7 @@ export function DiscoveryCard({
                 matchedSkills={matchedSkills}
                 onPortfolioPress={onPortfolioPress}
                 activePortfolioId={activePortfolioId}
+                showReachButton={showReachButton}
               />
             </View>
             <View style={{ height: cardH }}>
@@ -150,6 +172,7 @@ export function DiscoveryCard({
         <ReachOutCircle
           firstName={firstName}
           onPress={() => onReachOut?.(card)}
+          disabled={reachDisabled}
         />
       )}
       </View>
@@ -179,9 +202,13 @@ function PageDots({ count, index }: { count: number; index: number }) {
 function ReachOutCircle({
   firstName,
   onPress,
+  disabled = false,
 }: {
   firstName: string;
   onPress: () => void;
+  /// Non-interactive preview state (owner's project-edit Preview): half-opacity,
+  /// untappable, no haptics/press animation — purely shows what seekers see.
+  disabled?: boolean;
 }) {
   const scale = useRef(new Animated.Value(1)).current;
   const press = () => {
@@ -190,6 +217,23 @@ function ReachOutCircle({
     }
     onPress();
   };
+
+  // Static, half-transparent, non-interactive — fills the bottom-right gutter
+  // so the content stack reads correctly while making clear it's just a preview.
+  if (disabled) {
+    return (
+      <View style={[styles.reachWrap, styles.reachPreview]} pointerEvents="none">
+        <View style={styles.reachContainer}>
+          <BlurView intensity={36} tint="default" style={styles.reachBlur}>
+            <View style={styles.reachTint} pointerEvents="none" />
+            <View style={styles.reachTopHighlight} pointerEvents="none" />
+            <PaperPlaneTilt size={20} color={Brand.actionInk} weight="fill" />
+          </BlurView>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.reachWrap} pointerEvents="box-none">
       <Pressable
@@ -240,6 +284,9 @@ function PhotoBackdrop({
         source={{ uri }}
         style={styles.photo}
         resizeMode="cover"
+        // Android fades images in over 300ms by default — reads as a flash when
+        // a card is (re)mounted. The URI is already cached from the peek render.
+        fadeDuration={0}
       />
     );
   }
@@ -281,11 +328,52 @@ function Scrim() {
 
 // ─── Top-right badge ──────────────────────────────────────────────────────
 
-function MatchBadge({ text }: { text: string }) {
+/// `tone='match'` ties the skill-overlap badge to the card's match vocabulary
+/// (the warm-tan matched chips + sage trust pill) with a solid tan fill and a
+/// leading dot — visibly a "good fit" signal, distinct from the neutral white
+/// `default` badge used for the "Needs … by …" urgency line on project cards.
+function MatchBadge({ text, tone = 'default' }: { text: string; tone?: 'default' | 'match' }) {
+  const isMatch = tone === 'match';
   return (
-    <View style={styles.badge}>
-      <View style={styles.badgeDot} />
-      <Text style={styles.badgeText}>{text}</Text>
+    <View style={[styles.badge, isMatch && styles.badgeMatch]}>
+      {isMatch && <View style={styles.badgeDot} />}
+      <Text
+        style={[styles.badgeText, isMatch && styles.badgeTextMatch]}
+        numberOfLines={2}
+      >
+        {text}
+      </Text>
+    </View>
+  );
+}
+
+/// Format a `YYYY-MM-DD` deadline into a short "Apr 30" for the badge. Parsed
+/// from local calendar parts to avoid a UTC day-shift.
+function formatNeededBy(iso: string): string {
+  const [y, m, d] = iso.split('-').map(Number);
+  if (!y || !m || !d) return '';
+  return new Date(y, m - 1, d).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
+// ─── Reply-tier badge ─────────────────────────────────────────────────────
+// Warm, public-facing trust signal against the 72h reach-out SLA. Renders a
+// worded tier ("Replies fast" / "Responsive") instead of a raw percentage —
+// the number lives on the owner's private management card. Returns null below
+// the threshold so a weak rate is simply absent, never punishing. Fed the real
+// reply-within-72h rate (0–1) of the entity whose responsiveness is shown — the
+// seeker for a seeker card, the owner/founder for a project card.
+function ReplyTierBadge({ rate }: { rate: number | null | undefined }) {
+  const tier = responseTier(rate);
+  if (!tier) return null;
+  const Icon = tier.kind === 'fast' ? Lightning : ArrowClockwise;
+  return (
+    <View style={styles.replyBadge}>
+      <Icon
+        size={12}
+        color="#FFFFFF"
+        weight={tier.kind === 'fast' ? 'fill' : 'bold'}
+      />
+      <Text style={styles.replyBadgeText}>{tier.label}</Text>
     </View>
   );
 }
@@ -317,10 +405,12 @@ function SkillChip({
 
 function ShippingTile({
   item,
+  count,
   active,
   onPress,
 }: {
   item: PortfolioItem;
+  count: number;
   active: boolean;
   onPress: () => void;
 }) {
@@ -361,7 +451,12 @@ function ShippingTile({
           </LinearGradient>
         )}
         <View style={styles.shipBody}>
-          <Text style={styles.shipEyebrow} numberOfLines={1}>PORTFOLIO HIGHLIGHTS</Text>
+          <View style={styles.shipEyebrowRow}>
+            <Text style={styles.shipEyebrow} numberOfLines={1}>
+              {count} PROJECT{count !== 1 ? 'S' : ''} · SWIPE UP
+            </Text>
+            <CaretUp size={9} color="rgba(255, 255, 255, 0.66)" weight="bold" />
+          </View>
           <Text style={styles.shipTitle} numberOfLines={1}>{item.title}</Text>
         </View>
       </Animated.View>
@@ -371,7 +466,7 @@ function ShippingTile({
 
 // ─── Decorative quote glyph (behind vibe text) ────────────────────────────
 
-function VibeBlock({ text }: { text: string }) {
+function VibeBlock({ text, lines = 3 }: { text: string; lines?: number }) {
   return (
     <View style={styles.vibeBlock}>
       <Text
@@ -382,7 +477,7 @@ function VibeBlock({ text }: { text: string }) {
       >
         {'“'}
       </Text>
-      <Text style={styles.vibeText} numberOfLines={2}>{text}</Text>
+      <Text style={styles.vibeText} numberOfLines={lines}>{text}</Text>
     </View>
   );
 }
@@ -394,6 +489,47 @@ interface SeekerContentProps {
   matchedSkills?: string[];
   onPortfolioPress?: (item: PortfolioItem) => void;
   activePortfolioId?: string | null;
+  /// When the reach-out button is shown, the link rail stacks above it;
+  /// otherwise (e.g. profile preview) it sits in the bottom-right corner.
+  showReachButton?: boolean;
+}
+
+/// How many skill chips show before the "+N" expander.
+const SKILL_CAP = 5;
+
+/// First complete sentence of the blurb — a clean, full thought instead of a
+/// mid-sentence truncation. Falls back to the whole string when there's no
+/// terminal punctuation.
+function firstSentence(text: string): string {
+  const t = (text ?? '').replace(/\s+/g, ' ').trim();
+  if (!t) return '';
+  const m = t.match(/^.*?[.!?](\s|$)/);
+  return (m ? m[0] : t).trim();
+}
+
+/// Vertical rail of quick-link icon buttons, stacking up from the reach-out
+/// button in the bottom-right gutter. Hidden when the seeker has no links.
+function LinkRail({ links, bottom }: { links?: SeekerLinks; bottom: number }) {
+  const items = [
+    links?.github ? { Icon: GithubLogo, url: links.github } : null,
+    links?.site ? { Icon: Globe, url: links.site } : null,
+    links?.appStore ? { Icon: AppStoreLogo, url: links.appStore } : null,
+  ].filter(Boolean) as { Icon: React.ComponentType<IconProps>; url: string }[];
+  if (items.length === 0) return null;
+  return (
+    <View style={[styles.linkRail, { bottom }]} pointerEvents="box-none">
+      {items.map((it, i) => (
+        <Pressable
+          key={i}
+          onPress={() => Linking.openURL(it.url).catch(() => {})}
+          style={({ pressed }) => [styles.linkRailBtn, pressed && { opacity: 0.7 }]}
+          accessibilityRole="button"
+        >
+          <it.Icon size={18} color="#F5E9D8" weight="fill" />
+        </Pressable>
+      ))}
+    </View>
+  );
 }
 
 function SeekerContent({
@@ -401,6 +537,7 @@ function SeekerContent({
   matchedSkills,
   onPortfolioPress,
   activePortfolioId,
+  showReachButton = true,
 }: SeekerContentProps) {
   const campus = CAMPUSES.find((c) => c.id === card.campusId);
   const matchedSet = new Set((matchedSkills ?? []).map((s) => s.toLowerCase()));
@@ -412,11 +549,14 @@ function SeekerContent({
   });
   const featured = card.portfolio[0];
 
+  // Skills: show SKILL_CAP, then a "+N" chip that expands the rest in place.
+  const [skillsExpanded, setSkillsExpanded] = useState(false);
+  const shownSkills = skillsExpanded ? ordered : ordered.slice(0, SKILL_CAP);
+  const overflow = ordered.length - SKILL_CAP;
+
   // Top-right badge text — synthesized from match data
-  const badgeParts: string[] = [];
-  if (sharedCount > 0) badgeParts.push(`${sharedCount} shared`);
-  if (campus) badgeParts.push(campus.name.toUpperCase());
-  const badgeText = badgeParts.join(' · ');
+  // Fit signal only — campus is already shown in the eyebrow below.
+  const badgeText = sharedCount > 0 ? `${sharedCount} matching skill${sharedCount !== 1 ? 's' : ''}` : '';
 
   // Eyebrow — built only from data we actually have (major / campus / grad
   // year). Anything missing is simply omitted; no fabricated "Computer
@@ -429,6 +569,8 @@ function SeekerContent({
     .filter(Boolean)
     .join(' · ');
 
+  const vibeSentence = firstSentence(card.vibeBlurb);
+
   return (
     <>
       <PhotoBackdrop uri={card.photoUri} />
@@ -436,28 +578,42 @@ function SeekerContent({
 
       {badgeText && (
         <View style={styles.badgePosition}>
-          <MatchBadge text={badgeText} />
+          <MatchBadge text={badgeText} tone="match" />
         </View>
       )}
 
-      <View style={styles.stack}>
+      <LinkRail links={card.links} bottom={showReachButton ? 92 : 22} />
+
+      <View style={[styles.stack, styles.stackFull]}>
         {eyebrowText !== '' && (
           <Text style={styles.eyebrow} numberOfLines={1}>{eyebrowText}</Text>
         )}
         <Text style={styles.name} numberOfLines={1}>{card.name.trim() || 'Someone on Ambit'}</Text>
-        {card.vibeBlurb !== '' && <VibeBlock text={card.vibeBlurb} />}
+        <ReplyTierBadge rate={card.responseRate} />
+        {vibeSentence !== '' && <VibeBlock text={vibeSentence} />}
         <View style={styles.skillsRow}>
-          {ordered.slice(0, 4).map((s) => (
+          {shownSkills.map((s) => (
             <SkillChip
               key={s}
               label={s}
               matched={matchedSet.has(s.toLowerCase())}
             />
           ))}
+          {!skillsExpanded && overflow > 0 && (
+            <Pressable
+              onPress={() => setSkillsExpanded(true)}
+              style={[styles.chip, styles.chipMore]}
+              accessibilityRole="button"
+              accessibilityLabel={`Show ${overflow} more skills`}
+            >
+              <Text style={styles.chipText}>+{overflow}</Text>
+            </Pressable>
+          )}
         </View>
         {featured && (
           <ShippingTile
             item={featured}
+            count={card.portfolio.length}
             active={activePortfolioId === featured.id}
             onPress={() => onPortfolioPress?.(featured)}
           />
@@ -489,10 +645,22 @@ function ProjectContent({ card, matchedSkills }: ProjectContentProps) {
     return am - bm;
   });
 
-  const badgeParts: string[] = [];
-  if (sharedCount > 0) badgeParts.push(`${sharedCount} shared`);
-  if (campus) badgeParts.push(campus.name.toUpperCase());
-  const badgeText = badgeParts.join(' · ');
+  // Top-right urgency badge: the open need + deadline ("Needs Frontend · by
+  // Apr 30"). Both are optional — fall back to deadline-only, need-only, then
+  // a quiet skill-fit signal. Campus is intentionally omitted (it's already in
+  // the eyebrow below).
+  const headlineRole = card.rolesSought?.[0];
+  const byDate = card.neededBy ? formatNeededBy(card.neededBy) : '';
+  const by = byDate ? `by ${byDate}` : null;
+  const badgeText =
+    headlineRole && by ? `Needs ${headlineRole} · ${by}`
+    : headlineRole      ? `Needs ${headlineRole}`
+    : by                ? `Needs someone ${by}`
+    : sharedCount > 0   ? `${sharedCount} matching skill${sharedCount !== 1 ? 's' : ''}`
+    : '';
+  // Only the skill-overlap fallback gets the warm match tone; the "Needs …"
+  // variants stay neutral white (they're a need, not a fit signal).
+  const badgeTone = !headlineRole && !by && sharedCount > 0 ? 'match' : 'default';
 
   const eyebrowText = campus
     ? `BY ${card.ownerName.toUpperCase()} · ${campus.name.toUpperCase()}`
@@ -501,7 +669,7 @@ function ProjectContent({ card, matchedSkills }: ProjectContentProps) {
   return (
     <>
       <PhotoBackdrop
-        uri={card.ownerPhotoUri ?? null}
+        uri={card.imageUri ?? card.ownerPhotoUri ?? null}
         fallbackGradient={card.gradient}
         fallbackInitials={initials}
       />
@@ -509,11 +677,11 @@ function ProjectContent({ card, matchedSkills }: ProjectContentProps) {
 
       {badgeText !== '' && (
         <View style={styles.badgePosition}>
-          <MatchBadge text={badgeText} />
+          <MatchBadge text={badgeText} tone={badgeTone} />
         </View>
       )}
 
-      <View style={styles.stack}>
+      <View style={[styles.stack, styles.stackFull]}>
         <Text style={styles.eyebrow} numberOfLines={1}>{eyebrowText}</Text>
         {card.rolesSought && card.rolesSought.length > 0 && (
           <View style={styles.rolesRow}>
@@ -525,8 +693,12 @@ function ProjectContent({ card, matchedSkills }: ProjectContentProps) {
           </View>
         )}
         <Text style={styles.name} numberOfLines={2}>{card.title}</Text>
+        <ReplyTierBadge rate={card.responseRate} />
         {card.pitch !== '' && <VibeBlock text={card.pitch} />}
-        <View style={styles.skillsRow}>
+        {/* Only the bottom chip row sits beside the floating reach button, so
+            it (not the whole stack) reserves the gutter — the eyebrow/title/
+            blurb above use the full card width. Mirrors the seeker card. */}
+        <View style={[styles.skillsRow, styles.skillsRowGutter]}>
           {ordered.slice(0, 4).map((s) => (
             <SkillChip
               key={s}
@@ -695,25 +867,58 @@ const styles = StyleSheet.create({
   badge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
+    maxWidth: 190,
     paddingHorizontal: 12,
-    paddingVertical: 8,
-    paddingLeft: 8,
-    borderRadius: 999,
+    paddingVertical: 7,
+    borderRadius: 14,
     backgroundColor: 'rgba(255, 255, 255, 0.92)',
+  },
+  // Warm-tan fill ties the skill-overlap badge to the matched-skill chips.
+  badgeMatch: {
+    backgroundColor: 'rgba(201, 164, 122, 0.95)',
   },
   badgeDot: {
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: Brand.sage,
+    backgroundColor: '#3A332A',
   },
   badgeText: {
     fontFamily: AmbitFont.body,
-    fontSize: 11,
-    fontWeight: '600',
+    fontSize: 11.5,
+    fontWeight: '700',
     color: '#3A332A',
     letterSpacing: 0.2,
+    lineHeight: 15,
+    textAlign: 'right',
+  },
+  badgeTextMatch: {
+    color: '#2A1E12',
+    textAlign: 'left',
+  },
+
+  // ── Reply-tier badge (sage-frosted trust pill) ─────────────────────────
+  // Sage ties it to the card's existing trust vocabulary (the match-badge
+  // dot + the Venn sage), reading as a calm "good" signal distinct from the
+  // neutral white skill chips below it.
+  replyBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    alignSelf: 'flex-start',
+    marginTop: -4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    backgroundColor: 'rgba(138, 155, 122, 0.46)',
+  },
+  replyBadgeText: {
+    fontFamily: AmbitFont.body,
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    letterSpacing: 0.3,
   },
 
   // ── Bottom content stack ───────────────────────────────────────────────
@@ -728,13 +933,23 @@ const styles = StyleSheet.create({
     gap: 16,
     zIndex: 3,
   },
+  // Seeker override: full-width vibe + skills. The reach-out gutter is reserved
+  // only on the bottom portfolio tile (shipTile.marginRight), not the whole
+  // stack — so the text/chips above use the full card width.
+  stackFull: { paddingRight: 0 },
   eyebrow: {
     fontFamily: AmbitFont.body,
-    fontSize: 10,
+    fontSize: 10.5,
     fontWeight: '700',
-    color: 'rgba(245, 233, 216, 0.7)',
-    letterSpacing: 2.2,
+    // Brighter + tighter tracking than before: at 0.7 opacity with very wide
+    // letter-spacing the school line washed out over light photos. A subtle
+    // shadow separates it from whatever sits behind the top of the scrim.
+    color: 'rgba(245, 233, 216, 0.95)',
+    letterSpacing: 1.5,
     textTransform: 'uppercase',
+    textShadowColor: 'rgba(0, 0, 0, 0.55)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
   name: {
     fontFamily: AmbitFont.display,
@@ -808,16 +1023,20 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 8,
   },
+  // Project card only: keep the bottom chip row clear of the reach button.
+  skillsRowGutter: { paddingRight: 72 },
   // Modern frosted pills — no border. Matched skills get a warm-tan wash,
-  // the rest a neutral frosted white; both read on the dark scrim.
+  // the rest a neutral frosted white; both read on the dark scrim. Fills are
+  // a touch more opaque than before so a chip mid-scrim (over a bright photo
+  // patch) keeps its edge instead of dissolving into the image.
   chip: {
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 999,
-    backgroundColor: 'rgba(255, 255, 255, 0.16)',
+    backgroundColor: 'rgba(255, 255, 255, 0.24)',
   },
   chipMatched: {
-    backgroundColor: 'rgba(201, 164, 122, 0.34)',
+    backgroundColor: 'rgba(201, 164, 122, 0.46)',
   },
   chipText: {
     fontFamily: AmbitFont.body,
@@ -825,9 +1044,34 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#FFFFFF',
     letterSpacing: 0.1,
+    // Holds the label legible when the pill sits over a light photo region.
+    textShadowColor: 'rgba(0, 0, 0, 0.4)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   chipTextMatched: {
     color: '#FFFFFF',
+  },
+  // "+N" expander — slightly dimmer so it reads as an affordance, not a skill.
+  chipMore: {
+    backgroundColor: 'rgba(255, 255, 255, 0.16)',
+  },
+
+  // ── Quick-links rail (stacks up from the reach-out button) ─────────────
+  linkRail: {
+    position: 'absolute',
+    right: 22,
+    alignItems: 'center',
+    gap: 10,
+    zIndex: 4,
+  },
+  linkRailBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.16)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   // ── Shipping mini-tile ─────────────────────────────────────────────────
@@ -866,6 +1110,11 @@ const styles = StyleSheet.create({
   },
   shipBody: {
     flexShrink: 1,
+  },
+  shipEyebrowRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
   shipEyebrow: {
     fontFamily: AmbitFont.body,
@@ -984,6 +1233,10 @@ const styles = StyleSheet.create({
     bottom: 22,
     right: 22,
     zIndex: 5,
+  },
+  // Non-interactive preview (owner project-edit Preview): half-transparent.
+  reachPreview: {
+    opacity: 0.5,
   },
   reachContainer: {
     width: 58,

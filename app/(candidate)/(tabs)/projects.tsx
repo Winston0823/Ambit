@@ -12,6 +12,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
+  ArrowClockwise,
   ChatCircle,
   Compass,
   Handshake,
@@ -22,6 +23,7 @@ import { useAuth } from '../../../context/AuthContext';
 import { useProfileRole } from '../../../hooks/useProfileRole';
 import { supabase } from '../../../lib/supabase';
 import { getInbox, type InboxItem } from '../../../lib/messaging';
+import { formatResponseRate } from '../../../lib/closureLoop';
 import { SwipeRevealRow } from '../../../components/molecules/SwipeRevealRow';
 import { HardShadow, Skeleton } from '../../../components/atoms';
 import { AmbitFont, Brand, Radii, Space } from '../../../constants/theme';
@@ -68,23 +70,34 @@ export default function ProjectsTab() {
 
   const [projects, setProjects] = useState<ProjectRow[] | null>(null);
   const [inbox, setInbox] = useState<InboxItem[]>([]);
+  // Owner's real reply-within-72h rate (0–1) from profiles.response_rate.
+  // One value for all their cards — it measures the founder, not the project.
+  // null = no reach-outs aged past the 72h window yet → chip is hidden.
+  const [myRate, setMyRate] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     if (!user) {
       setProjects([]);
       setInbox([]);
+      setMyRate(null);
       return;
     }
-    const [{ data }, ib] = await Promise.all([
+    const [{ data }, ib, prof] = await Promise.all([
       supabase
         .from('projects')
         .select('id, title, vibe_blurb, required_skills, active, created_at')
         .eq('owner_id', user.id)
         .order('created_at', { ascending: false }),
       getInbox().catch(() => [] as InboxItem[]),
+      supabase
+        .from('profiles')
+        .select('response_rate')
+        .eq('id', user.id)
+        .maybeSingle(),
     ]);
     setProjects((data ?? []) as ProjectRow[]);
     setInbox(ib);
+    setMyRate((prof.data as { response_rate: number | null } | null)?.response_rate ?? null);
   }, [user?.id]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
@@ -92,20 +105,32 @@ export default function ProjectsTab() {
   if (projects === null) {
     return (
       <View style={styles.root}>
-        <View style={[styles.content, { paddingTop: insets.top + 40 }]}>
-          <Skeleton width={60} height={12} radius={6} />
-          <Skeleton width={180} height={34} radius={10} style={{ marginTop: 12, marginBottom: 24 }} />
-          <Skeleton height={52} radius={999} style={{ marginBottom: 20 }} />
-          {[0, 1].map((i) => (
-            <View key={i} style={styles.skelCard}>
-              <View style={styles.skelHeader}>
-                <Skeleton width={110} height={20} radius={6} />
-                <Skeleton width={46} height={18} radius={999} />
+        <ScrollView
+          style={styles.flex}
+          contentContainerStyle={[styles.content, { paddingTop: insets.top + 8 }]}
+          showsVerticalScrollIndicator={false}
+        >
+          <ProjectsHeader />
+          {/* Project cards — cream island, ink border, hard edge; header
+              (title + status pill), a rate chip, then the summary line. */}
+          {[0, 1, 2].map((i) => (
+            <HardShadow key={i} radius={Radii.card} offset={4}>
+              <View style={styles.skelCard}>
+                <View style={styles.skelHeader}>
+                  <Skeleton width={110} height={20} radius={6} />
+                  <Skeleton width={52} height={20} radius={999} />
+                </View>
+                <Skeleton width={96} height={20} radius={999} />
+                <Skeleton width="68%" height={13} radius={6} />
               </View>
-              <Skeleton width="68%" height={13} radius={6} style={{ marginTop: 12 }} />
-            </View>
+            </HardShadow>
           ))}
-        </View>
+          <View style={{ height: 120 }} />
+        </ScrollView>
+        <FloatingNewProject
+          isPureSeeker={isPureSeeker}
+          onPress={() => router.push(isPureSeeker ? '/feed' : '/project-new')}
+        />
       </View>
     );
   }
@@ -139,29 +164,13 @@ export default function ProjectsTab() {
       ].filter(Boolean).join(' · ');
 
   return (
+    <View style={styles.root}>
     <ScrollView
-      style={styles.root}
-      contentContainerStyle={[styles.content, { paddingTop: insets.top + 40 }]}
+      style={styles.flex}
+      contentContainerStyle={[styles.content, { paddingTop: insets.top + 8 }]}
+      showsVerticalScrollIndicator={false}
     >
-      <Text style={styles.kicker}>{isPureSeeker ? 'YOUR HUSTLE' : 'YOURS'}</Text>
-      <Text style={styles.title}>{isPureSeeker ? 'Projects you’re in' : 'Your projects'}</Text>
-      {summary !== '' && <Text style={styles.summary}>{summary}</Text>}
-
-      <HardShadow radius={999} offset={4} style={styles.newBtnWrap}>
-        <Pressable
-          onPress={() => router.push(isPureSeeker ? '/feed' : '/project-new')}
-          style={styles.newBtn}
-          accessibilityRole="button"
-          accessibilityLabel={isPureSeeker ? 'Find a new project' : 'New project'}
-        >
-          {isPureSeeker ? (
-            <Compass size={18} color={Brand.actionInk} weight="bold" />
-          ) : (
-            <Plus size={18} color={Brand.actionInk} weight="bold" />
-          )}
-          <Text style={styles.newBtnLabel}>{isPureSeeker ? 'Find new project' : 'New project'}</Text>
-        </Pressable>
-      </HardShadow>
+      <ProjectsHeader summary={summary} />
 
       {/* ── Owner dashboard ────────────────────────────────────── */}
       {!isPureSeeker && (
@@ -207,6 +216,21 @@ export default function ProjectsTab() {
                           </Text>
                         </View>
                       )}
+                    </View>
+
+                    {/* Reply-rate chip against the 72h SLA — real
+                        profiles.response_rate. On the owner's OWN card we
+                        always show the chip: a percentage once there's data,
+                        otherwise a neutral "building" state so the metric is
+                        visible and legibly empty rather than silently gone.
+                        (Discovery cards still hide a null rate for warmth.) */}
+                    <View style={styles.rateChip}>
+                      <ArrowClockwise size={11} color={Brand.inkLabel} weight="bold" />
+                      <Text style={styles.rateChipText}>
+                        {myRate != null
+                          ? `${formatResponseRate(myRate)} replied within 72h`
+                          : 'No reach-outs to reply to yet'}
+                      </Text>
                     </View>
 
                     {/* Single calm summary line (Vocabulary restraint) */}
@@ -267,8 +291,64 @@ export default function ProjectsTab() {
         </View>
       )}
 
-      <View style={{ height: 100 }} />
+      <View style={{ height: 120 }} />
     </ScrollView>
+    <FloatingNewProject
+      isPureSeeker={isPureSeeker}
+      onPress={() => router.push(isPureSeeker ? '/feed' : '/project-new')}
+    />
+    </View>
+  );
+}
+
+/// Centered nav-title header — one header system across Discovery / Messages /
+/// Projects (display face, 24pt, centered in a 44pt bar). Optional muted
+/// caption + a full-bleed hairline closing the header off from the list.
+function ProjectsHeader({ summary }: { summary?: string }) {
+  return (
+    <View style={styles.headerBlock}>
+      <View style={styles.topbar}>
+        <Text style={styles.title}>Projects</Text>
+      </View>
+      {summary ? <Text style={styles.summary}>{summary}</Text> : null}
+      <View style={styles.headerDivider} />
+    </View>
+  );
+}
+
+/// Primary action parked in the thumb zone — a contained teal pill floating
+/// above the tab bar, with a canvas fade so list content reads underneath as
+/// it scrolls past. Pinned (doesn't scroll away).
+function FloatingNewProject({
+  isPureSeeker,
+  onPress,
+}: {
+  isPureSeeker: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <View style={styles.floatWrap} pointerEvents="box-none">
+      <LinearGradient
+        colors={['rgba(242,238,228,0)', Brand.canvas]}
+        style={styles.floatFade}
+        pointerEvents="none"
+      />
+      <HardShadow radius={999} offset={4}>
+        <Pressable
+          onPress={onPress}
+          style={styles.newBtn}
+          accessibilityRole="button"
+          accessibilityLabel={isPureSeeker ? 'Find a new project' : 'New project'}
+        >
+          {isPureSeeker ? (
+            <Compass size={18} color={Brand.actionInk} weight="bold" />
+          ) : (
+            <Plus size={18} color={Brand.actionInk} weight="bold" />
+          )}
+          <Text style={styles.newBtnLabel}>{isPureSeeker ? 'Find new project' : 'New project'}</Text>
+        </Pressable>
+      </HardShadow>
+    </View>
   );
 }
 
@@ -291,40 +371,63 @@ function AvatarStack({ uris }: { uris: (string | null)[] }) {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Brand.canvas },
+  flex: { flex: 1 },
   center: { alignItems: 'center', justifyContent: 'center' },
   content: { paddingHorizontal: Space.lg, paddingTop: Space.lg, gap: Space.md },
 
   // Skeleton (loading) cards — shaped like the real project cards.
-  skelCard: { backgroundColor: Brand.cardCream, borderWidth: 1.5, borderColor: Brand.borderSoft, borderRadius: Radii.card, padding: 20 },
+  skelCard: { backgroundColor: Brand.cardCream, borderWidth: 1.5, borderColor: Brand.inkEdge, borderRadius: Radii.card, padding: 20, gap: 8 },
   skelHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
 
-  kicker: {
-    fontFamily: AmbitFont.body,
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 1.6,
-    color: Brand.inkMuted,
+  // ── Centered nav-title header (matches Messages / Discovery) ───
+  headerBlock: { alignItems: 'center' },
+  topbar: {
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   title: {
     fontFamily: AmbitFont.display,
-    fontSize: 34,
+    fontSize: 24,
     color: Brand.inkPrimary,
-    marginTop: -12,
+    letterSpacing: -0.5,
   },
   summary: {
     fontFamily: AmbitFont.body,
     fontSize: 13,
     color: Brand.inkMuted,
-    marginTop: -8,
+    marginTop: 2,
+  },
+  headerDivider: {
+    alignSelf: 'stretch',
+    height: 1,
+    backgroundColor: Brand.borderSoft,
+    marginHorizontal: -Space.lg,
+    marginTop: 14,
   },
 
-  newBtnWrap: { marginTop: 4 },
+  // ── Floating "New project" pill (thumb zone, above the tab bar) ─
+  floatWrap: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 16,
+    alignItems: 'center',
+  },
+  floatFade: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: -16,
+    height: 116,
+  },
   newBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    paddingVertical: 16,
+    paddingHorizontal: 28,
+    paddingVertical: 15,
     backgroundColor: Brand.action,
     borderWidth: 1.6,
     borderColor: Brand.actionInk,
@@ -386,18 +489,35 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: Brand.inkMuted,
   },
+  rateChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    alignSelf: 'flex-start',
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: Brand.surface2,
+  },
+  rateChipText: {
+    fontFamily: AmbitFont.body,
+    fontSize: 11,
+    fontWeight: '600',
+    color: Brand.inkLabel,
+    letterSpacing: 0.2,
+  },
   statusPill: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: Radii.sm,
-    backgroundColor: Brand.primary,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: Brand.tagMint,
   },
   statusPillPaused: { backgroundColor: Brand.surface2 },
   statusText: {
     fontFamily: AmbitFont.body,
-    fontSize: 10,
-    fontWeight: '600',
-    color: Brand.inkOnBrand,
+    fontSize: 11,
+    fontWeight: '700',
+    color: Brand.tagMintInk,
     letterSpacing: 0.4,
   },
   statusTextPaused: { color: Brand.inkLabel },

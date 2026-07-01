@@ -143,6 +143,23 @@ export const Radii = {
   full:  999,  // avatars
 } as const;
 
+// ---------- Owner funnel-stage colors (private CRM tag) ----------
+
+/// A warm→cool progression ramp at matched HSL saturation/lightness (S≈55%,
+/// L≈58%) so the four read as one tonal family: orange → yellow → green → blue.
+/// Drives BOTH the private funnel stages (keyed below) and the shared status
+/// milestones (by index) in the chat StageRail, left→right.
+export const StageRamp = ['#CF9459', '#CFC359', '#59CF80', '#5994CF'] as const;
+
+/// Private funnel stage → color, keyed by the OwnerStage values in
+/// lib/closureLoop.ts. Same ramp, named.
+export const StageColor = {
+  new:          StageRamp[0],  // orange
+  screening:    StageRamp[1],  // yellow
+  interviewing: StageRamp[2],  // green
+  finalist:     StageRamp[3],  // blue
+} as const;
+
 // ---------- Status bar / system mock overlays (mock-only) ----------
 
 export const System = {

@@ -292,35 +292,34 @@ export function ChatComposer({
 
       {/* Attachment grid — WeChat pattern. Lives BELOW the input row in
           the keyboard's vacated footprint. Parent dismisses the keyboard
-          before flipping attachMenuOpen=true. Photos / Meeting / Highlight are the live actions. */}
+          before flipping attachMenuOpen=true. Order follows the natural flow:
+          Photos, then Find a time (pick when you're both free) → Propose meeting
+          (offer a slot), then Highlight. */}
       {attachMenuOpen && !editing && (
         <View style={styles.attachGrid}>
           <View style={styles.attachGridRow}>
             <AttachTile
               Icon={ImageSquare}
               label="Photos"
-              tint={Brand.primary}
               onPress={pickImage}
             />
-            {onOpenScheduling && (
-              <AttachTile
-                Icon={CalendarPlus}
-                label="Propose time"
-                tint={Brand.primary}
-                onPress={() => {
-                  onCloseAttachMenu();
-                  onOpenScheduling();
-                }}
-              />
-            )}
             {onOpenAvailabilityPoll && (
               <AttachTile
                 Icon={Clock}
                 label="Find a time"
-                tint={Brand.primary}
                 onPress={() => {
                   onCloseAttachMenu();
                   onOpenAvailabilityPoll();
+                }}
+              />
+            )}
+            {onOpenScheduling && (
+              <AttachTile
+                Icon={CalendarPlus}
+                label="Propose meeting"
+                onPress={() => {
+                  onCloseAttachMenu();
+                  onOpenScheduling();
                 }}
               />
             )}
@@ -328,7 +327,6 @@ export function ChatComposer({
               <AttachTile
                 Icon={Images}
                 label="Highlight"
-                tint={Brand.primary}
                 onPress={() => {
                   onCloseAttachMenu();
                   onOpenPortfolio();
@@ -345,15 +343,15 @@ export function ChatComposer({
 interface AttachTileProps {
   Icon:    React.ComponentType<{ size: number; color: string; weight?: 'regular' | 'bold' | 'fill' }>;
   label:   string;
-  tint:    string;
   onPress?: () => void;
   disabled?: boolean;
 }
 
-/// One tile in the attachment grid. Square card with a tinted circle
-/// holding the icon, label centered underneath. Disabled tiles fade
-/// to ~45% and ignore taps.
-function AttachTile({ Icon, label, tint, onPress, disabled }: AttachTileProps) {
+/// One tile in the attachment grid. The icon is the action's primary signal,
+/// so it gets a large tactile tile in the app's button language — teal `action`
+/// fill, ink border, hard offset edge — with the label quiet underneath.
+/// Disabled tiles fade to ~45% and ignore taps.
+function AttachTile({ Icon, label, onPress, disabled }: AttachTileProps) {
   return (
     <Pressable
       onPress={disabled ? undefined : onPress}
@@ -366,9 +364,11 @@ function AttachTile({ Icon, label, tint, onPress, disabled }: AttachTileProps) {
       accessibilityLabel={label}
       accessibilityState={{ disabled: !!disabled }}
     >
-      <View style={[styles.attachTileIcon, { backgroundColor: tint }]}>
-        <Icon size={22} color={disabled ? Brand.inkMuted : Brand.inkOnBrand} weight="regular" />
-      </View>
+      <HardShadow radius={Radii.lg} offset={4}>
+        <View style={styles.attachTileIcon}>
+          <Icon size={32} color={disabled ? Brand.inkMuted : Brand.actionInk} weight="regular" />
+        </View>
+      </HardShadow>
       <Text style={[styles.attachTileLabel, disabled && styles.attachTileLabelDisabled]}>
         {label}
       </Text>
@@ -512,14 +512,20 @@ const styles = StyleSheet.create({
   attachTile: {
     width: '25%',
     alignItems: 'center',
-    gap: 8,
+    gap: 12,
     paddingVertical: 8,
   },
   attachTileDisabled: { opacity: 0.45 },
+  // Large tactile tile — the icon is the action's main signal. App button
+  // language: teal `action` fill, 1.5px ink border, hard offset edge (the
+  // <HardShadow> wrapper). Radius on the 4px grid (Radii.lg).
   attachTileIcon: {
-    width: 52,
-    height: 52,
-    borderRadius: 14,
+    width: 64,
+    height: 64,
+    borderRadius: Radii.lg,
+    backgroundColor: Brand.action,
+    borderWidth: 1.5,
+    borderColor: Brand.inkEdge,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -528,6 +534,9 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     color: Brand.inkPrimary,
+    // Center each line so a wrapping label ("Propose / meeting") stays centered
+    // under its tile instead of left-aligning the second line.
+    textAlign: 'center',
   },
   attachTileLabelDisabled: { color: Brand.inkMuted },
   // Transparent — the surrounding pill provides the surface now.

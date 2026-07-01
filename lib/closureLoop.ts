@@ -24,6 +24,19 @@ export type ConversationStatus =
   | 'hired'
   | 'auto_declined';
 
+/// The owner's PRIVATE per-conversation funnel stage — their own CRM tag for
+/// a candidate, independent of the shared `status` hire flow. Persisted as
+/// free text in `conversations.owner_stage` (set via the owner-only
+/// `set_owner_stage` RPC). Owner-only: the seeker never sees or sets it.
+export type OwnerStage = 'new' | 'screening' | 'interviewing' | 'finalist';
+
+export const OWNER_STAGES: { value: OwnerStage; label: string }[] = [
+  { value: 'new',          label: 'New' },
+  { value: 'screening',    label: 'Screening' },
+  { value: 'interviewing', label: 'Interviewing' },
+  { value: 'finalist',     label: 'Finalist' },
+];
+
 /// Message kind — `'user'` for normal participant messages; the rest are
 /// inserted by closure-loop RPCs and rendered as centered banner bubbles
 /// rather than speech bubbles.
@@ -66,6 +79,19 @@ export async function confirmHire(conversationId: string): Promise<void> {
     p_conversation_id: conversationId,
   });
   if (error) throw error;
+}
+
+/// Set the owner's private funnel stage for a conversation. Owner-only on the
+/// server (the RPC guards `owner_id = auth.uid()`); a seeker call is a no-op.
+export async function updateOwnerStage(
+  conversationId: string,
+  stage: OwnerStage,
+): Promise<void> {
+  const { error } = await supabase.rpc('set_owner_stage', {
+    p_conversation_id: conversationId,
+    p_stage: stage,
+  });
+  if (error) throw new Error(error.message);
 }
 
 /// Force a recompute of the response-rate cache for the current user.

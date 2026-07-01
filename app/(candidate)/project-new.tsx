@@ -12,9 +12,12 @@ import {
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BackChevron, HardShadow, OnboardingProgress } from '../../components/atoms';
+import { ProjectCoverField, ProjectDeadlineField } from '../../components/molecules';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
+import { uploadProjectImage, toDateOnly } from '../../lib/projects';
 import { ROLE_CATEGORIES, skillsForRoles } from '../../data/mock';
+import { useDirtyGuard } from '../../hooks/useDirtyGuard';
 import { AmbitFont, Brand, Space } from '../../constants/theme';
 
 const BLURB_MIN = 10;
@@ -41,6 +44,8 @@ export default function ProjectNewScreen() {
   const [vibe, setVibe] = useState('');
   const [roles, setRoles] = useState<string[]>([]);
   const [campusId, setCampusId] = useState<string | null>(null);
+  const [coverUri, setCoverUri] = useState<string | null>(null);
+  const [neededBy, setNeededBy] = useState<Date | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -75,6 +80,7 @@ export default function ProjectNewScreen() {
           required_skills: skillsForRoles(roles),
           roles_sought: roles,
           campus_id: campusId,
+          needed_by: neededBy ? toDateOnly(neededBy) : null,
         })
         .select('id')
         .single();
@@ -82,6 +88,16 @@ export default function ProjectNewScreen() {
       supabase.functions
         .invoke('embed-vibe', { body: { table: 'projects', id: data.id, text: `${title.trim()}\n\n${vibe.trim()}` } })
         .catch((e) => console.warn('embed-vibe failed:', e?.message ?? e));
+      // Cover is best-effort: the project already exists, so a failed upload
+      // shouldn't block creation — log and continue.
+      if (coverUri) {
+        try {
+          const url = await uploadProjectImage(user.id, data.id, coverUri, Date.now());
+          await supabase.from('projects').update({ image_url: url }).eq('id', data.id);
+        } catch (e: any) {
+          console.warn('project cover upload failed:', e?.message ?? e);
+        }
+      }
       router.back();
     } catch (e: any) {
       Alert.alert("Couldn't create project", e?.message ?? 'Try again.');
@@ -91,12 +107,27 @@ export default function ProjectNewScreen() {
 
   const advance = () => (step === 0 ? setStep(1) : submit());
 
+  // Dirty when any field has diverged from its empty initial state — so a back
+  // tap that would discard typed edits prompts a confirm first.
+  const isDirty =
+    title.trim().length > 0 ||
+    vibe.trim().length > 0 ||
+    roles.length > 0 ||
+    coverUri !== null ||
+    neededBy !== null;
+  const guardBack = useDirtyGuard(isDirty);
+
+  // Step 0 back leaves the screen (guarded); step 1 back just returns to step 0
+  // without losing anything, so it needs no guard.
+  const onBack = () => (step === 0 ? guardBack(() => router.back()) : setStep(0));
+
   return (
     <View style={styles.root}>
       <View style={{ marginTop: insets.top + 14 }}>
-        <OnboardingProgress current={step + 1} total={2} />
+        {/* leadInset clears the back chevron so the wave doesn't crash into it. */}
+        <OnboardingProgress current={step + 1} total={2} leadInset={36} />
       </View>
-      <BackChevron onPress={() => (step === 0 ? router.back() : setStep(0))} />
+      <BackChevron onPress={onBack} />
 
       <ScrollView
         style={styles.scroll}
@@ -133,6 +164,8 @@ export default function ProjectNewScreen() {
                 maxLength={140}
               />
             </View>
+            <ProjectCoverField uri={coverUri} onChange={setCoverUri} />
+            <ProjectDeadlineField value={neededBy} onChange={setNeededBy} />
           </>
         ) : (
           <>

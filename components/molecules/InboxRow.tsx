@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
-import { Archive, ArrowBendUpLeft, Bell, BellSlash, Clock, X } from 'phosphor-react-native';
+import { Archive, ArrowBendUpLeft, Bell, BellSlash, Clock, PushPin, X } from 'phosphor-react-native';
 import type { InboxItem } from '../../lib/messaging';
 import { inboxState, isReachedOutToYou } from '../../lib/messaging';
 import { getAutoCloseCountdown } from '../../lib/closureLoop';
@@ -14,9 +14,9 @@ interface Props {
   onPress: () => void;
   /// Left-swipe → Pass. Parent owns the PassReasonSheet.
   onPassRequest?: (conversationId: string) => void;
-  /// Long-press → toggle pin via parent (the parent decides whether to
-  /// show a confirmation toast on pin-limit-reached).
-  onLongPress?: (item: InboxItem) => void;
+  /// Left-swipe → toggle pin (revealed beside Pass). Parent surfaces the
+  /// pin-limit-reached toast.
+  onPin?: (item: InboxItem) => void;
   /// Left-swipe → Mute / Archive (per-participant).
   onMute?: (item: InboxItem) => void;
   onArchive?: (item: InboxItem) => void;
@@ -30,13 +30,15 @@ interface Props {
 ///   • active — any conversation that doesn't fit the above and isn't
 ///     auto-closed. White card. Optional "Reply" / "Hired" chip.
 ///   • auto-closed — terminal. Same shape, 55% opacity.
-export function InboxRow({ item, meId, onPress, onPassRequest, onLongPress, onMute, onArchive }: Props) {
+export function InboxRow({ item, meId, onPress, onPassRequest, onPin, onMute, onArchive }: Props) {
   const initial = (item.partner_name ?? '?').slice(0, 1).toUpperCase();
   const swipeRef = useRef<Swipeable>(null);
   const sentByMe  = item.last_message_sender_id === meId;
   const isPending = isReachedOutToYou(item, meId);
   const isClosed  = item.status === 'passed' || item.status === 'auto_declined';
   const passable  = item.status === 'active' && !!onPassRequest;
+  const canPin    = !!onPin;
+  const isPinned  = !!item.is_pinned;
   // "Your turn" on active, non-pending rows where they sent last (pending rows
   // already signal it via the countdown chip, so we don't double up).
   const yourTurnChip =
@@ -62,53 +64,78 @@ export function InboxRow({ item, meId, onPress, onPassRequest, onLongPress, onMu
     swipeRef.current?.close();
     if (onPassRequest) onPassRequest(item.conversation_id);
   };
-  const handleLongPress = () => {
-    if (onLongPress) onLongPress(item);
+  const handlePin = () => {
+    swipeRef.current?.close();
+    if (onPin) onPin(item);
   };
 
-  // Right-swipe action panel — same as the previous design, kept here
-  // because the gesture is independent of the visual refresh.
+  // Right-edge reveal (swipe-left): Pin sits beside Pass, both as inset buttons
+  // on one persistent ink panel — the row's hard-shadow black extended to full
+  // height — so the actions read as sections of the card's bubble language, not
+  // floating tiles each with their own shadow.
+  const panelWidth = (count: number) => count * BTN_W + (count + 1) * PANEL_PAD;
+
   const renderRightActions = (progress: Animated.AnimatedInterpolation<number>) => {
-    if (!passable) return null;
-    const translateX = progress.interpolate({ inputRange: [0, 1], outputRange: [80, 0] });
+    if (!passable && !canPin) return null;
+    const count = (canPin ? 1 : 0) + (passable ? 1 : 0);
+    const total = panelWidth(count);
+    const translateX = progress.interpolate({ inputRange: [0, 1], outputRange: [total, 0] });
     return (
-      <Animated.View style={[styles.actionWrap, { transform: [{ translateX }] }]}>
-        <Pressable onPress={handlePass} style={styles.passAction} accessibilityLabel="Pass">
-          <X size={18} color={Brand.inkOnBrand} weight="bold" />
-          <Text style={styles.passActionLabel}>Pass</Text>
-        </Pressable>
+      <Animated.View style={[styles.actionOuter, { width: total, transform: [{ translateX }] }]}>
+        <View style={[styles.actionPanel, styles.actionPanelRight, { width: total + PANEL_OVERLAP }]}>
+          {canPin && (
+            <Pressable
+              onPress={handlePin}
+              style={[styles.actionBtn, styles.pinBtn]}
+              accessibilityLabel={isPinned ? 'Unpin' : 'Pin'}
+            >
+              <PushPin size={18} color={Brand.inkOnBrand} weight={isPinned ? 'fill' : 'bold'} />
+              <Text style={styles.actionLabel}>{isPinned ? 'Unpin' : 'Pin'}</Text>
+            </Pressable>
+          )}
+          {passable && (
+            <Pressable onPress={handlePass} style={[styles.actionBtn, styles.passBtn]} accessibilityLabel="Pass">
+              <X size={18} color={Brand.inkOnBrand} weight="bold" />
+              <Text style={styles.actionLabel}>Pass</Text>
+            </Pressable>
+          )}
+        </View>
       </Animated.View>
     );
   };
 
-  // Left-swipe → Mute / Archive (per-participant, role-agnostic).
+  // Left-edge reveal (swipe-right): Mute / Archive on the same ink panel.
   const renderLeftActions = (progress: Animated.AnimatedInterpolation<number>) => {
     if (!onMute && !onArchive) return null;
-    const translateX = progress.interpolate({ inputRange: [0, 1], outputRange: [-160, 0] });
+    const count = (onMute ? 1 : 0) + (onArchive ? 1 : 0);
+    const total = panelWidth(count);
+    const translateX = progress.interpolate({ inputRange: [0, 1], outputRange: [-total, 0] });
     return (
-      <Animated.View style={[styles.leftActions, { transform: [{ translateX }] }]}>
-        {onMute && (
-          <Pressable
-            onPress={() => { swipeRef.current?.close(); onMute(item); }}
-            style={[styles.leftAction, styles.muteAction]}
-            accessibilityLabel={item.is_muted ? 'Unmute' : 'Mute'}
-          >
-            {item.is_muted
-              ? <Bell size={18} color={Brand.inkOnBrand} weight="bold" />
-              : <BellSlash size={18} color={Brand.inkOnBrand} weight="bold" />}
-            <Text style={styles.leftActionLabel}>{item.is_muted ? 'Unmute' : 'Mute'}</Text>
-          </Pressable>
-        )}
-        {onArchive && (
-          <Pressable
-            onPress={() => { swipeRef.current?.close(); onArchive(item); }}
-            style={[styles.leftAction, styles.archiveAction]}
-            accessibilityLabel="Archive"
-          >
-            <Archive size={18} color={Brand.inkOnBrand} weight="bold" />
-            <Text style={styles.leftActionLabel}>Archive</Text>
-          </Pressable>
-        )}
+      <Animated.View style={[styles.actionOuter, { width: total, transform: [{ translateX }] }]}>
+        <View style={[styles.actionPanel, styles.actionPanelLeft, { width: total + PANEL_OVERLAP }]}>
+          {onMute && (
+            <Pressable
+              onPress={() => { swipeRef.current?.close(); onMute(item); }}
+              style={[styles.actionBtn, styles.muteBtn]}
+              accessibilityLabel={item.is_muted ? 'Unmute' : 'Mute'}
+            >
+              {item.is_muted
+                ? <Bell size={18} color={Brand.inkOnBrand} weight="bold" />
+                : <BellSlash size={18} color={Brand.inkOnBrand} weight="bold" />}
+              <Text style={styles.actionLabel}>{item.is_muted ? 'Unmute' : 'Mute'}</Text>
+            </Pressable>
+          )}
+          {onArchive && (
+            <Pressable
+              onPress={() => { swipeRef.current?.close(); onArchive(item); }}
+              style={[styles.actionBtn, styles.archiveBtn]}
+              accessibilityLabel="Archive"
+            >
+              <Archive size={18} color={Brand.inkOnBrand} weight="bold" />
+              <Text style={styles.actionLabel}>Archive</Text>
+            </Pressable>
+          )}
+        </View>
       </Animated.View>
     );
   };
@@ -145,9 +172,10 @@ export function InboxRow({ item, meId, onPress, onPassRequest, onLongPress, onMu
   const showHiredChip = item.status === 'hired';
 
   return (
-    // Card language: crisp ink edge below each island card. Closed rows render
-    // at reduced opacity, so their backing block is transparent (a solid block
-    // would bleed through the translucent card).
+    // One crisp ink edge runs under the whole row (card + revealed actions) via
+    // this single full-width HardShadow. The Swipeable clips its own bounds, so
+    // the shadow must live outside it. Closed rows drop the backing (transparent)
+    // since a solid block would bleed through the translucent card.
     <HardShadow
       radius={Radii.card}
       offset={4}
@@ -156,7 +184,7 @@ export function InboxRow({ item, meId, onPress, onPassRequest, onLongPress, onMu
     >
     <Swipeable
       ref={swipeRef}
-      enabled={passable || !!onMute || !!onArchive}
+      enabled={passable || canPin || !!onMute || !!onArchive}
       renderRightActions={renderRightActions}
       renderLeftActions={renderLeftActions}
       friction={2}
@@ -165,8 +193,6 @@ export function InboxRow({ item, meId, onPress, onPassRequest, onLongPress, onMu
     >
       <Pressable
         onPress={onPress}
-        onLongPress={handleLongPress}
-        delayLongPress={300}
         style={({ pressed }) => [
           styles.card,
           isPending && styles.cardPending,
@@ -278,6 +304,16 @@ function formatRelative(iso: string): string {
 const AVATAR_SIZE = 48;
 const AVATAR_GAP  = 14;
 const SUB_INDENT  = AVATAR_SIZE + AVATAR_GAP;
+
+// Swipe-action sizing. The revealed zone is one persistent ink panel (the
+// hard-shadow black extended to full height); Pin / Pass / Mute / Archive are
+// inset buttons sitting on that field. BTN_W is each button's width, PANEL_PAD
+// the ink shown around and between them. The panel underlaps the card by
+// PANEL_OVERLAP so the black reads as starting *behind* the card and sliding
+// out from under it — no cream gutter between card and actions.
+const BTN_W         = 72;
+const PANEL_PAD     = 6;
+const PANEL_OVERLAP = 32;
 
 const styles = StyleSheet.create({
   // Spacing lives on the HardShadow wrapper so the offset edge hugs the card
@@ -417,34 +453,42 @@ const styles = StyleSheet.create({
   },
   chipTextSolid: { color: Brand.tagMintInk },
 
-  // Swipe-action panel (kept from v3)
-  actionWrap: {
-    width: 80,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: Brand.danger,
+  // Swipe actions: one persistent ink panel (the row's hard-shadow black grown
+  // to full height) holding the buttons as inset sections. The panel underlaps
+  // the card by PANEL_OVERLAP (negative margin) so the black appears to start
+  // behind the card and slide out from under it — no cream gutter between them.
+  actionOuter: { flexDirection: 'row', alignItems: 'stretch' },
+  actionPanel: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    gap: PANEL_PAD,
+    paddingVertical: PANEL_PAD,
+    backgroundColor: Brand.actionInk,
+    borderRadius: Radii.card,
   },
-  passAction: {
-    width: '100%',
-    height: '100%',
+  // Right reveal: black tucks under the card's right edge; buttons stay in the
+  // visible zone via the overlap-sized left padding.
+  actionPanelRight: { marginLeft: -PANEL_OVERLAP, paddingLeft: PANEL_PAD + PANEL_OVERLAP, paddingRight: PANEL_PAD },
+  // Left reveal: mirror — black tucks under the card's left edge.
+  actionPanelLeft:  { marginRight: -PANEL_OVERLAP, paddingRight: PANEL_PAD + PANEL_OVERLAP, paddingLeft: PANEL_PAD },
+  actionBtn: {
+    width: BTN_W,
+    borderRadius: Radii.lg,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 4,
   },
-  passActionLabel: {
+  pinBtn:     { backgroundColor: Brand.accent },
+  passBtn:    { backgroundColor: Brand.danger },
+  muteBtn:    { backgroundColor: Brand.accent },
+  archiveBtn: { backgroundColor: Brand.inkLabel },
+  actionLabel: {
     fontFamily: AmbitFont.body,
     fontSize: 11,
     fontWeight: '700',
     letterSpacing: 0.5,
     color: Brand.inkOnBrand,
   },
-
-  // Left-swipe Mute / Archive.
-  leftActions: { flexDirection: 'row' },
-  leftAction: { width: 80, alignItems: 'center', justifyContent: 'center', gap: 4 },
-  muteAction: { backgroundColor: Brand.accent },
-  archiveAction: { backgroundColor: Brand.inkLabel },
-  leftActionLabel: { fontFamily: AmbitFont.body, fontSize: 11, fontWeight: '700', letterSpacing: 0.5, color: Brand.inkOnBrand },
 
   timeRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
 });

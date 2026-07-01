@@ -12,8 +12,10 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { LinearGradient } from 'expo-linear-gradient';
 import { Plus, Sparkle } from 'phosphor-react-native';
 import { BackChevron, Chip } from '../../atoms';
-import { OnboardingContinue } from '../../molecules';
+import { OnboardingContinue, ResumeImportSheet } from '../../molecules';
 import { useOnboarding } from '../../../context/OnboardingContext';
+import { useAuth } from '../../../context/AuthContext';
+import { canonicalizeSkill, normalizeResumeSkills, type ParsedResume } from '../../../lib/resume';
 import { SKILL_CATEGORIES } from '../../../data/mock';
 import { Brand, AmbitFont, Space } from '../../../constants/theme';
 
@@ -33,9 +35,19 @@ const MAX_SELECTED = 8;
 /// S-008 Skill Tag Selector.
 export function SkillTagsScreen({ onBack, onContinue }: Props) {
   const { profile, update } = useOnboarding();
+  const { user } = useAuth();
   const insets = useSafeAreaInsets();
   const selected = profile.skills;
   const [customInput, setCustomInput] = useState('');
+  const [importOpen, setImportOpen] = useState(false);
+
+  // Résumé import fills the draft non-destructively: merge skills (existing
+  // first), and fill name/blurb only if the user hasn't typed them yet.
+  const handleResumeParsed = (r: ParsedResume) => {
+    update('skills', normalizeResumeSkills([...profile.skills, ...(r.skills ?? [])]).slice(0, MAX_SELECTED));
+    if (!profile.name.trim() && r.name?.trim()) update('name', r.name.trim());
+    if (!profile.vibeBlurb.trim() && r.headline?.trim()) update('vibeBlurb', r.headline.trim());
+  };
 
   const allPreset = new Set(SKILL_CATEGORIES.flatMap((c) => c.tags));
   const customSkills = selected.filter((s) => !allPreset.has(s));
@@ -49,7 +61,10 @@ export function SkillTagsScreen({ onBack, onContinue }: Props) {
   };
 
   const addCustom = () => {
-    const skill = customInput.trim();
+    // Snap a typed skill to its canonical chip ("typescript" → "TypeScript")
+    // so a known skill lands in its real category section; novel skills stay
+    // custom (rendered under "ADDED BY YOU").
+    const skill = canonicalizeSkill(customInput);
     if (!skill || selected.includes(skill) || selected.length >= MAX_SELECTED) return;
     update('skills', [...selected, skill]);
     setCustomInput('');
@@ -101,6 +116,11 @@ export function SkillTagsScreen({ onBack, onContinue }: Props) {
           <Text style={styles.counterText}>{selected.length} / {MAX_SELECTED}</Text>
         </View>
       </View>
+
+      <Pressable onPress={() => setImportOpen(true)} style={styles.importBtn} accessibilityLabel="Import from résumé">
+        <Sparkle size={15} color={Brand.actionDeep} weight="fill" />
+        <Text style={styles.importBtnText}>Import a résumé to autofill</Text>
+      </Pressable>
 
       {/* Scroll area + fade overlays. Wrap so the gradients can absolute-
           position over the ScrollView's visible edges. marginBottom lives
@@ -190,12 +210,26 @@ export function SkillTagsScreen({ onBack, onContinue }: Props) {
       </View>
 
       <OnboardingContinue onPress={onContinue} disabled={!isValid} />
+
+      <ResumeImportSheet
+        visible={importOpen}
+        onClose={() => setImportOpen(false)}
+        userId={user?.id ?? ''}
+        onParsed={handleResumeParsed}
+      />
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Brand.canvas },
+  importBtn: {
+    flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 8,
+    marginTop: 16, marginHorizontal: Space.lg,
+    paddingHorizontal: 16, paddingVertical: 10, borderRadius: 999,
+    backgroundColor: 'rgba(166, 199, 194, 0.22)',
+  },
+  importBtnText: { fontFamily: AmbitFont.body, fontSize: 13.5, fontWeight: '700', color: Brand.actionDeep },
   watermark: {
     position: 'absolute',
     top: 110,

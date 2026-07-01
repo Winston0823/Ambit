@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Platform,
@@ -15,8 +15,9 @@ import { ArrowsClockwise, BookmarkSimple, CaretDown, Check, GraduationCap, Magni
 import type { IconProps } from 'phosphor-react-native';
 import * as Haptics from 'expo-haptics';
 import { DiscoveryOverview, SwipeDeck } from '../../../components/organisms';
+import type { SwipeDeckHandle } from '../../../components/organisms';
 import { PortfolioModal, ReachOutComposer, BottomSheet, ReachOutLimitSheet } from '../../../components/molecules';
-import { HardShadow, Tactile } from '../../../components/atoms';
+import { HardShadow, Skeleton as SkeletonBlock, Tactile } from '../../../components/atoms';
 import { CAMPUSES } from '../../../data/mock';
 import {
   canReachOut,
@@ -43,6 +44,7 @@ import { supabase } from '../../../lib/supabase';
 import { sendPortfolioAttachment, sendProjectAttachment, startConversationWithMessage } from '../../../lib/messaging';
 import { fetchPortfoliosByUser } from '../../../lib/portfolio';
 import { useAuth } from '../../../context/AuthContext';
+import { toast } from '../../../lib/toast';
 
 const SKIP_OVERVIEW_THRESHOLD = 5;
 // Stable reference so the filter BottomSheet doesn't see a new array each render.
@@ -89,6 +91,8 @@ async function fetchProjectDeck(userId: string): Promise<ProjectCardData[]> {
     vibe_blurb: string;
     required_skills: string[];
     roles_sought: string[];
+    image_url: string | null;
+    needed_by: string | null;
     campus_id: string | null;
     owner_id: string;
     score: number;
@@ -98,14 +102,16 @@ async function fetchProjectDeck(userId: string): Promise<ProjectCardData[]> {
   const ownerIds = [...new Set(rows.map((r) => r.owner_id))];
   const { data: owners } = await supabase
     .from('profiles')
-    .select('id, name, photo_url')
+    .select('id, name, photo_url, response_rate')
     .in('id', ownerIds);
 
   const ownerMap = Object.fromEntries(
-    (owners ?? []).map((o: { id: string; name: string; photo_url: string | null }) => [
-      o.id,
-      { name: o.name, photoUri: o.photo_url },
-    ])
+    (owners ?? []).map(
+      (o: { id: string; name: string; photo_url: string | null; response_rate: number | null }) => [
+        o.id,
+        { name: o.name, photoUri: o.photo_url, responseRate: o.response_rate },
+      ]
+    )
   );
 
   return rows.map((r, i): ProjectCardData => {
@@ -128,6 +134,10 @@ async function fetchProjectDeck(userId: string): Promise<ProjectCardData[]> {
       skillsSought: r.required_skills.slice(0, 5),
       rolesSought: r.roles_sought ?? [],
       gradient: CARD_GRADIENTS[i % CARD_GRADIENTS.length],
+      imageUri: r.image_url ?? null,
+      neededBy: r.needed_by ?? null,
+      // Reply-tier reflects the founder answering reach-outs, not the project.
+      responseRate: ownerMap[r.owner_id]?.responseRate ?? null,
     };
   });
 }
@@ -158,7 +168,7 @@ async function fetchSeekerDeck(userId: string): Promise<SeekerCardData[]> {
 
   const { data: seekers } = await supabase
     .from('profiles')
-    .select('id, name, photo_url, campus_id, skills, vibe_blurb')
+    .select('id, name, photo_url, campus_id, skills, vibe_blurb, response_rate')
     .in('id', seekerIds);
 
   if (!seekers || seekers.length === 0) return DEMO_FALLBACK ? MOCK_SEEKERS : [];
@@ -177,6 +187,7 @@ async function fetchSeekerDeck(userId: string): Promise<SeekerCardData[]> {
     campus_id: string | null;
     skills: string[];
     vibe_blurb: string;
+    response_rate: number | null;
   }[])
     // Skip incomplete profiles — a seeker with no usable name hasn't finished
     // onboarding, and rendered a blank discovery card (`?? 'Unknown'` only
@@ -192,6 +203,7 @@ async function fetchSeekerDeck(userId: string): Promise<SeekerCardData[]> {
       skills: s.skills ?? [],
       vibeBlurb: s.vibe_blurb ?? '',
       portfolio: portfolioMap.get(s.id) ?? [],
+      responseRate: s.response_rate ?? null,
     }));
 }
 
@@ -220,6 +232,10 @@ export default function DiscoveryFeed() {
 
   const [liveDeck, setLiveDeck] = useState<DiscoveryCardData[] | null>(null);
   const [deckLoading, setDeckLoading] = useState(false);
+  // Distinct from "empty": a failed load. An outage must NOT read as an empty
+  // deck (theme 1/10 — "errors look like emptiness"). When true we render a
+  // retry affordance instead of cards or the honest empty state.
+  const [deckError, setDeckError] = useState(false);
 
   // Viewer's own skills — drives the matched-first ordering, the SHARED
   // tags, and the shared-count in the OverlapVenn on every card. Loaded
@@ -246,12 +262,23 @@ export default function DiscoveryFeed() {
   const fetchDeck = useCallback(async () => {
     if (!user || roleLoading) return;
     setDeckLoading(true);
+    setDeckError(false);
     try {
       const data =
         role === 'owner'
           ? await fetchSeekerDeck(user.id)
           : await fetchProjectDeck(user.id);
       setLiveDeck(data);
+    } catch (e: any) {
+      // A thrown error here is a real outage (network down, query rejected) —
+      // NOT an empty result. Surface it distinctly so the deck doesn't quietly
+      // fall back to a misleading empty/demo state with no signal.
+      console.warn('deck fetch failed:', e?.message ?? e);
+      setDeckError(true);
+      toast.error("Couldn't load your deck.", {
+        actionLabel: 'Retry',
+        onAction: () => { void fetchDeck(); },
+      });
     } finally {
       setDeckLoading(false);
     }
@@ -268,10 +295,20 @@ export default function DiscoveryFeed() {
     [liveDeck, role]
   );
 
+  // Demo cards carry non-UUID placeholder ids ('seeker-2', 'project-1') and
+  // dead-end "Reach out". When the deck is the dev-only mock fallback, show a
+  // visible banner so the cards don't look like real, actionable matches.
+  const showingDemo = useMemo(
+    () => deck.length > 0 && deck.some((c) => !isRealUuid(c.id)),
+    [deck],
+  );
+
   const [consecutiveSkips, setConsecutiveSkips] = useState(0);
   const [lastFiveSeen, setLastFiveSeen] = useState<DiscoveryCardData[]>([]);
   const [deckResetKey, setDeckResetKey] = useState(0);
   const [reinserted, setReinserted] = useState<DiscoveryCardData[]>([]);
+  // Imperative handle so a confirmed reach-out can fly the current card up.
+  const swipeDeckRef = useRef<SwipeDeckHandle>(null);
 
   /// Card whose Reach Out button was tapped. Non-null = modal composer open.
   /// SwipeDeck pauses its PanResponder via gesturesDisabled while non-null so
@@ -499,12 +536,17 @@ export default function DiscoveryFeed() {
     }
   };
 
-  /// Called by the composer after a confirmed send. Resets the skip
-  /// counters and closes the composer; we stay in the deck.
+  /// Called by the composer after a confirmed send. Resets the skip counters,
+  /// closes the composer, and flies the messaged card up off the deck —
+  /// reaching out is the third terminal exit (up = sent), so you advance to the
+  /// next card and can't pass/save the same person you just messaged. No-op if
+  /// the reach came from a context where the deck isn't mounted (e.g. overview).
   const handleReachSent = () => {
+    const reached = reachOutCard;
     setConsecutiveSkips(0);
     setLastFiveSeen([]);
     setReachOutCard(null);
+    if (reached) swipeDeckRef.current?.commitReach(reached.id);
   };
 
   const handleOverviewPick = (card: DiscoveryCardData) => {
@@ -585,8 +627,20 @@ export default function DiscoveryFeed() {
         </View>
       )}
 
+      {/* Demo banner — only when the dev-only mock fallback is showing, so the
+          placeholder cards (which dead-end "Reach out") read as demo data, not
+          real matches. */}
+      {!loading && !overviewVisible && !deckError && showingDemo && (
+        <View style={styles.demoBanner}>
+          <Sparkle size={13} color={Brand.actionDeep} weight="fill" />
+          <Text style={styles.demoBannerText}>Demo cards — sample data, not live matches</Text>
+        </View>
+      )}
+
       {loading ? (
         <Skeleton />
+      ) : deckError && !liveDeck ? (
+        <DeckError onRetry={fetchDeck} />
       ) : overviewVisible ? (
         <DiscoveryOverview
           seen={lastFiveSeen}
@@ -595,6 +649,7 @@ export default function DiscoveryFeed() {
         />
       ) : (
         <SwipeDeck
+          ref={swipeDeckRef}
           key={`${deckResetKey}-${filterSkills.join(',')}-${filterCampus.join(',')}`}
           deck={filteredDeck}
           matchedSkills={viewerSkills}
@@ -712,7 +767,8 @@ export default function DiscoveryFeed() {
 }
 
 /// Borderless icon + label filter trigger. No bubble/outline when inactive;
-/// a soft warm-tan tint (no border) + accent + count when it has selections.
+/// a soft teal tint (no border) + teal accent + count when it has selections —
+/// matching the blue selection fill used by the filter-sheet chips.
 function FilterButton({
   Icon,
   label,
@@ -725,7 +781,7 @@ function FilterButton({
   onPress: () => void;
 }) {
   const active = count > 0;
-  const tint = active ? Brand.accent : Brand.inkLabel;
+  const tint = active ? Brand.actionDeep : Brand.inkLabel;
   return (
     <Tactile
       haptic="tap"
@@ -737,15 +793,36 @@ function FilterButton({
       <Text style={[styles.filterBtnText, active && styles.filterBtnTextActive]}>
         {label}{active ? ` · ${count}` : ''}
       </Text>
-      <CaretDown size={11} color={active ? Brand.accent : Brand.inkMuted} weight="bold" />
+      <CaretDown size={11} color={active ? Brand.actionDeep : Brand.inkMuted} weight="bold" />
     </Tactile>
   );
 }
 
 function Skeleton() {
+  // Mirror the DiscoveryCard silhouette: one big rounded-20 card on a 7px hard
+  // shadow, with a badge top-right, a bottom-left stack (eyebrow → big title →
+  // ~2-line vibe → chip row), and the reach-out circle bottom-right.
   return (
     <View style={styles.skeletonWrap}>
-      <View style={styles.skeletonCard} />
+      <HardShadow radius={Radii.card} offset={7} style={{ flex: 1 }}>
+        <View style={styles.skeletonCard}>
+          <SkeletonBlock width={120} height={30} radius={14} style={styles.skelBadge} />
+          <View style={styles.skelStack}>
+            <SkeletonBlock width={120} height={11} radius={5} />
+            <SkeletonBlock width="68%" height={30} radius={8} />
+            <View style={{ gap: 7 }}>
+              <SkeletonBlock width="90%" height={15} radius={6} />
+              <SkeletonBlock width="62%" height={15} radius={6} />
+            </View>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              {[70, 92, 64].map((w, i) => (
+                <SkeletonBlock key={i} width={w} height={33} radius={999} />
+              ))}
+            </View>
+          </View>
+          <SkeletonBlock width={58} height={58} radius={29} style={styles.skelReach} />
+        </View>
+      </HardShadow>
     </View>
   );
 }
@@ -755,6 +832,25 @@ function Skeleton() {
 ///     "Start over", which clears skipped matches so the RPC re-surfaces them
 ///   - empty (no live matches at all — e.g. a brand-new campus) — be honest
 ///     that nothing is here yet rather than implying they swiped everything
+/// Distinct from the empty/exhausted states: a failed load. Reads as a problem
+/// to fix (with Retry), not as "there's nothing here."
+function DeckError({ onRetry }: { onRetry: () => void }) {
+  return (
+    <View style={styles.emptyWrap}>
+      <Text style={styles.emptyTitle}>Couldn't load your deck.</Text>
+      <Text style={styles.emptySub}>
+        Something went wrong reaching the server. Check your connection and try again.
+      </Text>
+      <HardShadow radius={999} offset={4} style={styles.refreshCtaWrap}>
+        <Pressable onPress={onRetry} style={styles.refreshCta}>
+          <ArrowsClockwise size={18} color={Brand.actionInk} weight="bold" />
+          <Text style={styles.refreshCtaLabel}>Retry</Text>
+        </Pressable>
+      </HardShadow>
+    </View>
+  );
+}
+
 function DeckExhausted({ onRefresh, isOwner, neverHadCards }: { onRefresh: () => void; isOwner: boolean; neverHadCards: boolean }) {
   if (neverHadCards) {
     return (
@@ -813,11 +909,25 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 999, // only matters when the active tint shows
   },
-  filterBtnActive: { backgroundColor: 'rgba(212, 180, 144, 0.18)' }, // soft warm tint, no border
+  filterBtnActive: { backgroundColor: 'rgba(166, 199, 194, 0.22)' }, // soft teal tint, no border
   filterBtnText: { fontFamily: AmbitFont.body, fontSize: 14, fontWeight: '600', color: Brand.inkBody },
-  filterBtnTextActive: { color: Brand.accent },
+  filterBtnTextActive: { color: Brand.actionDeep },
   filterClear: { paddingHorizontal: 8, paddingVertical: 8 },
-  filterClearText: { fontFamily: AmbitFont.body, fontSize: 13.5, fontWeight: '600', color: Brand.accent },
+  filterClearText: { fontFamily: AmbitFont.body, fontSize: 13.5, fontWeight: '600', color: Brand.actionDeep },
+
+  // Demo-fallback banner (dev-only) — soft teal tint, sits above the deck.
+  demoBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    alignSelf: 'center',
+    marginBottom: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 999,
+    backgroundColor: 'rgba(166, 199, 194, 0.22)',
+  },
+  demoBannerText: { fontFamily: AmbitFont.body, fontSize: 12, fontWeight: '600', color: Brand.actionDeep },
 
   // ── Filter sheet (searchable, tall + scrollable) ───────────────────────
   filterSheetHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, paddingHorizontal: 4 },
@@ -887,8 +997,15 @@ const styles = StyleSheet.create({
   skeletonCard: {
     flex: 1,
     backgroundColor: Brand.surface1,
-    borderRadius: Radii.lg,
+    borderRadius: Radii.card,
+    borderWidth: 1.5,
+    borderColor: Brand.inkEdge,
+    overflow: 'hidden',
+    position: 'relative',
   },
+  skelBadge: { position: 'absolute', top: 16, right: 16 },
+  skelStack: { position: 'absolute', left: 22, right: 22, bottom: 22, paddingRight: 72, gap: 16 },
+  skelReach: { position: 'absolute', bottom: 22, right: 22 },
   emptyWrap: {
     flex: 1,
     alignItems: 'center',
