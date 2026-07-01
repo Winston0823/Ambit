@@ -23,6 +23,10 @@ interface AuthContextValue {
   signUpWithEmail: (email: string, password: string) => Promise<void>;
   signInWithEmail: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
+  /// Permanently delete the signed-in user's account and all their data,
+  /// then clear the local session. Throws on failure so the UI can surface
+  /// an error and keep the user signed in.
+  deleteAccount: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -202,6 +206,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut();
   };
 
+  const deleteAccount = async () => {
+    const uid = session?.user?.id;
+    const token = session?.access_token;
+    if (!uid || !token) throw new Error('Not signed in.');
+
+    // Clean up this device's push tokens + badge first (best-effort).
+    await unregisterAllPushTokens(uid).catch(() => {});
+    await clearBadge();
+
+    // The auth user can only be deleted server-side with the service role.
+    const { error } = await supabase.functions.invoke('delete-account', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (error) throw new Error('Could not delete account. Please try again.');
+
+    // Drop the local session so the app routes back to onboarding.
+    await supabase.auth.signOut();
+  };
+
   return (
     <AuthContext.Provider value={{
       session,
@@ -215,6 +238,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signUpWithEmail,
       signInWithEmail,
       signOut,
+      deleteAccount,
     }}>
       {children}
     </AuthContext.Provider>

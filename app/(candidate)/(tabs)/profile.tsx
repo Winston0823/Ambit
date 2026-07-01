@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Image,
   KeyboardAvoidingView,
   Modal,
@@ -19,10 +20,12 @@ import {
   Camera,
   Chat,
   Check,
+  Gear,
   MapPin,
   PencilSimpleLine,
   Plus,
   SignOut,
+  Trash,
   X,
 } from 'phosphor-react-native';
 import { Chip, HardShadow, Skeleton } from '../../../components/atoms';
@@ -99,7 +102,34 @@ const PORTFOLIO_GRADIENTS: [string, string][] = [
 ///                                          Will move to a portfolio_items
 ///                                          table once schema lands.
 export default function ProfileTab() {
-  const { user, signOut } = useAuth();
+  const { user, signOut, deleteAccount } = useAuth();
+  const [deleting, setDeleting] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
+
+  const confirmDeleteAccount = () => {
+    if (deleting) return;
+    Alert.alert(
+      'Delete account?',
+      'This permanently deletes your profile, projects, messages, and all your data. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete account',
+          style: 'destructive',
+          onPress: async () => {
+            setDeleting(true);
+            try {
+              await deleteAccount();
+              // Session is cleared inside deleteAccount → app routes to onboarding.
+            } catch (e: any) {
+              setDeleting(false);
+              Alert.alert('Could not delete', e?.message ?? 'Please try again.');
+            }
+          },
+        },
+      ],
+    );
+  };
   const insets = useSafeAreaInsets();
   const [profile, setProfile] = useState<ProfileRow | null>(null);
   const [loading, setLoading] = useState(true);
@@ -403,12 +433,12 @@ export default function ProfileTab() {
           </Pressable>
         </View>
         <Pressable
-          onPress={() => { signOut().catch(() => {}); }}
+          onPress={() => { if (Platform.OS !== 'web') Haptics.selectionAsync().catch(() => {}); setAccountOpen(true); }}
           style={styles.signOutBtn}
           hitSlop={10}
-          accessibilityLabel="Sign out"
+          accessibilityLabel="Account settings"
         >
-          <SignOut size={18} color={Brand.inkMuted} weight="regular" />
+          <Gear size={20} color={Brand.inkMuted} weight="regular" />
         </Pressable>
       </View>
 
@@ -610,7 +640,82 @@ export default function ProfileTab() {
         onSave={handleSavePortfolio}
         onDelete={handleDeletePortfolio}
       />
+
+      <AccountSettingsModal
+        visible={accountOpen}
+        deleting={deleting}
+        onClose={() => { if (!deleting) setAccountOpen(false); }}
+        onSignOut={() => { setAccountOpen(false); signOut().catch(() => {}); }}
+        onDeleteAccount={confirmDeleteAccount}
+      />
     </View>
+  );
+}
+
+/// Account settings sheet — opened from the gear icon in the profile header.
+/// Holds sign-out and the permanent account-deletion action (Apple 5.1.1(v)).
+function AccountSettingsModal({
+  visible,
+  deleting,
+  onClose,
+  onSignOut,
+  onDeleteAccount,
+}: {
+  visible: boolean;
+  deleting: boolean;
+  onClose: () => void;
+  onSignOut: () => void;
+  onDeleteAccount: () => void;
+}) {
+  return (
+    <Modal transparent animationType="fade" visible={visible} onRequestClose={onClose}>
+      <View style={modalStyles.root}>
+        <Pressable style={modalStyles.scrim} onPress={onClose} />
+        <View style={modalStyles.sheet}>
+          <View style={modalStyles.sheetHeader}>
+            <Text style={modalStyles.sheetTitle}>Account</Text>
+            <Pressable onPress={onClose} hitSlop={10} disabled={deleting}>
+              <X size={20} color={Brand.inkMuted} weight="bold" />
+            </Pressable>
+          </View>
+
+          <Pressable
+            onPress={onSignOut}
+            disabled={deleting}
+            style={styles.accountRow}
+            accessibilityRole="button"
+            accessibilityLabel="Sign out"
+          >
+            <SignOut size={20} color={Brand.inkBody} weight="regular" />
+            <Text style={styles.accountRowText}>Sign out</Text>
+          </Pressable>
+
+          <View style={styles.accountDivider} />
+
+          <Pressable
+            onPress={onDeleteAccount}
+            disabled={deleting}
+            style={styles.accountRow}
+            accessibilityRole="button"
+            accessibilityLabel="Delete account"
+          >
+            {deleting ? (
+              <ActivityIndicator size="small" color="#C0392B" />
+            ) : (
+              <Trash size={20} color="#C0392B" weight="regular" />
+            )}
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.accountRowText, styles.deleteText]}>
+                {deleting ? 'Deleting…' : 'Delete account'}
+              </Text>
+              <Text style={styles.accountRowSub}>
+                Permanently removes your profile, projects, and messages.
+              </Text>
+            </View>
+          </Pressable>
+        </View>
+      </View>
+    </Modal>
   );
 }
 
@@ -985,6 +1090,30 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+
+  // ── Account settings sheet rows ────────────────────────────────────
+  accountRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 14,
+  },
+  accountRowText: {
+    fontFamily: AmbitFont.body,
+    fontSize: 15,
+    color: Brand.inkBody,
+  },
+  accountRowSub: {
+    fontFamily: AmbitFont.body,
+    fontSize: 12,
+    color: Brand.inkMuted,
+    marginTop: 2,
+  },
+  accountDivider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: Brand.borderDefault,
+  },
+  deleteText: { color: '#C0392B' },
 
   scroll: { flex: 1 },
   scrollContent: { paddingHorizontal: Space.lg, paddingTop: Space.md },
