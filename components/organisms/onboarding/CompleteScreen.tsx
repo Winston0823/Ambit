@@ -1,13 +1,17 @@
-import React, { useEffect, useRef } from 'react';
-import { Animated, Dimensions, Platform, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Animated, Dimensions, Platform, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import ConfettiCannon from 'react-native-confetti-cannon';
 import { Button, HardShadow } from '../../atoms';
+import { toast } from '../../../lib/toast';
+import { haptics } from '../../../lib/haptics';
 import { Brand, AmbitFont, Space } from '../../../constants/theme';
 
-interface Props { onDone: () => void; }
+/// `onDone` submits the profile and resolves on success; it REJECTS on
+/// failure so we can keep the user here, tell them why, and let them retry.
+interface Props { onDone: () => Promise<void>; }
 
 const { width: SCREEN_W } = Dimensions.get('window');
 
@@ -19,6 +23,27 @@ export function CompleteScreen({ onDone }: Props) {
   const scale = useRef(new Animated.Value(0.6)).current;
   const opacity = useRef(new Animated.Value(0)).current;
   const confettiRef = useRef<ConfettiCannon>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  /// Drive the final submit. Double-tap guarded via `submitting`. On success
+  /// the parent dismisses/reroutes (we keep the button disabled through the
+  /// unmount). On failure we re-enable the button (the on-screen Retry) and
+  /// raise a toast with a Retry action + the reason.
+  const handlePress = useCallback(async () => {
+    if (submitting) return;
+    setSubmitting(true);
+    try {
+      await onDone();
+      // Leave `submitting` true — the flow is dismissing/rerouting now.
+    } catch (e: any) {
+      haptics.error();
+      setSubmitting(false);
+      toast.error(
+        e?.message ?? "Couldn't finish setting up your profile. Try again.",
+        { actionLabel: 'Retry', onAction: () => { void handlePress(); } },
+      );
+    }
+  }, [submitting, onDone]);
 
   useEffect(() => {
     Animated.parallel([
@@ -55,7 +80,18 @@ export function CompleteScreen({ onDone }: Props) {
       <View style={{ flex: 1 }} />
 
       <Animated.View style={[{ opacity }, styles.cta]}>
-        <Button title="Enter Ambit" onPress={onDone} trailingArrow />
+        <Button
+          title={submitting ? 'Entering…' : 'Enter Ambit'}
+          onPress={handlePress}
+          disabled={submitting}
+          trailingArrow
+        />
+        {submitting && (
+          <ActivityIndicator
+            style={styles.spinner}
+            color={Brand.actionInk}
+          />
+        )}
       </Animated.View>
 
       {/* Confetti — warm-palette colors, fires once on mount via the timeout
@@ -101,5 +137,11 @@ const styles = StyleSheet.create({
   cta: {
     alignSelf: 'stretch',
     paddingBottom: Space.ctaBottom,
+  },
+  spinner: {
+    position: 'absolute',
+    top: 0,
+    bottom: Space.ctaBottom,
+    right: Space.lg,
   },
 });

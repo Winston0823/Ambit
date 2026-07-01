@@ -97,7 +97,16 @@ const PROGRESS_STEPS_ALL: LinearStep[] = [
 ///     `skills` (their value prop is the research, not a personal chip list).
 ///   - Student Owners (not Seeker, not Both) skip `skills` for the same
 ///     reason — they pitch the project, not themselves.
-function shouldShow(step: LinearStep, profile: OnboardingProfile): boolean {
+function shouldShow(
+  step: LinearStep,
+  profile: OnboardingProfile,
+  hasSession: boolean,
+): boolean {
+  // `eduEmail` exists only to create the auth account (email + password). A
+  // user who already has a session — social sign-in, or a resumed session —
+  // has an account, so demanding credentials again would just try to sign
+  // them up a second time. Skip it. (Audit P0: social sign-in loop.)
+  if (step === 'eduEmail' && hasSession) return false;
   if (profile.demographic === 'professor') {
     return step !== 'role' && step !== 'skills';
   }
@@ -105,12 +114,18 @@ function shouldShow(step: LinearStep, profile: OnboardingProfile): boolean {
   return true;
 }
 
-function activeSteps(profile: OnboardingProfile): readonly LinearStep[] {
-  return STEPS.filter((s) => shouldShow(s, profile));
+function activeSteps(
+  profile: OnboardingProfile,
+  hasSession: boolean,
+): readonly LinearStep[] {
+  return STEPS.filter((s) => shouldShow(s, profile, hasSession));
 }
 
-function activeProgressSteps(profile: OnboardingProfile): LinearStep[] {
-  return PROGRESS_STEPS_ALL.filter((s) => shouldShow(s, profile));
+function activeProgressSteps(
+  profile: OnboardingProfile,
+  hasSession: boolean,
+): LinearStep[] {
+  return PROGRESS_STEPS_ALL.filter((s) => shouldShow(s, profile, hasSession));
 }
 
 /// Per-step "is this field filled?" predicate. Mirrors the validation
@@ -133,8 +148,11 @@ function isComplete(step: LinearStep, profile: OnboardingProfile): boolean {
   }
 }
 
-function firstIncompleteStep(profile: OnboardingProfile): LinearStep {
-  for (const step of activeSteps(profile)) {
+function firstIncompleteStep(
+  profile: OnboardingProfile,
+  hasSession: boolean,
+): LinearStep {
+  for (const step of activeSteps(profile, hasSession)) {
     if (!isComplete(step, profile)) return step;
   }
   return 'complete';
@@ -177,18 +195,37 @@ function Steps({ onDismiss }: { onDismiss: () => void }) {
   const prevStepRef = useRef<Step>(step);
   const translateX = useRef(new Animated.Value(0)).current;
   const { profile, reset, submit, hydrate } = useOnboarding();
-  const { user, refreshProfile } = useAuth();
+  const { user, hasProfile, refreshProfile } = useAuth();
+  const hasSession = !!user;
+
+  /// The resume-jump must fire at most once, and only while the user is still
+  /// on an entry screen (hasn't started filling the profile spine). Without
+  /// this guard the effect re-runs on every `user?.id` change — including the
+  /// one triggered mid-flow by email sign-up — and a slow hydrate could yank a
+  /// user who has already advanced backward to an earlier step. (Audit P1.)
+  const resumeJumpedRef = useRef(false);
+  const ENTRY_STEPS: readonly Step[] = ['splash', 'welcome', 'preview', 'signIn'];
 
   /// First mount with a signed-in user: pull their partial profile (if any)
   /// from Supabase and jump straight to the first step they haven't filled.
-  /// Brand-new users (no session yet) start at splash as normal.
+  /// Brand-new users (no session yet) start at splash as normal. This is also
+  /// the routing path for social sign-in from the entry screens: a new social
+  /// user lands on the first incomplete spine step (demographic — eduEmail is
+  /// skipped because they already have a session).
   useEffect(() => {
     if (!user) return;
+    if (resumeJumpedRef.current) return;
+    // Only jump from an entry screen — never yank a user who's already in the
+    // spine. (Reads the current step; not a dep, so it sees the latest value
+    // when the user?.id change fires the effect.)
+    if (!ENTRY_STEPS.includes(step)) return;
+    resumeJumpedRef.current = true;
     let cancelled = false;
     (async () => {
       const merged = await hydrate(user.id);
       if (cancelled) return;
-      setStep(firstIncompleteStep(merged));
+      // hasSession is guaranteed true here (user is truthy).
+      setStep(firstIncompleteStep(merged, true));
     })();
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -207,7 +244,7 @@ function Steps({ onDismiss }: { onDismiss: () => void }) {
   /// the role + skills screens that don't apply to them.
   const advance = () => {
     if (step === 'signIn') return;
-    const steps = activeSteps(profile);
+    const steps = activeSteps(profile, hasSession);
     const i = steps.indexOf(step as LinearStep);
     if (i >= 0 && i < steps.length - 1) setStep(steps[i + 1]);
   };
@@ -217,7 +254,7 @@ function Steps({ onDismiss }: { onDismiss: () => void }) {
       setStep('welcome');
       return;
     }
-    const steps = activeSteps(profile);
+    const steps = activeSteps(profile, hasSession);
     const i = steps.indexOf(step as LinearStep);
     if (i > 0) setStep(steps[i - 1]);
     else dismiss();
@@ -261,15 +298,31 @@ function Steps({ onDismiss }: { onDismiss: () => void }) {
     prevStepRef.current = step;
   }, [step, translateX, opacity]);
 
+  /// Called after Apple/Google sign-in succeeds (from Welcome or SignIn).
+  /// A user who already has a completed profile leaves the flow; a brand-new
+  /// social user (no profile row) must NOT dismiss — dismissing resets to
+  /// splash and the resume-hydrate would later strand them on eduEmail →
+  /// duplicate account. The hydrate effect routes them into the spine at the
+  /// first incomplete step (demographic). (Audit P0: social sign-in loop.)
+  const handleSocialSignedIn = () => {
+    if (hasProfile === true) dismiss();
+  };
+
+  /// Final submit. Throws on failure so CompleteScreen can keep the user on
+  /// the celebration screen, surface the reason, and offer Retry. We only
+  /// dismiss/reset after a confirmed successful upsert. (Audit P0: final
+  /// submit failure was swallowed, then reset() wiped everything.)
   const handleDone = async () => {
-    if (user) {
-      try {
-        await submit(user.id, user.email);
-        // Flip hasProfile in AuthContext so the root layout re-routes from
-        // OnboardingInline to the main app. Non-blocking on failure.
-        await refreshProfile();
-      } catch { /* non-blocking */ }
+    if (!user) {
+      // With the eduEmail confirmation guard in place we should always have a
+      // session by CompleteScreen; treat its absence as a retryable error
+      // rather than silently discarding the profile.
+      throw new Error('Your session expired — sign in again to finish.');
     }
+    await submit(user.id, user.email);
+    // Flip hasProfile in AuthContext so the root layout re-routes from
+    // OnboardingInline to the main app.
+    await refreshProfile();
     dismiss();
   };
 
@@ -282,11 +335,11 @@ function Steps({ onDismiss }: { onDismiss: () => void }) {
           <WelcomeScreen
             onCreateAccount={advance}
             onSignIn={() => setStep('signIn')}
-            onSocialSignedIn={dismiss}
+            onSocialSignedIn={handleSocialSignedIn}
           />
         );
       case 'signIn':
-        return <SignInScreen onBack={back} onSignedIn={dismiss} />;
+        return <SignInScreen onBack={back} onSignedIn={handleSocialSignedIn} />;
       case 'preview':
         return <PathPreviewScreen onBack={back} onContinue={advance} />;
       case 'eduEmail':
@@ -306,7 +359,7 @@ function Steps({ onDismiss }: { onDismiss: () => void }) {
     }
   };
 
-  const progressSteps = activeProgressSteps(profile);
+  const progressSteps = activeProgressSteps(profile, hasSession);
   const progressIndex = progressSteps.indexOf(step as LinearStep);
   const showProgress = progressIndex >= 0;
   const insets = useSafeAreaInsets();

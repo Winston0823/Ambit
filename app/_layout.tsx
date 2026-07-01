@@ -7,7 +7,6 @@ import * as Notifications from 'expo-notifications';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { useFonts } from 'expo-font';
-import { RoleProvider } from '../context/RoleContext';
 import { AuthProvider, useAuth } from '../context/AuthContext';
 import { SavedDeckProvider } from '../context/SavedDeckContext';
 import { Brand } from '../constants/theme';
@@ -39,15 +38,13 @@ export default function RootLayout() {
     <GestureHandlerRootView style={styles.root}>
       <SafeAreaProvider>
         <AuthProvider>
-          <RoleProvider>
-            <SavedDeckProvider>
-              <StatusBar style="dark" />
-              <Gate />
-              {/* Single app-wide toast surface — overlays onboarding + app so
-                  any layer's toast.error(...) is visible (audit theme 1). */}
-              <ToastHost />
-            </SavedDeckProvider>
-          </RoleProvider>
+          <SavedDeckProvider>
+            <StatusBar style="dark" />
+            <Gate />
+            {/* Single app-wide toast surface — overlays onboarding + app so
+                any layer's toast.error(...) is visible (audit theme 1). */}
+            <ToastHost />
+          </SavedDeckProvider>
         </AuthProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
