@@ -10,13 +10,28 @@ import {
 } from 'react-native';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { PencilSimple } from 'phosphor-react-native';
 import * as Haptics from 'expo-haptics';
 import { BackChevron, Skeleton } from '../../components/atoms';
 import { getInbox, type InboxItem } from '../../lib/messaging';
 import { supabase } from '../../lib/supabase';
 import { optimistic } from '../../lib/mutation';
-import { AmbitFont, Brand, Radii, Space } from '../../constants/theme';
+import { OWNER_STAGES, type OwnerStage } from '../../lib/closureLoop';
+import { AmbitFont, Brand, Radii, Space, StageColor } from '../../constants/theme';
+
+const STAGE_LABEL: Record<OwnerStage, string> = Object.fromEntries(
+  OWNER_STAGES.map((s) => [s.value, s.label]),
+) as Record<OwnerStage, string>;
+
+/// Soft rgba tint of a stage hex — for the per-row pipeline gradient + chip.
+function tint(hex: string, a: number): string {
+  const h = hex.replace('#', '');
+  const r = parseInt(h.slice(0, 2), 16);
+  const g = parseInt(h.slice(2, 4), 16);
+  const b = parseInt(h.slice(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${a})`;
+}
 
 type Stage = { key: string; label: string; statuses: InboxItem['status'][] };
 
@@ -40,6 +55,9 @@ export default function ProjectManageScreen() {
   const [title, setTitle] = useState<string>('');
   const [active, setActive] = useState<boolean>(true);
   const [candidates, setCandidates] = useState<InboxItem[] | null>(null);
+  // Private funnel stage per conversation (owner's CRM tag). Not carried by the
+  // inbox RPC, so fetched directly — owner can read it via conversations RLS.
+  const [stageMap, setStageMap] = useState<Record<string, OwnerStage>>({});
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -51,7 +69,21 @@ export default function ProjectManageScreen() {
       setTitle((proj as { title: string }).title);
       setActive((proj as { active: boolean }).active);
     }
-    setCandidates(inbox.filter((i) => i.project_id === id));
+    const cands = inbox.filter((i) => i.project_id === id);
+    setCandidates(cands);
+
+    const ids = cands.map((c) => c.conversation_id);
+    if (ids.length > 0) {
+      const { data: rows } = await supabase
+        .from('conversations')
+        .select('id, owner_stage')
+        .in('id', ids);
+      const map: Record<string, OwnerStage> = {};
+      (rows ?? []).forEach((r: any) => { if (r.owner_stage) map[r.id] = r.owner_stage; });
+      setStageMap(map);
+    } else {
+      setStageMap({});
+    }
   }, [id]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
@@ -165,14 +197,28 @@ export default function ProjectManageScreen() {
               <Text style={styles.stageLabel}>
                 {stage.label.toUpperCase()} · {rows.length}
               </Text>
-              {rows.map((c) => (
+              {rows.map((c) => {
+                // The owner's private funnel stage (defaults to New until moved)
+                // → a left-clean → right-tinted gradient + a stage chip, so the
+                // pipeline reads each candidate's stage at a glance.
+                const ownerStage = stageMap[c.conversation_id] ?? 'new';
+                const sc = StageColor[ownerStage];
+                return (
                 <Pressable
                   key={c.conversation_id}
                   onPress={() => router.push({ pathname: '/chat/[id]', params: { id: c.conversation_id } })}
                   style={({ pressed }) => [styles.candidate, pressed && { opacity: 0.7 }]}
                   accessibilityRole="button"
-                  accessibilityLabel={`Open chat with ${c.partner_name}`}
+                  accessibilityLabel={`Open chat with ${c.partner_name} — stage ${STAGE_LABEL[ownerStage]}`}
                 >
+                  <LinearGradient
+                    colors={['transparent', tint(sc, 0.22)]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    locations={[0.35, 1]}
+                    style={StyleSheet.absoluteFill}
+                    pointerEvents="none"
+                  />
                   {c.partner_photo_url ? (
                     <Image source={{ uri: c.partner_photo_url }} style={styles.avatar} />
                   ) : (
@@ -193,8 +239,14 @@ export default function ProjectManageScreen() {
                       <Text style={styles.unreadText}>{c.unread_count}</Text>
                     </View>
                   )}
+                  {/* Stage indicator at the right of the listing. */}
+                  <View style={[styles.stageChip, { backgroundColor: tint(sc, 0.18) }]}>
+                    <View style={[styles.stageChipDot, { backgroundColor: sc }]} />
+                    <Text style={styles.stageChipText}>{STAGE_LABEL[ownerStage]}</Text>
+                  </View>
                 </Pressable>
-              ))}
+              );
+              })}
             </View>
           );
         })
@@ -297,6 +349,23 @@ const styles = StyleSheet.create({
     borderRadius: Radii.lg,
     borderWidth: 1,
     borderColor: Brand.borderSoft,
+    overflow: 'hidden', // clip the stage gradient to the rounded corners
+  },
+  stageChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 999,
+  },
+  stageChipDot: { width: 7, height: 7, borderRadius: 4 },
+  stageChipText: {
+    fontFamily: AmbitFont.body,
+    fontSize: 11,
+    fontWeight: '700',
+    color: Brand.inkBody,
+    letterSpacing: 0.2,
   },
   avatar: { width: 44, height: 44, borderRadius: 14 },
   avatarFallback: {

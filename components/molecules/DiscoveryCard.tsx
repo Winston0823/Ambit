@@ -911,7 +911,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 999,
-    backgroundColor: 'rgba(138, 155, 122, 0.46)',
+    backgroundColor: 'rgba(138, 155, 122, 0.72)',
   },
   replyBadgeText: {
     fontFamily: AmbitFont.body,
@@ -1005,9 +1005,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 999,
-    backgroundColor: 'rgba(212, 180, 144, 0.28)',
+    backgroundColor: 'rgba(212, 180, 144, 0.5)',
     borderWidth: 1,
-    borderColor: 'rgba(212, 180, 144, 0.55)',
+    borderColor: 'rgba(212, 180, 144, 0.72)',
   },
   roleChipText: {
     fontFamily: AmbitFont.body,
@@ -1033,10 +1033,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 999,
-    backgroundColor: 'rgba(255, 255, 255, 0.24)',
+    backgroundColor: 'rgba(255, 255, 255, 0.40)',
   },
   chipMatched: {
-    backgroundColor: 'rgba(201, 164, 122, 0.46)',
+    backgroundColor: 'rgba(201, 164, 122, 0.62)',
   },
   chipText: {
     fontFamily: AmbitFont.body,
