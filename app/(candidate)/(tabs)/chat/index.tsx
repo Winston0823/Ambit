@@ -3,6 +3,7 @@ import { HardShadow, Skeleton } from '../../../../components/atoms';
 import {
   Alert,
   FlatList,
+  Image,
   Platform,
   Pressable,
   RefreshControl,
@@ -12,7 +13,7 @@ import {
 } from 'react-native';
 import { router, useFocusEffect, useSegments } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { MagnifyingGlass, Plus } from 'phosphor-react-native';
+import { Archive, ArrowCounterClockwise, CaretRight, MagnifyingGlass, Plus } from 'phosphor-react-native';
 import * as Haptics from 'expo-haptics';
 import {
   InboxRow,
@@ -35,9 +36,9 @@ import {
 import { AmbitFont, Brand, Radii, Space } from '../../../../constants/theme';
 import { toast } from '../../../../lib/toast';
 
-/// S-050 Inbox v4. Editorial paper canvas. "ambit" wordmark + side
-/// icons up top, large italic "Chats" title, iMessage-style pinned
-/// strip, then a flat list — no day groupings.
+/// S-050 Inbox v4. Editorial paper canvas. Single header row —
+/// "Messages" title on the left, + / search icons on the right —
+/// iMessage-style pinned strip, then a flat list — no day groupings.
 export default function ChatTab() {
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
@@ -46,7 +47,7 @@ export default function ChatTab() {
   const [passTargetId, setPassTargetId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<InboxFilter>('all');
-  const [archivedUndo, setArchivedUndo] = useState<InboxItem | null>(null);
+  const [archivedExpanded, setArchivedExpanded] = useState(false);
 
   // The "+" button opens the discovery feed to find new people to reach out
   // to. Route to the correct group so the user stays in their context.
@@ -98,20 +99,33 @@ export default function ChatTab() {
     const existing = supabase.getChannels().find((c) => c.topic === `realtime:${topic}`);
     if (existing) return;
 
+    // Debounce refetches: a burst of message inserts (e.g. someone sends a
+    // few lines quickly, or several threads update at once) would otherwise
+    // fire a full get_inbox per row. Trailing 300ms coalesces the burst into
+    // one refetch.
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    const scheduleLoad = () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => { load(); }, 300);
+    };
+
     const ch = supabase
       .channel(topic)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'messages' },
-        () => { load(); },
+        scheduleLoad,
       )
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'conversation_reads', filter: `user_id=eq.${user.id}` },
-        () => { load(); },
+        scheduleLoad,
       )
       .subscribe();
-    return () => { supabase.removeChannel(ch); };
+    return () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      supabase.removeChannel(ch);
+    };
   }, [user?.id, load]);
 
   // Split pinned vs the rest. get_inbox already sorts pinned to the
@@ -124,6 +138,13 @@ export default function ChatTab() {
       rest:   all.filter((i) => !i.is_pinned),
     };
   }, [items]);
+
+  // Archived conversations — surfaced in a collapsible section at the bottom
+  // of the list so archiving is recoverable beyond the undo toast's lifetime.
+  const archived = useMemo(
+    () => (items ?? []).filter((i) => i.is_archived),
+    [items],
+  );
 
   // Archived rows are hidden from every tab; the rest get the active filter.
   const filteredRest = useMemo(() => {
@@ -146,27 +167,31 @@ export default function ChatTab() {
     catch { patchItem(item.conversation_id, { is_muted: !next }); }
   }, [patchItem]);
 
+  const handleUnarchive = useCallback(async (item: InboxItem) => {
+    if (Platform.OS !== 'web') Haptics.selectionAsync().catch(() => {});
+    patchItem(item.conversation_id, { is_archived: false });
+    try { await setConversationArchived(item.conversation_id, false); }
+    catch { patchItem(item.conversation_id, { is_archived: true }); }
+  }, [patchItem]);
+
   const handleArchive = useCallback(async (item: InboxItem) => {
     if (Platform.OS !== 'web') Haptics.selectionAsync().catch(() => {});
     patchItem(item.conversation_id, { is_archived: true });
-    setArchivedUndo(item);
-    try { await setConversationArchived(item.conversation_id, true); }
-    catch { patchItem(item.conversation_id, { is_archived: false }); }
-  }, [patchItem]);
-
-  const undoArchive = useCallback(async () => {
-    const it = archivedUndo;
-    if (!it) return;
-    setArchivedUndo(null);
-    patchItem(it.conversation_id, { is_archived: false });
-    try { await setConversationArchived(it.conversation_id, false); } catch { /* refetch reconciles */ }
-  }, [archivedUndo, patchItem]);
-
-  useEffect(() => {
-    if (!archivedUndo) return;
-    const t = setTimeout(() => setArchivedUndo(null), 4000);
-    return () => clearTimeout(t);
-  }, [archivedUndo]);
+    try {
+      await setConversationArchived(item.conversation_id, true);
+    } catch {
+      patchItem(item.conversation_id, { is_archived: false });
+      toast.error("Couldn't archive that chat.");
+      return;
+    }
+    // Shared toast bus (replaces the hand-rolled undo pill). Even after the
+    // toast auto-dismisses, the conversation is recoverable from the
+    // "Archived" section at the bottom of the list.
+    toast.success('Archived', {
+      actionLabel: 'Undo',
+      onAction: () => { void handleUnarchive(item); },
+    });
+  }, [patchItem, handleUnarchive]);
 
   // Pin / unpin — triggered by the inbox row's swipe-left Pin action (and by
   // long-pressing a pinned avatar in the strip). Surfaces the `pin_limit_reached`
@@ -196,7 +221,7 @@ export default function ChatTab() {
       );
       const msg = String(e?.message ?? '');
       if (msg.includes('pin_limit_reached')) {
-        Alert.alert('Pinned chats full', 'Unpin one first — iMessage caps at four.');
+        Alert.alert('Pinned chats full', 'You can pin up to 4 chats. Unpin one first.');
       } else {
         Alert.alert("Couldn't update pin", msg || 'Try again.');
       }
@@ -260,6 +285,39 @@ export default function ChatTab() {
             onFilter={setFilter}
           />
         }
+        ListFooterComponent={
+          archived.length > 0 ? (
+            <View style={styles.archivedSection}>
+              <Pressable
+                onPress={() => {
+                  if (Platform.OS !== 'web') Haptics.selectionAsync().catch(() => {});
+                  setArchivedExpanded((x) => !x);
+                }}
+                style={styles.archivedHeader}
+                accessibilityRole="button"
+                accessibilityLabel={`Archived, ${archived.length} conversations`}
+              >
+                <Archive size={16} color={Brand.inkLabel} weight="bold" />
+                <Text style={styles.archivedHeaderText}>Archived ({archived.length})</Text>
+                <CaretRight
+                  size={15}
+                  color={Brand.inkMuted}
+                  weight="bold"
+                  style={{ transform: [{ rotate: archivedExpanded ? '90deg' : '0deg' }] }}
+                />
+              </Pressable>
+              {archivedExpanded &&
+                archived.map((item) => (
+                  <ArchivedRow
+                    key={item.conversation_id}
+                    item={item}
+                    onOpen={() => openConversation(item.conversation_id)}
+                    onUnarchive={() => handleUnarchive(item)}
+                  />
+                ))}
+            </View>
+          ) : null
+        }
         ListEmptyComponent={
           pinned.length === 0 ? (
             // A non-empty inbox with an active filter (or pinned-only rows)
@@ -303,18 +361,58 @@ export default function ChatTab() {
         }}
       />
 
-      {archivedUndo && (
-        <View style={[styles.undoToastWrap, { bottom: insets.bottom + 16 }]} pointerEvents="box-none">
-          <HardShadow radius={999} offset={4}>
-            <View style={styles.undoToast}>
-              <Text style={styles.undoToastText}>Archived</Text>
-              <Pressable onPress={undoArchive} hitSlop={8} style={styles.undoBtn} accessibilityLabel="Undo archive">
-                <Text style={styles.undoBtnText}>Undo</Text>
-              </Pressable>
-            </View>
-          </HardShadow>
+    </View>
+  );
+}
+
+/// Compact row for an archived conversation. Tapping the body opens the
+/// thread; the trailing "Unarchive" button restores it to the active list.
+function ArchivedRow({
+  item,
+  onOpen,
+  onUnarchive,
+}: {
+  item: InboxItem;
+  onOpen: () => void;
+  onUnarchive: () => void;
+}) {
+  const initial = (item.partner_name ?? '?').slice(0, 1).toUpperCase();
+  const preview = item.last_message_deleted
+    ? 'Message deleted'
+    : item.last_message_body
+      ? item.last_message_body
+      : item.last_message_attachment_url
+        ? 'Photo'
+        : 'Say hi';
+  return (
+    <View style={styles.archivedRow}>
+      <Pressable style={styles.archivedRowMain} onPress={onOpen}>
+        <View style={styles.archivedAvatar}>
+          {item.partner_photo_url ? (
+            <Image source={{ uri: item.partner_photo_url }} style={styles.archivedAvatarImg} />
+          ) : (
+            <Text style={styles.archivedAvatarInitial}>{initial}</Text>
+          )}
         </View>
-      )}
+        <View style={styles.archivedMeta}>
+          <Text style={styles.archivedName} numberOfLines={1}>
+            {item.partner_name ?? 'Someone'}
+          </Text>
+          <Text style={styles.archivedPreview} numberOfLines={1}>
+            {preview}
+          </Text>
+        </View>
+      </Pressable>
+      <Pressable
+        onPress={onUnarchive}
+        hitSlop={8}
+        style={styles.unarchiveBtn}
+        accessibilityRole="button"
+        accessibilityLabel={`Unarchive conversation with ${item.partner_name ?? 'this person'}`}
+      >
+        <ArrowCounterClockwise size={14} color={Brand.inkOnBrand} weight="bold" />
+        <Text style={styles.unarchiveBtnText}>Unarchive</Text>
+      </Pressable>
     </View>
   );
 }
@@ -347,29 +445,31 @@ function ListHeader({
 }) {
   return (
     <View>
-      {/* Top bar — matches the Discovery layout: icon left, centered title,
-          icon right. "Messages" replaces the old "ambit" wordmark; the
-          separate title row below it is gone. */}
+      {/* Single header row — "Messages" title on the left, the + and
+          search actions grouped on the right. Replaces the old two-layer
+          chrome (ambit wordmark bar + separate title/icon row). */}
       <View style={styles.topbar}>
-        <Pressable
-          onPress={() => router.push('/chat/new')}
-          hitSlop={12}
-          style={styles.leftBtn}
-          accessibilityRole="button"
-          accessibilityLabel="New chat"
-        >
-          <Plus size={22} color={Brand.inkPrimary} weight="bold" />
-        </Pressable>
         <Text style={styles.title}>Messages</Text>
-        <Pressable
-          onPress={() => router.push('/chat/search')}
-          hitSlop={12}
-          style={styles.rightBtn}
-          accessibilityRole="button"
-          accessibilityLabel="Search messages"
-        >
-          <MagnifyingGlass size={22} color={Brand.inkPrimary} weight="regular" />
-        </Pressable>
+        <View style={styles.topbarActions}>
+          <Pressable
+            onPress={() => router.push('/chat/new')}
+            hitSlop={12}
+            style={styles.iconBtn}
+            accessibilityRole="button"
+            accessibilityLabel="New chat"
+          >
+            <Plus size={22} color={Brand.inkPrimary} weight="bold" />
+          </Pressable>
+          <Pressable
+            onPress={() => router.push('/chat/search')}
+            hitSlop={12}
+            style={styles.iconBtn}
+            accessibilityRole="button"
+            accessibilityLabel="Search messages"
+          >
+            <MagnifyingGlass size={22} color={Brand.inkPrimary} weight="regular" />
+          </Pressable>
+        </View>
       </View>
 
       {/* Segmented filter — role-agnostic (works for whoever reached out). */}
@@ -409,17 +509,19 @@ function ListHeader({
   );
 }
 
-/// Loading placeholder — wordmark/title chrome plus a handful of greyed
+/// Loading placeholder — header chrome plus a handful of greyed
 /// row stand-ins. Mirrors the feed's skeleton-card approach so both tabs
 /// speak the same loading language.
 function InboxSkeleton() {
   return (
     <View style={{ flex: 1 }}>
-      {/* Header: 44pt bar with side icons + centered "Messages" title. */}
+      {/* Header: 44pt bar — "Messages" title left, + / search icons right. */}
       <View style={styles.skelTopbar}>
-        <Skeleton width={36} height={36} radius={18} />
         <Skeleton width={120} height={24} radius={8} />
-        <Skeleton width={36} height={36} radius={18} />
+        <View style={styles.skelTopbarActions}>
+          <Skeleton width={36} height={36} radius={18} />
+          <Skeleton width={36} height={36} radius={18} />
+        </View>
       </View>
       {/* Filter chips row (All / Unread / Your turn / Hired). */}
       <View style={styles.skelFilters}>
@@ -468,6 +570,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Space.lg,
     marginBottom: 8,
   },
+  skelTopbarActions: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   skelFilters: {
     flexDirection: 'row',
     gap: 8,
@@ -506,53 +609,113 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: Brand.borderSoft,
   },
-  filterChipActive: { backgroundColor: Brand.action, borderWidth: 1.5, borderColor: Brand.actionInk },
-  filterChipText: { fontFamily: AmbitFont.body, fontSize: 13.5, fontWeight: '600', color: Brand.inkBody },
-  filterChipTextActive: { color: Brand.actionInk, fontWeight: '700' },
+  // Selected chip = ASTRA selected purple (#9362C8) with white ink.
+  filterChipActive: { backgroundColor: Brand.selected, borderWidth: 1.5, borderColor: Brand.selected },
+  filterChipText: { fontFamily: AmbitFont.semibold, fontSize: 13.5, color: Brand.inkBody },
+  filterChipTextActive: { fontFamily: AmbitFont.bold, color: Brand.inkOnBrand },
 
-  undoToastWrap: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
-  undoToast: {
+  // ── Archived section (collapsible, bottom of list) ────────────
+  archivedSection: {
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: Brand.borderSoft,
+  },
+  archivedHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
-    paddingLeft: 20,
-    paddingRight: 8,
-    paddingVertical: 8,
-    borderRadius: 999,
-    backgroundColor: Brand.cardCream,
-    borderWidth: 1.5,
-    borderColor: Brand.inkEdge,
+    gap: 8,
+    paddingVertical: 14,
+    paddingHorizontal: 4,
   },
-  undoToastText: { fontFamily: AmbitFont.body, fontSize: 14, fontWeight: '600', color: Brand.inkPrimary },
-  undoBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 999, backgroundColor: Brand.action, borderWidth: 1.5, borderColor: Brand.actionInk },
-  undoBtnText: { fontFamily: AmbitFont.body, fontSize: 14, fontWeight: '700', color: Brand.actionInk },
+  archivedHeaderText: {
+    flex: 1,
+    fontFamily: AmbitFont.body,
+    fontSize: 13.5,
+    fontWeight: '700',
+    letterSpacing: 0.2,
+    color: Brand.inkLabel,
+  },
+  archivedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 4,
+  },
+  archivedRowMain: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    minWidth: 0,
+  },
+  archivedAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: Brand.surface2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  archivedAvatarImg: { width: 40, height: 40, borderRadius: 10 },
+  archivedAvatarInitial: {
+    fontFamily: AmbitFont.display,
+    fontSize: 16,
+    color: Brand.inkLabel,
+  },
+  archivedMeta: { flex: 1, minWidth: 0 },
+  archivedName: {
+    fontFamily: AmbitFont.body,
+    fontSize: 15,
+    fontWeight: '600',
+    color: Brand.inkBody,
+  },
+  archivedPreview: {
+    fontFamily: AmbitFont.body,
+    fontSize: 13,
+    color: Brand.inkMuted,
+    marginTop: 1,
+  },
+  unarchiveBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 999,
+    backgroundColor: Brand.action,
+    borderWidth: 1.4,
+    borderColor: Brand.actionInk,
+  },
+  unarchiveBtnText: {
+    fontFamily: AmbitFont.bold,
+    fontSize: 12.5,
+    color: Brand.inkOnBrand,
+  },
 
   topbar: {
     height: 44,
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
     marginBottom: 8,
     // The header renders inside the FlatList content container, which has
-    // paddingHorizontal: 18 (see listContent). Cancel it here so the bar is
-    // full-bleed and the icons sit at Space.lg from the SCREEN edge —
-    // matching the Discovery feed's icon X positions exactly.
+    // its own horizontal padding (see listContent). Cancel it here so the
+    // bar is full-bleed and the title/icons sit at Space.lg from the
+    // SCREEN edge — matching the Discovery feed's icon X positions.
     marginHorizontal: -18,
+    paddingHorizontal: Space.lg,
   },
-  leftBtn: {
-    position: 'absolute',
-    left: Space.lg,
-    top: 0,
-    bottom: 0,
-    width: 44,
+  topbarActions: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: 4,
   },
-  rightBtn: {
-    position: 'absolute',
-    right: Space.lg,
-    top: 0,
-    bottom: 0,
+  iconBtn: {
     width: 44,
+    height: 44,
     alignItems: 'center',
     justifyContent: 'center',
   },

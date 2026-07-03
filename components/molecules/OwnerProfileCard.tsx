@@ -3,7 +3,7 @@ import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-nati
 import { LinearGradient } from 'expo-linear-gradient';
 import { CaretRight } from 'phosphor-react-native';
 import { Chip, HardShadow } from '../atoms';
-import { AmbitFont, Brand, Radii } from '../../constants/theme';
+import { AmbitFont, Astra, Brand, Radii } from '../../constants/theme';
 
 export interface OwnerProject {
   id: string;
@@ -22,12 +22,12 @@ interface Props {
   onProjectPress?: (id: string) => void;
 }
 
-/// Warm tan thumbnail gradients, rotated per project.
+/// Royal→iris thumbnail gradients, rotated per project.
 const THUMBS: [string, string][] = [
-  ['#C9A886', '#6A4A28'],
-  ['#9EC5A8', '#3A5544'],
-  ['#D9B6F0', '#5A3F7A'],
-  ['#E8C9A0', '#B48045'],
+  [Astra.royal, Astra.iris],
+  [Astra.void, Astra.royal],
+  [Brand.selected, Astra.iris],
+  [Astra.royal, Brand.selected],
 ];
 
 /// The canonical "owner" card — clean, light, roles-forward. Identity is
@@ -50,7 +50,7 @@ export function OwnerProfileCard({ name, photoUri, campusName, vibe, skills, pro
             {photoUri ? (
               <Image source={{ uri: photoUri }} style={styles.avatarImg} />
             ) : (
-              <LinearGradient colors={['#C9A886', '#7A5A3A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.avatarImg}>
+              <LinearGradient colors={[Astra.royal, Astra.iris]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.avatarImg}>
                 <Text style={styles.avatarInitial}>{initial}</Text>
               </LinearGradient>
             )}
@@ -121,7 +121,7 @@ const styles = StyleSheet.create({
   },
   idz: { padding: 24 },
   idRow: { flexDirection: 'row', gap: 16, alignItems: 'center' },
-  avatar: { width: 64, height: 64, borderRadius: 18, overflow: 'hidden' },
+  avatar: { width: 64, height: 64, borderRadius: Radii.md, overflow: 'hidden' },
   avatarImg: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' },
   avatarInitial: { fontFamily: AmbitFont.display, fontSize: 26, color: Brand.inkOnBrand },
   idText: { flex: 1, minWidth: 0 },
@@ -141,7 +141,7 @@ const styles = StyleSheet.create({
 
   proj: { flexDirection: 'row', gap: 16, alignItems: 'center', paddingBottom: 16, marginBottom: 16 },
   projDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: Brand.borderSoft },
-  thumb: { width: 62, height: 62, borderRadius: 15 },
+  thumb: { width: 62, height: 62, borderRadius: Radii.md },
   projBody: { flex: 1, minWidth: 0 },
   projTitle: { fontFamily: AmbitFont.display, fontSize: 18, color: Brand.inkPrimary },
   projPitch: { fontFamily: AmbitFont.body, fontSize: 12.5, color: Brand.inkMuted, marginTop: 2 },

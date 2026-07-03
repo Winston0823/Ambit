@@ -1,5 +1,6 @@
 import React, { useMemo, useRef } from 'react';
 import { Animated, PanResponder, StyleSheet, View } from 'react-native';
+import { Radii } from '../../constants/theme';
 
 interface Props {
   children: React.ReactNode;
@@ -23,7 +24,7 @@ export function SwipeRevealRow({
   onPress,
   renderReveal,
   revealWidth = 84,
-  radius = 18,
+  radius = Radii.lg,
 }: Props) {
   const tx = useRef(new Animated.Value(0)).current;
   const openRef = useRef(false);

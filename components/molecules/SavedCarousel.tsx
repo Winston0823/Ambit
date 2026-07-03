@@ -3,7 +3,7 @@ import { Animated, Dimensions, Pressable, StyleSheet, Text, View } from 'react-n
 import { LinearGradient } from 'expo-linear-gradient';
 import type { DiscoveryCardData } from '../../data/mock';
 import { HardShadow } from '../atoms';
-import { AmbitFont, Brand, Radii, Space } from '../../constants/theme';
+import { AmbitFont, Astra, Brand, Radii, Space, TypeScale } from '../../constants/theme';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const CARD_W = 152;
@@ -66,13 +66,13 @@ export function SavedCarousel({ cards, onPress }: Props) {
                   />
                 ) : (
                   <LinearGradient
-                    colors={isSeeker ? [Brand.seekerSurface, Brand.seekerInk] : card.gradient}
+                    colors={[Astra.royal, Astra.iris]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
                     style={StyleSheet.absoluteFill}
                   />
                 )}
-                <LinearGradient colors={['transparent', 'rgba(18,10,3,0.88)']} style={styles.scrim} />
+                <LinearGradient colors={['transparent', 'rgba(12,0,34,0.88)']} style={styles.scrim} />
                 <View style={styles.meta}>
                   <Text style={styles.eyebrow}>{isSeeker ? 'SEEKER' : 'PROJECT'}</Text>
                   <Text style={styles.title} numberOfLines={2}>{title}</Text>
@@ -90,10 +90,7 @@ export function SavedCarousel({ cards, onPress }: Props) {
 const styles = StyleSheet.create({
   wrap: { marginBottom: Space.lg },
   label: {
-    fontFamily: AmbitFont.body,
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 1.1,
+    ...TypeScale.labelSm,
     color: Brand.inkLabel,
     paddingHorizontal: Space.lg,
     marginBottom: 12,
@@ -104,17 +101,14 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: Radii.card,
     overflow: 'hidden',
-    backgroundColor: Brand.seekerInk,
-    borderWidth: 1.5,
-    borderColor: Brand.inkEdge,
+    backgroundColor: Astra.royal,
   },
   photo: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },
   scrim: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '62%' },
   meta: { position: 'absolute', left: 12, right: 12, bottom: 12 },
   eyebrow: {
-    fontFamily: AmbitFont.body,
+    fontFamily: AmbitFont.semibold,
     fontSize: 9,
-    fontWeight: '700',
     letterSpacing: 1.2,
     color: 'rgba(255,255,255,0.72)',
     marginBottom: 3,

@@ -2,7 +2,7 @@ import React from 'react';
 import { Image, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import type { PortfolioItem } from '../../data/mock';
-import { AmbitFont } from '../../constants/theme';
+import { AmbitFont, Astra } from '../../constants/theme';
 
 interface Props {
   item: PortfolioItem;
@@ -77,8 +77,8 @@ export function PortfolioAttachmentBubble({ item, isMine, onPress }: Props) {
 const styles = StyleSheet.create({
   card: {
     width: 268,
-    borderRadius: 22,
-    backgroundColor: '#2A1A0C',
+    borderRadius: 16,
+    backgroundColor: Astra.void,
     overflow: 'hidden',
     paddingTop: 92,
     paddingHorizontal: 16,
@@ -95,17 +95,16 @@ const styles = StyleSheet.create({
   },
   stack: { gap: 8 },
   eyebrow: {
-    fontFamily: AmbitFont.body,
+    fontFamily: AmbitFont.bold,
     fontSize: 9.5,
-    fontWeight: '700',
-    color: 'rgba(245, 233, 216, 0.7)',
+    color: 'rgba(255, 255, 255, 0.7)',
     letterSpacing: 2,
     textTransform: 'uppercase',
   },
   title: {
     fontFamily: AmbitFont.display,
     fontSize: 23,
-    color: '#F5E9D8',
+    color: '#FFFFFF',
     letterSpacing: -0.4,
     lineHeight: 27,
     marginTop: -1,
@@ -118,7 +117,7 @@ const styles = StyleSheet.create({
     fontSize: 72,
     fontFamily: Platform.select({ ios: 'Georgia', android: 'serif', default: 'serif' }),
     fontStyle: 'italic',
-    color: 'rgba(232, 201, 160, 0.42)',
+    color: 'rgba(153, 117, 206, 0.5)',
     includeFontPadding: false,
     zIndex: 0,
   },
@@ -128,7 +127,7 @@ const styles = StyleSheet.create({
     fontFamily: Platform.select({ ios: 'Georgia', android: 'serif', default: 'serif' }),
     fontStyle: 'italic',
     fontSize: 14.5,
-    color: '#F5E9D8',
+    color: 'rgba(255, 255, 255, 0.92)',
     lineHeight: 20,
     letterSpacing: -0.1,
   },
@@ -140,9 +139,8 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.16)',
   },
   chipText: {
-    fontFamily: AmbitFont.body,
+    fontFamily: AmbitFont.semibold,
     fontSize: 11.5,
-    fontWeight: '600',
     color: '#FFFFFF',
     letterSpacing: 0.1,
   },

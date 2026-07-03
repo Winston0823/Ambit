@@ -113,12 +113,11 @@ const styles = StyleSheet.create({
     marginBottom: Space.lg,
   },
   kicker: {
-    fontFamily: AmbitFont.body,
+    fontFamily: AmbitFont.bold,
     fontSize: 12,
-    fontWeight: '700',
     letterSpacing: 1.5,
     textTransform: 'uppercase',
-    color: Brand.actionDeep,
+    color: Brand.inkLabel,
     marginBottom: 12,
   },
   headline: {

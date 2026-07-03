@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
+  Alert,
   Animated,
   Easing,
   Image,
@@ -142,9 +143,36 @@ export function PortfolioModal({ item, onDismiss, onSave, onDelete }: Props) {
   };
   const removeTool = (idx: number) => setToolTags((prev) => prev.filter((_, i) => i !== idx));
 
+  // Dirty = an edit-mode draft diverges from the saved item. New (empty) items
+  // read clean until the user types, so a scrim tap on an untouched sheet just
+  // closes. `displayItem` is guaranteed here (guarded above).
+  const isDirty =
+    mode === 'edit' &&
+    !!displayItem &&
+    (draftTitle.trim() !== (displayItem.title ?? '').trim() ||
+      draftDescription.trim() !== (displayItem.description ?? '').trim() ||
+      (draftImageUri ?? null) !== (displayItem.imageUri ?? null) ||
+      draftTimeframe.trim() !== (displayItem.timeframe ?? '').trim() ||
+      draftContributions !== (displayItem.contributions ?? []).join('\n') ||
+      draftLink.trim() !== (displayItem.linkUrl ?? '').trim() ||
+      toolTags.join('') !== (displayItem.tools ?? []).join(''));
+
+  // Gate every dismiss path (scrim tap, Android hardware back) on unsaved
+  // drafts so a stray tap doesn't silently throw away edits.
+  const requestDismiss = () => {
+    if (isDirty) {
+      Alert.alert('Discard changes?', "You've made edits that haven't been saved.", [
+        { text: 'Keep editing', style: 'cancel' },
+        { text: 'Discard', style: 'destructive', onPress: onDismiss },
+      ]);
+      return;
+    }
+    onDismiss();
+  };
+
   const handleScrimPress = () => {
     if (Platform.OS !== 'web') Haptics.selectionAsync().catch(() => {});
-    onDismiss();
+    requestDismiss();
   };
 
   const handleEdit = () => {
@@ -182,15 +210,26 @@ export function PortfolioModal({ item, onDismiss, onSave, onDelete }: Props) {
 
   const handleDelete = () => {
     if (!onDelete) return;
-    if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
-    onDelete(displayItem.id);
+    // Destructive + irreversible — confirm before removing (matches the
+    // project-delete pattern).
+    Alert.alert('Delete this highlight?', 'This permanently removes it from your profile.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: () => {
+          if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
+          onDelete(displayItem.id);
+        },
+      },
+    ]);
   };
 
   const coverUri = mode === 'edit' ? draftImageUri : displayItem.imageUri;
   const timeframe = mode === 'edit' ? draftTimeframe.trim() : (displayItem.timeframe ?? '');
 
   return (
-    <Modal transparent animationType="none" visible={mounted} onRequestClose={onDismiss} statusBarTranslucent>
+    <Modal transparent animationType="none" visible={mounted} onRequestClose={requestDismiss} statusBarTranslucent>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.root}>
         <Animated.View style={[styles.scrimWrap, { opacity: scrimOpacity }]}>
           <Pressable style={styles.scrim} onPress={handleScrimPress} />

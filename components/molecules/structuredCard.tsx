@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { AmbitFont, Brand } from '../../constants/theme';
+import { AmbitFont, Brand, Radii } from '../../constants/theme';
 
 /// Shared design language for "structured message" cards in chat — the media
 /// previews (project / portfolio attachments) and the interactive widgets
@@ -10,7 +10,7 @@ import { AmbitFont, Brand } from '../../constants/theme';
 /// so every rich message reads as one family.
 
 export const STRUCT_CARD_WIDTH = 268;
-export const STRUCT_CARD_RADIUS = 22;
+export const STRUCT_CARD_RADIUS = Radii.lg; // sharp 12pt (ASTRA)
 /// Warm dark surface — same as the project/portfolio attachment cards.
 /// Structured cards are now LIGHT cream on the eggshell canvas (was warm-dark).
 export const STRUCT_DARK = Brand.cardCream;

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Alert, Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Camera } from 'phosphor-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { BackChevron, KeyboardDismiss } from '../../atoms';
@@ -78,7 +78,7 @@ export function PhotoScreen({ onBack, onContinue }: Props) {
               <Image source={{ uri: profile.photoUri }} style={styles.avatarImg} />
             ) : (
               <View style={styles.avatarPlaceholder}>
-                <Feather name="camera" size={36} color={Brand.actionDeep} />
+                <Camera size={36} color={Brand.actionDeep} weight="duotone" />
                 <Text style={styles.avatarLabel}>Tap to add a photo</Text>
               </View>
             )}
@@ -109,7 +109,7 @@ const styles = StyleSheet.create({
     marginBottom: 32, alignSelf: 'flex-start',
   },
   avatarBtn: {
-    width: 220, height: 220, borderRadius: 110,
+    width: 220, height: 220, borderRadius: Radii.xl,
     overflow: 'hidden',
     marginBottom: 32,
   },
@@ -129,8 +129,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     backgroundColor: Brand.surface1,
     borderWidth: 1.5, borderColor: Brand.borderDefault,
-    fontFamily: AmbitFont.body, fontSize: 16, color: Brand.inkBody,
-    fontWeight: '600',
+    fontFamily: AmbitFont.medium, fontSize: 16, color: Brand.inkBody,
     textAlign: 'center',
   },
 });

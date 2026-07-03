@@ -184,7 +184,7 @@ export function PartnerProfileIsland({
           .eq('owner_id',  partnerId),
       ]);
       if (cancelled) return;
-      const rows = [...(a.data ?? []), ...(b.data ?? [])] as Array<{
+      const rows = [...(a.data ?? []), ...(b.data ?? [])] as unknown as Array<{
         id: string;
         last_message_at: string;
         status: SiblingChat['status'];
@@ -240,7 +240,7 @@ export function PartnerProfileIsland({
   // and the blurred thread behind it doesn't bleed through the content.
   const bgColor = progress.interpolate({
     inputRange:  [0, 1],
-    outputRange: ['rgba(255,255,255,0.35)', 'rgba(250,246,240,0.97)'],
+    outputRange: ['rgba(255,255,255,0.35)', 'rgba(252,249,248,0.97)'],
   });
   const backdropOpacity = progress.interpolate({
     inputRange:  [0, 1],
@@ -502,7 +502,7 @@ function ProofLink({
 const styles = StyleSheet.create({
   backdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: Brand.inkEdge,
+    backgroundColor: '#0C0022', // void scrim
     zIndex: 20,
   },
 
@@ -513,8 +513,8 @@ const styles = StyleSheet.create({
     position: 'absolute',
     overflow: 'hidden',
     zIndex: 30,
-    borderWidth: 1.5,
-    borderColor: Brand.inkEdge,
+    borderWidth: 1,
+    borderColor: 'rgba(111,77,162,0.25)', // purple hairline
   },
 
   // Collapsed pill content — Hearth direction. Glassy pill with photo
@@ -560,7 +560,7 @@ const styles = StyleSheet.create({
   pillStatusDot: {
     fontFamily: AmbitFont.body,
     fontSize: 10,
-    color: Brand.actionDeep,
+    color: '#10B981', // emerald — online/active
     lineHeight: 14,
   },
   pillName: {

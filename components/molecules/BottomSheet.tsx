@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { BlurView } from 'expo-blur';
 import { Brand, Space } from '../../constants/theme';
 
 const SCREEN_H = Dimensions.get('window').height;
@@ -154,6 +155,9 @@ export function BottomSheet({ visible, onClose, children, hideHandle, snapPoints
           // scroll view in the content scrolls freely).
           {...(snap ? {} : pan.panHandlers)}
         >
+          {/* Light-glass backing — blur + translucent warm-white fill. */}
+          <BlurView intensity={24} tint="light" style={styles.glass} pointerEvents="none" />
+          <View style={styles.glassFill} pointerEvents="none" />
           <View {...(snap ? pan.panHandlers : {})} style={snap ? styles.grabZone : undefined}>
             {!hideHandle && <View style={styles.handle} />}
           </View>
@@ -166,17 +170,23 @@ export function BottomSheet({ visible, onClose, children, hideHandle, snapPoints
 
 const styles = StyleSheet.create({
   root: { flex: 1, justifyContent: 'flex-end' },
-  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.45)' },
+  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(12,0,34,0.45)' },
   sheet: {
-    backgroundColor: Brand.canvas,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingTop: 12,
     paddingHorizontal: Space.md,
-    // Bottom-anchored sheet: crisp ink edge instead of a soft shadow.
-    borderWidth: 1.5,
+    overflow: 'hidden', // clip the glass blur to the rounded top corners
+    // Bottom-anchored glass sheet: purple hairline instead of a soft shadow.
+    borderWidth: 1,
     borderBottomWidth: 0,
-    borderColor: Brand.inkEdge,
+    borderColor: 'rgba(111,77,162,0.25)', // purple hairline
+  },
+  // Glass backing layers (behind the sheet content).
+  glass: { ...StyleSheet.absoluteFillObject },
+  glassFill: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(252,249,248,0.85)', // canvas @0.85
   },
   // Generous grab strip at the top — the whole zone (not just the 4px notch)
   // is draggable so the sheet is easy to resize.

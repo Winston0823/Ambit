@@ -11,7 +11,7 @@
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#F2EEE4"
+      "backgroundColor": "#FCF9F8"
     },
     "ios": {
       "supportsTablet": true,
@@ -45,7 +45,7 @@
         "expo-notifications",
         {
           "icon": "./assets/icon.png",
-          "color": "#D4B490",
+          "color": "#2D005E",
           "androidMode": "default",
           "androidCollapsedTitle": "New messages on Ambit"
         }

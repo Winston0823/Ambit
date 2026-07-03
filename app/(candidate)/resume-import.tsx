@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -18,7 +18,8 @@ import { Check, FileArrowUp, Camera, ClipboardText } from 'phosphor-react-native
 import { BackChevron, HardShadow } from '../../components/atoms';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
-import { upsertPortfolioItem } from '../../lib/portfolio';
+import { fetchPortfolioForUser, upsertPortfolioItem } from '../../lib/portfolio';
+import { toast } from '../../lib/toast';
 import {
   parseResumeText,
   pickAndParseDocument,
@@ -27,11 +28,27 @@ import {
   resumeLinksPatch,
   type ParsedResume,
 } from '../../lib/resume';
-import { AmbitFont, Brand, Radii, Space } from '../../constants/theme';
+import { AmbitFont, Astra, Brand, Radii, Space } from '../../constants/theme';
 
 const MAX_SKILLS = 8;
+const PARSE_TIMEOUT_MS = 20000;
 const clampTitle = (s: string) => s.trim().slice(0, 60);
 const clampDesc = (s: string) => s.trim().slice(0, 400);
+
+/// Case/space-insensitive key for de-duping highlight titles across re-imports.
+const titleKey = (s: string) => s.trim().toLowerCase().replace(/\s+/g, ' ');
+
+/// A parse that found nothing usable — every field blank. Lands the user on a
+/// helpful "try another source" state instead of an empty review form.
+const isEmptyParse = (r: ParsedResume): boolean =>
+  !(r.name ?? '').trim() &&
+  !(r.headline ?? '').trim() &&
+  (r.skills?.length ?? 0) === 0 &&
+  r.experience.length === 0 &&
+  r.portfolio.length === 0 &&
+  !r.links.github &&
+  !r.links.linkedin &&
+  !r.links.portfolio;
 
 /// S-105 Résumé import — review & apply. Two phases in one screen:
 ///   1. Source: paste text / upload a file / use a photo → parse.
@@ -46,6 +63,12 @@ export default function ResumeImportScreen() {
   const [applying, setApplying] = useState(false);
   const [pasteText, setPasteText] = useState('');
   const [parsed, setParsed] = useState<ParsedResume | null>(null);
+  // A completed parse that yielded nothing usable → an honest "try another
+  // source" banner rather than a blank review.
+  const [noResults, setNoResults] = useState(false);
+  // Lets the user bail on an in-flight parse; a set flag makes the resolver
+  // ignore the (eventual) result.
+  const parseCancelled = useRef(false);
 
   // The user's CURRENT profile — import is additive, so we merge against this
   // and never overwrite a name/blurb they've already written or drop existing
@@ -93,15 +116,39 @@ export default function ResumeImportScreen() {
 
   const runParse = async (fn: () => Promise<ParsedResume | null>) => {
     if (parsing) return;
+    parseCancelled.current = false;
+    setNoResults(false);
     setParsing(true);
     try {
-      const r = await fn();
-      if (r) seedReview(r);
+      // Race the parse against a timeout so a hung request can't lock the user
+      // under an uncancellable overlay forever.
+      const r = await Promise.race<ParsedResume | null>([
+        fn(),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('__timeout__')), PARSE_TIMEOUT_MS),
+        ),
+      ]);
+      if (parseCancelled.current) return; // user bailed — ignore the result
+      if (!r || isEmptyParse(r)) {
+        setNoResults(true);
+      } else {
+        seedReview(r);
+      }
     } catch (e: any) {
-      Alert.alert("Couldn't read that résumé", e?.message ?? 'Try another source.');
+      if (parseCancelled.current) return;
+      const msg =
+        e?.message === '__timeout__'
+          ? 'That took too long. Check your connection and try again.'
+          : (e?.message ?? 'Try another source.');
+      toast.error(msg);
     } finally {
-      setParsing(false);
+      if (!parseCancelled.current) setParsing(false);
     }
+  };
+
+  const cancelParse = () => {
+    parseCancelled.current = true;
+    setParsing(false);
   };
 
   const toggleSkill = (s: string) => {
@@ -121,6 +168,15 @@ export default function ResumeImportScreen() {
   };
 
   const selectedSkills = useMemo(() => skills.filter((s) => skillsOn.has(s)), [skills, skillsOn]);
+
+  // Review-phase back drops everything we pulled + the user's tweaks — confirm
+  // before discarding.
+  const requestReviewBack = () => {
+    Alert.alert('Discard imported details?', "Going back clears what we pulled from your résumé and any edits you've made.", [
+      { text: 'Keep editing', style: 'cancel' },
+      { text: 'Discard', style: 'destructive', onPress: () => setParsed(null) },
+    ]);
+  };
 
   const apply = async () => {
     if (!user || !parsed || applying) return;
@@ -163,7 +219,15 @@ export default function ResumeImportScreen() {
         if (title && description) highlights.push({ title, description, linkUrl: p.link || null });
       });
 
+      // Dedupe by normalized title — against BOTH what's already on the profile
+      // (so a re-import doesn't stack duplicate highlights) and within this
+      // batch — before inserting.
+      const existingItems = await fetchPortfolioForUser(user.id).catch(() => []);
+      const seenTitles = new Set(existingItems.map((p) => titleKey(p.title)));
       for (const h of highlights) {
+        const key = titleKey(h.title);
+        if (seenTitles.has(key)) continue;
+        seenTitles.add(key);
         try {
           await upsertPortfolioItem({
             userId: user.id,
@@ -195,6 +259,15 @@ export default function ResumeImportScreen() {
           <Text style={styles.kicker}>IMPORT RÉSUMÉ</Text>
           <Text style={styles.h}>Let's fill this{'\n'}in for you</Text>
           <Text style={styles.sub}>Paste it, upload a file, or snap a photo — we'll pull out your skills, blurb, and projects. You review everything before anything saves.</Text>
+
+          {noResults && (
+            <View style={styles.noResults}>
+              <Text style={styles.noResultsTitle}>We couldn't find anything to import.</Text>
+              <Text style={styles.noResultsBody}>
+                That source came back empty. Try pasting more of your résumé, or use a clearer file or photo.
+              </Text>
+            </View>
+          )}
 
           <Text style={styles.fieldLabel}>PASTE FROM A DOC</Text>
           <TextInput
@@ -235,6 +308,15 @@ export default function ResumeImportScreen() {
           <View style={styles.overlay} pointerEvents="auto">
             <ActivityIndicator color={Brand.accent} />
             <Text style={styles.overlayText}>Reading your résumé…</Text>
+            <Pressable
+              onPress={cancelParse}
+              style={styles.overlayCancel}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Cancel reading résumé"
+            >
+              <Text style={styles.overlayCancelText}>Cancel</Text>
+            </Pressable>
           </View>
         )}
       </View>
@@ -247,7 +329,7 @@ export default function ResumeImportScreen() {
   return (
     <View style={styles.root}>
       <View style={{ marginTop: insets.top + 6 }}>
-        <BackChevron onPress={() => setParsed(null)} />
+        <BackChevron onPress={requestReviewBack} />
       </View>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={styles.reviewContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
@@ -386,23 +468,23 @@ const styles = StyleSheet.create({
   sourceBtnText: { fontFamily: AmbitFont.body, fontSize: 15, fontWeight: '600', color: Brand.inkPrimary },
 
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  chip: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 999, backgroundColor: Brand.cardCream, borderWidth: 1.5, borderColor: Brand.borderDefault },
-  chipOn: { backgroundColor: Brand.action, borderColor: Brand.actionInk },
+  chip: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: Radii.chip, backgroundColor: Brand.cardCream, borderWidth: 1.5, borderColor: Astra.hairlinePurple },
+  chipOn: { backgroundColor: Brand.selected, borderColor: Brand.selected },
   chipText: { fontFamily: AmbitFont.body, fontSize: 14, fontWeight: '600', color: Brand.inkMuted },
-  chipTextOn: { color: Brand.actionInk, fontWeight: '700' },
+  chipTextOn: { color: Brand.inkOnBrand, fontWeight: '700' },
 
   selRow: {
     flexDirection: 'row', alignItems: 'flex-start', gap: 12,
     paddingVertical: 14, paddingHorizontal: 16, marginBottom: 10,
     borderRadius: Radii.lg, backgroundColor: Brand.cardCream, borderWidth: 1.5, borderColor: Brand.borderDefault,
   },
-  selRowOn: { borderColor: Brand.actionInk, backgroundColor: Brand.surface1 },
+  selRowOn: { borderColor: Brand.selected, backgroundColor: Brand.surface1 },
   checkbox: {
     width: 22, height: 22, borderRadius: 7, marginTop: 1,
-    borderWidth: 1.5, borderColor: Brand.borderDefault,
+    borderWidth: 1.5, borderColor: Astra.hairlinePurple,
     alignItems: 'center', justifyContent: 'center',
   },
-  checkboxOn: { backgroundColor: Brand.action, borderColor: Brand.actionInk },
+  checkboxOn: { backgroundColor: Brand.selected, borderColor: Brand.selected },
   selTitle: { fontFamily: AmbitFont.body, fontSize: 15, fontWeight: '700', color: Brand.inkPrimary },
   selSub: { fontFamily: AmbitFont.body, fontSize: 13, color: Brand.inkMuted, marginTop: 3, lineHeight: 18 },
 
@@ -412,10 +494,31 @@ const styles = StyleSheet.create({
 
   overlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(245,242,234,0.82)',
+    backgroundColor: Astra.glassFill,
     alignItems: 'center', justifyContent: 'center', gap: 12,
   },
   overlayText: { fontFamily: AmbitFont.body, fontSize: 14, fontWeight: '600', color: Brand.inkBody },
+  overlayCancel: {
+    marginTop: 8,
+    paddingHorizontal: 24,
+    paddingVertical: 10,
+    borderRadius: 999,
+    borderWidth: 1.5,
+    borderColor: Brand.inkEdge,
+    backgroundColor: Brand.cardCream,
+  },
+  overlayCancelText: { fontFamily: AmbitFont.body, fontSize: 14, fontWeight: '700', color: Brand.inkPrimary },
+
+  noResults: {
+    marginTop: 20,
+    padding: 16,
+    borderRadius: Radii.lg,
+    backgroundColor: Brand.surface1,
+    borderWidth: 1.5,
+    borderColor: Brand.inkEdge,
+  },
+  noResultsTitle: { fontFamily: AmbitFont.body, fontSize: 15, fontWeight: '700', color: Brand.inkPrimary },
+  noResultsBody: { fontFamily: AmbitFont.body, fontSize: 13.5, color: Brand.inkMuted, marginTop: 6, lineHeight: 19 },
 
   ctaWrap: { position: 'absolute', alignSelf: 'center' },
   cta: {

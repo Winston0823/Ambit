@@ -223,7 +223,7 @@ const styles = StyleSheet.create({
     opacity: 0.75,
   },
   cellMine: {
-    backgroundColor: Brand.action, // Yours — teal
+    backgroundColor: Brand.selected, // Yours — iris purple
   },
   cellTheirs: {
     backgroundColor: Brand.canvas,
@@ -232,7 +232,7 @@ const styles = StyleSheet.create({
     borderStyle: 'dashed',
   },
   cellBoth: {
-    backgroundColor: Brand.actionDeep, // Both — deeper teal
+    backgroundColor: Brand.actionDeep, // Both — deep royal
     borderColor: Brand.actionDeep,
   },
 
@@ -256,7 +256,7 @@ const styles = StyleSheet.create({
     borderColor: Brand.borderDefault,
   },
   legendBusy:   { backgroundColor: Brand.surface2 },
-  legendMine:   { backgroundColor: Brand.action, borderColor: Brand.action },
+  legendMine:   { backgroundColor: Brand.selected, borderColor: Brand.selected },
   legendTheirs: { backgroundColor: Brand.canvas, borderColor: Brand.actionDeep, borderStyle: 'dashed' },
   legendBoth:   { backgroundColor: Brand.actionDeep, borderColor: Brand.actionDeep },
   legendLabel: {

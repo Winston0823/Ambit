@@ -6,18 +6,28 @@ export interface Campus {
   id: string;
   name: string;
   city: string;
+  /// Campus photo for the filter drawer row (bleeds in from the right, faded
+  /// into the canvas). Null → a warm gradient placeholder is used instead.
+  imageUrl?: string | null;
 }
 
 /// LA-area campuses. USC + UCLA are the v1 anchor campuses; the rest are
 /// nearby schools where students might commute or collaborate.
 export const CAMPUSES: Campus[] = [
-  { id: 'usc',        name: 'USC',        city: 'Los Angeles' },
-  { id: 'ucla',       name: 'UCLA',       city: 'Los Angeles' },
-  { id: 'caltech',    name: 'Caltech',    city: 'Pasadena' },
-  { id: 'lmu',        name: 'LMU',        city: 'Los Angeles' },
-  { id: 'pepperdine', name: 'Pepperdine', city: 'Malibu' },
-  { id: 'csula',      name: 'Cal State LA', city: 'Los Angeles' },
-  { id: 'oxy',        name: 'Occidental College', city: 'Los Angeles' },
+  { id: 'usc',        name: 'USC',        city: 'Los Angeles',
+    imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/5a/Doheny_Memorial_Library_of_USC.jpg/500px-Doheny_Memorial_Library_of_USC.jpg' },
+  { id: 'ucla',       name: 'UCLA',       city: 'Los Angeles',
+    imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/ad/Royce_Hall_post_rain.jpg/500px-Royce_Hall_post_rain.jpg' },
+  { id: 'caltech',    name: 'Caltech',    city: 'Pasadena',
+    imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/cc/Caltech_Entrance.jpg/500px-Caltech_Entrance.jpg' },
+  { id: 'lmu',        name: 'LMU',        city: 'Los Angeles',
+    imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/55/Loyola_Marymount_SunkenGardens_SacredHeartChapel.jpg/500px-Loyola_Marymount_SunkenGardens_SacredHeartChapel.jpg' },
+  { id: 'pepperdine', name: 'Pepperdine', city: 'Malibu',
+    imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/6b/Pepperdine_University_Malibu_Canyon_Entrance_Gate.JPG/500px-Pepperdine_University_Malibu_Canyon_Entrance_Gate.JPG' },
+  { id: 'csula',      name: 'Cal State LA', city: 'Los Angeles',
+    imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b0/Aerial_view_of_California_State_University%2C_Los_Angeles_campus_2.jpg/500px-Aerial_view_of_California_State_University%2C_Los_Angeles_campus_2.jpg' },
+  { id: 'oxy',        name: 'Occidental College', city: 'Los Angeles',
+    imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/95/Herrick_Memorial_Chapel_n_fountain.jpg/500px-Herrick_Memorial_Chapel_n_fountain.jpg' },
 ];
 
 /// Skill tag categories. Spec § 8.1 has the full taxonomy; this is a v0 subset.

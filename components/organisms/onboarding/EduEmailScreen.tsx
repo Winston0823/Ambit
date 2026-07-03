@@ -184,9 +184,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: Space.lg,
   },
   fieldLabel: {
-    fontFamily: AmbitFont.body,
+    fontFamily: AmbitFont.semibold,
     fontSize: 14,
-    fontWeight: '600',
     color: Brand.inkLabel,
     marginBottom: 8,
     letterSpacing: 0.2,
@@ -197,10 +196,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     backgroundColor: Brand.surface1,
     borderWidth: 0,
-    fontFamily: AmbitFont.body,
+    fontFamily: AmbitFont.medium,
     fontSize: 16,
     color: Brand.inkBody,
-    fontWeight: '600',
   },
   helperNote: {
     fontFamily: AmbitFont.body,
@@ -226,13 +224,12 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   forgot: {
-    fontFamily: AmbitFont.body,
+    fontFamily: AmbitFont.semibold,
     fontSize: 13,
-    fontWeight: '600',
     color: Brand.actionDeep,
   },
   forgotEmphasized: {
-    fontWeight: '700',
+    fontFamily: AmbitFont.bold,
     textDecorationLine: 'underline',
   },
 });

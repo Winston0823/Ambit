@@ -10,7 +10,7 @@ import {
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MagnifyingGlass, X } from 'phosphor-react-native';
-import { BackChevron, Skeleton } from '../../../../components/atoms';
+import { BackChevron, GlassSurface, Skeleton } from '../../../../components/atoms';
 import { searchMessages, type SearchHit } from '../../../../lib/messaging';
 import { AmbitFont, Brand, Radii, Space } from '../../../../constants/theme';
 import { toast } from '../../../../lib/toast';
@@ -61,7 +61,7 @@ export default function SearchScreen() {
     <View style={styles.root}>
       <BackChevron onPress={() => router.back()} />
 
-      <View style={[styles.searchBar, { marginTop: insets.top + 40 }]}>
+      <GlassSurface hairline intensity={20} style={[styles.searchBar, { marginTop: insets.top + 40 }]}>
         <MagnifyingGlass size={18} color={Brand.inkMuted} weight="regular" />
         <TextInput
           autoFocus
@@ -77,7 +77,7 @@ export default function SearchScreen() {
             <X size={16} color={Brand.inkMuted} weight="bold" />
           </Pressable>
         )}
-      </View>
+      </GlassSurface>
 
       {hits === null ? (
         <View style={styles.empty}>
@@ -114,7 +114,7 @@ export default function SearchScreen() {
           renderItem={({ item }) => (
             <Pressable
               onPress={() =>
-                router.replace({
+                router.push({
                   pathname: '/chat/[id]',
                   params: { id: item.conversation_id },
                 })
@@ -147,14 +147,12 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Brand.canvas },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
+  // Glass search bar — GlassSurface provides the blur/fill + purple hairline.
   searchBar: {
     marginHorizontal: Space.lg,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    backgroundColor: Brand.cardCream,
-    borderWidth: 1,
-    borderColor: Brand.borderSoft,
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderRadius: Radii.md,

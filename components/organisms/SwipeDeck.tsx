@@ -14,6 +14,7 @@ import {
 import {
   ArrowCounterClockwise,
   BookmarkSimple,
+  PaperPlaneTilt,
   X,
 } from 'phosphor-react-native';
 import * as Haptics from 'expo-haptics';
@@ -256,6 +257,16 @@ export const SwipeDeck = forwardRef<SwipeDeckHandle, Props>(function SwipeDeck({
           position.setValue({ x: g.dx, y: 0 });
         },
         onPanResponderRelease: (_e, g) => {
+          // Abort a committed-looking drag: if the release flick meaningfully
+          // OPPOSES the card's displacement (dragged left but flung right, or
+          // vice versa), the user is pulling it back — cancel to center even
+          // past the distance threshold, in either direction.
+          const OPPOSE_VELOCITY = 0.5; // pt/ms
+          const aborting =
+            (g.dx < 0 && g.vx >= OPPOSE_VELOCITY) ||
+            (g.dx > 0 && g.vx <= -OPPOSE_VELOCITY);
+          if (aborting) { cancelToCenter(); return; }
+
           const passed = g.dx <= -SWIPE_X_DISTANCE || g.vx <= -SWIPE_X_VELOCITY;
           const saved = g.dx >= SWIPE_X_DISTANCE || g.vx >= SWIPE_X_VELOCITY;
           if (passed) commitPass(g);
@@ -327,7 +338,7 @@ export const SwipeDeck = forwardRef<SwipeDeckHandle, Props>(function SwipeDeck({
                 onPortfolioPress={isActive ? onPortfolioPress : undefined}
                 activePortfolioId={isActive ? activePortfolioId : undefined}
                 onReachOut={isActive ? onReachOut : undefined}
-                showReachButton={isActive}
+                showReachButton={false}
                 animateIn={false}
               />
 
@@ -345,7 +356,7 @@ export const SwipeDeck = forwardRef<SwipeDeckHandle, Props>(function SwipeDeck({
                     pointerEvents="none"
                     style={[styles.stamp, styles.stampSave, { opacity: saveStampOpacity, transform: [{ rotate: '-14deg' }, { scale: saveStampScale }] }]}
                   >
-                    <BookmarkSimple size={30} color={Brand.seekerInk} weight="fill" />
+                    <BookmarkSimple size={30} color={Brand.inkOnBrand} weight="fill" />
                     <Text style={[styles.stampLabel, styles.stampLabelSave]}>SAVE</Text>
                   </Animated.View>
                 </>
@@ -355,18 +366,54 @@ export const SwipeDeck = forwardRef<SwipeDeckHandle, Props>(function SwipeDeck({
         })}
 
         {/* Low-profile rewind — fades in only after the first decision, so
-            an empty deck stays pristine. */}
+            an empty deck stays pristine. Top-center, clear of the card's
+            corner status badges. */}
         {history.length > 0 && !gesturesDisabled && (
-          <Pressable
-            onPress={rewind}
-            hitSlop={10}
-            style={styles.rewindBtn}
-            accessibilityRole="button"
-            accessibilityLabel="Undo last"
-          >
-            <ArrowCounterClockwise size={18} color={Brand.inkOnBrand} weight="bold" />
-          </Pressable>
+          <View style={styles.rewindWrap} pointerEvents="box-none">
+            <Pressable
+              onPress={rewind}
+              hitSlop={10}
+              style={styles.rewindBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Undo last"
+            >
+              <ArrowCounterClockwise size={16} color={Brand.action} weight="bold" />
+            </Pressable>
+          </View>
         )}
+      </View>
+
+      {/* Action row beneath the card — pass ✕ / save bookmark / send. Each
+          fires the SAME animated fly-off commit as its gesture (send opens the
+          composer via the parent), so button and gesture stay identical. */}
+      <View
+        style={styles.actionRow}
+        pointerEvents={gesturesDisabled ? 'none' : 'auto'}
+      >
+        <Pressable
+          onPress={() => commitPass()}
+          style={[styles.actionBtn, styles.actionOutline]}
+          accessibilityRole="button"
+          accessibilityLabel="Pass"
+        >
+          <X size={22} color={Brand.inkBody} weight="bold" />
+        </Pressable>
+        <Pressable
+          onPress={() => commitSave()}
+          style={[styles.actionBtn, styles.actionOutline]}
+          accessibilityRole="button"
+          accessibilityLabel="Save"
+        >
+          <BookmarkSimple size={22} color={Brand.primary} weight="regular" />
+        </Pressable>
+        <Pressable
+          onPress={reach}
+          style={[styles.actionBtn, styles.actionSend]}
+          accessibilityRole="button"
+          accessibilityLabel="Reach out"
+        >
+          <PaperPlaneTilt size={20} color={Brand.inkOnBrand} weight="fill" />
+        </Pressable>
       </View>
     </View>
   );
@@ -393,21 +440,53 @@ const styles = StyleSheet.create({
     paddingBottom: Space.md,
   },
   cardArea: { flex: 1, position: 'relative' },
-  cardLayer: { ...StyleSheet.absoluteFillObject, borderRadius: Radii.lg },
+  cardLayer: { ...StyleSheet.absoluteFillObject, borderRadius: Radii.sm },
 
-  // Low-profile rewind, top-left of the card (clear of the top-right match
-  // badge). Translucent so it sits on the photo without competing.
-  rewindBtn: {
-    position: 'absolute',
-    top: 16,
-    left: 16,
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+  // Action row beneath the card — three equal-width buttons: pass / save /
+  // send. Send is a solid iris fill; pass + save are warm-white with a purple
+  // hairline (the ASTRA glass button family).
+  actionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingTop: Space.md,
+  },
+  actionBtn: {
+    flex: 1,
+    height: 48,
+    borderRadius: Radii.md,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(20,20,20,0.42)',
+    borderWidth: 1,
+  },
+  actionOutline: {
+    backgroundColor: Brand.cardCream,
+    borderColor: 'rgba(111,77,162,0.3)',
+  },
+  actionSend: {
+    backgroundColor: Brand.selected,
+    borderColor: 'rgba(111,77,162,0.3)',
+  },
+
+  // Low-profile rewind — a small glass pill floated top-center of the card,
+  // clear of the corner status badges. Appears only after the first decision.
+  rewindWrap: {
+    position: 'absolute',
+    top: 12,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
     zIndex: 7,
+  },
+  rewindBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: Radii.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(252,249,248,0.9)',
+    borderWidth: 1,
+    borderColor: 'rgba(111,77,162,0.25)',
   },
 
   // ── Drag stamps ──────────────────────────────────────────────────────────
@@ -425,22 +504,21 @@ const styles = StyleSheet.create({
   },
   stampPass: {
     right: 20,
-    backgroundColor: 'rgba(20,20,20,0.55)',
+    backgroundColor: 'rgba(12,0,34,0.55)', // void glass
     borderColor: Brand.inkOnBrand,
   },
   stampSave: {
     left: 20,
-    backgroundColor: 'rgba(242,232,221,0.9)',
-    borderColor: Brand.seekerInk,
+    backgroundColor: Brand.selected, // selected purple
+    borderColor: Brand.inkOnBrand,
   },
   stampLabel: {
-    fontFamily: AmbitFont.body,
+    fontFamily: AmbitFont.bold,
     fontSize: 18,
-    fontWeight: '800',
     letterSpacing: 2,
     color: Brand.inkOnBrand,
   },
-  stampLabelSave: { color: Brand.seekerInk },
+  stampLabelSave: { color: Brand.inkOnBrand },
 
   emptyWrap: {
     flex: 1,

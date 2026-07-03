@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
-import { Brand, AmbitFont } from '../../../constants/theme';
+import { Astra, AmbitFont } from '../../../constants/theme';
 
 interface Props { onContinue: () => void; }
 
@@ -49,12 +49,12 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Brand.canvas,
+    backgroundColor: Astra.void,
   },
   wordmark: {
     fontFamily: AmbitFont.display,
     fontSize: 64,
-    color: Brand.inkPrimary,
+    color: Astra.canvas,
     letterSpacing: -1,
   },
 });

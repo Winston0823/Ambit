@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '../../atoms';
 import { SocialAuthButtons } from '../../molecules';
 import { useAuth } from '../../../context/AuthContext';
-import { Brand, AmbitFont, Space } from '../../../constants/theme';
+import { Brand, AmbitFont, Radii, Space } from '../../../constants/theme';
 
 interface Props {
   onCreateAccount: () => void;
@@ -108,7 +108,7 @@ const styles = StyleSheet.create({
   logoSquare: {
     width: 140,
     height: 140,
-    borderRadius: 32,
+    borderRadius: Radii.xl,
     backgroundColor: Brand.seekerSurface,
     alignItems: 'center',
     justifyContent: 'center',

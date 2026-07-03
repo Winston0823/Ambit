@@ -1,5 +1,6 @@
 import React, { useRef } from 'react';
 import {
+  ActivityIndicator,
   Animated,
   Image,
   Pressable,
@@ -21,6 +22,10 @@ interface Props {
   variant?: Variant;
   disabled?: boolean;
   trailingArrow?: boolean;
+  /// Stretch to fill the parent width (form CTAs).
+  fullWidth?: boolean;
+  /// Show a spinner instead of the label; also blocks press.
+  loading?: boolean;
   style?: ViewStyle;
 }
 
@@ -37,13 +42,16 @@ export function Button({
   variant = 'primary',
   disabled = false,
   trailingArrow = false,
+  fullWidth = false,
+  loading = false,
   style,
 }: Props) {
   const tones = TONES[variant];
   const scale = useRef(new Animated.Value(1)).current;
+  const blocked = disabled || loading;
 
   const press = () => {
-    if (disabled) return;
+    if (blocked) return;
     haptics.tap();
     onPress();
   };
@@ -60,61 +68,68 @@ export function Button({
       onPress={press}
       onPressIn={pressIn}
       onPressOut={pressOut}
-      disabled={disabled}
+      disabled={blocked}
       style={({ pressed }) => [
         styles.base,
         tones.container,
+        fullWidth && styles.fullWidth,
         { opacity: pressed ? 0.92 : 1 },
         style,
       ]}
     >
-      <Text style={[styles.label, tones.label]}>{title}</Text>
-      {trailingArrow && (
-        <Image
-          source={require('../../assets/icons/ArrowSwirl.png')}
-          style={styles.arrow}
-          resizeMode="contain"
-        />
+      {loading ? (
+        <ActivityIndicator color={tones.label.color as string} />
+      ) : (
+        <>
+          <Text style={[styles.label, tones.label]}>{title.toUpperCase()}</Text>
+          {trailingArrow && (
+            <Image
+              source={require('../../assets/icons/ArrowSwirl.png')}
+              style={styles.arrow}
+              resizeMode="contain"
+            />
+          )}
+        </>
       )}
     </Pressable>
   );
 
   return (
-    <Animated.View style={[{ transform: [{ scale }] }, disabled && { opacity: 0.45 }]}>
-      {isPrimary ? <HardShadow radius={999} offset={4}>{inner}</HardShadow> : inner}
+    <Animated.View
+      style={[{ transform: [{ scale }] }, fullWidth && styles.fullWidth, disabled && { opacity: 0.45 }]}
+    >
+      {isPrimary ? <HardShadow radius={Radii.sm} offset={6}>{inner}</HardShadow> : inner}
     </Animated.View>
   );
 }
 
 const TONES: Record<Variant, { container: ViewStyle; label: TextStyle }> = {
   primary: {
-    // The hard shadow is provided by a <HardShadow> wrapper (crisp solid block,
-    // not RN's blurry shadowRadius:0). Just the fill + ink border here.
+    // Royal fill, white label. Soft elevation via the <HardShadow> wrapper.
     container: {
       backgroundColor: Brand.action,
-      borderWidth: 1.6,
-      borderColor: Brand.actionInk,
     },
-    label: { color: Brand.actionInk },
+    label: { color: Brand.inkOnBrand },
   },
   secondary: {
+    // Glass: translucent white + purple hairline, ink label.
     container: {
-      backgroundColor: Brand.surface1,
-      borderWidth: 1.5,
-      borderColor: Brand.borderDefault,
+      backgroundColor: 'rgba(255,255,255,0.6)',
+      borderWidth: 1,
+      borderColor: 'rgba(111,77,162,0.28)',
     },
     label: { color: Brand.inkPrimary },
   },
   ghost: {
     container: { backgroundColor: 'transparent' },
-    label: { color: Brand.accent },
+    label: { color: Brand.action },
   },
 };
 
 const styles = StyleSheet.create({
   base: {
     minHeight: 52,
-    borderRadius: 999,
+    borderRadius: Radii.sm,
     paddingHorizontal: 24,
     flexDirection: 'row',
     alignItems: 'center',
@@ -122,12 +137,17 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   label: {
-    fontFamily: AmbitFont.body,
-    fontSize: 17,
+    fontFamily: AmbitFont.semibold,
+    fontSize: 14,
+    letterSpacing: 1.2,
   },
   arrow: {
     width: 52,
     height: 18,
     marginLeft: 8,
+  },
+  fullWidth: {
+    alignSelf: 'stretch',
+    width: '100%',
   },
 });

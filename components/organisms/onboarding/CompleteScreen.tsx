@@ -1,13 +1,13 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, Dimensions, Platform, StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Check } from 'phosphor-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import ConfettiCannon from 'react-native-confetti-cannon';
 import { Button, HardShadow } from '../../atoms';
 import { toast } from '../../../lib/toast';
 import { haptics } from '../../../lib/haptics';
-import { Brand, AmbitFont, Space } from '../../../constants/theme';
+import { Brand, Astra, AmbitFont, Radii, Space } from '../../../constants/theme';
 
 /// `onDone` submits the profile and resolves on success; it REJECTS on
 /// failure so we can keep the user here, tell them why, and let them retry.
@@ -65,9 +65,9 @@ export function CompleteScreen({ onDone }: Props) {
       <View style={{ flex: 1 }} />
 
       <Animated.View style={{ transform: [{ scale }] }}>
-        <HardShadow radius={48} offset={5}>
+        <HardShadow radius={Radii.lg} offset={5}>
           <View style={styles.check}>
-            <Feather name="check" size={40} color={Brand.actionInk} />
+            <Check size={40} color={Brand.inkOnBrand} weight="bold" />
           </View>
         </HardShadow>
       </Animated.View>
@@ -89,7 +89,7 @@ export function CompleteScreen({ onDone }: Props) {
         {submitting && (
           <ActivityIndicator
             style={styles.spinner}
-            color={Brand.actionInk}
+            color={Brand.inkOnBrand}
           />
         )}
       </Animated.View>
@@ -105,10 +105,10 @@ export function CompleteScreen({ onDone }: Props) {
         fallSpeed={2800}
         explosionSpeed={420}
         colors={[
-          Brand.action,
-          Brand.actionDeep,
-          '#DDEEE3',
-          '#3E6B53',
+          Brand.selected,
+          Astra.iris,
+          Astra.lilac,
+          Astra.canvas,
         ]}
       />
     </SafeAreaView>
@@ -117,21 +117,21 @@ export function CompleteScreen({ onDone }: Props) {
 
 const styles = StyleSheet.create({
   root: {
-    flex: 1, paddingHorizontal: Space.lg, backgroundColor: Brand.canvas,
+    flex: 1, paddingHorizontal: Space.lg, backgroundColor: Astra.void,
     alignItems: 'center',
   },
   check: {
-    width: 96, height: 96, borderRadius: 48,
-    backgroundColor: Brand.action,
-    borderWidth: 1.6, borderColor: Brand.actionInk,
+    width: 96, height: 96, borderRadius: Radii.lg,
+    backgroundColor: Brand.selected,
+    borderWidth: 1.6, borderColor: Astra.iris,
     alignItems: 'center', justifyContent: 'center',
   },
   headline: {
-    fontFamily: AmbitFont.display, fontSize: 44, color: Brand.inkPrimary,
+    fontFamily: AmbitFont.display, fontSize: 44, color: Astra.canvas,
     marginTop: 32,
   },
   subtitle: {
-    fontFamily: AmbitFont.body, fontSize: 15, color: Brand.inkMuted,
+    fontFamily: AmbitFont.body, fontSize: 15, color: Astra.lilac,
     textAlign: 'center', marginTop: 12, paddingHorizontal: 40,
   },
   cta: {

@@ -281,9 +281,8 @@ const styles = StyleSheet.create({
     gap: 20,
   },
   label: {
-    fontFamily: AmbitFont.body,
+    fontFamily: AmbitFont.semibold,
     fontSize: 14,
-    fontWeight: '600',
     color: Brand.inkLabel,
     marginBottom: 8,
     letterSpacing: 0.2,
@@ -299,10 +298,9 @@ const styles = StyleSheet.create({
     backgroundColor: Brand.surface1,
     borderWidth: 1.5,
     borderColor: Brand.borderDefault,
-    fontFamily: AmbitFont.body,
+    fontFamily: AmbitFont.medium,
     fontSize: 16,
     color: Brand.inkBody,
-    fontWeight: '600',
   },
   inputWithIcon: {
     paddingRight: 48,
@@ -321,10 +319,9 @@ const styles = StyleSheet.create({
     marginTop: -4,
   },
   forgot: {
-    fontFamily: AmbitFont.body,
+    fontFamily: AmbitFont.semibold,
     fontSize: 13,
     color: Brand.actionDeep,
-    fontWeight: '600',
   },
   errorNote: {
     fontFamily: AmbitFont.body,

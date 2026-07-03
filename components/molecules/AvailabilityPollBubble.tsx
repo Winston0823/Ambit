@@ -202,7 +202,7 @@ const styles = StyleSheet.create({
   primaryBtn: {
     paddingVertical: 12,
     borderRadius: 999,
-    backgroundColor: Brand.action,
+    backgroundColor: Brand.selected,
     borderWidth: 1.6,
     borderColor: Brand.actionInk,
     alignItems: 'center',
@@ -211,7 +211,7 @@ const styles = StyleSheet.create({
     fontFamily: AmbitFont.body,
     fontSize: 15,
     fontWeight: '700',
-    color: Brand.actionInk,
+    color: Brand.inkOnBrand,
   },
 
   secondaryBtn: { alignSelf: 'center', paddingVertical: 4 },

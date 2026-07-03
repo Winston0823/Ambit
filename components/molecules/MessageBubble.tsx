@@ -4,6 +4,7 @@ import {
   Animated,
   Dimensions,
   Image,
+  Linking,
   Pressable,
   StyleSheet,
   Text,
@@ -11,6 +12,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Paperclip, Warning } from 'phosphor-react-native';
+import { toast } from '../../lib/toast';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 
@@ -21,8 +23,8 @@ const animatedMsgIds = new Set<string>();
 // Screen-anchored "gradient" layer revealed through my (outgoing) bubbles.
 // Vocabulary-locked: outgoing bubbles are now a FLAT Brand.action fill, so
 // the stops are identical — the LinearGradient plumbing stays (positioning
-// math + clipping unchanged) but renders as one solid teal.
-const MINE_GRADIENT = [Brand.action, Brand.action] as const; // flat teal (dark ink text on top)
+// math + clipping unchanged) but renders as one solid royal.
+const MINE_GRADIENT = [Brand.action, Brand.action] as const; // flat royal (white text on top)
 const MINE_GRADIENT_START = { x: 0.4, y: 0 };
 const MINE_GRADIENT_END = { x: 0.6, y: 1 };
 import type { MessageRow, ReactionRow } from '../../lib/messaging';
@@ -174,6 +176,48 @@ function Avatar({
   );
 }
 
+/// Splits a run of text on http(s):// and www.-prefixed tokens and
+/// renders the URL tokens as tappable, underlined spans. Kept simple on
+/// purpose (regex split, no full URL grammar) — the goal is "links you
+/// can tap," not a parser. Trailing sentence punctuation is trimmed off
+/// the tap target so "see https://ambit.app." doesn't open a URL with a
+/// dangling period.
+const URL_SPLIT_RE = /((?:https?:\/\/|www\.)[^\s]+)/gi;
+
+function openUrl(raw: string) {
+  // Strip trailing punctuation that's almost certainly sentence-level.
+  const cleaned = raw.replace(/[.,;:!?)\]]+$/, '');
+  const href = /^https?:\/\//i.test(cleaned) ? cleaned : `https://${cleaned}`;
+  Linking.openURL(href).catch(() => {
+    toast.error("Couldn't open that link.");
+  });
+}
+
+function LinkifiedText({ text, style, linkStyle }: { text: string; style: any; linkStyle?: any }) {
+  // Reset lastIndex isn't needed with String.split, and split keeps the
+  // captured delimiters (the URLs) as odd-indexed array entries.
+  const parts = text.split(URL_SPLIT_RE);
+  return (
+    <Text style={style}>
+      {parts.map((part, i) => {
+        if (i % 2 === 1) {
+          return (
+            <Text
+              key={i}
+              style={[styles.link, linkStyle]}
+              onPress={() => openUrl(part)}
+              suppressHighlighting
+            >
+              {part}
+            </Text>
+          );
+        }
+        return part;
+      })}
+    </Text>
+  );
+}
+
 export function MessageBubble({
   message,
   isMine,
@@ -236,6 +280,37 @@ export function MessageBubble({
   const wasEdited = !!message.edited_at && !isDeleted;
   const kind = message.kind ?? 'user';
 
+  // Shared send-status row for the attachment branches (scheduling / poll
+  // / project / portfolio) that early-return before the default bubble's
+  // status row. Without this, an optimistic attachment send that fails is
+  // completely silent — no spinner, no "tap to retry" (audit fix). Only
+  // renders while a send is actually in flight or failed; a sent card
+  // stays clean. Tapping the failed row retries where a payload exists.
+  const sendStatusRow =
+    isMine && (status === 'sending' || status === 'failed') ? (
+      <View style={styles.statusRow}>
+        {status === 'sending' ? (
+          <>
+            <ActivityIndicator size="small" color={Brand.inkMuted} />
+            <Text style={styles.statusText}>Sending…</Text>
+          </>
+        ) : (
+          <Pressable
+            onPress={onRetry}
+            hitSlop={6}
+            style={styles.statusRetry}
+            accessibilityRole="button"
+            accessibilityLabel="Retry failed send"
+          >
+            <Warning size={11} color={Brand.danger} weight="fill" />
+            <Text style={[styles.statusText, { color: Brand.danger }]}>
+              Not delivered · Tap to retry
+            </Text>
+          </Pressable>
+        )}
+      </View>
+    ) : null;
+
   // System messages (closure-loop) render as a centered banner pill
   // rather than a speech bubble. Reactions / read receipts / replies
   // don't apply to them.
@@ -262,6 +337,7 @@ export function MessageBubble({
           meId={meId}
           isMine={isMine}
         />
+        {sendStatusRow}
       </View>
     );
   }
@@ -277,6 +353,7 @@ export function MessageBubble({
           onOpen={() => onOpenAvailabilityPoll?.(availabilityPoll.id)}
           onProposeTime={() => onProposeMeetingTime?.()}
         />
+        {sendStatusRow}
       </View>
     );
   }
@@ -290,6 +367,7 @@ export function MessageBubble({
           isMine={isMine}
           onPress={() => onOpenProjectRef?.(projectRef)}
         />
+        {sendStatusRow}
       </View>
     );
   }
@@ -303,6 +381,7 @@ export function MessageBubble({
           isMine={isMine}
           onPress={() => onOpenPortfolioRef?.(portfolioRef)}
         />
+        {sendStatusRow}
       </View>
     );
   }
@@ -427,7 +506,19 @@ export function MessageBubble({
             Message deleted
           </Text>
         ) : message.body ? (
-          <Text style={[styles.body, isMine && styles.bodyMine]}>{message.body}</Text>
+          <LinkifiedText
+            text={message.body}
+            style={[
+              styles.body,
+              isMine && styles.bodyMine,
+              // Failed sends flip the bubble to the danger fill; dark ink on
+              // that red is ~2.9:1. White ink restores contrast.
+              isMine && status === 'failed' && styles.bodyFailed,
+            ]}
+            // Links on the royal "mine" fill need a light color too — the
+            // default deep-royal link would vanish into the bubble.
+            linkStyle={isMine ? styles.linkMine : undefined}
+          />
         ) : null}
       </Pressable>
         {isMine && (lastInGroup ? <Avatar url={avatarUrl} name={senderName} /> : <View style={styles.avatarSpacer} />)}
@@ -564,9 +655,8 @@ const styles = StyleSheet.create({
   },
   avatarImg: { width: '100%', height: '100%' },
   avatarInitial: {
-    fontFamily: AmbitFont.body,
+    fontFamily: AmbitFont.bold,
     fontSize: 14,
-    fontWeight: '700',
     color: Brand.inkLabel,
   },
 
@@ -587,9 +677,8 @@ const styles = StyleSheet.create({
   systemPillMuted: { backgroundColor: Brand.cardCream },
   systemPillWarm:  { backgroundColor: Brand.tagMint },
   systemText: {
-    fontFamily: AmbitFont.body,
+    fontFamily: AmbitFont.semibold,
     fontSize: 13,
-    fontWeight: '600',
     color: Brand.inkBody,
     textAlign: 'center',
   },
@@ -597,17 +686,17 @@ const styles = StyleSheet.create({
   bubble: {
     // iMessage rhythm — tight padding, no shadow, no internal meta row.
     maxWidth: '72%',
-    borderRadius: 20,
+    borderRadius: 16,
     paddingHorizontal: 12,
     paddingVertical: 8,
     gap: 4,
     overflow: 'hidden',
   },
   bubbleMine: {
-    // Flat teal fill, borderless — the hard ink border is reserved for
-    // tactile (pressable) surfaces; plain text bubbles stay quiet.
+    // Flat royal fill, white text — the signature ASTRA outgoing bubble.
+    // Tight tail corner (bottom-right 5) anchors it to my side.
     backgroundColor: Brand.action,
-    borderBottomRightRadius: 4,
+    borderBottomRightRadius: 5,
   },
   // Screen-sized gradient layer clipped by the bubble's rounded rect.
   mineGradientLayer: {
@@ -622,16 +711,16 @@ const styles = StyleSheet.create({
     height: SCREEN_H,
   },
   bubbleTheirs: {
-    // Incoming surface — cream on eggshell with only a soft hairline for
-    // separation; hard ink borders are reserved for interactive bubbles.
+    // Incoming surface — white/glass island with only a soft hairline for
+    // separation. Tail corner bottom-left 5 anchors it to their side.
     backgroundColor: Brand.cardCream,
-    borderBottomLeftRadius: 4,
+    borderBottomLeftRadius: 5,
     borderWidth: 1,
     borderColor: Brand.borderSoft,
   },
   // Mid-run bubbles round their tail corner (the tail belongs to the last one).
-  bubbleTheirsGrouped: { borderBottomLeftRadius: 20 },
-  bubbleMineGrouped:   { borderBottomRightRadius: 20 },
+  bubbleTheirsGrouped: { borderBottomLeftRadius: 16 },
+  bubbleMineGrouped:   { borderBottomRightRadius: 16 },
   bubbleDeleted: { opacity: 0.65 },
   // Optimistic-send tints: while in flight the bubble is slightly
   // translucent; on failure it shifts to a muted red so the user sees the
@@ -645,7 +734,15 @@ const styles = StyleSheet.create({
     color: Brand.inkBody,
     lineHeight: 21,
   },
-  bodyMine: { color: Brand.actionInk },
+  bodyMine: { color: Brand.inkOnBrand }, // white on the royal fill (was dark ink — invisible)
+  bodyFailed: { color: Brand.inkOnBrand },
+  // Tappable URL span — underline + brand accent so it reads as a link
+  // without leaving the type ramp.
+  linkMine: { color: '#FFFFFF' },
+  link: {
+    color: Brand.actionDeep,
+    textDecorationLine: 'underline',
+  },
 
   // External status line below the latest mine bubble — iMessage
   // "Delivered" / "Read 3:36 PM". Tiny, right-aligned, muted.
@@ -663,6 +760,12 @@ const styles = StyleSheet.create({
     color: Brand.inkMuted,
     letterSpacing: 0.1,
   },
+  // Tappable retry affordance inside the attachment-branch status row.
+  statusRetry: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
 
   tombstone: {
     fontFamily: AmbitFont.body,
@@ -670,7 +773,7 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     color: Brand.inkMuted,
   },
-  tombstoneMine: { color: Brand.actionInk },
+  tombstoneMine: { color: 'rgba(255,255,255,0.72)' },
 
   image: {
     width: 220,
@@ -688,9 +791,8 @@ const styles = StyleSheet.create({
   },
   replyQuoteMine: { borderLeftColor: Brand.canvas },
   replyAuthor: {
-    fontFamily: AmbitFont.body,
+    fontFamily: AmbitFont.semibold,
     fontSize: 11,
-    fontWeight: '600',
     color: Brand.accent,
   },
   replyAuthorMine: { color: Brand.canvas },
@@ -699,7 +801,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: Brand.inkMuted,
   },
-  replyBodyMine: { color: Brand.actionInk },
+  replyBodyMine: { color: 'rgba(255,255,255,0.85)' },
   replyBodyRow: {
     flexDirection: 'row',
     alignItems: 'center',

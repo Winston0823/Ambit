@@ -22,7 +22,7 @@ import {
   X,
 } from 'phosphor-react-native';
 import type { MessageRow } from '../../lib/messaging';
-import { HardShadow } from '../atoms';
+import { GlassSurface, HardShadow } from '../atoms';
 import { AmbitFont, Brand, Radii, Space } from '../../constants/theme';
 import { Motion } from '../../constants/motion';
 
@@ -246,6 +246,7 @@ export function ChatComposer({
       )}
 
       <HardShadow radius={26} offset={4} style={styles.inputRowShadow}>
+      <GlassSurface intensity={20} hairline style={styles.inputRowGlass}>
       <View style={styles.inputRow}>
         {!editing && (
           <Pressable
@@ -284,10 +285,11 @@ export function ChatComposer({
           accessibilityLabel={editing ? 'Save edit' : 'Send'}
         >
           <Animated.View style={[styles.sendBtn, { opacity: sendOpacity, transform: [{ scale: sendScale }] }]}>
-            <PaperPlaneTilt size={16} color={Brand.actionInk} weight="fill" />
+            <PaperPlaneTilt size={16} color={Brand.inkOnBrand} weight="fill" />
           </Animated.View>
         </Pressable>
       </View>
+      </GlassSurface>
       </HardShadow>
 
       {/* Attachment grid — WeChat pattern. Lives BELOW the input row in
@@ -348,8 +350,8 @@ interface AttachTileProps {
 }
 
 /// One tile in the attachment grid. The icon is the action's primary signal,
-/// so it gets a large tactile tile in the app's button language — teal `action`
-/// fill, ink border, hard offset edge — with the label quiet underneath.
+/// so it gets a large tactile tile in the app's button language — royal `action`
+/// fill, ink border, soft lift — with the label quiet underneath.
 /// Disabled tiles fade to ~45% and ignore taps.
 function AttachTile({ Icon, label, onPress, disabled }: AttachTileProps) {
   return (
@@ -366,7 +368,7 @@ function AttachTile({ Icon, label, onPress, disabled }: AttachTileProps) {
     >
       <HardShadow radius={Radii.lg} offset={4}>
         <View style={styles.attachTileIcon}>
-          <Icon size={32} color={disabled ? Brand.inkMuted : Brand.actionInk} weight="regular" />
+          <Icon size={32} color={disabled ? Brand.inkMuted : Brand.inkOnBrand} weight="regular" />
         </View>
       </HardShadow>
       <Text style={[styles.attachTileLabel, disabled && styles.attachTileLabelDisabled]}>
@@ -460,12 +462,15 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
 
-  // Floating cream pill that holds the +, input, and send. Crisp ink
-  // border + the hard offset edge (HardShadow wrapper) — the locked
-  // tactile language, replacing the old soft shadow.
+  // Floating glass pill that holds the +, input, and send. GlassSurface
+  // supplies the blur + warm-white fill + purple hairline; the HardShadow
+  // wrapper lifts it softly off the canvas.
   inputRowShadow: {
     marginHorizontal: Space.md,
     marginBottom: 8,
+  },
+  inputRowGlass: {
+    borderRadius: 26,
   },
   inputRow: {
     flexDirection: 'row',
@@ -474,12 +479,10 @@ const styles = StyleSheet.create({
     paddingLeft: 12,
     paddingRight: 8,
     paddingVertical: 8,
-    backgroundColor: Brand.cardCream,
+    backgroundColor: 'transparent',
     borderRadius: 26,
-    borderWidth: 1.5,
-    borderColor: Brand.inkEdge,
   },
-  // Bare + tap target (no chip) — a clean tan glyph that darkens when the
+  // Bare + tap target (no chip) — a clean glyph that darkens when the
   // attachment grid is open.
   plusBtn: {
     width: 36,
@@ -517,7 +520,7 @@ const styles = StyleSheet.create({
   },
   attachTileDisabled: { opacity: 0.45 },
   // Large tactile tile — the icon is the action's main signal. App button
-  // language: teal `action` fill, 1.5px ink border, hard offset edge (the
+  // language: royal `action` fill, 1.5px ink border, soft lift (the
   // <HardShadow> wrapper). Radius on the 4px grid (Radii.lg).
   attachTileIcon: {
     width: 64,
@@ -550,14 +553,13 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: Brand.inkBody,
   },
-  // Solid espresso send — the one dark action in the pill.
+  // Royal circular send — the one saturated action in the glass pill,
+  // white paper-airplane on royal.
   sendBtn: {
     width: 40,
     height: 40,
     borderRadius: 20,
     backgroundColor: Brand.action,
-    borderWidth: 1.6,
-    borderColor: Brand.actionInk,
     alignItems: 'center',
     justifyContent: 'center',
   },

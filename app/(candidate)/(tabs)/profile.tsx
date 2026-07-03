@@ -15,10 +15,10 @@ import {
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   Camera,
-  Chat,
   Check,
   FileArrowUp,
   MapPin,
@@ -27,15 +27,11 @@ import {
   SignOut,
   X,
 } from 'phosphor-react-native';
-import { Chip, HardShadow, Skeleton } from '../../../components/atoms';
+import { Chip, GlassSurface, HardShadow, Skeleton, TextField } from '../../../components/atoms';
 import { router, useFocusEffect } from 'expo-router';
 import {
-  AddPortfolioBubble,
-  DiscoveryCard,
   OwnerProfileCard,
-  PortfolioBubble,
   PortfolioModal,
-  SpeechBubble,
 } from '../../../components/molecules';
 import type { OwnerProject } from '../../../components/molecules';
 import { useAuth } from '../../../context/AuthContext';
@@ -57,6 +53,7 @@ import { CAMPUSES, SKILL_CATEGORIES } from '../../../data/mock';
 import type { PortfolioItem, SeekerCardData } from '../../../data/mock';
 import {
   AmbitFont,
+  Astra,
   Brand,
   Radii,
   Space,
@@ -83,12 +80,13 @@ const ROLE_LABEL: Record<NonNullable<ProfileRow['role']>, string> = {
 };
 const ROLE_OPTIONS: NonNullable<ProfileRow['role']>[] = ['seeker', 'owner'];
 
+// ASTRA royal→iris gradient family for portfolio tiles + avatar fallback.
 const PORTFOLIO_GRADIENTS: [string, string][] = [
-  [Brand.primary, Brand.accent],
-  ['#C9A57A', Brand.seekerInk],
-  [Brand.seekerSurface, Brand.accent],
-  ['#E8C9A0', Brand.primary],
-  [Brand.accent, '#7A5A38'],
+  [Astra.royal, Astra.iris],
+  [Astra.iris, Astra.selected],
+  [Astra.selected, Astra.royal],
+  [Astra.void, Astra.iris],
+  [Astra.royal, Astra.selected],
 ];
 
 /// S-090 Profile — live editable WYSIWYG version of the user's seeker card.
@@ -108,6 +106,11 @@ export default function ProfileTab() {
   const insets = useSafeAreaInsets();
   const [profile, setProfile] = useState<ProfileRow | null>(null);
   const [loading, setLoading] = useState(true);
+  // A genuine read failure (network / RLS) — distinct from a legitimately
+  // absent profile row (new user). Drives an error state with Retry instead of
+  // rendering editable "Add your name" placeholders over a profile we simply
+  // couldn't reach.
+  const [loadError, setLoadError] = useState(false);
   // Résumé import → the review/apply screen (paste / file / photo live there).
   const openResumeImport = () => router.push('/resume-import');
 
@@ -121,8 +124,16 @@ export default function ProfileTab() {
   const [editing, setEditing] = useState(false);
   const [ownerProjects, setOwnerProjects] = useState<OwnerProject[]>([]);
 
+  // Inline field drafts (Name + About) — the ASTRA editor edits these in place
+  // via TextField and commits through the same optimistic updateField() the
+  // pickers use, on blur. Seeded from the profile and re-synced whenever the
+  // canonical row changes (focus refetch, résumé import, etc.).
+  const [nameDraft, setNameDraft] = useState('');
+  const [aboutDraft, setAboutDraft] = useState('');
+  useEffect(() => { setNameDraft(profile?.name ?? ''); }, [profile?.name]);
+  useEffect(() => { setAboutDraft(profile?.vibe_blurb ?? ''); }, [profile?.vibe_blurb]);
+
   // Edit modal state
-  const [textEdit, setTextEdit] = useState<TextEditState | null>(null);
   const [skillsOpen, setSkillsOpen] = useState(false);
   const [campusOpen, setCampusOpen] = useState(false);
   const [roleOpen, setRoleOpen] = useState(false);
@@ -140,6 +151,7 @@ export default function ProfileTab() {
   // pill hidden.
   const loadProfile = useCallback(async () => {
     if (!user) { setLoading(false); return; }
+    setLoadError(false);
     const full = await supabase
       .from('profiles')
       .select('id, name, vibe_blurb, skills, role, campus_id, photo_url, response_rate, avg_response_minutes')
@@ -159,8 +171,11 @@ export default function ProfileTab() {
       .eq('id', user.id)
       .maybeSingle();
     if (base.error) {
+      // A real outage — NOT a missing row (maybeSingle returns null data / no
+      // error for that). Surface an error state with Retry so we never render
+      // empty editable placeholders over a profile we couldn't read.
       console.warn('profile fetch (baseline) also failed:', base.error.message);
-      setProfile(null);
+      setLoadError(true);
     } else {
       setProfile(
         base.data
@@ -198,6 +213,15 @@ export default function ProfileTab() {
     });
   };
 
+  /// Commit an inline text field on blur — only writes when the trimmed draft
+  /// actually diverges from the saved value, so a focus/blur with no change is
+  /// a no-op (no needless network write or embed refresh).
+  const commitText = (field: 'name' | 'vibe_blurb', draft: string) => {
+    const next = draft.trim();
+    if (next === (profile?.[field] ?? '')) return;
+    updateField(field, next);
+  };
+
   const pickPhoto = async () => {
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
@@ -215,6 +239,9 @@ export default function ProfileTab() {
     if (result.canceled || !user) return;
     const asset = result.assets[0];
 
+    // Remember the current photo so a failed upload can snap back instead of
+    // leaving a local file:// URI on display forever.
+    const prevPhoto = profile?.photo_url ?? null;
     // Show the local URI immediately so the UI updates without waiting.
     setProfile((p) => (p ? { ...p, photo_url: asset.uri } : p));
 
@@ -234,6 +261,9 @@ export default function ProfileTab() {
       setProfile((p) => (p ? { ...p, photo_url: data.publicUrl } : p));
     } catch (e: any) {
       console.warn('Avatar upload failed:', e?.message ?? e);
+      // Revert the optimistic local URI — the upload never landed, so keep
+      // showing the previous (real) avatar rather than a dead file:// path.
+      setProfile((p) => (p ? { ...p, photo_url: prevPhoto } : p));
       toast.error("Couldn't upload your photo. Tap to try again.", {
         actionLabel: 'Retry',
         onAction: () => { void pickPhoto(); },
@@ -340,6 +370,7 @@ export default function ProfileTab() {
       await deletePortfolioItem(id);
     } catch (e: any) {
       console.warn('portfolio delete failed:', e?.message ?? e);
+      toast.error("Couldn't delete that highlight. We've put it back.");
       if (user) {
         const items = await fetchPortfolioForUser(user.id);
         setPortfolio(items);
@@ -399,6 +430,31 @@ export default function ProfileTab() {
     );
   }
 
+  // Distinct error state (not an empty editor) — matches the feed's DeckError
+  // language: title + body + a Retry button.
+  if (loadError) {
+    return (
+      <View style={styles.root}>
+        <View style={[styles.errorWrap, { paddingTop: insets.top }]}>
+          <Text style={styles.errorTitle}>Couldn't load your profile.</Text>
+          <Text style={styles.errorBody}>
+            Something went wrong reaching the server. Check your connection and try again.
+          </Text>
+          <HardShadow radius={999} offset={4} style={{ marginTop: 12 }}>
+            <Pressable
+              onPress={() => { setLoading(true); loadProfile(); }}
+              style={styles.errorBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Retry loading your profile"
+            >
+              <Text style={styles.errorBtnText}>Retry</Text>
+            </Pressable>
+          </HardShadow>
+        </View>
+      </View>
+    );
+  }
+
   const initial = (profile?.name ?? '?')[0]?.toUpperCase() ?? '?';
   const skills = profile?.skills ?? [];
 
@@ -413,16 +469,18 @@ export default function ProfileTab() {
     skills,
     vibeBlurb: profile?.vibe_blurb ?? '',
     portfolio,
+    // Preview parity — the public seeker card shows the reply-tier badge, so
+    // the WYSIWYG preview must carry the same rate.
+    responseRate: profile?.response_rate ?? null,
   };
 
   return (
     <View style={styles.root}>
-      {/* Header — minimal: an eyebrow label so the user knows they're in
-          edit mode, plus a sign-out button in the corner. */}
-      {/* Just clear the safe area — no extra top gap. The 44px header band
-          centers the eyebrow + sign-out button, giving a snug top that sits
-          right below the Dynamic Island. */}
-      <View style={[styles.header, { marginTop: insets.top }]}>
+      {/* Glass top bar — the Edit|Preview segment centered on a light-glass
+          surface with a lilac bottom hairline; résumé-import + sign-out dock
+          to the right. */}
+      <GlassSurface intensity={24} tint="light" style={[styles.topBar, { paddingTop: insets.top }]}>
+      <View style={styles.header}>
         <View style={styles.segment}>
           <Pressable
             onPress={() => { if (Platform.OS !== 'web') Haptics.selectionAsync().catch(() => {}); setEditing(true); }}
@@ -452,7 +510,12 @@ export default function ProfileTab() {
           </Pressable>
         )}
         <Pressable
-          onPress={() => { signOut().catch(() => {}); }}
+          onPress={() => {
+            Alert.alert('Sign out?', 'You can sign back in anytime.', [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Sign out', style: 'destructive', onPress: () => { signOut().catch(() => {}); } },
+            ]);
+          }}
           style={styles.signOutBtn}
           hitSlop={10}
           accessibilityLabel="Sign out"
@@ -460,6 +523,7 @@ export default function ProfileTab() {
           <SignOut size={18} color={Brand.inkMuted} weight="regular" />
         </Pressable>
       </View>
+      </GlassSurface>
 
       {editing ? (
       <ScrollView
@@ -467,64 +531,78 @@ export default function ProfileTab() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Photo */}
-        <Pressable onPress={pickPhoto} style={styles.photoRow}>
-          <View style={styles.photoThumb}>
-            {profile?.photo_url
-              ? <Image source={{ uri: profile.photo_url }} style={styles.photoThumbImg} />
-              : <Text style={styles.photoThumbInitial}>{initial}</Text>}
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.fieldRowLabel}>Photo</Text>
-            <Text style={styles.fieldRowValueStacked}>
-              {profile?.photo_url ? 'Tap to change' : 'Add a photo'}
-            </Text>
-          </View>
-          <Camera size={18} color={Brand.inkMuted} weight="regular" />
-        </Pressable>
+        {/* Photo — centered squared avatar (royal→iris) + Change photo */}
+        <View style={styles.avatarBlock}>
+          <Pressable onPress={pickPhoto} style={styles.avatarSquare} accessibilityLabel="Change photo">
+            {profile?.photo_url ? (
+              <Image source={{ uri: profile.photo_url }} style={styles.avatarSquareImg} />
+            ) : (
+              <LinearGradient
+                colors={[Astra.royal, Astra.iris]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.avatarSquareImg}
+              >
+                <Text style={styles.avatarSquareInitial}>{initial}</Text>
+              </LinearGradient>
+            )}
+            <View style={styles.cameraChip}>
+              <Camera size={14} color={Brand.inkOnBrand} weight="fill" />
+            </View>
+          </Pressable>
+          <Pressable onPress={pickPhoto} hitSlop={8}>
+            <Text style={styles.changePhoto}>{profile?.photo_url ? 'Change photo' : 'Add photo'}</Text>
+          </Pressable>
+        </View>
 
-        {/* Core fields — labeled list (Tinder / Hinge convention) */}
-        <View style={styles.fieldGroup}>
-          <FieldRow
+        {/* Core fields — inline TextField editing; commits on blur. Campus +
+            role are single-select pickers, so they stay tap-to-open rows. */}
+        <View style={styles.fieldStack}>
+          <TextField
             label="Name"
-            value={profile?.name ?? ''}
+            value={nameDraft}
+            onChangeText={setNameDraft}
+            onEndEditing={() => commitText('name', nameDraft)}
+            onBlur={() => commitText('name', nameDraft)}
             placeholder="Add your name"
-            onPress={() => setTextEdit({ field: 'name', title: 'Your name', value: profile?.name ?? '', placeholder: 'Alex Chen', multiline: false })}
+            maxLength={60}
+            returnKeyType="done"
           />
-          <FieldRow
+          <TextField
             label="About"
-            stacked
-            value={profile?.vibe_blurb ?? ''}
+            textarea
+            value={aboutDraft}
+            onChangeText={setAboutDraft}
+            onEndEditing={() => commitText('vibe_blurb', aboutDraft)}
+            onBlur={() => commitText('vibe_blurb', aboutDraft)}
             placeholder="Two sentences on how you like to work"
-            onPress={() => setTextEdit({ field: 'vibe_blurb', title: 'Your vibe', value: profile?.vibe_blurb ?? '', placeholder: 'Two sentences about how you like to work.', multiline: true })}
+            maxLength={280}
           />
-          <FieldRow
+          <PickerField
             label="Campus"
             value={campus?.name ?? ''}
             placeholder="Set your campus"
             onPress={() => setCampusOpen(true)}
           />
-          <FieldRow
+          <PickerField
             label="Looking to"
             value={profile?.role ? ROLE_LABEL[profile.role] : ''}
             placeholder="Pick a role"
             onPress={() => setRoleOpen(true)}
-            last
           />
         </View>
 
-        {/* Skills */}
+        {/* Skills — owned chips fill #9362C8 (selected), plus a dashed add chip. */}
         <View style={styles.editSection}>
-          <View style={styles.editSectionHead}>
-            <Text style={styles.sectionLabel}>SKILLS</Text>
-            <Pressable onPress={() => setSkillsOpen(true)} hitSlop={8}>
-              <Text style={styles.editLink}>{skills.length === 0 ? 'Add' : 'Edit'}</Text>
-            </Pressable>
-          </View>
+          <Text style={styles.sectionLabel}>SKILLS</Text>
           <View style={styles.chipRow}>
-            {skills.length === 0
-              ? <Text style={styles.fieldRowEmpty}>No skills added yet</Text>
-              : skills.map((s) => <Chip key={s} label={s} selected={false} />)}
+            {skills.map((s) => (
+              <Chip key={s} label={s} selected onPress={() => setSkillsOpen(true)} />
+            ))}
+            <Pressable onPress={() => setSkillsOpen(true)} style={styles.addChip} hitSlop={6} accessibilityLabel="Add skills">
+              <Text style={styles.addChipPlus}>＋</Text>
+              <Text style={styles.addChipLabel}>Add</Text>
+            </Pressable>
           </View>
         </View>
 
@@ -563,32 +641,49 @@ export default function ProfileTab() {
         ) : (
           <View style={styles.editSection}>
             <Text style={styles.sectionLabel}>PORTFOLIO</Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.portfolioRow}
-            >
+            <View style={styles.portfolioGrid}>
               {portfolio.map((item) => (
-                <PortfolioBubble
+                <Pressable
                   key={item.id}
-                  item={item}
                   onPress={() => setActivePortfolio(item)}
-                  active={activePortfolio?.id === item.id}
-                />
+                  style={styles.tile}
+                  accessibilityLabel={`Edit ${item.title || 'portfolio item'}`}
+                >
+                  <View style={[styles.tileImgWrap, activePortfolio?.id === item.id && styles.tileActive]}>
+                    {item.imageUri ? (
+                      <Image source={{ uri: item.imageUri }} style={styles.tileImg} />
+                    ) : (
+                      <LinearGradient
+                        colors={item.gradient}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={styles.tileImg}
+                      >
+                        <Text style={styles.tileInitial}>{(item.title[0] ?? '').toUpperCase()}</Text>
+                      </LinearGradient>
+                    )}
+                  </View>
+                  <Text style={styles.tileTitle} numberOfLines={1}>{item.title || 'Untitled'}</Text>
+                </Pressable>
               ))}
-              <AddPortfolioBubble
+              <Pressable
                 onPress={addNewPortfolio}
-                label={portfolio.length === 0 ? 'Add first' : 'Add'}
-              />
-            </ScrollView>
+                style={styles.tile}
+                accessibilityLabel="Add portfolio item"
+              >
+                <View style={[styles.tileImgWrap, styles.addTile]}>
+                  <Plus size={26} color={Brand.selected} weight="bold" />
+                </View>
+                <Text style={[styles.tileTitle, styles.addTileLabel]} numberOfLines={1}>Add</Text>
+              </Pressable>
+            </View>
           </View>
         )}
 
         <View style={{ height: Space.xl }} />
       </ScrollView>
-      ) : (
+      ) : profile?.role === 'owner' ? (
         <View style={styles.previewWrap}>
-          {profile?.role === 'owner' ? (
             <OwnerProfileCard
               name={profile?.name ?? ''}
               photoUri={profile?.photo_url ?? null}
@@ -598,27 +693,23 @@ export default function ProfileTab() {
               projects={ownerProjects}
               onProjectPress={(id) => router.push({ pathname: '/project-manage', params: { id } })}
             />
-          ) : (
-            <DiscoveryCard
-              card={previewCard}
-              showReachButton={false}
-              onPortfolioPress={setActivePortfolio}
-              activePortfolioId={activePortfolio?.id ?? null}
-            />
-          )}
         </View>
+      ) : (
+            <SeekerPreview
+              initial={initial}
+              name={previewCard.name}
+              photoUri={previewCard.photoUri}
+              headline={profile?.role ? ROLE_LABEL[profile.role] : ''}
+              campusName={campus?.name ?? null}
+              about={previewCard.vibeBlurb}
+              skills={skills}
+              portfolio={portfolio}
+              responseRate={previewCard.responseRate}
+              onPortfolioPress={setActivePortfolio}
+            />
       )}
 
       {/* ── Edit modals ────────────────────────────────────────────────── */}
-      <TextEditModal
-        state={textEdit}
-        onCancel={() => setTextEdit(null)}
-        onSave={(value) => {
-          if (textEdit) updateField(textEdit.field, value);
-          setTextEdit(null);
-        }}
-      />
-
       <SkillsEditModal
         visible={skillsOpen}
         selected={skills}
@@ -663,117 +754,161 @@ export default function ProfileTab() {
   );
 }
 
-/// One labeled, tappable row in the profile editor (Tinder/Hinge field list).
-function FieldRow({
+/// A single-select picker row styled to sit alongside the TextField inputs:
+/// an overline label, the chosen value (or placeholder) in a bordered field
+/// box, and a pencil affordance. Opens its modal on press.
+function PickerField({
   label,
   value,
   placeholder,
   onPress,
-  stacked,
-  last,
 }: {
   label: string;
   value: string;
   placeholder: string;
   onPress: () => void;
-  stacked?: boolean;
-  last?: boolean;
 }) {
   const empty = !value.trim();
   return (
-    <Pressable onPress={onPress} style={[styles.fieldRow, !last && styles.fieldRowDivider]}>
-      {stacked ? (
-        <View style={{ flex: 1, gap: 3 }}>
-          <Text style={styles.fieldRowLabel}>{label}</Text>
-          <Text style={[styles.fieldRowValueStacked, empty && styles.fieldRowEmpty]} numberOfLines={2}>
-            {empty ? placeholder : value}
-          </Text>
-        </View>
-      ) : (
-        <>
-          <Text style={styles.fieldRowLabel}>{label}</Text>
-          <Text style={[styles.fieldRowValue, empty && styles.fieldRowEmpty]} numberOfLines={1}>
-            {empty ? placeholder : value}
-          </Text>
-        </>
-      )}
-      <PencilSimpleLine size={15} color={Brand.inkMuted} weight="regular" />
-    </Pressable>
+    <View style={styles.pickerWrap}>
+      <Text style={styles.pickerLabel}>{label}</Text>
+      <Pressable onPress={onPress} style={styles.pickerBox} accessibilityRole="button">
+        <Text style={[styles.pickerValue, empty && styles.pickerValueEmpty]} numberOfLines={1}>
+          {empty ? placeholder : value}
+        </Text>
+        <PencilSimpleLine size={15} color={Brand.inkMuted} weight="regular" />
+      </Pressable>
+    </View>
   );
 }
 
-// ─── TextEditModal (name, vibe) ──────────────────────────────────────────
+// ─── SeekerPreview — read-only rich ASTRA profile ────────────────────────
 
-interface TextEditState {
-  field: keyof ProfileRow;
-  title: string;
-  value: string;
-  placeholder: string;
-  multiline: boolean;
-}
-
-function TextEditModal({
-  state,
-  onCancel,
-  onSave,
+/// The WYSIWYG read-only card. Squared avatar hero (royal→iris), Playfair
+/// name, iris headline, campus pin, ABOUT, glass SKILLS chips, and a
+/// horizontal PORTFOLIO HIGHLIGHTS strip. Response-rate logic is preserved —
+/// the reply-rate pill mirrors what owners see on the discovery card.
+function SeekerPreview({
+  initial,
+  name,
+  photoUri,
+  headline,
+  campusName,
+  about,
+  skills,
+  portfolio,
+  responseRate,
+  onPortfolioPress,
 }: {
-  state: TextEditState | null;
-  onCancel: () => void;
-  onSave: (value: string) => void;
+  initial: string;
+  name: string;
+  photoUri: string | null;
+  headline: string;
+  campusName: string | null;
+  about: string;
+  skills: string[];
+  portfolio: PortfolioItem[];
+  responseRate: number | null | undefined;
+  onPortfolioPress: (item: PortfolioItem) => void;
 }) {
-  const [draft, setDraft] = useState('');
-
-  useEffect(() => {
-    setDraft(state?.value ?? '');
-  }, [state]);
-
-  if (!state) return null;
-  const canSave = draft.trim().length > 0;
-
+  const rate = formatResponseRate(responseRate);
   return (
-    <Modal transparent animationType="fade" visible={!!state} onRequestClose={onCancel}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={modalStyles.root}
-      >
-        <Pressable style={modalStyles.scrim} onPress={onCancel} />
-        <View style={modalStyles.sheet}>
-          <View style={modalStyles.sheetHeader}>
-            <Text style={modalStyles.sheetTitle}>{state.title}</Text>
-            <Pressable onPress={onCancel} hitSlop={10}>
-              <X size={20} color={Brand.inkMuted} weight="bold" />
-            </Pressable>
+    <ScrollView
+      style={styles.scroll}
+      contentContainerStyle={previewStyles.content}
+      showsVerticalScrollIndicator={false}
+    >
+      <View style={previewStyles.hero}>
+        <View style={previewStyles.heroAvatar}>
+          {photoUri ? (
+            <Image source={{ uri: photoUri }} style={previewStyles.heroAvatarImg} />
+          ) : (
+            <LinearGradient
+              colors={[Astra.royal, Astra.iris]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={previewStyles.heroAvatarImg}
+            >
+              <Text style={previewStyles.heroAvatarInitial}>{initial}</Text>
+            </LinearGradient>
+          )}
+        </View>
+        <Text style={previewStyles.heroName} numberOfLines={2}>{name || 'Your name'}</Text>
+        {!!headline && <Text style={previewStyles.heroHeadline}>{headline}</Text>}
+        {!!campusName && (
+          <View style={previewStyles.heroMetaRow}>
+            <MapPin size={14} color={Brand.selected} weight="fill" />
+            <Text style={previewStyles.heroMeta}>{campusName}</Text>
           </View>
+        )}
+        {rate && (
+          <View style={previewStyles.ratePill}>
+            <Text style={previewStyles.rateText}>{rate} reply rate</Text>
+          </View>
+        )}
+      </View>
 
-          <TextInput
-            value={draft}
-            onChangeText={setDraft}
-            placeholder={state.placeholder}
-            placeholderTextColor={Brand.inkPlaceholder}
-            multiline={state.multiline}
-            autoFocus
-            maxLength={state.multiline ? 280 : 60}
-            style={[
-              modalStyles.input,
-              state.multiline && modalStyles.inputMultiline,
-            ]}
-          />
+      {!!about.trim() && (
+        <View style={previewStyles.section}>
+          <Text style={styles.sectionLabel}>ABOUT</Text>
+          <Text style={previewStyles.about}>{about}</Text>
+        </View>
+      )}
 
-          <View style={modalStyles.footer}>
-            <HardShadow radius={999} offset={3} style={!canSave ? { opacity: 0.45 } : undefined}>
-              <Pressable
-                onPress={() => canSave && onSave(draft.trim())}
-                disabled={!canSave}
-                style={modalStyles.saveBtn}
-              >
-                <Check size={16} color={Brand.actionInk} weight="bold" />
-                <Text style={modalStyles.saveLabel}>Save</Text>
-              </Pressable>
-            </HardShadow>
+      {skills.length > 0 && (
+        <View style={previewStyles.section}>
+          <Text style={styles.sectionLabel}>SKILLS</Text>
+          <View style={styles.chipRow}>
+            {skills.map((s) => (
+              <GlassSurface key={s} hairline style={previewStyles.glassChip}>
+                <Text style={previewStyles.glassChipText}>{s}</Text>
+              </GlassSurface>
+            ))}
           </View>
         </View>
-      </KeyboardAvoidingView>
-    </Modal>
+      )}
+
+      {portfolio.length > 0 && (
+        <View style={previewStyles.section}>
+          <Text style={styles.sectionLabel}>PORTFOLIO HIGHLIGHTS</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={previewStyles.stripRow}
+          >
+            {portfolio.map((item) => (
+              <Pressable
+                key={item.id}
+                onPress={() => onPortfolioPress(item)}
+                style={previewStyles.stripCard}
+                accessibilityLabel={`View ${item.title || 'highlight'}`}
+              >
+                <View style={previewStyles.stripThumb}>
+                  {item.imageUri ? (
+                    <Image source={{ uri: item.imageUri }} style={previewStyles.stripThumbImg} />
+                  ) : (
+                    <LinearGradient
+                      colors={item.gradient}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={previewStyles.stripThumbImg}
+                    >
+                      <Text style={previewStyles.stripInitial}>{(item.title[0] ?? '').toUpperCase()}</Text>
+                    </LinearGradient>
+                  )}
+                </View>
+                <Text style={previewStyles.stripTitle} numberOfLines={1}>{item.title || 'Untitled'}</Text>
+                {!!item.description && (
+                  <Text style={previewStyles.stripSub} numberOfLines={2}>{item.description}</Text>
+                )}
+              </Pressable>
+            ))}
+          </ScrollView>
+        </View>
+      )}
+
+      <View style={{ height: Space.xl }} />
+    </ScrollView>
   );
 }
 
@@ -814,14 +949,29 @@ function SkillsEditModal({
     setCustomInput('');
   };
 
+  // Dirty = the working selection diverges from the saved skills — gate dismiss
+  // so a stray scrim/X tap doesn't discard the edit.
+  const isDirty =
+    draft.length !== selected.length || draft.some((s) => !selected.includes(s));
+  const requestCancel = () => {
+    if (isDirty) {
+      Alert.alert('Discard changes?', "You've made edits that haven't been saved.", [
+        { text: 'Keep editing', style: 'cancel' },
+        { text: 'Discard', style: 'destructive', onPress: onCancel },
+      ]);
+      return;
+    }
+    onCancel();
+  };
+
   return (
-    <Modal transparent animationType="fade" visible={visible} onRequestClose={onCancel}>
+    <Modal transparent animationType="fade" visible={visible} onRequestClose={requestCancel}>
       <View style={modalStyles.root}>
-        <Pressable style={modalStyles.scrim} onPress={onCancel} />
+        <Pressable style={modalStyles.scrim} onPress={requestCancel} />
         <View style={[modalStyles.sheet, { maxHeight: '80%' }]}>
           <View style={modalStyles.sheetHeader}>
             <Text style={modalStyles.sheetTitle}>Your skills · {draft.length} / {MAX_SKILLS}</Text>
-            <Pressable onPress={onCancel} hitSlop={10}>
+            <Pressable onPress={requestCancel} hitSlop={10}>
               <X size={20} color={Brand.inkMuted} weight="bold" />
             </Pressable>
           </View>
@@ -1018,8 +1168,13 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Brand.canvas },
   center: { alignItems: 'center', justifyContent: 'center' },
 
+  // Glass top bar — lilac bottom hairline; safe-area padding applied inline.
+  topBar: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: Brand.navBarHairline,
+  },
   header: {
-    height: 44,
+    height: 52,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1027,6 +1182,23 @@ const styles = StyleSheet.create({
     ...TypeScale.labelSm,
     color: Brand.inkLabel,
   },
+
+  // Read-failure state (mirrors the feed's DeckError language).
+  errorWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40 },
+  errorTitle: { fontFamily: AmbitFont.display, fontSize: 24, color: Brand.inkPrimary, textAlign: 'center' },
+  errorBody: { fontFamily: AmbitFont.body, fontSize: 14.5, color: Brand.inkMuted, textAlign: 'center', marginTop: 12, lineHeight: 21 },
+  errorBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: Brand.action,
+    borderWidth: 1.6,
+    borderColor: Brand.actionInk,
+    paddingHorizontal: 40,
+    paddingVertical: 14,
+    borderRadius: 999,
+  },
+  errorBtnText: { fontFamily: AmbitFont.body, fontSize: 15, fontWeight: '700', color: Brand.actionInk },
   signOutBtn: {
     position: 'absolute',
     right: Space.lg,
@@ -1058,25 +1230,59 @@ const styles = StyleSheet.create({
   skelStack: { position: 'absolute', left: 22, right: 22, bottom: 22, paddingRight: 72, gap: 16 },
 
   // Segmented Edit | Preview control (centered in the header band).
-  segment: { flexDirection: 'row', backgroundColor: Brand.cardCream, borderRadius: 999, padding: 4 }, // light grouping bubble (card color, no outline)
-  segmentBtn: { paddingHorizontal: 20, paddingVertical: 8, borderRadius: 999 },
-  segmentBtnActive: { backgroundColor: Brand.action }, // just the teal indicator — no outline
-  segmentText: { fontFamily: AmbitFont.body, fontSize: 14, lineHeight: 20, textAlign: 'center', includeFontPadding: false, fontWeight: '600', color: Brand.inkMuted },
-  segmentTextActive: { color: Brand.actionInk, fontWeight: '700' },
+  // Active segment fills #9362C8 (Brand.selected) with white text.
+  segment: { flexDirection: 'row', backgroundColor: Brand.surface2, borderRadius: Radii.pill, padding: 4 },
+  segmentBtn: { paddingHorizontal: 20, paddingVertical: 7, borderRadius: Radii.pill },
+  segmentBtnActive: { backgroundColor: Brand.selected },
+  segmentText: { fontFamily: AmbitFont.semibold, fontSize: 13.5, lineHeight: 18, textAlign: 'center', includeFontPadding: false, color: Brand.inkLabel },
+  segmentTextActive: { fontFamily: AmbitFont.semibold, color: Brand.inkOnBrand },
 
-  // Field-list editor (Tinder / Hinge convention).
-  photoRow: { flexDirection: 'row', alignItems: 'center', gap: 16, paddingVertical: 16 },
-  photoThumb: { width: 56, height: 56, borderRadius: 16, backgroundColor: Brand.surface1, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
-  photoThumbImg: { width: '100%', height: '100%' },
-  photoThumbInitial: { fontFamily: AmbitFont.display, fontSize: 24, color: Brand.inkMuted },
-  fieldGroup: { backgroundColor: Brand.surface1, borderRadius: 16, paddingHorizontal: 16 },
-  fieldRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 16 },
-  fieldRowDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: Brand.borderSoft },
-  fieldRowLabel: { fontFamily: AmbitFont.body, fontSize: 15, fontWeight: '600', color: Brand.inkBody },
-  fieldRowValue: { flex: 1, textAlign: 'right', fontFamily: AmbitFont.body, fontSize: 15, color: Brand.inkPrimary },
-  fieldRowValueStacked: { fontFamily: AmbitFont.body, fontSize: 14, color: Brand.inkPrimary, lineHeight: 19 },
-  fieldRowEmpty: { color: Brand.inkMuted, fontWeight: '400' },
-  editSection: { marginTop: Space.lg },
+  // Centered squared avatar (royal→iris) + Change photo affordance.
+  avatarBlock: { alignItems: 'center', gap: 12, paddingTop: Space.md, paddingBottom: Space.sm },
+  avatarSquare: { width: 104, height: 104, borderRadius: 24, overflow: 'hidden' },
+  avatarSquareImg: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' },
+  avatarSquareInitial: { fontFamily: AmbitFont.display, fontSize: 44, color: Brand.inkOnBrand },
+  cameraChip: {
+    position: 'absolute',
+    right: 6,
+    bottom: 6,
+    width: 26,
+    height: 26,
+    borderRadius: 8,
+    backgroundColor: Brand.selected,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: Brand.cardCream,
+  },
+  changePhoto: { fontFamily: AmbitFont.semibold, fontSize: 13.5, color: Brand.selected },
+
+  // Inline TextField + picker stack.
+  fieldStack: { gap: Space.md, marginTop: Space.md },
+  pickerWrap: { gap: 8 },
+  pickerLabel: {
+    fontFamily: AmbitFont.semibold,
+    fontSize: 12,
+    letterSpacing: 1.4,
+    textTransform: 'uppercase',
+    color: Brand.inkLabel,
+  },
+  pickerBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    height: 46,
+    borderRadius: Radii.sm,
+    paddingHorizontal: 16,
+    backgroundColor: Brand.cardCream,
+    borderWidth: 1,
+    borderColor: Astra.hairlinePurple,
+  },
+  pickerValue: { flex: 1, fontFamily: AmbitFont.body, fontSize: 14, color: Brand.inkBody },
+  pickerValueEmpty: { color: Brand.inkPlaceholder },
+
+  editSection: { marginTop: Space.lg, gap: 12 },
   editSectionHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
   editLink: { fontFamily: AmbitFont.body, fontSize: 14, fontWeight: '600', color: Brand.actionDeep },
   projAddRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 16 },
@@ -1255,34 +1461,93 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   customAddBtnDisabled: { opacity: 0.4 },
+  // Dashed "＋ Add" skill chip — matches the Chip atom's 40pt height.
   addChip: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
+    height: 40,
     paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: Radii.pill,
+    borderRadius: Radii.chip,
     borderWidth: 1.5,
-    borderColor: Brand.accent,
+    borderColor: Brand.selected,
     borderStyle: 'dashed',
   },
   addChipPlus: {
-    fontFamily: AmbitFont.body,
+    fontFamily: AmbitFont.semibold,
     fontSize: 14,
-    fontWeight: '700',
-    color: Brand.actionDeep,
+    color: Brand.selected,
   },
   addChipLabel: {
-    fontFamily: AmbitFont.body,
+    fontFamily: AmbitFont.semibold,
     fontSize: 13,
-    fontWeight: '600',
-    color: Brand.actionDeep,
+    color: Brand.selected,
   },
 
-  portfolioRow: {
-    gap: 16,
-    paddingRight: Space.lg,
+  // Portfolio grid — 3-up squared gradient tiles + a dashed add tile.
+  portfolioGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
   },
+  tile: { width: '31%', gap: 8 },
+  tileImgWrap: {
+    width: '100%',
+    aspectRatio: 1,
+    borderRadius: Radii.md,
+    overflow: 'hidden',
+    backgroundColor: Brand.surface2,
+  },
+  tileActive: { borderWidth: 2, borderColor: Brand.selected },
+  tileImg: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' },
+  tileInitial: { fontFamily: AmbitFont.display, fontSize: 30, color: Brand.inkOnBrand },
+  tileTitle: { fontFamily: AmbitFont.medium, fontSize: 12.5, color: Brand.inkBody, textAlign: 'center' },
+  addTile: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
+    borderWidth: 1.5,
+    borderColor: Brand.selected,
+    borderStyle: 'dashed',
+  },
+  addTileLabel: { color: Brand.selected, fontFamily: AmbitFont.semibold },
+});
+
+// ─── Read-only preview styles ────────────────────────────────────────────
+
+const previewStyles = StyleSheet.create({
+  content: { paddingHorizontal: Space.lg, paddingTop: Space.md },
+
+  hero: { alignItems: 'center', gap: 8, paddingVertical: Space.md },
+  heroAvatar: { width: 132, height: 132, borderRadius: 28, overflow: 'hidden', marginBottom: 4 },
+  heroAvatarImg: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' },
+  heroAvatarInitial: { fontFamily: AmbitFont.display, fontSize: 56, color: Brand.inkOnBrand },
+  heroName: { fontFamily: AmbitFont.display, fontSize: 30, color: Brand.inkPrimary, textAlign: 'center', lineHeight: 36 },
+  heroHeadline: { fontFamily: AmbitFont.medium, fontSize: 15, color: Brand.selected, textAlign: 'center' },
+  heroMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  heroMeta: { fontFamily: AmbitFont.body, fontSize: 13.5, color: Brand.inkMuted },
+  ratePill: {
+    marginTop: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: Radii.pill,
+    backgroundColor: Brand.surface2,
+  },
+  rateText: { fontFamily: AmbitFont.semibold, fontSize: 12, color: Brand.actionDeep, letterSpacing: 0.2 },
+
+  section: { marginTop: Space.lg, gap: 12 },
+  about: { fontFamily: AmbitFont.body, fontSize: 15, color: Brand.inkBody, lineHeight: 22 },
+
+  glassChip: { borderRadius: Radii.chip, paddingHorizontal: 14, paddingVertical: 9 },
+  glassChipText: { fontFamily: AmbitFont.medium, fontSize: 13, color: Brand.actionDeep },
+
+  stripRow: { gap: 14, paddingRight: Space.lg },
+  stripCard: { width: 150, gap: 8 },
+  stripThumb: { width: 150, height: 110, borderRadius: Radii.lg, overflow: 'hidden', backgroundColor: Brand.surface2 },
+  stripThumbImg: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' },
+  stripInitial: { fontFamily: AmbitFont.display, fontSize: 40, color: Brand.inkOnBrand },
+  stripTitle: { fontFamily: AmbitFont.semibold, fontSize: 14, color: Brand.inkPrimary },
+  stripSub: { fontFamily: AmbitFont.body, fontSize: 12.5, color: Brand.inkMuted, lineHeight: 17 },
 });
 
 const modalStyles = StyleSheet.create({
@@ -1323,6 +1588,13 @@ const modalStyles = StyleSheet.create({
   inputMultiline: {
     minHeight: 96,
     textAlignVertical: 'top',
+  },
+  counter: {
+    fontFamily: AmbitFont.body,
+    fontSize: 12,
+    color: Brand.inkMuted,
+    textAlign: 'right',
+    marginTop: -4,
   },
   footer: {
     flexDirection: 'row',

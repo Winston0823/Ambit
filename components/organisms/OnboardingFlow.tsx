@@ -17,10 +17,6 @@ import {
 } from '../../context/OnboardingContext';
 import { useAuth } from '../../context/AuthContext';
 import { OnboardingProgress } from '../atoms';
-import {
-  ANCHORED_CTA_BOTTOM,
-  ANCHORED_CTA_HEIGHT,
-} from '../molecules/OnboardingContinue';
 import { SplashScreen } from './onboarding/SplashScreen';
 import { WelcomeScreen } from './onboarding/WelcomeScreen';
 import { PathPreviewScreen } from './onboarding/PathPreviewScreen';
@@ -374,13 +370,7 @@ function Steps({ onDismiss }: { onDismiss: () => void }) {
 
       {showProgress && (
         <View
-          style={[
-            styles.progressOverlay,
-            {
-              bottom:
-                insets.bottom + ANCHORED_CTA_BOTTOM + ANCHORED_CTA_HEIGHT + 16,
-            },
-          ]}
+          style={[styles.progressOverlay, { top: insets.top + 8 }]}
           pointerEvents="none"
         >
           <OnboardingProgress
@@ -398,8 +388,7 @@ const styles = StyleSheet.create({
   slider: { flex: 1 },
   progressOverlay: {
     position: 'absolute',
-    left: 0,
-    right: 0,
+    right: 20,
     zIndex: 20,
   },
 });

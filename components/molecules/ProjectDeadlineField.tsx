@@ -18,6 +18,12 @@ interface Props {
 export function ProjectDeadlineField({ value, onChange, label = 'NEEDS SOMEONE BY' }: Props) {
   const [showPicker, setShowPicker] = useState(false);
 
+  const minDate = startOfToday();
+  // Never hand the native picker a value below its minimum (past deadlines on
+  // old projects) — clamp up to today for display only.
+  const base = value ?? defaultDate();
+  const pickerValue = base.getTime() < minDate.getTime() ? minDate : base;
+
   const open = () => {
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
@@ -43,21 +49,59 @@ export function ProjectDeadlineField({ value, onChange, label = 'NEEDS SOMEONE B
       </View>
 
       {showPicker && (
-        <DateTimePicker
-          value={value ?? defaultDate()}
-          mode="date"
-          minimumDate={new Date()}
-          display={Platform.OS === 'ios' ? 'inline' : 'default'}
-          onChange={(event, date) => {
-            // Android fires once and dismisses itself; iOS stays inline.
-            if (Platform.OS !== 'ios') setShowPicker(false);
-            if (event.type === 'dismissed') return;
-            if (date) onChange(date);
-          }}
-        />
+        Platform.OS === 'ios' ? (
+          // iOS inline picker never dismisses itself — give it an explicit Done
+          // row so the user can close it (previously it was stuck open).
+          <View style={styles.iosPicker}>
+            <View style={styles.doneRow}>
+              <Pressable
+                onPress={() => setShowPicker(false)}
+                hitSlop={10}
+                style={styles.doneBtn}
+                accessibilityRole="button"
+                accessibilityLabel="Done choosing a deadline"
+              >
+                <Text style={styles.doneText}>Done</Text>
+              </Pressable>
+            </View>
+            <DateTimePicker
+              value={pickerValue}
+              mode="date"
+              minimumDate={minDate}
+              display="inline"
+              onChange={(_event, date) => {
+                if (date) onChange(date);
+              }}
+            />
+          </View>
+        ) : (
+          <DateTimePicker
+            value={pickerValue}
+            mode="date"
+            minimumDate={minDate}
+            display="default"
+            onChange={(event, date) => {
+              // Android fires once and dismisses itself.
+              setShowPicker(false);
+              if (event.type === 'dismissed') return;
+              if (date) onChange(date);
+            }}
+          />
+        )
       )}
     </View>
   );
+}
+
+/// Local midnight today — the picker's floor. Editing an old project whose
+/// deadline is already in the past would otherwise hand the native picker a
+/// value below `minimumDate`, which throws on iOS; we clamp the *displayed*
+/// value up to today without mutating the stored (past) date until the user
+/// actually picks a new one.
+function startOfToday(): Date {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d;
 }
 
 /// Default the picker to ~2 weeks out so the first tap lands on a sensible date.
@@ -97,4 +141,26 @@ const styles = StyleSheet.create({
   value: { fontFamily: AmbitFont.body, fontSize: 15, fontWeight: '600', color: Brand.inkPrimary },
   placeholder: { fontWeight: '500', color: Brand.inkMuted },
   clear: { padding: 8 },
+
+  iosPicker: {
+    marginTop: 8,
+    borderRadius: Radii.lg,
+    backgroundColor: Brand.surface1,
+    borderWidth: 1.5,
+    borderColor: Brand.inkEdge,
+    overflow: 'hidden',
+  },
+  doneRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    paddingHorizontal: 12,
+    paddingTop: 8,
+  },
+  doneBtn: { paddingHorizontal: 12, paddingVertical: 6 },
+  doneText: {
+    fontFamily: AmbitFont.body,
+    fontSize: 15,
+    fontWeight: '700',
+    color: Brand.actionDeep,
+  },
 });

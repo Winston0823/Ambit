@@ -55,26 +55,30 @@ export function OptionCard({ title, subtitle, selected = false, onPress, icon: I
 
   const bg = sel.interpolate({
     inputRange: [0, 1],
-    outputRange: [Brand.cardCream, Brand.action],
+    outputRange: ['rgba(255,255,255,0.6)', Brand.selected],
+  });
+  const border = sel.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['rgba(111,77,162,0.28)', Brand.selected],
   });
   const titleColor = sel.interpolate({
     inputRange: [0, 1],
-    outputRange: [Brand.inkHigh, Brand.actionInk],
+    outputRange: [Brand.inkPrimary, Brand.inkOnBrand],
   });
   const subColor = sel.interpolate({
     inputRange: [0, 1],
-    outputRange: [Brand.inkMuted, '#3A4F4D'],
+    outputRange: [Brand.inkMuted, '#CCC3D2'],
   });
   const checkScale = sel.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1] });
 
   return (
-    <HardShadow radius={Radii.card} offset={4}>
+    <HardShadow radius={Radii.sm} offset={6}>
       <Animated.View style={{ transform: [{ scale }] }}>
         <Pressable onPress={press}>
-          <Animated.View style={[styles.card, { backgroundColor: bg }]}>
+          <Animated.View style={[styles.card, { backgroundColor: bg, borderColor: border }]}>
             {Icon && (
               <View style={styles.iconWrap}>
-                <Icon size={26} color={selected ? Brand.actionInk : Brand.actionDeep} weight="duotone" />
+                <Icon size={26} color={selected ? Brand.inkOnBrand : Brand.accent} weight="duotone" />
               </View>
             )}
 
@@ -87,7 +91,7 @@ export function OptionCard({ title, subtitle, selected = false, onPress, icon: I
               pointerEvents="none"
               style={{ opacity: sel, transform: [{ scale: checkScale }] }}
             >
-              <CheckCircle size={24} color={Brand.actionInk} weight="fill" />
+              <CheckCircle size={24} color={Brand.inkOnBrand} weight="fill" />
             </Animated.View>
           </Animated.View>
         </Pressable>
@@ -99,11 +103,10 @@ export function OptionCard({ title, subtitle, selected = false, onPress, icon: I
 const styles = StyleSheet.create({
   card: {
     minHeight: 88,
-    borderRadius: Radii.card,
+    borderRadius: Radii.sm,
     paddingHorizontal: 20,
     paddingVertical: 16,
-    borderWidth: 1.5,
-    borderColor: Brand.actionInk,
+    borderWidth: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 16,
@@ -115,9 +118,8 @@ const styles = StyleSheet.create({
   },
   textCol: { flex: 1 },
   title: {
-    fontFamily: AmbitFont.body,
+    fontFamily: AmbitFont.semibold,
     fontSize: 16,
-    fontWeight: '600',
   },
   subtitle: {
     fontFamily: AmbitFont.body,

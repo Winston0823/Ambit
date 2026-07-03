@@ -1,39 +1,40 @@
 import React from 'react';
 import { View, ViewStyle, StyleProp } from 'react-native';
-import { Brand } from '../../constants/theme';
 
 interface Props {
   children: React.ReactNode;
-  /// Match the child's border radius so the block's bottom curve aligns.
+  /// Kept for API compatibility (was the block's corner radius). Unused now
+  /// that the shadow is a soft RN elevation rather than a solid offset block.
   radius?: number;
-  /// How far the solid block peeks below the child (the "hard shadow" depth).
+  /// Vertical shadow offset (px). Drives shadowOffset.height / a soft lift.
   offset?: number;
+  /// Shadow color. Defaults to a royal-tinted lift for the ASTRA look.
   color?: string;
   style?: StyleProp<ViewStyle>;
 }
 
-/// Crisp "hard shadow" — a solid color block offset behind the child, reliable
-/// where RN's `shadowRadius: 0` renders blurry or leaves a seam against a
-/// border. The child must be opaque (it covers the block's top half).
+/// ASTRA soft elevation. Repurposed from the old hard-offset block into a
+/// subtle floating shadow so buttons/cards lift gently off the warm canvas.
+/// Same props as before ({children, radius, offset, color, style}) so all
+/// existing call sites keep compiling — it just renders soft now.
 ///
-///   <HardShadow radius={999} offset={4}>
-///     <Pressable style={teal-pill-with-ink-border}>…</Pressable>
+///   <HardShadow radius={4} offset={6}>
+///     <Pressable style={royal-button}>…</Pressable>
 ///   </HardShadow>
-export function HardShadow({ children, radius = 999, offset = 4, color = Brand.actionInk, style }: Props) {
+export function HardShadow({ children, offset = 6, color = '#2D005E', style }: Props) {
   return (
-    <View style={style}>
-      <View
-        pointerEvents="none"
-        style={{
-          position: 'absolute',
-          left: 0,
-          right: 0,
-          top: offset,
-          bottom: -offset,
-          borderRadius: radius,
-          backgroundColor: color,
-        }}
-      />
+    <View
+      style={[
+        {
+          shadowColor: color,
+          shadowOffset: { width: 0, height: offset },
+          shadowRadius: 18,
+          shadowOpacity: 0.14,
+          elevation: 6,
+        },
+        style,
+      ]}
+    >
       {children}
     </View>
   );

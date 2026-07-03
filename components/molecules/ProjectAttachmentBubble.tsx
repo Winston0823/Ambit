@@ -2,17 +2,17 @@ import React from 'react';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import type { ProjectRefRow } from '../../lib/messaging';
-import { AmbitFont, Brand } from '../../constants/theme';
+import { AmbitFont, Astra, Brand } from '../../constants/theme';
 
-/// Stable warm gradient derived from the project id, so the same project
+/// Stable royal→iris gradient derived from the project id, so the same project
 /// always renders the same backdrop colors without storing one. Mirrors the
 /// discovery card's gradient-fallback when a project has no photo.
 const GRADIENTS: [string, string][] = [
-  [Brand.primary, Brand.accent],
-  ['#C9A57A', Brand.seekerInk],
-  ['#E8C9A0', Brand.primary],
-  [Brand.accent, '#7A5A38'],
-  ['#D4B490', '#4D361D'],
+  [Astra.royal, Astra.iris],
+  [Astra.royal, Astra.selected],
+  [Astra.iris, Astra.void],
+  [Astra.selected, Astra.royal],
+  [Astra.void, Astra.iris],
 ];
 const gradientFor = (id: string): [string, string] => {
   let h = 0;
@@ -96,8 +96,8 @@ export function ProjectAttachmentBubble({ project, isMine, onPress }: Props) {
 const styles = StyleSheet.create({
   card: {
     width: 268,
-    borderRadius: 22,
-    backgroundColor: '#2A1A0C',
+    borderRadius: 16,
+    backgroundColor: Astra.void,
     overflow: 'hidden',
     // Top area is the gradient "photo"; content sits in the scrim below.
     paddingTop: 92,
@@ -115,17 +115,16 @@ const styles = StyleSheet.create({
   },
   stack: { gap: 8 },
   eyebrow: {
-    fontFamily: AmbitFont.body,
+    fontFamily: AmbitFont.bold,
     fontSize: 9.5,
-    fontWeight: '700',
-    color: 'rgba(245, 233, 216, 0.7)',
+    color: 'rgba(255, 255, 255, 0.7)',
     letterSpacing: 2,
     textTransform: 'uppercase',
   },
   title: {
     fontFamily: AmbitFont.display,
     fontSize: 23,
-    color: '#F5E9D8',
+    color: '#FFFFFF',
     letterSpacing: -0.4,
     lineHeight: 27,
     marginTop: -1,
@@ -138,7 +137,7 @@ const styles = StyleSheet.create({
     fontSize: 72,
     fontFamily: Platform.select({ ios: 'Georgia', android: 'serif', default: 'serif' }),
     fontStyle: 'italic',
-    color: 'rgba(232, 201, 160, 0.42)',
+    color: 'rgba(153, 117, 206, 0.5)',
     includeFontPadding: false,
     zIndex: 0,
   },
@@ -148,7 +147,7 @@ const styles = StyleSheet.create({
     fontFamily: Platform.select({ ios: 'Georgia', android: 'serif', default: 'serif' }),
     fontStyle: 'italic',
     fontSize: 14.5,
-    color: '#F5E9D8',
+    color: 'rgba(255, 255, 255, 0.92)',
     lineHeight: 20,
     letterSpacing: -0.1,
   },
@@ -160,9 +159,8 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.16)',
   },
   chipText: {
-    fontFamily: AmbitFont.body,
+    fontFamily: AmbitFont.semibold,
     fontSize: 11.5,
-    fontWeight: '600',
     color: '#FFFFFF',
     letterSpacing: 0.1,
   },
