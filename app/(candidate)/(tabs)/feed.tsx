@@ -18,7 +18,8 @@ import type { IconProps } from 'phosphor-react-native';
 import * as Haptics from 'expo-haptics';
 import { DiscoveryOverview, SwipeDeck } from '../../../components/organisms';
 import type { SwipeDeckHandle } from '../../../components/organisms';
-import { PortfolioModal, ReachOutComposer, BottomSheet, ReachOutLimitSheet } from '../../../components/molecules';
+import { PortfolioModal, ReachOutComposer, BottomSheet, ReachOutLimitSheet, ReportReasonSheet } from '../../../components/molecules';
+import { blockUser, type ReportTarget } from '../../../lib/safety';
 import { Skeleton as SkeletonBlock, Tactile, TopAppBar } from '../../../components/atoms';
 import { CAMPUSES, SKILL_CATEGORIES } from '../../../data/mock';
 import {
@@ -344,6 +345,42 @@ export default function DiscoveryFeed() {
   const [reinserted, setReinserted] = useState<DiscoveryCardData[]>([]);
   // Imperative handle so a confirmed reach-out can fly the current card up.
   const swipeDeckRef = useRef<SwipeDeckHandle>(null);
+
+  // Safety: ⋯ on a card → Report/Block action sheet, and the report reason sheet.
+  const [flaggedUserId, setFlaggedUserId] = useState<string | null>(null);
+  const [reportTarget, setReportTarget] = useState<ReportTarget | null>(null);
+
+  const dropUserFromDeck = useCallback((userId: string) => {
+    setLiveDeck((prev) =>
+      prev ? prev.filter((c) => (c.kind === 'seeker' ? c.id : c.ownerId) !== userId) : prev,
+    );
+  }, []);
+
+  const handleBlockFromCard = useCallback(() => {
+    const uid = flaggedUserId;
+    setFlaggedUserId(null);
+    if (!uid) return;
+    Alert.alert(
+      'Block this person?',
+      "They won't be able to message you, and you won't see each other in the feed or inbox.",
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Block',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await blockUser(uid);
+              dropUserFromDeck(uid);
+              toast.success('Blocked.');
+            } catch (e: any) {
+              toast.error(e?.message ?? "Couldn't block — try again.");
+            }
+          },
+        },
+      ],
+    );
+  }, [flaggedUserId, dropUserFromDeck]);
 
   /// Card whose Reach Out button was tapped. Non-null = modal composer open.
   /// SwipeDeck pauses its PanResponder via gesturesDisabled while non-null so
@@ -771,7 +808,8 @@ export default function DiscoveryFeed() {
           onReachOut={handleReachOutPress}
           onPortfolioPress={setActivePortfolio}
           activePortfolioId={activePortfolio?.id ?? null}
-          gesturesDisabled={!!reachOutCard || !!activePortfolio}
+          onFlag={setFlaggedUserId}
+          gesturesDisabled={!!reachOutCard || !!activePortfolio || !!flaggedUserId || !!reportTarget}
           emptyState={
             filterCount > 0 && filteredDeck.length === 0 && activeDeck.length > 0 ? (
               // Filters hide every card, but the deck itself isn't empty — offer
@@ -931,6 +969,33 @@ export default function DiscoveryFeed() {
           setPendingReachOutCard(null);
         }}
       />
+
+      {/* Safety: ⋯ on a card opens Report / Block. */}
+      <BottomSheet visible={!!flaggedUserId} onClose={() => setFlaggedUserId(null)}>
+        <Pressable
+          style={styles.flagSheetItem}
+          onPress={() => {
+            const uid = flaggedUserId;
+            setFlaggedUserId(null);
+            if (uid) setReportTarget({ reportedUserId: uid, conversationId: null, messageId: null });
+          }}
+        >
+          <Text style={styles.flagSheetDanger}>Report</Text>
+        </Pressable>
+        <Pressable style={styles.flagSheetItem} onPress={handleBlockFromCard}>
+          <Text style={styles.flagSheetDanger}>Block user</Text>
+        </Pressable>
+      </BottomSheet>
+
+      <ReportReasonSheet
+        visible={!!reportTarget}
+        target={reportTarget}
+        onClose={() => setReportTarget(null)}
+        onReported={(t) => {
+          // A report is a strong signal — also drop them from the deck.
+          dropUserFromDeck(t.reportedUserId);
+        }}
+      />
     </View>
   );
 }
@@ -1084,6 +1149,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Brand.canvas,
   },
+  // Report/Block action-sheet rows.
+  flagSheetItem: { paddingVertical: 18, alignItems: 'center' },
+  flagSheetDanger: { fontFamily: AmbitFont.semibold, fontSize: 16, color: Brand.danger },
   // Right-slot actions in the shared TopAppBar (wordmark sits left, matching
   // the Projects / Profile headers).
   headerActions: {

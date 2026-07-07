@@ -18,6 +18,7 @@ import {
   CaretUp,
   ChatCircle,
   Clock,
+  DotsThree,
   GithubLogo,
   Globe,
   Lightning,
@@ -56,6 +57,10 @@ interface Props {
   reachDisabled?: boolean;
   /// Play the entry fade on mount. Default true. The SwipeDeck sets it false.
   animateIn?: boolean;
+  /// Safety: when provided, renders a ⋯ overflow button that hands back the
+  /// OTHER user's id (seeker → card.id, project → card.ownerId) so the parent
+  /// can offer Report / Block. Omitted in the user's own profile preview.
+  onFlag?: (userId: string) => void;
 }
 
 /// Discovery card — ASTRA two-section design with a swipe-up second screen.
@@ -72,7 +77,9 @@ export function DiscoveryCard({
   showReachButton = true,
   reachDisabled = false,
   animateIn = true,
+  onFlag,
 }: Props) {
+  const otherUserId = card.kind === 'seeker' ? card.id : card.ownerId;
   // Entry fade on mount (skipped in the deck, which keeps cards mounted).
   const opacity = useRef(new Animated.Value(animateIn ? 0 : 1)).current;
   const translateY = useRef(new Animated.Value(animateIn ? 8 : 0)).current;
@@ -170,6 +177,20 @@ export function DiscoveryCard({
 
         {showReachButton && (
           <SendCircle onPress={() => onReachOut?.(card)} disabled={reachDisabled} />
+        )}
+
+        {onFlag && (
+          <Pressable
+            onPress={() => onFlag(otherUserId)}
+            // Sit opposite the status badge (seeker badge is top-left, project
+            // "LIVE" is top-right) so they never overlap.
+            style={[styles.flagBtn, card.kind === 'seeker' ? styles.flagBtnRight : styles.flagBtnLeft]}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Report or block"
+          >
+            <DotsThree size={22} color={Brand.inkOnBrand} weight="bold" />
+          </Pressable>
         )}
       </View>
     </Animated.View>
@@ -603,6 +624,20 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     position: 'relative',
   },
+  // ⋯ report/block overlay — a subtle scrim disc over the photo panel.
+  flagBtn: {
+    position: 'absolute',
+    top: 14,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: 'rgba(0,0,0,0.28)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 20,
+  },
+  flagBtnRight: { right: 14 },
+  flagBtnLeft: { left: 14 },
 
   // ── Photo panel (Polaroid) ────────────────────────────────────────────────
   // The white margin around the print — even on top/left/right; the bottom is

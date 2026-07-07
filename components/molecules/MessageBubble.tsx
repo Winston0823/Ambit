@@ -419,6 +419,24 @@ export function MessageBubble({
           onLongPress={isDeleted ? undefined : onLongPress}
           onPress={isMine && status === 'failed' ? onRetry : undefined}
           delayLongPress={250}
+          // VoiceOver: the message actions (react/reply/copy/edit/delete) are
+          // only reachable via long-press, which screen-reader users can't
+          // perform. Expose them through the actions rotor instead, plus a
+          // Retry action for a failed send.
+          accessibilityRole="button"
+          accessibilityLabel={`${isMine ? 'You' : senderName || 'They'} said: ${
+            isDeleted ? 'message deleted' : message.body?.trim() || 'attachment'
+          }`}
+          accessibilityHint={isDeleted ? undefined : 'Opens message options'}
+          accessibilityActions={[
+            ...(isDeleted ? [] : [{ name: 'options', label: 'Message options' }]),
+            ...(isMine && status === 'failed' ? [{ name: 'retry', label: 'Retry sending' }] : []),
+          ]}
+          onAccessibilityAction={(e) => {
+            const action = e.nativeEvent.actionName;
+            if (action === 'options' && !isDeleted) onLongPress();
+            else if (action === 'retry') onRetry?.();
+          }}
           style={[
             styles.bubble,
             isMine ? styles.bubbleMine : styles.bubbleTheirs,

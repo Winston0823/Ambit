@@ -39,8 +39,8 @@ export const Brand = {
   inkPrimary:     '#1C1B1B',  // display headlines / primary text
   inkHigh:        '#14121A',
   inkBody:        '#4A4450',  // body text
-  inkLabel:       '#7B7481',  // tertiary / labels
-  inkMuted:       '#7B7481',  // tertiary muted text
+  inkLabel:       '#6E6774',  // tertiary / labels — WCAG AA (≥4.5:1) on canvas & cards
+  inkMuted:       '#6E6774',  // tertiary muted text — WCAG AA (≥4.5:1) on canvas & cards
   inkPlaceholder: '#9E97A3',  // muted / placeholder
   inkDisabled:    '#E5E2E1',
   inkOnBrand:     '#FFFFFF',  // text on royal CTAs

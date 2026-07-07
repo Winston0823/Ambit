@@ -51,8 +51,10 @@ import {
   MessageBubble,
   type MessageStatus,
   PassReasonSheet,
+  ReportReasonSheet,
   TypingIndicator,
 } from '../../../../components/molecules';
+import { blockUser, type ReportTarget } from '../../../../lib/safety';
 import {
   AvailabilityPollComposer,
   AvailabilityPollModal,
@@ -262,6 +264,8 @@ export default function ThreadScreen() {
   /// Closure-loop UI state: overflow menu (⋯) + pass-reason picker.
   const [overflowOpen, setOverflowOpen]   = useState(false);
   const [passSheetOpen, setPassSheetOpen] = useState(false);
+  // Report sheet is target-driven — non-null means "report this".
+  const [reportTarget, setReportTarget]   = useState<ReportTarget | null>(null);
 
   // Lazy-load the projects referenced by attachment messages. A ref tracks
   // which ids we've already requested so message updates don't refetch.
@@ -1081,7 +1085,7 @@ export default function ThreadScreen() {
 
   const handleLongPress = (m: MessageRow) => setSelectedMessage(m);
 
-  const handleMenuAction = async (action: 'reply' | 'copy' | 'edit' | 'delete') => {
+  const handleMenuAction = async (action: 'reply' | 'copy' | 'edit' | 'delete' | 'report') => {
     const m = selectedMessage;
     setSelectedMessage(null);
     if (!m) return;
@@ -1090,6 +1094,9 @@ export default function ThreadScreen() {
       if (m.body) await Clipboard.setStringAsync(m.body);
     } else if (action === 'edit') {
       if (m.sender_id === user?.id && m.body) setEditingAnimated(m);
+    } else if (action === 'report') {
+      // Report the message's author; carry the message + conversation for context.
+      setReportTarget({ reportedUserId: m.sender_id, conversationId, messageId: m.id });
     } else if (action === 'delete') {
       Alert.alert('Delete message?', 'This cannot be undone.', [
         { text: 'Cancel', style: 'cancel' },
@@ -1100,6 +1107,39 @@ export default function ThreadScreen() {
         },
       ]);
     }
+  };
+
+  // ── Safety: report / block the other participant ──────────────────────────
+  const handleReportConversation = () => {
+    setOverflowOpen(false);
+    if (!meta) return;
+    setReportTarget({ reportedUserId: meta.partner_id, conversationId, messageId: null });
+  };
+
+  const handleBlockUser = () => {
+    setOverflowOpen(false);
+    if (!meta) return;
+    const name = meta.partner_name || 'this person';
+    Alert.alert(
+      `Block ${name}?`,
+      `They won't be able to message you, and you won't see each other in the feed or inbox.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Block',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await blockUser(meta.partner_id);
+              toast.success(`Blocked ${name}.`);
+              router.back();
+            } catch (e: any) {
+              toast.error(e?.message ?? "Couldn't block — try again.");
+            }
+          },
+        },
+      ],
+    );
   };
 
   const handleQuickReact = async (emoji: string) => {
@@ -1495,6 +1535,12 @@ export default function ThreadScreen() {
             Pass on this chat
           </Text>
         </Pressable>
+        <Pressable style={styles.overflowItem} onPress={handleReportConversation}>
+          <Text style={[styles.overflowLabel, styles.overflowLabelDanger]}>Report</Text>
+        </Pressable>
+        <Pressable style={styles.overflowItem} onPress={handleBlockUser}>
+          <Text style={[styles.overflowLabel, styles.overflowLabelDanger]}>Block user</Text>
+        </Pressable>
       </BottomSheet>
 
       <PassReasonSheet
@@ -1631,7 +1677,16 @@ export default function ThreadScreen() {
         {isOwnSelected ? (
           <MenuButton label="Delete" onPress={() => handleMenuAction('delete')} destructive />
         ) : null}
+        {!isOwnSelected ? (
+          <MenuButton label="Report" onPress={() => handleMenuAction('report')} destructive />
+        ) : null}
       </BottomSheet>
+
+      <ReportReasonSheet
+        visible={!!reportTarget}
+        target={reportTarget}
+        onClose={() => setReportTarget(null)}
+      />
     </View>
   );
 }

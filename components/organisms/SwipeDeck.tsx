@@ -60,6 +60,8 @@ interface Props {
   matchedSkills?: string[];
   onPortfolioPress?: (item: PortfolioItem) => void;
   activePortfolioId?: string | null;
+  /// Safety: forwarded to the active card's ⋯ Report/Block affordance.
+  onFlag?: (userId: string) => void;
   /// Pause gestures + action buttons while an overlay (composer, portfolio
   /// modal) is in front.
   gesturesDisabled?: boolean;
@@ -85,6 +87,7 @@ export const SwipeDeck = forwardRef<SwipeDeckHandle, Props>(function SwipeDeck({
   matchedSkills,
   onPortfolioPress,
   activePortfolioId,
+  onFlag,
   gesturesDisabled,
 }: Props, ref) {
   const [index, setIndex] = useState(0);
@@ -338,6 +341,7 @@ export const SwipeDeck = forwardRef<SwipeDeckHandle, Props>(function SwipeDeck({
                 onPortfolioPress={isActive ? onPortfolioPress : undefined}
                 activePortfolioId={isActive ? activePortfolioId : undefined}
                 onReachOut={isActive ? onReachOut : undefined}
+                onFlag={isActive ? onFlag : undefined}
                 showReachButton={false}
                 animateIn={false}
               />
