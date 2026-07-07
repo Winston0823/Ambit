@@ -8,11 +8,12 @@ import {
   Text,
   View,
 } from 'react-native';
-import Constants from 'expo-constants';
 import * as Haptics from 'expo-haptics';
 import { FilmSlate } from 'phosphor-react-native';
 import { AmbitFont, Brand, Radii, Space } from '../../constants/theme';
 import { DAILY_FREE_LIMIT, addAdBonus } from '../../lib/reachOutLimit';
+import { showRewardedAd } from '../../lib/ads';
+import { toast } from '../../lib/toast';
 
 interface Props {
   visible: boolean;
@@ -28,13 +29,9 @@ interface Props {
 /// Bottom sheet shown when the user hits their daily reach-out cap.
 /// Offers a rewarded ad to unlock one more slot for the day.
 ///
-/// Ad integration:
-///   - Expo Go / dev: simulates a 2-second ad then grants the bonus.
-///   - Native build: replace the mock block inside `handleWatchAd` with
-///     the real react-native-google-mobile-ads rewarded ad call.
-///     Test ad unit IDs:
-///       iOS:     ca-app-pub-3940256099942544/1712485313
-///       Android: ca-app-pub-3940256099942544/5224354917
+/// Ad integration lives in `lib/ads.ts` (`showRewardedAd`): a real AdMob
+/// rewarded ad in native builds, a simulated 2s ad in Expo Go / web. The bonus
+/// is granted ONLY when the ad reports the reward earned.
 export function ReachOutLimitSheet({
   visible,
   used,
@@ -49,39 +46,21 @@ export function ReachOutLimitSheet({
     if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     setAdState('loading');
 
-    if (Constants.appOwnership === 'expo' || __DEV__) {
-      // ── Expo Go / simulator mock ──────────────────────────────────────
-      // In a native EAS build, replace this entire block with the real
-      // react-native-google-mobile-ads rewarded ad load + event listeners:
-      //
-      //   const rewarded = RewardedAd.createForAdRequest(AD_UNIT_ID, {
-      //     requestNonPersonalizedAdsOnly: true,
-      //   });
-      //   rewarded.addAdEventListener(RewardedAdEventType.LOADED, () => rewarded.show());
-      //   rewarded.addAdEventListener(RewardedAdEventType.EARNED_REWARD, async () => {
-      //     await addAdBonus();
-      //     setAdState('done');
-      //     setTimeout(() => { setAdState('idle'); onAdComplete(); }, 600);
-      //   });
-      //   rewarded.load();
-      //
-      await new Promise((r) => setTimeout(r, 2000)); // simulate ad duration
+    try {
+      const earned = await showRewardedAd();
+      if (!earned) {
+        // Closed before finishing — no reward, no bonus. Back to idle silently.
+        setAdState('idle');
+        return;
+      }
       await addAdBonus();
       setAdState('done');
       setTimeout(() => { setAdState('idle'); onAdComplete(); }, 500);
-      return;
+    } catch (e) {
+      console.warn('rewarded ad failed:', e);
+      setAdState('idle');
+      toast.error("Couldn't load an ad right now. Try again in a moment.");
     }
-
-    // ── Native build placeholder ────────────────────────────────────────
-    // TODO(app-store): This production branch grants the reward with NO ad
-    // shown, while the UI promises "watch a short ad." Wire real AdMob
-    // (react-native-google-mobile-ads) before submission — otherwise the
-    // "watch an ad" framing is misleading (Guideline 2.1). NOTE: adding ads
-    // introduces IDFA → an ATT prompt + NSUserTrackingUsageDescription
-    // become required. See tasks/todo.md.
-    await addAdBonus();
-    setAdState('done');
-    setTimeout(() => { setAdState('idle'); onAdComplete(); }, 500);
   };
 
   const dotsTotal = Math.max(limit, DAILY_FREE_LIMIT);
