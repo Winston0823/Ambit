@@ -25,12 +25,15 @@ create index if not exists blocked_users_blocked_idx on blocked_users(blocked_id
 
 alter table blocked_users enable row level security;
 
+drop policy if exists "blocked_users: own select" on blocked_users;
 create policy "blocked_users: own select"
   on blocked_users for select to authenticated
   using (blocker_id = auth.uid());
+drop policy if exists "blocked_users: own insert" on blocked_users;
 create policy "blocked_users: own insert"
   on blocked_users for insert to authenticated
   with check (blocker_id = auth.uid());
+drop policy if exists "blocked_users: own delete" on blocked_users;
 create policy "blocked_users: own delete"
   on blocked_users for delete to authenticated
   using (blocker_id = auth.uid());
@@ -54,9 +57,11 @@ alter table content_reports enable row level security;
 
 -- Reporters insert + read their OWN reports; review is service-role only
 -- (no broad authenticated read of the report queue).
+drop policy if exists "content_reports: own insert" on content_reports;
 create policy "content_reports: own insert"
   on content_reports for insert to authenticated
   with check (reporter_id = auth.uid());
+drop policy if exists "content_reports: own select" on content_reports;
 create policy "content_reports: own select"
   on content_reports for select to authenticated
   using (reporter_id = auth.uid());
@@ -212,21 +217,32 @@ as $$
   limit p_limit;
 $$;
 
-create or replace function compat_projects_for_seeker(p_seeker_id uuid, p_limit int default 30)
+-- Recreated from 022_project_needed_by.sql (the latest definition — carries
+-- roles_sought/image_url/needed_by) + the block filter. DROP first because the
+-- return signature can't be changed in place.
+drop function if exists compat_projects_for_seeker(uuid, int);
+create or replace function compat_projects_for_seeker(
+  p_seeker_id uuid,
+  p_limit     int default 30
+)
 returns table (
-  project_id       uuid,
-  title            text,
-  vibe_blurb       text,
-  required_skills  text[],
-  campus_id        text,
-  owner_id         uuid,
-  score            numeric(5,2),
-  skill_match_pct  numeric(5,2),
-  vibe_similarity  numeric(5,2)
+  project_id      uuid,
+  title           text,
+  vibe_blurb      text,
+  required_skills text[],
+  roles_sought    text[],
+  image_url       text,
+  needed_by       date,
+  campus_id       text,
+  owner_id        uuid,
+  score           numeric(5,2),
+  skill_match_pct numeric(5,2),
+  vibe_similarity numeric(5,2)
 )
 language sql
 stable
 security definer
+set search_path = public
 as $$
   with seeker as (
     select skills, vibe_embedding
@@ -239,6 +255,9 @@ as $$
       pr.title,
       pr.vibe_blurb,
       pr.required_skills,
+      pr.roles_sought,
+      pr.image_url,
+      pr.needed_by,
       pr.campus_id,
       pr.owner_id,
       pr.created_at,
@@ -249,11 +268,11 @@ as $$
           from   unnest(pr.required_skills) rs
           where  rs = any(seeker.skills)
         ) / array_length(pr.required_skills, 1)::numeric
-      end                                                              as skill_match_pct,
+      end                                        as skill_match_pct,
       case
         when pr.vibe_embedding is null or seeker.vibe_embedding is null then 0
         else greatest(0, 1 - (pr.vibe_embedding <=> seeker.vibe_embedding))
-      end                                                              as vibe_sim
+      end                                        as vibe_sim
     from projects pr, seeker
     where pr.active = true
       and pr.owner_id <> p_seeker_id
@@ -275,14 +294,14 @@ as $$
     title,
     vibe_blurb,
     required_skills,
+    roles_sought,
+    image_url,
+    needed_by,
     campus_id,
     owner_id,
-    round((
-      70 * skill_match_pct
-      + 30 * vibe_sim
-    )::numeric, 2)                          as score,
-    round((skill_match_pct * 100)::numeric, 2) as skill_match_pct,
-    round((vibe_sim * 100)::numeric, 2)     as vibe_similarity
+    round((70 * skill_match_pct + 30 * vibe_sim)::numeric, 2) as score,
+    round((skill_match_pct * 100)::numeric, 2)                as skill_match_pct,
+    round((vibe_sim * 100)::numeric, 2)                       as vibe_similarity
   from scored
   order by score desc, created_at desc
   limit p_limit;
@@ -294,8 +313,10 @@ grant execute on function compat_projects_for_seeker(uuid, int)  to authenticate
 -- ─────────────────────────────────────────────────────────────
 -- 5. Block-filter the inbox RPC (bidirectional).
 --    Recreated verbatim from 020_repair_inbox_pinning.sql + a block guard.
+--    DROP first — the return signature can't be changed in place.
 -- ─────────────────────────────────────────────────────────────
 
+drop function if exists get_inbox();
 create or replace function get_inbox()
 returns table (
   conversation_id              uuid,
