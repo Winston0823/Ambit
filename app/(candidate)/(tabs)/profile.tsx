@@ -31,10 +31,12 @@ import { Chip, GlassSurface, HardShadow, Skeleton, TextField } from '../../../co
 import { router, useFocusEffect } from 'expo-router';
 import {
   DiscoveryCard,
+  LegalModal,
   OwnerProfileCard,
   PortfolioModal,
 } from '../../../components/molecules';
 import type { OwnerProject } from '../../../components/molecules';
+import { PRIVACY_POLICY, TERMS_OF_USE, type LegalDoc } from '../../../constants/legal';
 import { useAuth } from '../../../context/AuthContext';
 import { setProfileRoleCache } from '../../../hooks/useProfileRole';
 import { supabase } from '../../../lib/supabase';
@@ -144,6 +146,7 @@ export default function ProfileTab() {
   const [roleOpen, setRoleOpen] = useState(false);
   const [activePortfolio, setActivePortfolio] = useState<PortfolioItem | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [legalDoc, setLegalDoc] = useState<LegalDoc | null>(null);
 
   // Account deletion (App Store 5.1.1(v)). Two-step confirm — the second
   // Alert spells out that it's permanent — then the edge function wipes the
@@ -761,6 +764,17 @@ export default function ProfileTab() {
           </Text>
         </Pressable>
 
+        {/* Legal — Terms + Privacy reachable anytime (App Store 5.1.1). */}
+        <View style={styles.legalRow}>
+          <Pressable onPress={() => setLegalDoc(TERMS_OF_USE)} hitSlop={8}>
+            <Text style={styles.legalLink}>Terms of Use</Text>
+          </Pressable>
+          <Text style={styles.legalDot}>·</Text>
+          <Pressable onPress={() => setLegalDoc(PRIVACY_POLICY)} hitSlop={8}>
+            <Text style={styles.legalLink}>Privacy Policy</Text>
+          </Pressable>
+        </View>
+
         <View style={{ height: Space.xl }} />
       </ScrollView>
       ) : profile?.role === 'owner' ? (
@@ -834,6 +848,8 @@ export default function ProfileTab() {
         onSave={handleSavePortfolio}
         onDelete={handleDeletePortfolio}
       />
+
+      <LegalModal doc={legalDoc} onClose={() => setLegalDoc(null)} />
     </View>
   );
 }
@@ -1185,6 +1201,15 @@ const styles = StyleSheet.create({
     color: Brand.danger,
     letterSpacing: 0.2,
   },
+  legalRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: Space.md,
+  },
+  legalLink: { fontFamily: AmbitFont.body, fontSize: 12.5, color: Brand.inkMuted, textDecorationLine: 'underline' },
+  legalDot: { fontFamily: AmbitFont.body, fontSize: 12.5, color: Brand.inkMuted },
 
   // Clearly-labeled résumé-import CTA in the edit form (ASTRA pill language).
   resumeImportShadow: { alignSelf: 'center', marginTop: Space.sm },
