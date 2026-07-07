@@ -346,8 +346,11 @@ function SeekerPortfolio({
 
       <Text style={styles.page2Section}>PORTFOLIO HIGHLIGHTS</Text>
       {card.portfolio.length > 0 ? (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.hlStrip}>
-          {card.portfolio.map((item) => (
+        // 2-up grid: up to 6 highlights (2×3) fill the fixed-height card face.
+        // Portfolios are capped at 6 at the source, so the slice is just a guard
+        // for any legacy rows that predate the cap.
+        <View style={styles.hlGrid}>
+          {card.portfolio.slice(0, 6).map((item) => (
             <PortfolioTile
               key={item.id}
               item={item}
@@ -355,7 +358,7 @@ function SeekerPortfolio({
               onPress={() => onPortfolioPress?.(item)}
             />
           ))}
-        </ScrollView>
+        </View>
       ) : (
         <Text style={styles.page2Empty}>No portfolio highlights yet.</Text>
       )}
@@ -396,7 +399,7 @@ function PortfolioTile({
         <LinearGradient colors={item.gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hlTileCover} />
       )}
       <Text style={styles.hlTileTitle} numberOfLines={1}>{item.title}</Text>
-      <Text style={styles.hlTileSub} numberOfLines={2}>{item.description}</Text>
+      <Text style={styles.hlTileSub} numberOfLines={1}>{item.description}</Text>
     </Pressable>
   );
 }
@@ -721,11 +724,13 @@ const styles = StyleSheet.create({
   },
   page2Empty: { fontFamily: AmbitFont.body, fontSize: 13, color: Brand.inkMuted, marginTop: 6 },
 
-  hlStrip: { flexDirection: 'row', gap: 12, paddingRight: 8 },
-  hlTile: { width: 140 },
+  // 2-up grid: two tiles per row (each ~48% wide) with a landscape cover so two
+  // rows + the links section fit within the fixed-height card face.
+  hlGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  hlTile: { width: '48%' },
   hlTileCover: {
-    width: 140,
-    height: 140,
+    width: '100%',
+    aspectRatio: 1.6,
     borderRadius: Radii.md,
     backgroundColor: Brand.surface2,
     borderWidth: 1,

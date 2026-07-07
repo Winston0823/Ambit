@@ -31,6 +31,9 @@ import {
 import { AmbitFont, Astra, Brand, Radii, Space } from '../../constants/theme';
 
 const MAX_SKILLS = 8;
+// Portfolio is capped at 6 highlights (fills the discovery card's 2×3 grid);
+// import fills remaining slots and never exceeds it.
+const PORTFOLIO_MAX = 6;
 const PARSE_TIMEOUT_MS = 20000;
 const clampTitle = (s: string) => s.trim().slice(0, 60);
 const clampDesc = (s: string) => s.trim().slice(0, 400);
@@ -224,9 +227,14 @@ export default function ResumeImportScreen() {
       // batch — before inserting.
       const existingItems = await fetchPortfolioForUser(user.id).catch(() => []);
       const seenTitles = new Set(existingItems.map((p) => titleKey(p.title)));
+      // Only fill up to the 6-highlight cap, counting what's already saved.
+      const remainingSlots = Math.max(0, PORTFOLIO_MAX - existingItems.length);
+      let inserted = 0;
+      let skippedForCap = 0;
       for (const h of highlights) {
         const key = titleKey(h.title);
         if (seenTitles.has(key)) continue;
+        if (inserted >= remainingSlots) { skippedForCap++; continue; }
         seenTitles.add(key);
         try {
           await upsertPortfolioItem({
@@ -236,9 +244,13 @@ export default function ResumeImportScreen() {
             description: h.description,
             linkUrl: h.linkUrl,
           });
+          inserted++;
         } catch (e) {
           console.warn('portfolio item from résumé failed:', e);
         }
+      }
+      if (skippedForCap > 0) {
+        toast.info(`Portfolio is full at ${PORTFOLIO_MAX} highlights — added what fit.`);
       }
 
       router.back();

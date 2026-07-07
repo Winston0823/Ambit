@@ -81,6 +81,10 @@ const ROLE_LABEL: Record<NonNullable<ProfileRow['role']>, string> = {
 };
 const ROLE_OPTIONS: NonNullable<ProfileRow['role']>[] = ['seeker', 'owner'];
 
+// Max portfolio highlights a seeker can showcase. Matches the discovery card's
+// 2×3 grid, which fills the fixed-height card face at exactly 6.
+const PORTFOLIO_MAX = 6;
+
 // ASTRA royal→iris gradient family for portfolio tiles + avatar fallback.
 const PORTFOLIO_GRADIENTS: [string, string][] = [
   [Astra.royal, Astra.iris],
@@ -421,6 +425,12 @@ export default function ProfileTab() {
   };
 
   const addNewPortfolio = () => {
+    // Hard cap — a full portfolio can't take a 7th highlight. The Add tile is
+    // hidden at the cap, but guard here too in case it's reached another way.
+    if (portfolio.length >= PORTFOLIO_MAX) {
+      toast.error(`You can showcase up to ${PORTFOLIO_MAX} highlights.`);
+      return;
+    }
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     }
@@ -697,17 +707,24 @@ export default function ProfileTab() {
                   <Text style={styles.tileTitle} numberOfLines={1}>{item.title || 'Untitled'}</Text>
                 </Pressable>
               ))}
-              <Pressable
-                onPress={addNewPortfolio}
-                style={styles.tile}
-                accessibilityLabel="Add portfolio item"
-              >
-                <View style={[styles.tileImgWrap, styles.addTile]}>
-                  <Plus size={26} color={Brand.selected} weight="bold" />
-                </View>
-                <Text style={[styles.tileTitle, styles.addTileLabel]} numberOfLines={1}>Add</Text>
-              </Pressable>
+              {portfolio.length < PORTFOLIO_MAX && (
+                <Pressable
+                  onPress={addNewPortfolio}
+                  style={styles.tile}
+                  accessibilityLabel="Add portfolio item"
+                >
+                  <View style={[styles.tileImgWrap, styles.addTile]}>
+                    <Plus size={26} color={Brand.selected} weight="bold" />
+                  </View>
+                  <Text style={[styles.tileTitle, styles.addTileLabel]} numberOfLines={1}>Add</Text>
+                </Pressable>
+              )}
             </View>
+            <Text style={styles.portfolioHint}>
+              {portfolio.length >= PORTFOLIO_MAX
+                ? `Showcasing the max of ${PORTFOLIO_MAX} highlights.`
+                : `${portfolio.length} of ${PORTFOLIO_MAX} highlights`}
+            </Text>
           </View>
         )}
 
@@ -1468,6 +1485,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 12,
+  },
+  portfolioHint: {
+    fontFamily: AmbitFont.body,
+    fontSize: 12.5,
+    color: Brand.inkMuted,
+    marginTop: 10,
   },
   tile: { width: '31%', gap: 8 },
   tileImgWrap: {
