@@ -73,7 +73,12 @@ export function ReachOutLimitSheet({
     }
 
     // ── Native build placeholder ────────────────────────────────────────
-    // Swap in real AdMob here (see comment above).
+    // TODO(app-store): This production branch grants the reward with NO ad
+    // shown, while the UI promises "watch a short ad." Wire real AdMob
+    // (react-native-google-mobile-ads) before submission — otherwise the
+    // "watch an ad" framing is misleading (Guideline 2.1). NOTE: adding ads
+    // introduces IDFA → an ATT prompt + NSUserTrackingUsageDescription
+    // become required. See tasks/todo.md.
     await addAdBonus();
     setAdState('done');
     setTimeout(() => { setAdState('idle'); onAdComplete(); }, 500);

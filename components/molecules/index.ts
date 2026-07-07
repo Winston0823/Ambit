@@ -1,4 +1,3 @@
-export { DebugMenuButton, DebugMenuSheet } from './DebugMenu';
 export { StageRail } from './StageRail';
 export { OnboardingContinue } from './OnboardingContinue';
 export { DiscoveryCard } from './DiscoveryCard';

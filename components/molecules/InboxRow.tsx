@@ -39,10 +39,10 @@ export function InboxRow({ item, meId, onPress, onPassRequest, onPin, onMute, on
   const sentByMe  = item.last_message_sender_id === meId;
   const isPending = isReachedOutToYou(item, meId);
   const isClosed  = item.status === 'passed' || item.status === 'auto_declined';
-  // Unread: incoming messages I haven't read. Pending rows carry their own
-  // "needs you" treatment (soft purple + countdown), so the iris unread wash
-  // only applies to the ordinary active rows.
-  const isUnread  = (item.unread_count ?? 0) > 0 && !isPending && !isClosed;
+  // Unread: incoming messages I haven't read. Drives the row highlight, so
+  // opening the chat (which marks it read) clears it — even for a reach-out
+  // (pending) row, whose "your turn" state instead lives in the countdown chip.
+  const isUnread  = (item.unread_count ?? 0) > 0 && !isClosed;
   const passable  = item.status === 'active' && !!onPassRequest;
   const canPin    = !!onPin;
   const isPinned  = !!item.is_pinned;
@@ -182,7 +182,10 @@ export function InboxRow({ item, meId, onPress, onPassRequest, onPin, onMute, on
   // byline + preview prefix, not a chip.
   const showHiredChip = item.status === 'hired';
 
-  const needsYou = isPending || isUnread;
+  // Row highlight (iris tint + dot) tracks UNREAD only, so it clears when you
+  // open the chat. The reach-out "your turn" signal is the persistent countdown
+  // chip below (driven by isPending), not a full-row highlight.
+  const needsYou = isUnread;
   const subtitle = [bylineProject, bylineSuffix].filter(Boolean).join('  ·  ');
   const surfaceBg = needsYou ? SURFACE_NEEDS : Brand.cardCream;
 

@@ -256,6 +256,8 @@ export interface ProjectRefRow {
   vibe_blurb:      string;
   required_skills: string[];
   owner_id:        string;
+  /// Founder-uploaded cover; the attachment card shows it when present.
+  image_url:       string | null;
 }
 
 /// Send a message that carries an attached project. The body doubles as the
@@ -315,7 +317,7 @@ export async function fetchProjectRefs(ids: string[]): Promise<Map<string, Proje
   if (ids.length === 0) return out;
   const { data } = await supabase
     .from('projects')
-    .select('id, title, vibe_blurb, required_skills, owner_id')
+    .select('id, title, vibe_blurb, required_skills, owner_id, image_url')
     .in('id', ids);
   for (const r of (data ?? []) as ProjectRefRow[]) out.set(r.id, r);
   return out;

@@ -30,6 +30,7 @@ import {
 import { Chip, GlassSurface, HardShadow, Skeleton, TextField } from '../../../components/atoms';
 import { router, useFocusEffect } from 'expo-router';
 import {
+  DiscoveryCard,
   OwnerProfileCard,
   PortfolioModal,
 } from '../../../components/molecules';
@@ -102,7 +103,7 @@ const PORTFOLIO_GRADIENTS: [string, string][] = [
 ///                                          Will move to a portfolio_items
 ///                                          table once schema lands.
 export default function ProfileTab() {
-  const { user, signOut } = useAuth();
+  const { user, signOut, deleteAccount } = useAuth();
   const insets = useSafeAreaInsets();
   const [profile, setProfile] = useState<ProfileRow | null>(null);
   const [loading, setLoading] = useState(true);
@@ -138,6 +139,47 @@ export default function ProfileTab() {
   const [campusOpen, setCampusOpen] = useState(false);
   const [roleOpen, setRoleOpen] = useState(false);
   const [activePortfolio, setActivePortfolio] = useState<PortfolioItem | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  // Account deletion (App Store 5.1.1(v)). Two-step confirm — the second
+  // Alert spells out that it's permanent — then the edge function wipes the
+  // account + data. On success the auth listener clears the session and the
+  // root layout routes back to sign-in automatically.
+  const confirmDeleteAccount = useCallback(() => {
+    Alert.alert(
+      'Delete account?',
+      'This permanently deletes your Ambit profile, projects, portfolio, messages, and matches.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Continue',
+          style: 'destructive',
+          onPress: () =>
+            Alert.alert(
+              'This can’t be undone',
+              'Your account and all associated data will be permanently erased.',
+              [
+                { text: 'Keep my account', style: 'cancel' },
+                {
+                  text: 'Delete forever',
+                  style: 'destructive',
+                  onPress: async () => {
+                    setDeleting(true);
+                    try {
+                      await deleteAccount();
+                      // Session cleared → root layout handles navigation.
+                    } catch {
+                      setDeleting(false);
+                      toast.error("Couldn't delete your account. Please try again.");
+                    }
+                  },
+                },
+              ],
+            ),
+        },
+      ],
+    );
+  }, [deleteAccount]);
 
   // Initial fetch
   //
@@ -402,9 +444,6 @@ export default function ProfileTab() {
       <View style={styles.root}>
         <View style={[styles.header, { marginTop: insets.top + 6 }]}>
           <Skeleton width={156} height={40} radius={999} />
-          <View style={styles.signOutBtn}>
-            <Skeleton width={20} height={20} radius={6} />
-          </View>
         </View>
         <View style={styles.previewWrap}>
           <HardShadow radius={Radii.card} offset={7} style={{ flex: 1 }}>
@@ -477,8 +516,8 @@ export default function ProfileTab() {
   return (
     <View style={styles.root}>
       {/* Glass top bar — the Edit|Preview segment centered on a light-glass
-          surface with a lilac bottom hairline; résumé-import + sign-out dock
-          to the right. */}
+          surface with a lilac bottom hairline. (Résumé import + log out now
+          live in the edit form as labeled buttons.) */}
       <GlassSurface intensity={24} tint="light" style={[styles.topBar, { paddingTop: insets.top }]}>
       <View style={styles.header}>
         <View style={styles.segment}>
@@ -497,31 +536,6 @@ export default function ProfileTab() {
             <Text style={[styles.segmentText, !editing && styles.segmentTextActive]}>Preview</Text>
           </Pressable>
         </View>
-        {/* Résumé import — a talent-profile feature, so seekers only. Owners'
-            profiles are project-centric (Live Projects, not a portfolio). */}
-        {profile?.role === 'seeker' && (
-          <Pressable
-            onPress={openResumeImport}
-            style={[styles.signOutBtn, styles.resumeDevBtn]}
-            hitSlop={10}
-            accessibilityLabel="Import résumé"
-          >
-            <FileArrowUp size={18} color={Brand.inkMuted} weight="regular" />
-          </Pressable>
-        )}
-        <Pressable
-          onPress={() => {
-            Alert.alert('Sign out?', 'You can sign back in anytime.', [
-              { text: 'Cancel', style: 'cancel' },
-              { text: 'Sign out', style: 'destructive', onPress: () => { signOut().catch(() => {}); } },
-            ]);
-          }}
-          style={styles.signOutBtn}
-          hitSlop={10}
-          accessibilityLabel="Sign out"
-        >
-          <SignOut size={18} color={Brand.inkMuted} weight="regular" />
-        </Pressable>
       </View>
       </GlassSurface>
 
@@ -554,6 +568,23 @@ export default function ProfileTab() {
             <Text style={styles.changePhoto}>{profile?.photo_url ? 'Change photo' : 'Add photo'}</Text>
           </Pressable>
         </View>
+
+        {/* Résumé import — a clearly-labeled CTA so the feature is discoverable
+            (the header icon alone read as "missing"). Seekers only; owners'
+            profiles are project-centric, not portfolio-driven. */}
+        {profile?.role === 'seeker' && (
+          <HardShadow radius={999} offset={3} style={styles.resumeImportShadow}>
+            <Pressable
+              onPress={openResumeImport}
+              style={styles.resumeImportBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Resume Import"
+            >
+              <FileArrowUp size={18} color={Brand.inkOnBrand} weight="regular" />
+              <Text style={styles.resumeImportLabel}>Resume Import</Text>
+            </Pressable>
+          </HardShadow>
+        )}
 
         {/* Core fields — inline TextField editing; commits on blur. Campus +
             role are single-select pickers, so they stay tap-to-open rows. */}
@@ -680,6 +711,39 @@ export default function ProfileTab() {
           </View>
         )}
 
+        {/* Log out — solid red button (same flat tone as the Resume Import
+            pill), sits directly above the delete-account danger link. */}
+        <HardShadow radius={999} offset={3} style={styles.logoutShadow}>
+          <Pressable
+            onPress={() => {
+              Alert.alert('Log out?', 'You can sign back in anytime.', [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Log out', style: 'destructive', onPress: () => { signOut().catch(() => {}); } },
+              ]);
+            }}
+            style={styles.logoutBtn}
+            accessibilityRole="button"
+            accessibilityLabel="Log out"
+          >
+            <SignOut size={18} color={Brand.inkOnBrand} weight="regular" />
+            <Text style={styles.logoutLabel}>Log out</Text>
+          </Pressable>
+        </HardShadow>
+
+        {/* Danger zone — permanent account deletion (App Store 5.1.1(v)). */}
+        <Pressable
+          onPress={confirmDeleteAccount}
+          disabled={deleting}
+          style={styles.deleteAccountBtn}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Delete account"
+        >
+          <Text style={styles.deleteAccountText}>
+            {deleting ? 'Deleting…' : 'Delete account'}
+          </Text>
+        </Pressable>
+
         <View style={{ height: Space.xl }} />
       </ScrollView>
       ) : profile?.role === 'owner' ? (
@@ -695,18 +759,21 @@ export default function ProfileTab() {
             />
         </View>
       ) : (
-            <SeekerPreview
-              initial={initial}
-              name={previewCard.name}
-              photoUri={previewCard.photoUri}
-              headline={profile?.role ? ROLE_LABEL[profile.role] : ''}
-              campusName={campus?.name ?? null}
-              about={previewCard.vibeBlurb}
-              skills={skills}
-              portfolio={portfolio}
-              responseRate={previewCard.responseRate}
-              onPortfolioPress={setActivePortfolio}
-            />
+        // WYSIWYG: render the exact DiscoveryCard owners swipe through, fed the
+        // user's own card. Previously a parallel hand-rolled SeekerPreview drifted
+        // from the real card (different layout, missing status badge / tiered reply
+        // pill / links / 6-skill cap), so the "Preview" misrepresented the profile.
+        // The reach circle is shown disabled — the seeker can't reach out to
+        // themselves, but it previews the CTA owners see. Matches project-edit.tsx.
+        <View style={styles.previewWrap}>
+          <DiscoveryCard
+            card={previewCard}
+            showReachButton
+            reachDisabled
+            onPortfolioPress={setActivePortfolio}
+            activePortfolioId={activePortfolio?.id ?? null}
+          />
+        </View>
       )}
 
       {/* ── Edit modals ────────────────────────────────────────────────── */}
@@ -779,136 +846,6 @@ function PickerField({
         <PencilSimpleLine size={15} color={Brand.inkMuted} weight="regular" />
       </Pressable>
     </View>
-  );
-}
-
-// ─── SeekerPreview — read-only rich ASTRA profile ────────────────────────
-
-/// The WYSIWYG read-only card. Squared avatar hero (royal→iris), Playfair
-/// name, iris headline, campus pin, ABOUT, glass SKILLS chips, and a
-/// horizontal PORTFOLIO HIGHLIGHTS strip. Response-rate logic is preserved —
-/// the reply-rate pill mirrors what owners see on the discovery card.
-function SeekerPreview({
-  initial,
-  name,
-  photoUri,
-  headline,
-  campusName,
-  about,
-  skills,
-  portfolio,
-  responseRate,
-  onPortfolioPress,
-}: {
-  initial: string;
-  name: string;
-  photoUri: string | null;
-  headline: string;
-  campusName: string | null;
-  about: string;
-  skills: string[];
-  portfolio: PortfolioItem[];
-  responseRate: number | null | undefined;
-  onPortfolioPress: (item: PortfolioItem) => void;
-}) {
-  const rate = formatResponseRate(responseRate);
-  return (
-    <ScrollView
-      style={styles.scroll}
-      contentContainerStyle={previewStyles.content}
-      showsVerticalScrollIndicator={false}
-    >
-      <View style={previewStyles.hero}>
-        <View style={previewStyles.heroAvatar}>
-          {photoUri ? (
-            <Image source={{ uri: photoUri }} style={previewStyles.heroAvatarImg} />
-          ) : (
-            <LinearGradient
-              colors={[Astra.royal, Astra.iris]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={previewStyles.heroAvatarImg}
-            >
-              <Text style={previewStyles.heroAvatarInitial}>{initial}</Text>
-            </LinearGradient>
-          )}
-        </View>
-        <Text style={previewStyles.heroName} numberOfLines={2}>{name || 'Your name'}</Text>
-        {!!headline && <Text style={previewStyles.heroHeadline}>{headline}</Text>}
-        {!!campusName && (
-          <View style={previewStyles.heroMetaRow}>
-            <MapPin size={14} color={Brand.selected} weight="fill" />
-            <Text style={previewStyles.heroMeta}>{campusName}</Text>
-          </View>
-        )}
-        {rate && (
-          <View style={previewStyles.ratePill}>
-            <Text style={previewStyles.rateText}>{rate} reply rate</Text>
-          </View>
-        )}
-      </View>
-
-      {!!about.trim() && (
-        <View style={previewStyles.section}>
-          <Text style={styles.sectionLabel}>ABOUT</Text>
-          <Text style={previewStyles.about}>{about}</Text>
-        </View>
-      )}
-
-      {skills.length > 0 && (
-        <View style={previewStyles.section}>
-          <Text style={styles.sectionLabel}>SKILLS</Text>
-          <View style={styles.chipRow}>
-            {skills.map((s) => (
-              <GlassSurface key={s} hairline style={previewStyles.glassChip}>
-                <Text style={previewStyles.glassChipText}>{s}</Text>
-              </GlassSurface>
-            ))}
-          </View>
-        </View>
-      )}
-
-      {portfolio.length > 0 && (
-        <View style={previewStyles.section}>
-          <Text style={styles.sectionLabel}>PORTFOLIO HIGHLIGHTS</Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={previewStyles.stripRow}
-          >
-            {portfolio.map((item) => (
-              <Pressable
-                key={item.id}
-                onPress={() => onPortfolioPress(item)}
-                style={previewStyles.stripCard}
-                accessibilityLabel={`View ${item.title || 'highlight'}`}
-              >
-                <View style={previewStyles.stripThumb}>
-                  {item.imageUri ? (
-                    <Image source={{ uri: item.imageUri }} style={previewStyles.stripThumbImg} />
-                  ) : (
-                    <LinearGradient
-                      colors={item.gradient}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={previewStyles.stripThumbImg}
-                    >
-                      <Text style={previewStyles.stripInitial}>{(item.title[0] ?? '').toUpperCase()}</Text>
-                    </LinearGradient>
-                  )}
-                </View>
-                <Text style={previewStyles.stripTitle} numberOfLines={1}>{item.title || 'Untitled'}</Text>
-                {!!item.description && (
-                  <Text style={previewStyles.stripSub} numberOfLines={2}>{item.description}</Text>
-                )}
-              </Pressable>
-            ))}
-          </ScrollView>
-        </View>
-      )}
-
-      <View style={{ height: Space.xl }} />
-    </ScrollView>
   );
 }
 
@@ -1021,7 +958,7 @@ function SkillsEditModal({
                 onPress={addCustom}
                 style={[styles.customAddBtn, (!customInput.trim() || draft.length >= MAX_SKILLS) && styles.customAddBtnDisabled]}
               >
-                <Plus size={16} color={Brand.actionInk} weight="bold" />
+                <Plus size={16} color={Brand.inkOnBrand} weight="bold" />
               </Pressable>
             </View>
           </ScrollView>
@@ -1029,7 +966,7 @@ function SkillsEditModal({
           <View style={modalStyles.footer}>
             <HardShadow radius={999} offset={3}>
               <Pressable onPress={() => onSave(draft)} style={modalStyles.saveBtn}>
-                <Check size={16} color={Brand.actionInk} weight="bold" />
+                <Check size={16} color={Brand.inkOnBrand} weight="bold" />
                 <Text style={modalStyles.saveLabel}>Save</Text>
               </Pressable>
             </HardShadow>
@@ -1198,18 +1135,60 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: 999,
   },
-  errorBtnText: { fontFamily: AmbitFont.body, fontSize: 15, fontWeight: '700', color: Brand.actionInk },
-  signOutBtn: {
-    position: 'absolute',
-    right: Space.lg,
-    top: 0,
-    bottom: 0,
-    width: 36,
+  errorBtnText: { fontFamily: AmbitFont.body, fontSize: 15, fontWeight: '700', color: Brand.inkOnBrand },
+  // Solid red log-out pill — flat danger fill, white label, lifted by shadow.
+  logoutShadow: { alignSelf: 'center', marginTop: Space.xl },
+  logoutBtn: {
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 8,
+    minWidth: 200,
+    paddingHorizontal: 32,
+    paddingVertical: 13,
+    borderRadius: 999,
+    backgroundColor: Brand.danger,
   },
-  // Sits just left of the sign-out icon (36pt wide + 8pt gap) so they don't stack.
-  resumeDevBtn: { right: Space.lg + 44 },
+  logoutLabel: {
+    fontFamily: AmbitFont.body,
+    fontSize: 14,
+    fontWeight: '700',
+    color: Brand.inkOnBrand,
+    letterSpacing: 0.2,
+  },
+  deleteAccountBtn: {
+    alignSelf: 'center',
+    marginTop: Space.md,
+    paddingVertical: Space.sm,
+    paddingHorizontal: Space.md,
+  },
+  deleteAccountText: {
+    fontFamily: AmbitFont.medium,
+    fontSize: 14,
+    color: Brand.danger,
+    letterSpacing: 0.2,
+  },
+
+  // Clearly-labeled résumé-import CTA in the edit form (ASTRA pill language).
+  resumeImportShadow: { alignSelf: 'center', marginTop: Space.sm },
+  resumeImportBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 22,
+    paddingVertical: 12,
+    borderRadius: 999,
+    backgroundColor: Brand.action,
+    borderWidth: 1.6,
+    borderColor: Brand.actionInk,
+  },
+  resumeImportLabel: {
+    fontFamily: AmbitFont.body,
+    fontSize: 14,
+    fontWeight: '700',
+    color: Brand.inkOnBrand,
+    letterSpacing: 0.2,
+  },
 
   scroll: { flex: 1 },
   scrollContent: { paddingHorizontal: Space.lg, paddingTop: Space.md },
@@ -1513,43 +1492,6 @@ const styles = StyleSheet.create({
   addTileLabel: { color: Brand.selected, fontFamily: AmbitFont.semibold },
 });
 
-// ─── Read-only preview styles ────────────────────────────────────────────
-
-const previewStyles = StyleSheet.create({
-  content: { paddingHorizontal: Space.lg, paddingTop: Space.md },
-
-  hero: { alignItems: 'center', gap: 8, paddingVertical: Space.md },
-  heroAvatar: { width: 132, height: 132, borderRadius: 28, overflow: 'hidden', marginBottom: 4 },
-  heroAvatarImg: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' },
-  heroAvatarInitial: { fontFamily: AmbitFont.display, fontSize: 56, color: Brand.inkOnBrand },
-  heroName: { fontFamily: AmbitFont.display, fontSize: 30, color: Brand.inkPrimary, textAlign: 'center', lineHeight: 36 },
-  heroHeadline: { fontFamily: AmbitFont.medium, fontSize: 15, color: Brand.selected, textAlign: 'center' },
-  heroMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  heroMeta: { fontFamily: AmbitFont.body, fontSize: 13.5, color: Brand.inkMuted },
-  ratePill: {
-    marginTop: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: Radii.pill,
-    backgroundColor: Brand.surface2,
-  },
-  rateText: { fontFamily: AmbitFont.semibold, fontSize: 12, color: Brand.actionDeep, letterSpacing: 0.2 },
-
-  section: { marginTop: Space.lg, gap: 12 },
-  about: { fontFamily: AmbitFont.body, fontSize: 15, color: Brand.inkBody, lineHeight: 22 },
-
-  glassChip: { borderRadius: Radii.chip, paddingHorizontal: 14, paddingVertical: 9 },
-  glassChipText: { fontFamily: AmbitFont.medium, fontSize: 13, color: Brand.actionDeep },
-
-  stripRow: { gap: 14, paddingRight: Space.lg },
-  stripCard: { width: 150, gap: 8 },
-  stripThumb: { width: 150, height: 110, borderRadius: Radii.lg, overflow: 'hidden', backgroundColor: Brand.surface2 },
-  stripThumbImg: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' },
-  stripInitial: { fontFamily: AmbitFont.display, fontSize: 40, color: Brand.inkOnBrand },
-  stripTitle: { fontFamily: AmbitFont.semibold, fontSize: 14, color: Brand.inkPrimary },
-  stripSub: { fontFamily: AmbitFont.body, fontSize: 12.5, color: Brand.inkMuted, lineHeight: 17 },
-});
-
 const modalStyles = StyleSheet.create({
   root: {
     flex: 1,
@@ -1615,7 +1557,7 @@ const modalStyles = StyleSheet.create({
     fontFamily: AmbitFont.body,
     fontSize: 14,
     fontWeight: '700',
-    color: Brand.actionInk,
+    color: Brand.inkOnBrand,
   },
 
   // CampusEditModal

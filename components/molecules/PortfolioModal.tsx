@@ -29,6 +29,7 @@ import {
   TypeScale,
 } from '../../constants/theme';
 import type { PortfolioItem } from '../../data/mock';
+import { toast } from '../../lib/toast';
 
 type Mode = 'view' | 'edit';
 
@@ -183,7 +184,10 @@ export function PortfolioModal({ item, onDismiss, onSave, onDelete }: Props) {
   const pickImage = async () => {
     if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) return;
+    if (!perm.granted) {
+      toast.error('Enable photo access in Settings to add an image.');
+      return;
+    }
     const result = await ImagePicker.launchImageLibraryAsync({
       allowsEditing: true,
       aspect: [4, 3],
@@ -599,5 +603,5 @@ const styles = StyleSheet.create({
   deleteBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8, paddingHorizontal: 4 },
   deleteLabel: { fontFamily: AmbitFont.body, fontSize: 14, fontWeight: '600', color: Brand.danger },
   saveBtn: { paddingHorizontal: 20, paddingVertical: 12, backgroundColor: Brand.action, borderRadius: 999, borderWidth: 1.6, borderColor: Brand.actionInk },
-  saveLabel: { fontFamily: AmbitFont.body, fontSize: 14, fontWeight: '700', color: Brand.actionInk },
+  saveLabel: { fontFamily: AmbitFont.body, fontSize: 14, fontWeight: '700', color: Brand.inkOnBrand },
 });

@@ -313,7 +313,7 @@ const styles = StyleSheet.create({
   saveBtn: {
     paddingVertical: 14,
     borderRadius: 999,
-    backgroundColor: Brand.action,
+    backgroundColor: Brand.selected, // brighter iris purple (was dark royal)
     alignItems: 'center',
     borderWidth: 1.6,
     borderColor: Brand.actionInk,
@@ -322,9 +322,8 @@ const styles = StyleSheet.create({
   },
   saveBtnDisabled: { opacity: 0.5 },
   saveBtnText: {
-    fontFamily: AmbitFont.body,
+    fontFamily: AmbitFont.semibold,
     fontSize: 15,
-    fontWeight: '700',
-    color: Brand.actionInk,
+    color: Brand.inkOnBrand, // white on the purple fill (was dark, invisible)
   },
 });

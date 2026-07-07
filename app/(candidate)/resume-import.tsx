@@ -252,12 +252,10 @@ export default function ResumeImportScreen() {
   if (!parsed) {
     return (
       <View style={styles.root}>
-        <View style={{ marginTop: insets.top + 6 }}>
-          <BackChevron onPress={() => router.back()} />
-        </View>
-        <ScrollView contentContainerStyle={styles.sourceContent} keyboardShouldPersistTaps="handled">
-          <Text style={styles.kicker}>IMPORT RÉSUMÉ</Text>
-          <Text style={styles.h}>Let's fill this{'\n'}in for you</Text>
+        <BackChevron onPress={() => router.back()} />
+        <ScrollView contentContainerStyle={[styles.sourceContent, { paddingTop: insets.top + 52 }]} keyboardShouldPersistTaps="handled">
+          <Text style={styles.h}>Import Résumé</Text>
+          <Text style={styles.subtitle}>Let's set up your profile</Text>
           <Text style={styles.sub}>Paste it, upload a file, or snap a photo — we'll pull out your skills, blurb, and projects. You review everything before anything saves.</Text>
 
           {noResults && (
@@ -284,7 +282,7 @@ export default function ResumeImportScreen() {
             disabled={pasteText.trim().length < 20 || parsing}
             style={[styles.parseBtn, (pasteText.trim().length < 20 || parsing) && styles.disabled]}
           >
-            <ClipboardText size={18} color={Brand.actionInk} weight="bold" />
+            <ClipboardText size={18} color={Brand.inkOnBrand} weight="bold" />
             <Text style={styles.parseBtnText}>Parse pasted text</Text>
           </Pressable>
 
@@ -292,14 +290,18 @@ export default function ResumeImportScreen() {
             <View style={styles.orLine} /><Text style={styles.orText}>OR</Text><View style={styles.orLine} />
           </View>
 
-          <Pressable onPress={() => runParse(() => pickAndParseDocument(user!.id))} disabled={parsing} style={[styles.sourceBtn, parsing && styles.disabled]}>
-            <FileArrowUp size={20} color={Brand.inkPrimary} weight="regular" />
-            <Text style={styles.sourceBtnText}>Upload a file (PDF or Word)</Text>
-          </Pressable>
-          <Pressable onPress={() => runParse(() => pickAndParsePhoto(user!.id))} disabled={parsing} style={[styles.sourceBtn, parsing && styles.disabled]}>
-            <Camera size={20} color={Brand.inkPrimary} weight="regular" />
-            <Text style={styles.sourceBtnText}>Use a photo of your résumé</Text>
-          </Pressable>
+          <HardShadow radius={Radii.lg} offset={4} style={[styles.sourceShadow, parsing && styles.disabled]}>
+            <Pressable onPress={() => runParse(() => pickAndParseDocument(user!.id))} disabled={parsing} style={styles.sourceBtn}>
+              <FileArrowUp size={20} color={Brand.inkPrimary} weight="regular" />
+              <Text style={styles.sourceBtnText}>Upload a file (PDF or Word)</Text>
+            </Pressable>
+          </HardShadow>
+          <HardShadow radius={Radii.lg} offset={4} style={[styles.sourceShadow, parsing && styles.disabled]}>
+            <Pressable onPress={() => runParse(() => pickAndParsePhoto(user!.id))} disabled={parsing} style={styles.sourceBtn}>
+              <Camera size={20} color={Brand.inkPrimary} weight="regular" />
+              <Text style={styles.sourceBtnText}>Use a photo of your résumé</Text>
+            </Pressable>
+          </HardShadow>
 
           <View style={{ height: 80 }} />
         </ScrollView>
@@ -328,11 +330,9 @@ export default function ResumeImportScreen() {
 
   return (
     <View style={styles.root}>
-      <View style={{ marginTop: insets.top + 6 }}>
-        <BackChevron onPress={requestReviewBack} />
-      </View>
+      <BackChevron onPress={requestReviewBack} />
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-        <ScrollView contentContainerStyle={styles.reviewContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={[styles.reviewContent, { paddingTop: insets.top + 52 }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           <Text style={styles.kicker}>REVIEW · EDIT ANYTHING</Text>
           <Text style={styles.h}>Here's what{'\n'}we found</Text>
 
@@ -407,7 +407,7 @@ export default function ResumeImportScreen() {
 
       <HardShadow radius={999} offset={4} style={[styles.ctaWrap, { bottom: insets.bottom + 24 }, applying && styles.disabled]}>
         <Pressable onPress={apply} disabled={applying} style={styles.cta}>
-          {applying ? <ActivityIndicator color={Brand.actionInk} /> : <Text style={styles.ctaText}>Add to my profile</Text>}
+          {applying ? <ActivityIndicator color={Brand.inkOnBrand} /> : <Text style={styles.ctaText}>Add to my profile</Text>}
         </Pressable>
       </HardShadow>
     </View>
@@ -431,11 +431,15 @@ function SelectRow({ selected, onPress, title, sub }: { selected: boolean; onPre
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Brand.cardCream },
-  sourceContent: { paddingHorizontal: 28, paddingTop: 16 },
-  reviewContent: { paddingHorizontal: 28, paddingTop: 16 },
+  // paddingTop (insets.top + 52) is applied inline: insets.top reserves the
+  // safe area ONCE, +52 clears the absolutely-positioned BackChevron (sits at
+  // insets.top+8, 44pt tall) so the title lands just below it in its own row.
+  sourceContent: { paddingHorizontal: 28 },
+  reviewContent: { paddingHorizontal: 28 },
 
   kicker: { fontFamily: AmbitFont.body, fontSize: 11, fontWeight: '700', letterSpacing: 1.6, color: Brand.inkMuted, marginBottom: 12 },
   h: { fontFamily: AmbitFont.display, fontSize: 34, lineHeight: 40, color: Brand.inkPrimary },
+  subtitle: { fontFamily: AmbitFont.medium, fontSize: 17, color: Brand.inkBody, marginTop: 8 },
   sub: { fontFamily: AmbitFont.body, fontSize: 14.5, color: Brand.inkMuted, marginTop: 16, lineHeight: 21 },
 
   field: { marginTop: 32 },
@@ -454,16 +458,17 @@ const styles = StyleSheet.create({
     marginTop: 14, paddingVertical: 14, borderRadius: 999,
     backgroundColor: Brand.action, borderWidth: 1.6, borderColor: Brand.actionInk,
   },
-  parseBtnText: { fontFamily: AmbitFont.body, fontSize: 15, fontWeight: '700', color: Brand.actionInk },
+  parseBtnText: { fontFamily: AmbitFont.body, fontSize: 15, fontWeight: '700', color: Brand.inkOnBrand },
 
   orRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 24 },
   orLine: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: Brand.borderDefault },
   orText: { fontFamily: AmbitFont.body, fontSize: 11, fontWeight: '700', letterSpacing: 1.2, color: Brand.inkMuted },
 
+  sourceShadow: { marginBottom: 12, borderRadius: Radii.lg },
   sourceBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
-    paddingVertical: 16, paddingHorizontal: 18, marginBottom: 12,
-    borderRadius: Radii.lg, backgroundColor: Brand.surface1, borderWidth: 1.5, borderColor: Brand.inkEdge,
+    paddingVertical: 16, paddingHorizontal: 18,
+    borderRadius: Radii.lg, backgroundColor: Brand.cardCream,
   },
   sourceBtnText: { fontFamily: AmbitFont.body, fontSize: 15, fontWeight: '600', color: Brand.inkPrimary },
 
@@ -525,5 +530,5 @@ const styles = StyleSheet.create({
     backgroundColor: Brand.action, borderWidth: 1.6, borderColor: Brand.actionInk,
     paddingHorizontal: 48, paddingVertical: 16, borderRadius: 999, minWidth: 220, alignItems: 'center',
   },
-  ctaText: { fontFamily: AmbitFont.body, fontSize: 16, fontWeight: '700', color: Brand.actionInk },
+  ctaText: { fontFamily: AmbitFont.body, fontSize: 16, fontWeight: '700', color: Brand.inkOnBrand },
 });

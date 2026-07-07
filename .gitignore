@@ -46,3 +46,6 @@ yarn-error.*
 
 # Superpowers brainstorm companion
 .superpowers/
+
+# local env (contains Supabase URL + anon key — do not commit)
+.env

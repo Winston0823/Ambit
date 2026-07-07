@@ -22,6 +22,7 @@ import {
   X,
 } from 'phosphor-react-native';
 import type { MessageRow } from '../../lib/messaging';
+import { toast } from '../../lib/toast';
 import { GlassSurface, HardShadow } from '../atoms';
 import { AmbitFont, Brand, Radii, Space } from '../../constants/theme';
 import { Motion } from '../../constants/motion';
@@ -156,7 +157,10 @@ export function ChatComposer({
     if (editing) return;
     onCloseAttachMenu();
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) return;
+    if (!perm.granted) {
+      toast.error('Enable photo access in Settings to attach a photo.');
+      return;
+    }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       quality: 0.7,

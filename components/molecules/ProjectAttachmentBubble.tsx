@@ -1,5 +1,5 @@
 import React from 'react';
-import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import type { ProjectRefRow } from '../../lib/messaging';
 import { AmbitFont, Astra, Brand } from '../../constants/theme';
@@ -45,17 +45,22 @@ export function ProjectAttachmentBubble({ project, isMine, onPress }: Props) {
       accessibilityRole="button"
       accessibilityLabel={`View project ${project.title}`}
     >
-      {/* Backdrop — warm gradient (the discovery photo-fallback look). */}
+      {/* Backdrop — the founder's real cover when present, else the warm
+          gradient (the discovery photo-fallback look). */}
       <LinearGradient
         colors={gradientFor(project.id)}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={StyleSheet.absoluteFill}
       />
-      {initials !== '' && (
-        <Text style={styles.watermark} numberOfLines={1} pointerEvents="none" allowFontScaling={false}>
-          {initials}
-        </Text>
+      {project.image_url ? (
+        <Image source={{ uri: project.image_url }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+      ) : (
+        initials !== '' && (
+          <Text style={styles.watermark} numberOfLines={1} pointerEvents="none" allowFontScaling={false}>
+            {initials}
+          </Text>
+        )
       )}
 
       {/* Top→bottom dark scrim so the bottom content reads cleanly. */}

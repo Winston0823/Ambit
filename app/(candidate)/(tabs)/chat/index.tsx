@@ -229,8 +229,11 @@ export default function ChatTab() {
   }, []);
 
   const openConversation = useCallback((id: string) => {
+    // Clear the unread highlight immediately (the thread marks it read on open;
+    // the focus refetch confirms). Feels instant instead of waiting on refetch.
+    patchItem(id, { unread_count: 0 });
     router.push({ pathname: '/chat/[id]', params: { id } });
-  }, []);
+  }, [patchItem]);
 
   // Apply the top inset as padding so the cream bg extends edge-to-edge
   // (no clipping above) while content still sits below the Dynamic Island.

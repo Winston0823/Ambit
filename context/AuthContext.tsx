@@ -30,6 +30,11 @@ interface AuthContextValue {
   /// path (audit P0: SignIn "Forgot password?" was a dead button).
   sendPasswordReset: (email: string) => Promise<void>;
   signOut: () => Promise<void>;
+  /// Permanently delete the signed-in user's account + all their data
+  /// (App Store Guideline 5.1.1(v)). Calls the `delete-account` edge
+  /// function, then clears the local session. Throws on failure so the
+  /// caller can surface an error and NOT navigate away.
+  deleteAccount: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -223,6 +228,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut();
   }, [session?.user?.id]);
 
+  const deleteAccount = useCallback(async () => {
+    const uid = session?.user?.id;
+    if (uid) {
+      // Stop this device's pushes first (the push_tokens rows also cascade
+      // on the server delete, but this clears the device-side badge/token now).
+      await unregisterAllPushTokens(uid).catch(() => {});
+      await clearBadge();
+    }
+    // The user's JWT is sent automatically by supabase-js; the function
+    // resolves the caller from it and deletes only that user.
+    const { error } = await supabase.functions.invoke('delete-account');
+    if (error) throw error;
+    // Server-side session is already invalid; clear the local one too.
+    await supabase.auth.signOut();
+  }, [session?.user?.id]);
+
   const value = useMemo<AuthContextValue>(() => ({
     session,
     user: session?.user ?? null,
@@ -236,6 +257,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     signInWithEmail,
     sendPasswordReset,
     signOut,
+    deleteAccount,
   }), [
     session,
     loading,
@@ -248,6 +270,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     signInWithEmail,
     sendPasswordReset,
     signOut,
+    deleteAccount,
   ]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
