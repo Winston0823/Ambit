@@ -18,8 +18,9 @@ Audit summary lives in Obsidian: `Ambit/Decisions/App Store Readiness Audit.md`.
 - [x] Strip `console.*` from release builds via `babel-plugin-transform-remove-console` (production env only).
 
 ## TODOs (tracked, not done this pass)
-- [ ] **Privacy Policy** — host a policy page + link it in onboarding/sign-in, and add the URL in App Store Connect. **REQUIRED before submission.**
-- [ ] **Rewarded-ad system (real)** — `ReachOutLimitSheet.tsx` currently grants the extra reach-out via a stub. Wire real AdMob (react-native-google-mobile-ads). NOTE: adding ads pulls in IDFA → ATT prompt + `NSUserTrackingUsageDescription` become required.
+- [ ] **Support email** — create the real `support@ambit.app` (or chosen) inbox. It's referenced in the finalized Privacy Policy + Terms and is the destination for privacy/support/UGC-report questions. Then set `LEGAL_CONTACT_EMAIL` in `constants/legal.ts` to match and re-export the docx. **REQUIRED before submission** (App Store needs a working support contact).
+- [~] **Privacy Policy** — DONE in-app (Apple-style Terms + Privacy in `constants/legal.ts`, `LegalModal` viewer, agree-gate on WelcomeScreen, links on profile). v1 finalized in Downloads. REMAINING: host both docs at a public URL, then set `LEGAL_URLS` in `constants/legal.ts` + the Privacy Policy URL in App Store Connect.
+- [x] **Rewarded-ad system (real)** — wired real AdMob (`lib/ads.ts` + `react-native-google-mobile-ads`); `ReachOutLimitSheet` grants only on `EARNED_REWARD`. ATT prompt + `NSUserTrackingUsageDescription` added. Real iOS App ID + ad-unit ID in place; Android unit still a placeholder.
 
 ## External — App Store Connect data entry (not code)
 Privacy questionnaire · screenshots (6.9"+6.5"; iPad 13" unless supportsTablet:false) · category · age rating · description/keywords · support+marketing URL · privacy policy URL · reviewer demo account · APNs key.
