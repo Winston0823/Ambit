@@ -78,6 +78,7 @@ import {
   listMessages,
   listReactions,
   markConversationRead,
+  setConversationArchived,
   sendImageMessage,
   sendPortfolioAttachment,
   sendTextMessage,
@@ -87,6 +88,7 @@ import {
   type ReactionRow,
 } from '../../../../lib/messaging';
 import { fetchPortfolioForUser, fetchPortfolioRefs } from '../../../../lib/portfolio';
+import { REPORT_REASONS, blockUser, reportUser } from '../../../../lib/moderation';
 import { DiscoveryCard, PortfolioModal } from '../../../../components/molecules';
 import { DaySeparator, dayLabel, sameDay } from '../../../../components/molecules/DaySeparator';
 import type { DiscoveryCardData, PortfolioItem } from '../../../../data/mock';
@@ -243,6 +245,7 @@ export default function ThreadScreen() {
   /// Closure-loop UI state: overflow menu (⋯) + pass-reason picker.
   const [overflowOpen, setOverflowOpen]   = useState(false);
   const [passSheetOpen, setPassSheetOpen] = useState(false);
+  const [reportOpen, setReportOpen]       = useState(false);
 
   // Lazy-load the projects referenced by attachment messages. A ref tracks
   // which ids we've already requested so message updates don't refetch.
@@ -334,6 +337,53 @@ export default function ThreadScreen() {
   const handleOpenPass = () => {
     setOverflowOpen(false);
     setPassSheetOpen(true);
+  };
+
+  // ── Safety: block + report (App Store UGC requirement) ─────────────
+  const handleOpenReport = () => {
+    setOverflowOpen(false);
+    setReportOpen(true);
+  };
+
+  const submitReport = async (reason: string) => {
+    setReportOpen(false);
+    if (!meta) return;
+    try {
+      await reportUser({
+        reportedUserId: meta.partner_id,
+        conversationId: conversationId ?? null,
+        reason,
+      });
+      toast.success('Report submitted. Our team will review it.');
+    } catch (e: any) {
+      toast.error(e?.message ?? "Couldn't submit report.");
+    }
+  };
+
+  const handleBlock = () => {
+    if (!meta) return;
+    setOverflowOpen(false);
+    Alert.alert(
+      `Block ${meta.partner_name}?`,
+      "They won't be able to reach you, and this conversation moves to your archive. You can unblock later from the conversation.",
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Block',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await blockUser(meta.partner_id);
+              if (conversationId) await setConversationArchived(conversationId, true).catch(() => {});
+              toast.success(`${meta.partner_name} blocked.`);
+              router.back();
+            } catch (e: any) {
+              toast.error(e?.message ?? "Couldn't block this user.");
+            }
+          },
+        },
+      ],
+    );
   };
 
   // Owner's private funnel stage — optimistic local set + owner-only RPC.
@@ -1319,6 +1369,25 @@ export default function ThreadScreen() {
             Pass on this chat
           </Text>
         </Pressable>
+
+        {/* Safety actions — required for App Store UGC compliance (1.2). */}
+        <Pressable style={styles.overflowItem} onPress={handleOpenReport}>
+          <Text style={[styles.overflowLabel, styles.overflowLabelDanger]}>Report {meta?.partner_name ?? 'user'}</Text>
+        </Pressable>
+        <Pressable style={styles.overflowItem} onPress={handleBlock}>
+          <Text style={[styles.overflowLabel, styles.overflowLabelDanger]}>Block {meta?.partner_name ?? 'user'}</Text>
+        </Pressable>
+      </BottomSheet>
+
+      {/* Report reason picker */}
+      <BottomSheet visible={reportOpen} onClose={() => setReportOpen(false)}>
+        <Text style={styles.reportTitle}>Report {meta?.partner_name ?? 'this user'}</Text>
+        <Text style={styles.reportSub}>What's going on? Our team reviews every report.</Text>
+        {REPORT_REASONS.map((reason) => (
+          <Pressable key={reason} style={styles.overflowItem} onPress={() => submitReport(reason)}>
+            <Text style={styles.overflowLabel}>{reason}</Text>
+          </Pressable>
+        ))}
       </BottomSheet>
 
       <PassReasonSheet
@@ -1765,6 +1834,21 @@ const styles = StyleSheet.create({
   },
   overflowLabelDisabled: {
     color: Brand.inkPlaceholder,
+  },
+  reportTitle: {
+    fontFamily: AmbitFont.display,
+    fontSize: 20,
+    color: Brand.inkPrimary,
+    paddingHorizontal: 16,
+    marginBottom: 4,
+  },
+  reportSub: {
+    fontFamily: AmbitFont.body,
+    fontSize: 14,
+    color: Brand.inkMuted,
+    paddingHorizontal: 16,
+    marginBottom: 12,
+    lineHeight: 20,
   },
 
   listContent: {

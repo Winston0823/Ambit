@@ -16,7 +16,8 @@
     "ios": {
       "supportsTablet": true,
       "usesAppleSignIn": true,
-      "bundleIdentifier": "com.winstongu.ambit"
+      "bundleIdentifier": "com.winstongu.ambit",
+      "buildNumber": "1"
     },
     "android": {
       "adaptiveIcon": {
@@ -35,6 +36,13 @@
       "expo-font",
       "expo-web-browser",
       "expo-apple-authentication",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Ambit uses your photos so you can set a profile picture and add work to your portfolio.",
+          "cameraPermission": "Ambit uses your camera so you can take a profile picture or capture work for your portfolio."
+        }
+      ],
       [
         "expo-calendar",
         {
