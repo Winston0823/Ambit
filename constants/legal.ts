@@ -1,20 +1,23 @@
-// Ambit legal content — Terms of Use (EULA) + Privacy Policy.
+// Ambit legal content — Terms of Use + Privacy Policy.
+//
+// Voice + structure modeled on Apple's Privacy Policy: warm, plain-language,
+// second-person, with question/noun-phrase section headings (not "Section 1")
+// and the bold lead-in "**Term.** Such as …" pattern for data bullets.
 //
 // Rendered in-app by LegalModal and linked from the sign-up agree-gate and the
-// profile screen. The SAME text should be hosted at a public URL for the App
-// Store Connect "Privacy Policy URL" field (see LEGAL_URLS below).
+// profile screen; the same source is exported to .docx (docs/legal/) for
+// hosting. Inline **bold** is supported by both renderers.
 //
-// ⚠️ These are working drafts written to satisfy Apple's review requirements
-// (Guideline 1.2 for UGC + 5.1.1 privacy). They are NOT a substitute for legal
-// review — have counsel check them before public launch. Update the bracketed
-// placeholders (contact email, company name, governing law, hosted URLs).
+// ⚠️ Working drafts written to satisfy Apple's review requirements (Guideline
+// 1.2 for UGC + 5.1.1 privacy). NOT a substitute for legal review — have
+// counsel check them before public launch. Update the bracketed placeholders
+// (contact email, entity name, governing law, hosted URLs).
 
-export const LEGAL_EFFECTIVE_DATE = 'July 7, 2026';
+export const LEGAL_EFFECTIVE_DATE = 'July 8, 2026';
 export const LEGAL_CONTACT_EMAIL = 'support@ambit.app'; // TODO: real support/privacy inbox
 export const LEGAL_ENTITY = 'Ambit'; // TODO: legal company name if incorporated
 
-// Hosted copies for App Store Connect metadata (required for the Privacy Policy
-// URL field, recommended for Terms). TODO: publish and paste the real URLs.
+// Hosted copies for App Store Connect metadata (Privacy Policy URL required).
 export const LEGAL_URLS = {
   terms: 'https://ambit.app/terms',
   privacy: 'https://ambit.app/privacy',
@@ -22,133 +25,140 @@ export const LEGAL_URLS = {
 
 export interface LegalSection {
   heading: string;
-  body: string; // blank line = paragraph break; "• " lines render as bullets
+  body: string; // "\n\n" = paragraph break, "• " = bullet, **text** = bold
 }
 
 export interface LegalDoc {
   title: string;
   updated: string;
+  intro: string; // lead paragraph under the title, before the first section
   sections: LegalSection[];
 }
 
-export const TERMS_OF_USE: LegalDoc = {
-  title: 'Terms of Use',
+export const PRIVACY_POLICY: LegalDoc = {
+  title: 'Ambit Privacy Policy',
   updated: LEGAL_EFFECTIVE_DATE,
+  intro:
+    `Ambit's Privacy Policy describes how Ambit collects, uses, and shares your personal data. We built Ambit to help student builders find each other — and we've built it to respect your privacy along the way. This policy is written in plain language, and we mean every word of it.`,
   sections: [
     {
-      heading: '1. Acceptance',
-      body: `By creating an account or using Ambit (the "App"), you agree to these Terms of Use and to our Privacy Policy. If you do not agree, do not use the App.`,
+      heading: 'What Is Personal Data at Ambit?',
+      body: `At Ambit, we believe strongly in your fundamental right to privacy. "Personal data" is data that identifies you or that can reasonably be linked to you — like your name, profile, messages, and email address. Data that we cannot connect back to you isn't personal data.`,
     },
     {
-      heading: '2. Eligibility',
-      body: `Ambit is for current university students and members of university communities. You must be at least 18 years old, or the age of majority where you live, and be able to form a binding contract. You must sign up with a valid university (.edu or equivalent) email where required.`,
-    },
-    {
-      heading: '3. Your account',
-      body: `You are responsible for your account and for keeping your login secure. Provide accurate information and keep it current. You may not impersonate anyone or misrepresent your affiliation, skills, or identity.`,
-    },
-    {
-      heading: '4. Community rules — zero tolerance for objectionable content',
-      body: `Ambit has ZERO TOLERANCE for objectionable content or abusive behavior. You agree not to post, send, or share content that is unlawful, harassing, hateful, threatening, sexually explicit, defamatory, discriminatory, spammy, fraudulent, or that infringes others' rights, and not to stalk, bully, or abuse any other user.
+      heading: 'Your Privacy Rights at Ambit',
+      body: `You control your presence on Ambit. You can view and edit your profile at any time, block or report other users, and permanently delete your account and all associated data from the profile screen. Depending on where you live, you may also have the right to access, correct, or export your personal data — just reach out and we'll help.
 
-We reserve the right to remove content and to suspend or terminate accounts that violate these rules, at our discretion and without notice.`,
+You never have to pay a fee or trade a benefit to exercise these rights.`,
     },
     {
-      heading: '5. Your content',
-      body: `You retain ownership of the content you create (your profile, messages, portfolio, and projects). You grant Ambit a non-exclusive, worldwide license to host, store, display, and transmit that content solely to operate and improve the App. You are solely responsible for the content you share and must have the rights to share it.`,
+      heading: 'Personal Data Ambit Collects from You',
+      body: `You share some information with us directly when you set up your profile and use the app:
+
+• **Account information.** Such as your university (.edu) email address and your name.
+• **Profile details.** Such as your photo, bio, skills, campus, role (seeker or owner), and whether you're a student or professor.
+• **Links you add.** Such as your GitHub, LinkedIn, personal site, and any résumé you upload, which we process to help fill in your profile.
+• **Content you create.** Such as portfolio items and images, projects and cover images, and the messages and photos you send to other users.`,
     },
     {
-      heading: '6. Reporting, blocking, and enforcement',
-      body: `You can report objectionable content and block abusive users from within the App. We review reports and act on violations — including removing content and ejecting the offending user — typically within 24 hours. By using Ambit you agree to this moderation process. Filing false or malicious reports is itself a violation.`,
+      heading: 'Personal Data Ambit Collects Automatically',
+      body: `Some information is collected as you use the app:
+
+• **Activity and reliability signals.** Such as your response rate and last active time, used to power matching and show reply-tier badges.
+• **A push-notification token.** So we can let you know when someone reaches out or replies.
+• **Permission-based data.** Such as your calendar availability (read on your device to help schedule meetings) and camera or photo access (to add images) — only with your permission.
+• **Advertising identifier.** Such as your device's advertising ID, used to show rewarded ads only if you allow tracking (see "Advertising and Tracking").`,
     },
     {
-      heading: '7. Prohibited use',
-      body: `You may not: reverse engineer or disrupt the App; scrape or harvest data; use bots or automated access; attempt to access other users' accounts; or use the App for any illegal purpose or in violation of any applicable law.`,
+      heading: 'How Ambit Uses Your Personal Data',
+      body: `We use your data to run the app and make it better: to create and secure your account, power matching and discovery, deliver your messages, send notifications you've asked for, help you schedule meetings, show rewarded ads you choose to watch, and keep the community safe by acting on reports and blocks. We also create a numerical representation of your profile text to improve how well matches fit.
+
+We do not use your data to build advertising profiles about you, and we never sell your personal data.`,
     },
     {
-      heading: '8. Disclaimers',
-      body: `Ambit is provided "as is" without warranties of any kind. Ambit is a platform for connecting people; we do not verify every user, do not employ or endorse any user, and are not a party to any arrangement, hire, or agreement you make with another user. You interact with other users at your own risk.`,
+      heading: 'How Ambit Shares Personal Data',
+      body: `• **With other users.** Your profile and the content you choose to share are visible to other users — that's the core of how Ambit works.
+• **With service providers.** Such as our cloud host and database (Supabase), push notifications (Expo), advertising (Google AdMob), and AI-assisted résumé parsing and matching. They may only process your data to provide their services to us.
+• **For legal and safety reasons.** To comply with the law, enforce our Terms, or protect the rights, safety, and integrity of Ambit and its users.`,
     },
     {
-      heading: '9. Limitation of liability',
-      body: `To the fullest extent permitted by law, Ambit and ${LEGAL_ENTITY} will not be liable for any indirect, incidental, or consequential damages, or for any conduct or content of any user. Our total liability for any claim is limited to the amount you paid us (if any) in the 12 months before the claim.`,
+      heading: 'Advertising and Tracking',
+      body: `Ambit shows rewarded ads through Google AdMob when you choose to watch one to unlock an extra reach-out. On iOS, we ask for your permission through Apple's App Tracking Transparency prompt before any tracking. If you decline, we simply request non-personalized ads. You can change your choice anytime in your device Settings.`,
     },
     {
-      heading: '10. Termination',
-      body: `You may stop using Ambit and delete your account at any time from the profile screen. We may suspend or terminate your access if you violate these Terms.`,
+      heading: 'Protection of Personal Data at Ambit',
+      body: `We use technical and organizational measures to protect your data, including encrypted storage of your login session on your device and access controls on our backend. No system is perfectly secure, but safeguarding your information is something we work at continuously.`,
     },
     {
-      heading: '11. Changes',
-      body: `We may update these Terms. Material changes will be surfaced in the App. Continued use after an update means you accept the revised Terms.`,
+      heading: 'Children and Personal Data',
+      body: `Ambit is not directed to children. You must be at least 18 to use Ambit, and our university-email requirement is designed to keep the service limited to adult members of university communities. We do not knowingly collect personal data from anyone under 13.`,
     },
     {
-      heading: '12. Contact',
-      body: `Questions about these Terms? Contact us at ${LEGAL_CONTACT_EMAIL}.`,
+      heading: 'Retaining and Deleting Your Data',
+      body: `We keep your information for as long as your account is active. Whenever you're ready, you can permanently delete your account from the profile screen — this removes your profile, projects, portfolio, messages, matches, and uploaded files.`,
+    },
+    {
+      heading: 'Our Commitment to Your Privacy',
+      body: `Protecting your privacy isn't a feature we bolted on — it's part of how Ambit is built. We collect what we need to make the app work, we're clear about it, and we put you in control of your data.`,
+    },
+    {
+      heading: 'Privacy Questions',
+      body: `If you have any questions about this policy or how we handle your data, we're happy to help. Contact us at ${LEGAL_CONTACT_EMAIL} and we'll get back to you.`,
     },
   ],
 };
 
-export const PRIVACY_POLICY: LegalDoc = {
-  title: 'Privacy Policy',
+export const TERMS_OF_USE: LegalDoc = {
+  title: 'Ambit Terms of Use',
   updated: LEGAL_EFFECTIVE_DATE,
+  intro:
+    `These Terms of Use are the agreement between you and ${LEGAL_ENTITY} for using Ambit (the "app"). We've kept them as plain as we can. By creating an account or using Ambit, you agree to these Terms and to our Privacy Policy. If you don't agree, please don't use the app.`,
   sections: [
     {
-      heading: 'Overview',
-      body: `This policy explains what information Ambit collects, how we use it, and your choices. By using the App you agree to this policy.`,
+      heading: 'Who Can Use Ambit',
+      body: `Ambit is for current university students and members of university communities. You must be at least 18 years old (or the age of majority where you live), able to enter a binding agreement, and — where required — sign up with a valid university (.edu or equivalent) email.`,
     },
     {
-      heading: 'Information you provide',
-      body: `• Account: your university (.edu) email, and name.
-• Profile: photo, bio/blurb, skills, campus, role (seeker/owner), and student/professor status.
-• Links you add: GitHub, LinkedIn, personal site, and any résumé you upload (which we process to help fill your profile).
-• Content you create: portfolio items and images, projects and cover images, and messages (including photos) you send to other users.`,
+      heading: 'Your Account',
+      body: `You're responsible for your account and for keeping your login secure. Please give us accurate information and keep it current. Don't impersonate anyone or misrepresent your affiliation, your skills, or who you are.`,
     },
     {
-      heading: 'Information collected automatically',
-      body: `• Usage and reliability signals (e.g. response rate, last activity) used for matching and to show reply-tier badges.
-• A device push-notification token, so we can notify you of messages and reach-outs.
-• With your permission, calendar availability (read on your device) to help schedule meetings, and camera/photo access to add images.
-• Advertising identifier (IDFA) and related data, only if you allow tracking, used to show rewarded ads (see "Advertising").`,
-    },
-    {
-      heading: 'How we use your information',
-      body: `To operate the App: create and secure your account, power matching and discovery, deliver messages, send notifications, schedule meetings, show rewarded ads, and keep the community safe (moderation of reports and blocks). We generate a vector representation of your profile text to improve matching relevance.`,
-    },
-    {
-      heading: 'How we share your information',
-      body: `• With other users: your profile and the content you choose to share are visible to other users as part of the App's core function.
-• With service providers that operate the App on our behalf: cloud hosting and database (Supabase), push notifications (Expo), advertising (Google AdMob), and AI-assisted résumé parsing and matching. These providers process data only to provide their services.
-• For legal reasons: to comply with law or protect rights, safety, and the integrity of the App.
+      heading: 'Being a Good Community Member',
+      body: `Ambit only works if it stays a place people trust. We have **zero tolerance for objectionable content and abusive behavior.** You agree not to post, send, or share content that is unlawful, harassing, hateful, threatening, sexually explicit, defamatory, discriminatory, spammy, fraudulent, or that infringes anyone's rights — and not to stalk, bully, or abuse another user.
 
-We do not sell your personal information.`,
+We may remove content and suspend or terminate accounts that break these rules, at our discretion and without notice.`,
     },
     {
-      heading: 'Advertising and tracking',
-      body: `Ambit shows rewarded ads through Google AdMob when you choose to watch one. On iOS we ask for your permission before any tracking via Apple's App Tracking Transparency prompt; if you decline, we request non-personalized ads. You can change this anytime in your device Settings.`,
+      heading: 'Your Content',
+      body: `You own the content you create — your profile, messages, portfolio, and projects. You give Ambit a non-exclusive, worldwide license to host, store, display, and transmit that content solely to operate and improve the app. You're responsible for what you share, and you confirm you have the right to share it.`,
     },
     {
-      heading: 'Data retention and deletion',
-      body: `We keep your information while your account is active. You can permanently delete your account and associated data at any time from the profile screen ("Delete account"), which removes your profile, projects, portfolio, messages, matches, and uploaded files.`,
+      heading: 'Reporting, Blocking, and How We Respond',
+      body: `You can report objectionable content and block abusive users right from the app. We review reports and act on violations — including removing content and removing the offending user — typically within 24 hours. By using Ambit, you agree to this moderation process. Filing false or malicious reports is itself a violation.`,
     },
     {
-      heading: 'Your choices and rights',
-      body: `You can edit or remove your profile content, block and report other users, control notification and tracking permissions in device Settings, and delete your account. Depending on where you live, you may have rights to access, correct, or delete your personal data — contact us to exercise them.`,
+      heading: 'Things You Agree Not to Do',
+      body: `Please don't reverse engineer or disrupt the app, scrape or harvest data, use bots or automated access, try to reach other users' accounts, or use Ambit for anything illegal or against applicable law.`,
     },
     {
-      heading: 'Security',
-      body: `We use industry-standard measures (including encrypted storage of your session on your device and access controls on our backend) to protect your information. No system is perfectly secure, but we work to safeguard your data.`,
+      heading: 'The Things We Have to Say',
+      body: `Ambit is provided "as is," without warranties of any kind. Ambit is a place to connect with people — we don't verify every user, we don't employ or endorse anyone, and we're not a party to any arrangement, hire, or agreement you make with another user. You interact with other users at your own risk.`,
     },
     {
-      heading: 'Children',
-      body: `Ambit is not directed to children. You must be at least 18, and our university-email requirement is intended to limit the service to adult members of university communities. We do not knowingly collect data from anyone under 13.`,
+      heading: 'Limitation of Liability',
+      body: `To the fullest extent permitted by law, Ambit and ${LEGAL_ENTITY} won't be liable for indirect, incidental, or consequential damages, or for the conduct or content of any user. Our total liability for any claim is limited to the amount you paid us, if any, in the 12 months before the claim.`,
     },
     {
-      heading: 'Changes',
-      body: `We may update this policy. Material changes will be surfaced in the App with a new effective date.`,
+      heading: 'Ending Your Membership',
+      body: `You can stop using Ambit and delete your account anytime from the profile screen. We may suspend or end your access if you break these Terms.`,
     },
     {
-      heading: 'Contact',
-      body: `Questions or requests about your privacy? Contact us at ${LEGAL_CONTACT_EMAIL}.`,
+      heading: 'Changes to These Terms',
+      body: `We may update these Terms from time to time. If we make a material change, we'll surface it in the app. Continuing to use Ambit after an update means you accept the revised Terms.`,
+    },
+    {
+      heading: 'Questions',
+      body: `If anything here is unclear, we'd rather you ask. Contact us at ${LEGAL_CONTACT_EMAIL}.`,
     },
   ],
 };

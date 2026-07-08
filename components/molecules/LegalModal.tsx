@@ -5,6 +5,19 @@ import { X } from 'phosphor-react-native';
 import type { LegalDoc } from '../../constants/legal';
 import { AmbitFont, Brand, Space } from '../../constants/theme';
 
+/// Render a string with **bold** spans into Text runs. `bullet` prepends a dot.
+function renderRuns(text: string, bullet?: boolean): React.ReactNode {
+  const runs = text
+    .split(/(\*\*[^*]+\*\*)/g)
+    .filter(Boolean)
+    .map((p, i) =>
+      p.startsWith('**') && p.endsWith('**')
+        ? <Text key={i} style={styles.boldRun}>{p.slice(2, -2)}</Text>
+        : <Text key={i}>{p}</Text>,
+    );
+  return bullet ? <>{'•  '}{runs}</> : <>{runs}</>;
+}
+
 interface Props {
   /// The doc to show, or null to hide the modal.
   doc: LegalDoc | null;
@@ -19,7 +32,6 @@ export function LegalModal({ doc, onClose }: Props) {
     <Modal visible={!!doc} animationType="slide" onRequestClose={onClose} presentationStyle="pageSheet">
       <View style={styles.root}>
         <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-          <Text style={styles.headerTitle} numberOfLines={1}>{doc?.title ?? ''}</Text>
           <Pressable onPress={onClose} hitSlop={10} accessibilityRole="button" accessibilityLabel="Close">
             <X size={22} color={Brand.inkMuted} weight="bold" />
           </Pressable>
@@ -30,15 +42,19 @@ export function LegalModal({ doc, onClose }: Props) {
         >
           {doc && (
             <>
-              <Text style={styles.updated}>Last updated {doc.updated}</Text>
+              <Text style={styles.title}>{doc.title}</Text>
+              <Text style={styles.updated}>Updated {doc.updated}</Text>
+              <Text style={styles.intro}>{renderRuns(doc.intro)}</Text>
               {doc.sections.map((s) => (
                 <View key={s.heading} style={styles.section}>
                   <Text style={styles.heading}>{s.heading}</Text>
-                  {s.body.split('\n\n').map((para, i) => {
-                    const isBullet = para.trimStart().startsWith('• ');
+                  {s.body.split('\n').map((line, i) => {
+                    const trimmed = line.trim();
+                    if (!trimmed) return null;
+                    const isBullet = trimmed.startsWith('• ');
                     return (
-                      <Text key={i} style={[styles.para, isBullet && styles.bullet]}>
-                        {para}
+                      <Text key={i} style={[styles.para, isBullet && styles.bulletPara]}>
+                        {renderRuns(isBullet ? trimmed.slice(2) : trimmed, isBullet)}
                       </Text>
                     );
                   })}
@@ -57,17 +73,41 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end',
     paddingHorizontal: Space.lg,
-    paddingBottom: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: Brand.borderDefault,
+    paddingBottom: 8,
   },
-  headerTitle: { fontFamily: AmbitFont.display, fontSize: 20, color: Brand.inkPrimary, flex: 1 },
-  content: { paddingHorizontal: Space.lg, paddingTop: 16 },
-  updated: { fontFamily: AmbitFont.body, fontSize: 12.5, color: Brand.inkMuted, marginBottom: 20 },
-  section: { marginBottom: 22 },
-  heading: { fontFamily: AmbitFont.semibold, fontSize: 15, color: Brand.inkPrimary, marginBottom: 8 },
+  content: { paddingHorizontal: Space.lg, paddingTop: 4 },
+  // Apple-style: big centered title + "Updated …" under it, then a lead intro.
+  title: {
+    fontFamily: AmbitFont.display,
+    fontSize: 28,
+    color: Brand.inkPrimary,
+    textAlign: 'center',
+  },
+  updated: {
+    fontFamily: AmbitFont.body,
+    fontSize: 12.5,
+    color: Brand.inkMuted,
+    textAlign: 'center',
+    marginTop: 6,
+    marginBottom: 20,
+  },
+  intro: {
+    fontFamily: AmbitFont.body,
+    fontSize: 15,
+    lineHeight: 23,
+    color: Brand.inkBody,
+    marginBottom: 28,
+  },
+  section: { marginBottom: 24 },
+  heading: {
+    fontFamily: AmbitFont.display,
+    fontSize: 18,
+    color: Brand.inkPrimary,
+    marginBottom: 10,
+  },
   para: { fontFamily: AmbitFont.body, fontSize: 14, lineHeight: 21, color: Brand.inkBody, marginTop: 8 },
-  bullet: { marginTop: 4 },
+  bulletPara: { marginTop: 6, paddingLeft: 4 },
+  boldRun: { fontFamily: AmbitFont.semibold, color: Brand.inkPrimary },
 });
