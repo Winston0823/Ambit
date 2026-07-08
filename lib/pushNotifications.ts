@@ -1,4 +1,4 @@
-import { Platform } from 'react-native';
+import { Alert, Platform } from 'react-native';
 import Constants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
 import { supabase } from './supabase';
@@ -22,11 +22,26 @@ Notifications.setNotificationHandler({
 /// (`eas build --profile development`). This function still runs safely
 /// in Expo Go — it just returns null without registering.
 export async function registerForPushNotifications(userId: string): Promise<string | null> {
-  // Always request notification permissions first — local notifications
-  // (the realtime fallback used in Expo Go / Simulator) need them too.
+  // Request notification permission — but prime it first. The iOS system
+  // prompt can only ever be shown ONCE; if we fire it cold and the user
+  // dismisses it, we can never ask again. So when the permission is still
+  // undetermined, show an in-app rationale and only trigger the real OS
+  // prompt if the user opts in. "Not now" leaves the one-shot intact for a
+  // later, more contextual ask.
   const existing = await Notifications.getPermissionsAsync();
   let status = existing.status;
-  if (status !== 'granted') {
+  if (status === 'undetermined') {
+    const optedIn = await new Promise<boolean>((resolve) => {
+      Alert.alert(
+        'Turn on notifications?',
+        'Ambit will let you know when someone reaches out or replies. You can change this anytime in Settings.',
+        [
+          { text: 'Not now', style: 'cancel', onPress: () => resolve(false) },
+          { text: 'Enable', onPress: () => resolve(true) },
+        ],
+      );
+    });
+    if (!optedIn) return null;
     const req = await Notifications.requestPermissionsAsync();
     status = req.status;
   }

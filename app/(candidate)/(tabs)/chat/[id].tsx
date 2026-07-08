@@ -40,18 +40,21 @@ import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import * as Haptics from 'expo-haptics';
-import { CaretDown, CaretLeft, CaretRight, DotsThree, X } from 'phosphor-react-native';
+import { ArrowsClockwise, CaretDown, CaretLeft, CaretRight, Clock, DotsThree, X } from 'phosphor-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { StatusBar } from 'expo-status-bar';
 import { Motion } from '../../../../constants/motion';
-import { HardShadow, Tactile, Skeleton } from '../../../../components/atoms';
+import { GlassSurface, HardShadow, Tactile, Skeleton } from '../../../../components/atoms';
 import { touchPresence } from '../../../../lib/presence';
 import {
   BottomSheet,
   MessageBubble,
   type MessageStatus,
   PassReasonSheet,
+  ReportReasonSheet,
   TypingIndicator,
 } from '../../../../components/molecules';
+import { blockUser, type ReportTarget } from '../../../../lib/safety';
 import {
   AvailabilityPollComposer,
   AvailabilityPollModal,
@@ -62,13 +65,16 @@ import {
 import {
   confirmHire,
   proposeHire,
+  revertHireProposal,
   updateOwnerStage,
+  getAutoCloseCountdown,
   type ConversationStatus,
   type OwnerStage,
 } from '../../../../lib/closureLoop';
 import { useAuth } from '../../../../context/AuthContext';
 import { supabase } from '../../../../lib/supabase';
 import { toast } from '../../../../lib/toast';
+import { haptics } from '../../../../lib/haptics';
 import {
   deleteMessage,
   editMessage,
@@ -78,7 +84,6 @@ import {
   listMessages,
   listReactions,
   markConversationRead,
-  setConversationArchived,
   sendImageMessage,
   sendPortfolioAttachment,
   sendTextMessage,
@@ -88,7 +93,6 @@ import {
   type ReactionRow,
 } from '../../../../lib/messaging';
 import { fetchPortfolioForUser, fetchPortfolioRefs } from '../../../../lib/portfolio';
-import { REPORT_REASONS, blockUser, reportUser } from '../../../../lib/moderation';
 import { DiscoveryCard, PortfolioModal } from '../../../../components/molecules';
 import { DaySeparator, dayLabel, sameDay } from '../../../../components/molecules/DaySeparator';
 import type { DiscoveryCardData, PortfolioItem } from '../../../../data/mock';
@@ -100,7 +104,7 @@ import {
   listAvailabilityPolls,
   type AvailabilityPollRow,
 } from '../../../../lib/availability';
-import { AmbitFont, Brand, Radii, Space } from '../../../../constants/theme';
+import { AmbitFont, Astra, Brand, Radii, Space } from '../../../../constants/theme';
 
 const QUICK_REACTIONS = ['👍', '❤️', '😂', '🙏', '🔥', '👀'];
 
@@ -122,6 +126,9 @@ interface ConvoMeta {
   pass_reason:       string | null;
   hired_at:          string | null;
   hired_proposed_by: string | null;
+  /// 72h auto-decline deadline (set on conversation creation). Drives the
+  /// quiet in-thread countdown banner while a reach-out awaits my reply.
+  auto_decline_at:   string | null;
   /// Owner's private funnel stage (owner-only; null until first set).
   owner_stage:       OwnerStage | null;
 }
@@ -172,6 +179,14 @@ export default function ThreadScreen() {
   const [pollComposerOpen, setPollComposerOpen] = useState(false);
   const [partnerLastReadAt, setPartnerLastReadAt] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  /// True when the initial thread fetch rejected (network / server). Before
+  /// this existed, ANY rejection in the initial Promise.all left `loading`
+  /// stuck true forever — an infinite skeleton. Now we surface a retryable
+  /// error state instead.
+  const [loadError, setLoadError] = useState(false);
+  /// Monotonic guard so a superseded load (conversation switch, rapid retry)
+  /// can't clobber the state of the newest one.
+  const loadSeqRef = useRef(0);
 
   const [replyTo, setReplyTo] = useState<MessageRow | null>(null);
   const [editing, setEditing] = useState<MessageRow | null>(null);
@@ -192,7 +207,8 @@ export default function ThreadScreen() {
   /// doesn't need to trigger renders.
   const failedPayloadsRef = useRef<
     Map<string, { type: 'text'; body: string; parentId: string | null }
-            | { type: 'image'; localUri: string; parentId: string | null }>
+            | { type: 'image'; localUri: string; parentId: string | null }
+            | { type: 'portfolio'; item: PortfolioItem }>
   >(new Map());
 
   const [partnerTyping, setPartnerTyping] = useState(false);
@@ -202,6 +218,9 @@ export default function ThreadScreen() {
   // True once the user drags the list — stops us from force-pinning to the
   // bottom (so we don't yank them off a message they scrolled up to read).
   const userScrolledRef = useRef(false);
+  // True while this screen is focused — gates auto mark-read so a background
+  // thread's incoming messages don't silently clear its unread state.
+  const isFocusedRef = useRef(false);
 
   // Native-driven scroll offset for the screen-anchored bubble gradient.
   // scrollY drives the per-bubble transforms (native); scrollYRef mirrors
@@ -245,7 +264,8 @@ export default function ThreadScreen() {
   /// Closure-loop UI state: overflow menu (⋯) + pass-reason picker.
   const [overflowOpen, setOverflowOpen]   = useState(false);
   const [passSheetOpen, setPassSheetOpen] = useState(false);
-  const [reportOpen, setReportOpen]       = useState(false);
+  // Report sheet is target-driven — non-null means "report this".
+  const [reportTarget, setReportTarget]   = useState<ReportTarget | null>(null);
 
   // Lazy-load the projects referenced by attachment messages. A ref tracks
   // which ids we've already requested so message updates don't refetch.
@@ -334,56 +354,25 @@ export default function ThreadScreen() {
     ]);
   };
 
+  // Revert a stuck `hired_pending` proposal back to `active`. Powers BOTH
+  // the recipient's "Not yet" (decline the proposal) and the proposer's
+  // "Withdraw proposal" — the server RPC just needs a participant. Not a
+  // terminal/destructive action, so no blocking Alert; optimistic with a
+  // rollback on failure.
+  const handleRevertHire = () => {
+    if (!conversationId || !meta) return;
+    const prev = meta;
+    haptics.selection();
+    setMeta((m) => (m ? { ...m, status: 'active', hired_proposed_by: null } : m));
+    revertHireProposal(conversationId).catch((e: any) => {
+      setMeta(prev);
+      Alert.alert('Could not update', e?.message ?? 'Try again.');
+    });
+  };
+
   const handleOpenPass = () => {
     setOverflowOpen(false);
     setPassSheetOpen(true);
-  };
-
-  // ── Safety: block + report (App Store UGC requirement) ─────────────
-  const handleOpenReport = () => {
-    setOverflowOpen(false);
-    setReportOpen(true);
-  };
-
-  const submitReport = async (reason: string) => {
-    setReportOpen(false);
-    if (!meta) return;
-    try {
-      await reportUser({
-        reportedUserId: meta.partner_id,
-        conversationId: conversationId ?? null,
-        reason,
-      });
-      toast.success('Report submitted. Our team will review it.');
-    } catch (e: any) {
-      toast.error(e?.message ?? "Couldn't submit report.");
-    }
-  };
-
-  const handleBlock = () => {
-    if (!meta) return;
-    setOverflowOpen(false);
-    Alert.alert(
-      `Block ${meta.partner_name}?`,
-      "They won't be able to reach you, and this conversation moves to your archive. You can unblock later from the conversation.",
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Block',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await blockUser(meta.partner_id);
-              if (conversationId) await setConversationArchived(conversationId, true).catch(() => {});
-              toast.success(`${meta.partner_name} blocked.`);
-              router.back();
-            } catch (e: any) {
-              toast.error(e?.message ?? "Couldn't block this user.");
-            }
-          },
-        },
-      ],
-    );
   };
 
   // Owner's private funnel stage — optimistic local set + owner-only RPC.
@@ -406,11 +395,17 @@ export default function ThreadScreen() {
   };
 
   // ── Initial load ─────────────────────────────────────────────
-  useEffect(() => {
+  // Extracted into a stable callback so the error state's Retry can re-run
+  // the exact same fetch. Any rejection now lands in catch → error state
+  // (never an infinite skeleton), and `finally` always clears `loading`.
+  const loadThread = useCallback(async () => {
     if (!conversationId || !user) return;
-    let cancelled = false;
+    const seq = ++loadSeqRef.current;
+    const isStale = () => seq !== loadSeqRef.current;
+    setLoadError(false);
+    setLoading(true);
 
-    (async () => {
+    try {
       // Conversation row + project title. profiles isn't directly FK'd
       // from conversations (both point at auth.users), so we fetch the
       // partner profile in a second query rather than via Postgrest join.
@@ -425,7 +420,7 @@ export default function ThreadScreen() {
       let convo: any = null;
       const full = await supabase
         .from('conversations')
-        .select('id, project_id, owner_id, seeker_id, status, pass_reason, hired_at, hired_proposed_by, owner_stage, projects(title)')
+        .select('id, project_id, owner_id, seeker_id, status, pass_reason, hired_at, hired_proposed_by, auto_decline_at, owner_stage, projects(title)')
         .eq('id', conversationId)
         .single();
       if (full.error) {
@@ -477,6 +472,7 @@ export default function ThreadScreen() {
         pass_reason:       (convo as any).pass_reason ?? null,
         hired_at:          (convo as any).hired_at ?? null,
         hired_proposed_by: (convo as any).hired_proposed_by ?? null,
+        auto_decline_at:   (convo as any).auto_decline_at ?? null,
         owner_stage:       ((convo as any).owner_stage as OwnerStage | null) ?? null,
       };
 
@@ -500,7 +496,7 @@ export default function ThreadScreen() {
           .then(({ data }) => data),
       ]);
 
-      if (cancelled) return;
+      if (isStale()) return;
       setMeta(partner);
       setMessages(msgs);
       setReactions(reacts);
@@ -509,13 +505,22 @@ export default function ThreadScreen() {
       setPartnerLastReadAt(partnerRead);
       setMyPhotoUrl((selfProfile as { photo_url: string | null } | null)?.photo_url ?? null);
       setMyName((selfProfile as { name: string | null } | null)?.name ?? 'You');
-      setLoading(false);
-    })();
-
-    return () => {
-      cancelled = true;
-    };
+    } catch (e) {
+      // A rejected fetch (network / server) must NOT hang on the skeleton
+      // forever — surface a retryable error instead.
+      console.warn('thread load failed:', e);
+      if (!isStale()) setLoadError(true);
+    } finally {
+      if (!isStale()) setLoading(false);
+    }
   }, [conversationId, user?.id]);
+
+  useEffect(() => {
+    loadThread();
+    // Invalidate any in-flight load on unmount / conversation switch so a
+    // late completion can't setState on a torn-down screen.
+    return () => { loadSeqRef.current++; };
+  }, [loadThread]);
 
   // ── Realtime ─────────────────────────────────────────────────
   useEffect(() => {
@@ -598,14 +603,19 @@ export default function ThreadScreen() {
     ch.on(
       'postgres_changes',
       {
-        event:  'UPDATE',
+        // '*' not 'UPDATE': the partner's FIRST read is an INSERT into
+        // conversation_reads (no prior row), which an UPDATE-only listener
+        // missed — so the very first ✓✓ never landed until a later update.
+        event:  '*',
         schema: 'public',
         table:  'conversation_reads',
         filter: `conversation_id=eq.${conversationId}`,
       },
       (payload) => {
-        const row = payload.new as { user_id: string; last_read_at: string };
-        if (row.user_id !== user.id) setPartnerLastReadAt(row.last_read_at);
+        const row = (payload.new ?? {}) as { user_id?: string; last_read_at?: string };
+        if (row.user_id && row.user_id !== user.id && row.last_read_at) {
+          setPartnerLastReadAt(row.last_read_at);
+        }
       },
     );
 
@@ -660,7 +670,26 @@ export default function ThreadScreen() {
       typingTimerRef.current = setTimeout(() => setPartnerTyping(false), 3000);
     });
 
-    ch.subscribe();
+    ch.subscribe((chStatus) => {
+      // There's a gap between the initial fetch and the channel going live;
+      // messages inserted in that window aren't broadcast to us. Once we're
+      // SUBSCRIBED, reconcile against the server so nothing is dropped.
+      if (chStatus === 'SUBSCRIBED') {
+        listMessages(conversationId, { limit: 200 })
+          .then((fresh) => {
+            setMessages((prev) => {
+              const byId = new Map<string, MessageRow>();
+              for (const m of fresh) byId.set(m.id, m);
+              // Preserve local-only optimistic rows the server doesn't have yet.
+              for (const m of prev) if (!byId.has(m.id)) byId.set(m.id, m);
+              return Array.from(byId.values()).sort((a, b) =>
+                a.created_at.localeCompare(b.created_at),
+              );
+            });
+          })
+          .catch(() => { /* realtime will still stream new inserts */ });
+      }
+    });
     }
     channelRef.current = ch;
 
@@ -678,11 +707,22 @@ export default function ThreadScreen() {
   // ── Mark read on focus (and on each new message arrival) ─────
   useFocusEffect(
     useCallback(() => {
+      isFocusedRef.current = true;
       if (conversationId) markConversationRead(conversationId);
+      return () => { isFocusedRef.current = false; };
     }, [conversationId]),
   );
   useEffect(() => {
-    if (conversationId && messages.length > 0) {
+    // Only auto mark-read when the user is actually seeing the newest
+    // messages: screen focused AND parked at the bottom. A message that
+    // arrives while they've scrolled up (or while the thread is backgrounded)
+    // must stay unread until they come back to it.
+    if (
+      conversationId &&
+      messages.length > 0 &&
+      isFocusedRef.current &&
+      !userScrolledRef.current
+    ) {
       markConversationRead(conversationId);
     }
   }, [conversationId, messages.length]);
@@ -760,6 +800,37 @@ export default function ThreadScreen() {
     }
     return null;
   }, [messages, user?.id]);
+
+  // ── In-thread reply deadline (72h auto-decline) ──────────────
+  // A reach-out I haven't answered auto-declines 72h after the
+  // conversation was created (server sweep — see 005_closure_loop). Show a
+  // quiet countdown above the composer so the deadline isn't invisible.
+  // Only while: status active, the partner has actually reached out, and I
+  // haven't replied yet (once I send, the sweep no longer fires).
+  const iHaveReplied = useMemo(
+    () => !!user && messages.some((m) => m.sender_id === user.id && (!m.kind || m.kind === 'user')),
+    [messages, user?.id],
+  );
+  const theyReachedOut = useMemo(
+    () => !!meta && messages.some((m) => m.sender_id === meta.partner_id && (!m.kind || m.kind === 'user')),
+    [messages, meta],
+  );
+  // Minute-granularity tick so the label stays live without re-rendering
+  // the whole thread on every second.
+  const [deadlineTick, setDeadlineTick] = useState(0);
+  const deadlineActive =
+    !!meta && meta.status === 'active' && !iHaveReplied && theyReachedOut && !!meta.auto_decline_at;
+  useEffect(() => {
+    if (!deadlineActive) return;
+    const t = setInterval(() => setDeadlineTick((n) => n + 1), 60_000);
+    return () => clearInterval(t);
+  }, [deadlineActive]);
+  const replyCountdown = useMemo(
+    () => (deadlineActive && meta ? getAutoCloseCountdown(meta.auto_decline_at) : null),
+    // deadlineTick intentionally re-reads at minute boundaries.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [deadlineActive, meta?.auto_decline_at, deadlineTick],
+  );
 
   // ── Handlers ─────────────────────────────────────────────────
 
@@ -887,6 +958,9 @@ export default function ThreadScreen() {
       setMessages((prev) => prev.map((m) => (m.id === clientId ? real : m)));
       markSent(clientId);
     } catch {
+      // Stash the payload so the bubble's "Not delivered · tap to retry"
+      // affordance can re-send it (mirrors the text/image paths).
+      failedPayloadsRef.current.set(clientId, { type: 'portfolio', item });
       markFailed(clientId);
     }
   };
@@ -949,12 +1023,21 @@ export default function ThreadScreen() {
           clientId: messageId,
         });
         setMessages((prev) => prev.map((m) => (m.id === messageId ? real : m)));
-      } else {
+      } else if (payload.type === 'image') {
         const real = await sendImageMessage({
           conversationId,
           senderId: user.id,
           localUri: payload.localUri,
           parentId: payload.parentId,
+          clientId: messageId,
+        });
+        setMessages((prev) => prev.map((m) => (m.id === messageId ? real : m)));
+      } else {
+        const real = await sendPortfolioAttachment({
+          conversationId,
+          senderId: user.id,
+          portfolioId: payload.item.id,
+          portfolioTitle: payload.item.title,
           clientId: messageId,
         });
         setMessages((prev) => prev.map((m) => (m.id === messageId ? real : m)));
@@ -981,16 +1064,28 @@ export default function ThreadScreen() {
 
   const handleToggleReaction = async (message: MessageRow, emoji: string) => {
     if (!user) return;
+    const matches = (r: ReactionRow) =>
+      r.message_id === message.id && r.user_id === user.id && r.emoji === emoji;
+    const mine: ReactionRow = { message_id: message.id, user_id: user.id, emoji };
+    const had = reactions.some(matches);
+    // Optimistic toggle + tactile tick — the chip responds instantly instead
+    // of waiting on the round trip. The realtime INSERT/DELETE that follows is
+    // deduped against this local change, so it's a no-op on success.
+    setReactions((prev) => (had ? prev.filter((r) => !matches(r)) : [...prev, mine]));
+    haptics.selection();
     try {
       await toggleReaction({ messageId: message.id, userId: user.id, emoji });
     } catch (e: any) {
+      // Roll back on failure.
+      setReactions((prev) => (had ? [...prev, mine] : prev.filter((r) => !matches(r))));
       console.warn('toggle reaction failed:', e?.message);
+      toast.error("Couldn't update that reaction.");
     }
   };
 
   const handleLongPress = (m: MessageRow) => setSelectedMessage(m);
 
-  const handleMenuAction = async (action: 'reply' | 'copy' | 'edit' | 'delete') => {
+  const handleMenuAction = async (action: 'reply' | 'copy' | 'edit' | 'delete' | 'report') => {
     const m = selectedMessage;
     setSelectedMessage(null);
     if (!m) return;
@@ -999,6 +1094,9 @@ export default function ThreadScreen() {
       if (m.body) await Clipboard.setStringAsync(m.body);
     } else if (action === 'edit') {
       if (m.sender_id === user?.id && m.body) setEditingAnimated(m);
+    } else if (action === 'report') {
+      // Report the message's author; carry the message + conversation for context.
+      setReportTarget({ reportedUserId: m.sender_id, conversationId, messageId: m.id });
     } else if (action === 'delete') {
       Alert.alert('Delete message?', 'This cannot be undone.', [
         { text: 'Cancel', style: 'cancel' },
@@ -1011,11 +1109,45 @@ export default function ThreadScreen() {
     }
   };
 
+  // ── Safety: report / block the other participant ──────────────────────────
+  const handleReportConversation = () => {
+    setOverflowOpen(false);
+    if (!meta) return;
+    setReportTarget({ reportedUserId: meta.partner_id, conversationId, messageId: null });
+  };
+
+  const handleBlockUser = () => {
+    setOverflowOpen(false);
+    if (!meta) return;
+    const name = meta.partner_name || 'this person';
+    Alert.alert(
+      `Block ${name}?`,
+      `They won't be able to message you, and you won't see each other in the feed or inbox.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Block',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await blockUser(meta.partner_id);
+              toast.success(`Blocked ${name}.`);
+              router.back();
+            } catch (e: any) {
+              toast.error(e?.message ?? "Couldn't block — try again.");
+            }
+          },
+        },
+      ],
+    );
+  };
+
   const handleQuickReact = async (emoji: string) => {
     const m = selectedMessage;
     setSelectedMessage(null);
     if (!m || !user) return;
-    await toggleReaction({ messageId: m.id, userId: user.id, emoji });
+    // Reuse the optimistic + rollback path from the reaction chip.
+    await handleToggleReaction(m, emoji);
   };
 
   // ── Render ───────────────────────────────────────────────────
@@ -1026,6 +1158,10 @@ export default function ThreadScreen() {
 
   return (
     <View style={[styles.root, { paddingBottom: Math.max(insets.bottom, 8) }]}>
+      {/* Real OS status bar over the light thread — dark glyphs read on the
+          warm cream. (We used to hide it and draw a fake 9:41 + Dynamic Island,
+          which collided with the device's real status bar and hardware island.) */}
+      <StatusBar style="dark" />
       {/* Hearth surface — single solid warm cream. The previous two-wash
           gradient setup made a visible "lighter cream stripe" in the
           middle where the washes faded out and the cool base canvas
@@ -1061,11 +1197,13 @@ export default function ThreadScreen() {
                 router.back();
               }}
               hitSlop={8}
-              style={({ pressed }) => [styles.circleBtn, pressed && { opacity: 0.85 }]}
+              style={({ pressed }) => pressed && { opacity: 0.85 }}
               accessibilityRole="button"
               accessibilityLabel="Back"
             >
-              <CaretLeft size={18} color={Brand.inkPrimary} weight="bold" />
+              <GlassSurface intensity={24} hairline style={styles.circleBtn}>
+                <CaretLeft size={18} color={Brand.inkPrimary} weight="bold" />
+              </GlassSurface>
             </Pressable>
           </HardShadow>
 
@@ -1075,11 +1213,13 @@ export default function ThreadScreen() {
             <Pressable
               onPress={() => setOverflowOpen(true)}
               hitSlop={8}
-              style={({ pressed }) => [styles.circleBtn, pressed && { opacity: 0.85 }]}
+              style={({ pressed }) => pressed && { opacity: 0.85 }}
               accessibilityRole="button"
               accessibilityLabel="More options"
             >
-              <DotsThree size={18} color={Brand.inkPrimary} weight="bold" />
+              <GlassSurface intensity={24} hairline style={styles.circleBtn}>
+                <DotsThree size={18} color={Brand.inkPrimary} weight="bold" />
+              </GlassSurface>
             </Pressable>
           </HardShadow>
         </View>
@@ -1095,6 +1235,7 @@ export default function ThreadScreen() {
             partnerName={meta.partner_name}
             meId={user?.id ?? ''}
             onConfirmHire={handleConfirmHire}
+            onRevertHire={handleRevertHire}
           />
         )}
       </View>
@@ -1122,7 +1263,9 @@ export default function ThreadScreen() {
         />
       )}
 
-      {loading || !meta || !user ? (
+      {loadError ? (
+        <ThreadError onRetry={loadThread} topPad={insets.top + 96} />
+      ) : loading || !meta || !user ? (
         // Mirror the real thread: each bubble sits in a row with a 32px avatar
         // gutter (theirs left, mine right) + 8px gap, a 72% max width, and the
         // asymmetric tail corner. Same top offset as the list so bubbles don't
@@ -1151,10 +1294,10 @@ export default function ThreadScreen() {
               <Skeleton
                 width={b.w as any}
                 height={b.h}
-                radius={18}
+                radius={16}
                 style={{
-                  borderBottomLeftRadius: b.mine ? 18 : 4,
-                  borderBottomRightRadius: b.mine ? 4 : 18,
+                  borderBottomLeftRadius: b.mine ? 16 : 5,
+                  borderBottomRightRadius: b.mine ? 5 : 16,
                 }}
               />
               {b.mine && <Skeleton width={32} height={32} radius={8} />}
@@ -1316,6 +1459,29 @@ export default function ThreadScreen() {
           </HardShadow>
         </Animated.View>
 
+        {replyCountdown && (
+          <View
+            style={[
+              styles.replyDeadline,
+              replyCountdown.urgent && styles.replyDeadlineUrgent,
+            ]}
+          >
+            <Clock
+              size={13}
+              color={replyCountdown.urgent ? Brand.danger : Brand.inkLabel}
+              weight="bold"
+            />
+            <Text
+              style={[
+                styles.replyDeadlineText,
+                replyCountdown.urgent && styles.replyDeadlineTextUrgent,
+              ]}
+            >
+              Reply within {deadlinePhrase(replyCountdown.minutesLeft)} to keep this open
+            </Text>
+          </View>
+        )}
+
         {meta.status === 'active' || meta.status === 'hired_pending' ? (
           <ChatComposer
             replyTo={replyTo}
@@ -1369,25 +1535,12 @@ export default function ThreadScreen() {
             Pass on this chat
           </Text>
         </Pressable>
-
-        {/* Safety actions — required for App Store UGC compliance (1.2). */}
-        <Pressable style={styles.overflowItem} onPress={handleOpenReport}>
-          <Text style={[styles.overflowLabel, styles.overflowLabelDanger]}>Report {meta?.partner_name ?? 'user'}</Text>
+        <Pressable style={styles.overflowItem} onPress={handleReportConversation}>
+          <Text style={[styles.overflowLabel, styles.overflowLabelDanger]}>Report</Text>
         </Pressable>
-        <Pressable style={styles.overflowItem} onPress={handleBlock}>
-          <Text style={[styles.overflowLabel, styles.overflowLabelDanger]}>Block {meta?.partner_name ?? 'user'}</Text>
+        <Pressable style={styles.overflowItem} onPress={handleBlockUser}>
+          <Text style={[styles.overflowLabel, styles.overflowLabelDanger]}>Block user</Text>
         </Pressable>
-      </BottomSheet>
-
-      {/* Report reason picker */}
-      <BottomSheet visible={reportOpen} onClose={() => setReportOpen(false)}>
-        <Text style={styles.reportTitle}>Report {meta?.partner_name ?? 'this user'}</Text>
-        <Text style={styles.reportSub}>What's going on? Our team reviews every report.</Text>
-        {REPORT_REASONS.map((reason) => (
-          <Pressable key={reason} style={styles.overflowItem} onPress={() => submitReport(reason)}>
-            <Text style={styles.overflowLabel}>{reason}</Text>
-          </Pressable>
-        ))}
       </BottomSheet>
 
       <PassReasonSheet
@@ -1524,7 +1677,16 @@ export default function ThreadScreen() {
         {isOwnSelected ? (
           <MenuButton label="Delete" onPress={() => handleMenuAction('delete')} destructive />
         ) : null}
+        {!isOwnSelected ? (
+          <MenuButton label="Report" onPress={() => handleMenuAction('report')} destructive />
+        ) : null}
       </BottomSheet>
+
+      <ReportReasonSheet
+        visible={!!reportTarget}
+        target={reportTarget}
+        onClose={() => setReportTarget(null)}
+      />
     </View>
   );
 }
@@ -1550,6 +1712,43 @@ function MenuButton({
   );
 }
 
+/// Hours-granularity phrasing for the in-thread reply deadline banner:
+/// "21h" / "2d" / "45m". Deliberately coarser than the inbox chip — the
+/// banner is a gentle nudge, not a stopwatch.
+function deadlinePhrase(minutesLeft: number): string {
+  if (minutesLeft >= 24 * 60) {
+    const days = Math.floor(minutesLeft / (24 * 60));
+    return `${days}d`;
+  }
+  if (minutesLeft >= 60) return `${Math.floor(minutesLeft / 60)}h`;
+  return `${minutesLeft}m`;
+}
+
+/// Retryable error state for a failed thread load. Mirrors the feed's
+/// DeckError visual language (title + body + hard-shadow Retry) so a
+/// server hiccup reads as "something to fix," not an empty thread.
+function ThreadError({ onRetry, topPad }: { onRetry: () => void; topPad: number }) {
+  return (
+    <View style={[styles.threadErrorWrap, { paddingTop: topPad }]}>
+      <Text style={styles.threadErrorTitle}>Couldn&apos;t load this conversation.</Text>
+      <Text style={styles.threadErrorBody}>
+        Something went wrong reaching the server. Check your connection and try again.
+      </Text>
+      <HardShadow radius={999} offset={4} style={styles.threadErrorCtaWrap}>
+        <Pressable
+          onPress={onRetry}
+          style={styles.threadErrorCta}
+          accessibilityRole="button"
+          accessibilityLabel="Retry loading conversation"
+        >
+          <ArrowsClockwise size={18} color={Brand.inkOnBrand} weight="bold" />
+          <Text style={styles.threadErrorCtaLabel}>Retry</Text>
+        </Pressable>
+      </HardShadow>
+    </View>
+  );
+}
+
 /// Closure-loop status banner. Sits below the header when the
 /// conversation isn't 'active'. For the hire-pending state on the
 /// *receiving* side, renders an inline Confirm button.
@@ -1560,6 +1759,7 @@ function StatusBanner({
   partnerName,
   meId,
   onConfirmHire,
+  onRevertHire,
 }: {
   status: ConversationStatus;
   passReason: string | null;
@@ -1567,20 +1767,32 @@ function StatusBanner({
   partnerName: string;
   meId: string;
   onConfirmHire: () => void;
+  onRevertHire: () => void;
 }) {
   if (status === 'hired_pending') {
     const iProposed = hiredProposedBy === meId;
     return (
       <View style={[styles.banner, styles.bannerWarm]}>
         {iProposed ? (
-          <Text style={styles.bannerText}>
-            Waiting for {partnerName} to confirm the hire.
-          </Text>
+          <>
+            <Text style={styles.bannerText}>
+              Waiting for {partnerName} to confirm the hire.
+            </Text>
+            {/* Proposer can retract a premature / mistaken proposal. */}
+            <Pressable onPress={onRevertHire} style={styles.bannerGhostCta}>
+              <Text style={styles.bannerGhostCtaLabel}>Withdraw</Text>
+            </Pressable>
+          </>
         ) : (
           <>
             <Text style={[styles.bannerText, styles.bannerTextEmphatic]}>
               {partnerName} marked this as Hired. Confirm?
             </Text>
+            {/* Recipient can decline ("Not yet") — reverts to active so the
+                thread stays usable instead of dead-ending on Confirm. */}
+            <Pressable onPress={onRevertHire} style={styles.bannerGhostCta}>
+              <Text style={styles.bannerGhostCtaLabel}>Not yet</Text>
+            </Pressable>
             <Pressable onPress={onConfirmHire} style={styles.bannerCta}>
               <Text style={styles.bannerCtaLabel}>Confirm</Text>
             </Pressable>
@@ -1669,6 +1881,48 @@ const styles = StyleSheet.create({
   },
 
   root: { flex: 1, backgroundColor: Brand.canvas },
+
+  // ── Mock iOS status bar + Dynamic Island (decorative iPhone chrome) ─────
+  // ── Thread load-error state (mirrors feed DeckError) ────────────
+  threadErrorWrap: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: Space.xl,
+    gap: 12,
+  },
+  threadErrorTitle: {
+    fontFamily: AmbitFont.display,
+    fontSize: 22,
+    color: Brand.inkPrimary,
+    textAlign: 'center',
+    letterSpacing: -0.3,
+  },
+  threadErrorBody: {
+    fontFamily: AmbitFont.body,
+    fontSize: 14,
+    color: Brand.inkMuted,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  threadErrorCtaWrap: { marginTop: 8 },
+  threadErrorCta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 999,
+    backgroundColor: Brand.action,
+    borderWidth: 1.6,
+    borderColor: Brand.actionInk,
+  },
+  threadErrorCtaLabel: {
+    fontFamily: AmbitFont.bold,
+    fontSize: 14,
+    color: Brand.inkOnBrand,
+    letterSpacing: 0.2,
+  },
   // Loading body — sits below the header row and fills the remaining
   // vertical space so the spinner is centered in what would otherwise
   // be the messages-list area. Keeps the header pinned at its final
@@ -1730,18 +1984,15 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     paddingBottom: Space.md,
   },
-  // 40pt circular tactile button used for back + overflow. Cream island
-  // surface with the crisp ink border + hard offset edge (HardShadow
-  // wrapper) — matches the locked button language.
+  // 40pt circular glass button used for back + overflow. GlassSurface
+  // supplies the blur + warm-white fill + purple hairline; the HardShadow
+  // wrapper lifts it softly off the thread.
   circleBtn: {
     width: 40,
     height: 40,
     borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Brand.cardCream,
-    borderWidth: 1.5,
-    borderColor: Brand.inkEdge,
   },
   headerSpacer: {
     flex: 1,
@@ -1782,12 +2033,57 @@ const styles = StyleSheet.create({
     borderColor: Brand.actionInk,
   },
   bannerCtaLabel: {
+    fontFamily: AmbitFont.bold,
+    fontSize: 13,
+    color: Brand.inkOnBrand,
+    letterSpacing: 0.2,
+  },
+  // Quiet secondary action on the banner (Not yet / Withdraw) — outline on
+  // the warm fill so it reads as reversible, not the primary Confirm.
+  bannerGhostCta: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    borderWidth: 1.4,
+    borderColor: Brand.inkEdge,
+    backgroundColor: 'transparent',
+  },
+  bannerGhostCtaLabel: {
     fontFamily: AmbitFont.body,
     fontSize: 13,
     fontWeight: '700',
-    color: Brand.actionInk,
+    color: Brand.inkPrimary,
     letterSpacing: 0.2,
   },
+
+  // In-thread reply deadline banner — quiet by default (sits just above
+  // the composer), escalates to danger accents inside the last 24h.
+  replyDeadline: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginHorizontal: Space.md,
+    marginBottom: 8,
+    paddingHorizontal: Space.md,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: Brand.cardCream,
+    borderWidth: 1,
+    borderColor: Brand.borderSoft,
+    alignSelf: 'center',
+  },
+  replyDeadlineUrgent: {
+    backgroundColor: 'rgba(192,57,43,0.08)',
+    borderColor: 'rgba(192,57,43,0.35)',
+  },
+  replyDeadlineText: {
+    fontFamily: AmbitFont.body,
+    fontSize: 12.5,
+    fontWeight: '600',
+    color: Brand.inkLabel,
+    letterSpacing: 0.1,
+  },
+  replyDeadlineTextUrgent: { color: Brand.danger },
 
   // Composer-lock placeholder shown when status is terminal
   composerLocked: {
@@ -1834,21 +2130,6 @@ const styles = StyleSheet.create({
   },
   overflowLabelDisabled: {
     color: Brand.inkPlaceholder,
-  },
-  reportTitle: {
-    fontFamily: AmbitFont.display,
-    fontSize: 20,
-    color: Brand.inkPrimary,
-    paddingHorizontal: 16,
-    marginBottom: 4,
-  },
-  reportSub: {
-    fontFamily: AmbitFont.body,
-    fontSize: 14,
-    color: Brand.inkMuted,
-    paddingHorizontal: 16,
-    marginBottom: 12,
-    lineHeight: 20,
   },
 
   listContent: {

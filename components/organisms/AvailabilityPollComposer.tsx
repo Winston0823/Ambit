@@ -561,7 +561,7 @@ const styles = StyleSheet.create({
     borderColor: Brand.borderDefault,
   },
   hourChipSelected: {
-    backgroundColor: Brand.action,
+    backgroundColor: Brand.selected,
     borderColor: Brand.actionInk,
   },
   hourChipText: {
@@ -570,7 +570,7 @@ const styles = StyleSheet.create({
     color: Brand.inkBody,
     fontWeight: '600',
   },
-  hourChipTextSelected: { color: Brand.actionInk, fontWeight: '700' },
+  hourChipTextSelected: { color: Brand.inkOnBrand, fontWeight: '700' },
 
   durationChip: {
     paddingHorizontal: 16,
@@ -581,7 +581,7 @@ const styles = StyleSheet.create({
     borderColor: Brand.borderDefault,
   },
   durationChipSelected: {
-    backgroundColor: Brand.action,
+    backgroundColor: Brand.selected,
     borderColor: Brand.actionInk,
   },
   durationChipText: {
@@ -589,7 +589,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: Brand.inkBody,
   },
-  durationChipTextSelected: { color: Brand.actionInk, fontWeight: '700' },
+  durationChipTextSelected: { color: Brand.inkOnBrand, fontWeight: '700' },
 
   primaryBtn: {
     flexDirection: 'row',
@@ -598,7 +598,7 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingVertical: 16,
     borderRadius: 999,
-    backgroundColor: Brand.action,
+    backgroundColor: Brand.selected,
     borderWidth: 1.6,
     borderColor: Brand.actionInk,
   },
@@ -606,7 +606,7 @@ const styles = StyleSheet.create({
     fontFamily: AmbitFont.body,
     fontSize: 15,
     fontWeight: '700',
-    color: Brand.actionInk,
+    color: Brand.inkOnBrand,
   },
   secondaryBtn: {
     paddingVertical: 16,

@@ -77,9 +77,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   label: {
-    fontFamily: AmbitFont.body,
+    fontFamily: AmbitFont.semibold,
     fontSize: 16,
-    fontWeight: '600',
     color: Brand.inkHigh,
   },
 });

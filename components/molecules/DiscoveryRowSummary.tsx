@@ -88,7 +88,7 @@ const styles = StyleSheet.create({
   swatch: {
     width: 48,
     height: 48,
-    borderRadius: Radii.full,
+    borderRadius: Radii.lg, // squared avatar (~25% of size), not a circle
     alignItems: 'center',
     justifyContent: 'center',
   },

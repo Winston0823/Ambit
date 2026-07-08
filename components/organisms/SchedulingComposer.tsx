@@ -562,7 +562,7 @@ const styles = StyleSheet.create({
     borderColor: Brand.borderDefault,
   },
   durationChipSelected: {
-    backgroundColor: Brand.action,
+    backgroundColor: Brand.selected,
     borderColor: Brand.actionInk,
   },
   durationChipText: {
@@ -570,7 +570,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: Brand.inkBody,
   },
-  durationChipTextSelected: { color: Brand.actionInk, fontWeight: '700' },
+  durationChipTextSelected: { color: Brand.inkOnBrand, fontWeight: '700' },
 
   // ── Overlap chips ─────────────────────────────────────────────────
   overlapHint: {
@@ -599,7 +599,7 @@ const styles = StyleSheet.create({
     borderColor: Brand.borderDefault,
   },
   overlapChipSelected: {
-    backgroundColor: Brand.action,
+    backgroundColor: Brand.selected,
     borderColor: Brand.actionInk,
   },
   overlapChipDisabled: { opacity: 0.4 },
@@ -609,7 +609,7 @@ const styles = StyleSheet.create({
     color: Brand.inkBody,
   },
   overlapChipTextSelected: {
-    color: Brand.actionInk,
+    color: Brand.inkOnBrand,
     fontWeight: '600',
   },
 
@@ -677,7 +677,7 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingVertical: 16,
     borderRadius: 999,
-    backgroundColor: Brand.action,
+    backgroundColor: Brand.selected,
     borderWidth: 1.6,
     borderColor: Brand.actionInk,
   },
@@ -686,7 +686,7 @@ const styles = StyleSheet.create({
     fontFamily: AmbitFont.body,
     fontSize: 15,
     fontWeight: '700',
-    color: Brand.actionInk,
+    color: Brand.inkOnBrand,
   },
 
   iosPickerDoneOverlay: {

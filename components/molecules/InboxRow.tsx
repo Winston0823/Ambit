@@ -1,12 +1,15 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Archive, ArrowBendUpLeft, Bell, BellSlash, Clock, PushPin, X } from 'phosphor-react-native';
 import type { InboxItem } from '../../lib/messaging';
 import { inboxState, isReachedOutToYou } from '../../lib/messaging';
 import { getAutoCloseCountdown } from '../../lib/closureLoop';
-import { HardShadow } from '../atoms';
-import { AmbitFont, Brand, Radii } from '../../constants/theme';
+import { AmbitFont, Astra, Brand, Radii } from '../../constants/theme';
+
+/// Soft iris tint for rows that need you (unread / reached-out-to-you).
+const SURFACE_NEEDS = 'rgba(153, 117, 206, 0.09)';
 
 interface Props {
   item:    InboxItem;
@@ -36,6 +39,10 @@ export function InboxRow({ item, meId, onPress, onPassRequest, onPin, onMute, on
   const sentByMe  = item.last_message_sender_id === meId;
   const isPending = isReachedOutToYou(item, meId);
   const isClosed  = item.status === 'passed' || item.status === 'auto_declined';
+  // Unread: incoming messages I haven't read. Drives the row highlight, so
+  // opening the chat (which marks it read) clears it — even for a reach-out
+  // (pending) row, whose "your turn" state instead lives in the countdown chip.
+  const isUnread  = (item.unread_count ?? 0) > 0 && !isClosed;
   const passable  = item.status === 'active' && !!onPassRequest;
   const canPin    = !!onPin;
   const isPinned  = !!item.is_pinned;
@@ -43,21 +50,26 @@ export function InboxRow({ item, meId, onPress, onPassRequest, onPin, onMute, on
   // already signal it via the countdown chip, so we don't double up).
   const yourTurnChip =
     !isPending && !isClosed && item.status === 'active' && inboxState(item, meId) === 'your_turn';
+  // Sender-side: I reached out and it's on THEM. The same 72h clock is
+  // ticking against the conversation, so surface a quiet "expires in Xh"
+  // so the sender knows silence has a deadline (audit fix, 2026-07-01).
+  const isAwaiting = item.status === 'active' && sentByMe && !isPending;
 
-  // Countdown ticks the label once a minute when the card is pending.
-  // Cheap timer; only the label string updates so the rest of the
-  // tree doesn't re-render.
+  // Countdown ticks the label once a minute while the clock matters
+  // (pending on my side OR awaiting their reply). Cheap timer; only the
+  // label string updates so the rest of the tree doesn't re-render.
+  const showTimer = isPending || isAwaiting;
   const [nowTick, setNowTick] = useState(0);
   useEffect(() => {
-    if (!isPending) return;
+    if (!showTimer) return;
     const t = setInterval(() => setNowTick((n) => n + 1), 60_000);
     return () => clearInterval(t);
-  }, [isPending]);
+  }, [showTimer]);
   const countdown = useMemo(
-    () => (isPending ? getAutoCloseCountdown(item.auto_decline_at) : null),
+    () => (showTimer ? getAutoCloseCountdown(item.auto_decline_at) : null),
     // nowTick is intentionally a dep — re-read at minute boundaries.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [isPending, item.auto_decline_at, nowTick],
+    [showTimer, item.auto_decline_at, nowTick],
   );
 
   const handlePass = () => {
@@ -155,10 +167,9 @@ export function InboxRow({ item, meId, onPress, onPassRequest, onPin, onMute, on
       ? 'You: '
       : null;
 
-  // Pending byline: "PROJECT · REACHED OUT TO YOU".
-  // Active byline:  "PROJECT".
-  // Closed byline:  "AUTO-CLOSED · MISSED REACH OUT" or "PASSED · ..."
-  const bylineProject = (item.project_title ?? '').toUpperCase();
+  // Subtitle: project title, plus a status suffix where relevant. Mixed case,
+  // iris — matches the Figma "Founder · Muse AI" byline.
+  const bylineProject = item.project_title ?? '';
   const bylineSuffix =
     item.status === 'auto_declined' ? 'Missed reach out'
     : item.status === 'passed'      ? 'Passed'
@@ -171,17 +182,18 @@ export function InboxRow({ item, meId, onPress, onPassRequest, onPin, onMute, on
   // byline + preview prefix, not a chip.
   const showHiredChip = item.status === 'hired';
 
+  // Row highlight (iris tint + dot) tracks UNREAD only, so it clears when you
+  // open the chat. The reach-out "your turn" signal is the persistent countdown
+  // chip below (driven by isPending), not a full-row highlight.
+  const needsYou = isUnread;
+  const subtitle = [bylineProject, bylineSuffix].filter(Boolean).join('  ·  ');
+  const surfaceBg = needsYou ? SURFACE_NEEDS : Brand.cardCream;
+
   return (
-    // One crisp ink edge runs under the whole row (card + revealed actions) via
-    // this single full-width HardShadow. The Swipeable clips its own bounds, so
-    // the shadow must live outside it. Closed rows drop the backing (transparent)
-    // since a solid block would bleed through the translucent card.
-    <HardShadow
-      radius={Radii.card}
-      offset={4}
-      color={isClosed ? 'transparent' : undefined}
-      style={styles.rowWrap}
-    >
+    // Soft-shadow surface lives on the wrapper (outside the Swipeable, which
+    // clips its own bounds). The card inside carries the same fill so the swipe
+    // reveal stays seamless.
+    <View style={[styles.rowWrap, { backgroundColor: surfaceBg }, isClosed && styles.rowClosed]}>
     <Swipeable
       ref={swipeRef}
       enabled={passable || canPin || !!onMute || !!onArchive}
@@ -195,77 +207,72 @@ export function InboxRow({ item, meId, onPress, onPassRequest, onPin, onMute, on
         onPress={onPress}
         style={({ pressed }) => [
           styles.card,
-          isPending && styles.cardPending,
-          isClosed  && styles.cardClosed,
-          pressed   && { opacity: 0.75 },
+          { backgroundColor: surfaceBg },
+          pressed && { opacity: 0.75 },
         ]}
       >
-        {/* Top row: avatar + (name above byline) on the left, time on the right */}
-        <View style={styles.topRow}>
-          <View style={styles.topLeft}>
-            <View style={[styles.avatarWrap, isClosed && styles.avatarClosed]}>
-              {item.partner_photo_url ? (
-                <Image source={{ uri: item.partner_photo_url }} style={styles.avatar} />
-              ) : (
-                <View style={[styles.avatar, styles.avatarFallback]}>
-                  <Text style={styles.avatarInitial}>{initial}</Text>
-                </View>
-              )}
-            </View>
-            <View style={styles.nameBlock}>
-              <Text style={[styles.name, isClosed && styles.nameClosed]} numberOfLines={1}>
-                {item.partner_name ?? 'Someone'}
-              </Text>
-              {bylineProject ? (
-                <Text
-                  style={[
-                    styles.byline,
-                    isPending && styles.bylinePending,
-                    isClosed && styles.bylineClosed,
-                  ]}
-                  numberOfLines={1}
-                >
-                  {bylineProject}
-                  {bylineSuffix ? (
-                    <>
-                      <Text style={styles.bylineSep}>  ·  </Text>
-                      <Text>{bylineSuffix.toUpperCase()}</Text>
-                    </>
-                  ) : null}
-                </Text>
-              ) : null}
-            </View>
-          </View>
-          <View style={styles.timeRow}>
-            {item.is_muted && <BellSlash size={12} color={Brand.inkBody} weight="bold" />}
-            <Text style={styles.time}>{formatRelative(item.last_message_at)}</Text>
-          </View>
-        </View>
+        {/* Avatar — 46pt gradient monogram (or partner photo). */}
+        {item.partner_photo_url ? (
+          <Image source={{ uri: item.partner_photo_url }} style={styles.avatar} />
+        ) : (
+          <LinearGradient
+            colors={[Astra.royal, Astra.iris]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.avatar}
+          >
+            <Text style={styles.avatarInitial}>{initial}</Text>
+          </LinearGradient>
+        )}
 
-        {/* Preview + chip live in the full card width with a left
-            indent equal to the avatar + gap, so they align under the
-            name rather than under the avatar. */}
-        <View style={styles.subBlock}>
+        <View style={styles.col}>
+          <View style={styles.nameRow}>
+            <Text style={[styles.name, isClosed && styles.nameClosed]} numberOfLines={1}>
+              {item.partner_name ?? 'Someone'}
+            </Text>
+            <View style={styles.timeRow}>
+              {item.is_muted && <BellSlash size={12} color={Brand.inkMuted} weight="bold" />}
+              <Text style={[styles.time, needsYou && styles.timeAccent]}>
+                {formatRelative(item.last_message_at)}
+              </Text>
+              {needsYou && <View style={styles.dot} />}
+            </View>
+          </View>
+
+          {subtitle !== '' && (
+            <Text style={[styles.subtitle, isClosed && styles.subtitleClosed]} numberOfLines={1}>
+              {subtitle}
+            </Text>
+          )}
+
           <Text
-            style={[
-              styles.preview,
-              isPending && styles.previewPending,
-              isClosed  && styles.previewClosed,
-            ]}
+            style={[styles.preview, isPending && styles.previewPending, isClosed && styles.previewClosed]}
             numberOfLines={1}
           >
-            {previewPrefix && (
-              <Text style={styles.previewPrefix}>{previewPrefix}</Text>
-            )}
+            {previewPrefix && <Text style={styles.previewPrefix}>{previewPrefix}</Text>}
             {previewText}
           </Text>
 
           {(countdown || showHiredChip || yourTurnChip) && (
             <View style={styles.chipRow}>
-              {countdown && (
+              {countdown && isPending && (
+                <View style={[styles.chip, countdown.urgent ? styles.chipUrgent : styles.chipOutline]}>
+                  <Clock
+                    size={11}
+                    color={countdown.urgent ? Brand.inkOnBrand : Brand.inkLabel}
+                    weight="bold"
+                  />
+                  <Text style={[styles.chipText, countdown.urgent && styles.chipTextUrgent]}>
+                    {countdown.label}
+                  </Text>
+                </View>
+              )}
+              {countdown && isAwaiting && (
                 <View style={[styles.chip, styles.chipOutline]}>
-                  <Clock size={11} color={Brand.inkLabel} weight="bold" />
-                  <Text style={styles.chipText}>{countdown.label}</Text>
+                  <Clock size={11} color={Brand.inkMuted} weight="regular" />
+                  <Text style={[styles.chipText, styles.chipTextMuted]}>
+                    {awaitingExpiryLabel(countdown.minutesLeft)}
+                  </Text>
                 </View>
               )}
               {yourTurnChip && (
@@ -284,8 +291,19 @@ export function InboxRow({ item, meId, onPress, onPassRequest, onPin, onMute, on
         </View>
       </Pressable>
     </Swipeable>
-    </HardShadow>
+    </View>
   );
+}
+
+/// Sender-side expiry phrasing — mirrors the recipient's countdown but
+/// framed from the waiting side: "expires in 21h" / "expires in 2d".
+function awaitingExpiryLabel(minutesLeft: number): string {
+  if (minutesLeft >= 24 * 60) {
+    const days = Math.floor(minutesLeft / (24 * 60));
+    return `expires in ${days}d`;
+  }
+  if (minutesLeft >= 60) return `expires in ${Math.floor(minutesLeft / 60)}h`;
+  return `expires in ${minutesLeft}m`;
 }
 
 function formatRelative(iso: string): string {
@@ -301,123 +319,94 @@ function formatRelative(iso: string): string {
   return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
-const AVATAR_SIZE = 48;
-const AVATAR_GAP  = 14;
-const SUB_INDENT  = AVATAR_SIZE + AVATAR_GAP;
-
-// Swipe-action sizing. The revealed zone is one persistent ink panel (the
-// hard-shadow black extended to full height); Pin / Pass / Mute / Archive are
-// inset buttons sitting on that field. BTN_W is each button's width, PANEL_PAD
-// the ink shown around and between them. The panel underlaps the card by
-// PANEL_OVERLAP so the black reads as starting *behind* the card and sliding
-// out from under it — no cream gutter between card and actions.
+// Swipe-action sizing. The revealed zone is one persistent ink panel; Pin /
+// Pass / Mute / Archive are inset buttons on that field. BTN_W is each button's
+// width, PANEL_PAD the ink around/between them; the panel underlaps the card by
+// PANEL_OVERLAP so the black reads as starting behind the card.
 const BTN_W         = 72;
 const PANEL_PAD     = 6;
 const PANEL_OVERLAP = 32;
 
 const styles = StyleSheet.create({
-  // Spacing lives on the HardShadow wrapper so the offset edge hugs the card
-  // (a margin on the card itself would expose the backing block below it).
-  rowWrap: { marginBottom: 12 },
-  // Cream island cards — aligned with the Projects look: cream fill, crisp
-  // 1.5 ink border, hard offset edge from the <HardShadow> wrapper.
-  card: {
-    backgroundColor: Brand.cardCream,
-    borderWidth: 1.5,
-    borderColor: Brand.inkEdge,
+  // Soft-filled card (Figma chat list): rounded, gentle drop shadow, no border.
+  // The wrapper carries the shadow (the Swipeable clips its own bounds) and a
+  // fill matching the card so the swipe reveal stays seamless.
+  rowWrap: {
+    marginBottom: 10,
     borderRadius: Radii.card,
-    padding: 16,
-    gap: 8,
+    shadowColor: '#000',
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 2,
   },
-  // Pending rows share the island-card frame; the teal lives in the byline
-  // and countdown chip rather than a tinted fill. Extra padding keeps the
-  // "needs you" cards a touch more generous.
-  cardPending: {
-    padding: 20,
-  },
-  cardClosed: { opacity: 0.55 },
-
-  topRow: {
+  rowClosed: { opacity: 0.55 },
+  card: {
     flexDirection: 'row',
     alignItems: 'flex-start',
+    gap: 12,
+    borderRadius: Radii.card,
+    paddingLeft: 13,
+    paddingRight: 14,
+    paddingVertical: 13,
+  },
+
+  // Avatar — 46pt rounded-square gradient monogram (royal→iris), white serif
+  // initial; a partner photo fills the same frame.
+  avatar: {
+    width: 46,
+    height: 46,
+    borderRadius: 7,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  avatarInitial: {
+    fontFamily: AmbitFont.display,
+    fontSize: 17,
+    color: '#FFFFFF',
+  },
+
+  col: { flex: 1, minWidth: 0, gap: 3 },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
     gap: 8,
   },
-  topLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: AVATAR_GAP,
-    flex: 1,
-    minWidth: 0,
-  },
-  nameBlock: { flex: 1, minWidth: 0 },
-
-  // Indent past the avatar so preview + chip align under the name.
-  subBlock: {
-    paddingLeft: SUB_INDENT,
-    gap: 12,
-  },
-
-  // Avatar — rounded square (Stitch direction), pale gray fill,
-  // italic bronze monogram. 48pt with 12pt radius.
-  avatarWrap: { width: AVATAR_SIZE, height: AVATAR_SIZE },
-  avatar: { width: AVATAR_SIZE, height: AVATAR_SIZE, borderRadius: 12 },
-  avatarFallback: {
-    backgroundColor: Brand.surface2,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarClosed: {},
-  avatarInitial: {
-    fontFamily: AmbitFont.display,
-    fontSize: 18,
-    color: Brand.inkLabel,
-    letterSpacing: -0.2,
-  },
-  byline: {
-    marginTop: 2,
-    fontFamily: AmbitFont.body,
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 1.6,
-    color: Brand.inkLabel,
-  },
-  bylinePending: { color: Brand.actionDeep },
-  bylineClosed:  { color: Brand.inkMuted },
-  bylineProject: { color: Brand.inkLabel },
-  bylineSep:     { color: Brand.inkLabel },
-  time: {
-    fontFamily: AmbitFont.body,
-    fontSize: 11,
-    fontWeight: '600',
-    color: Brand.inkMuted,
-    letterSpacing: 0.04,
-  },
-
   name: {
-    fontFamily: AmbitFont.display,
-    fontSize: 20,
+    flexShrink: 1,
+    fontFamily: AmbitFont.semibold,
+    fontSize: 15,
     color: Brand.inkPrimary,
-    letterSpacing: -0.3,
-    lineHeight: 24,
   },
   nameClosed: { color: Brand.inkMuted },
 
+  timeRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  time: {
+    fontFamily: AmbitFont.medium,
+    fontSize: 11,
+    color: Brand.inkMuted,
+  },
+  timeAccent: { color: Brand.selected },
+  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: Brand.selected },
+
+  subtitle: {
+    fontFamily: AmbitFont.medium,
+    fontSize: 12,
+    color: Brand.accent, // iris
+  },
+  subtitleClosed: { color: Brand.inkMuted },
+
   preview: {
-    fontFamily: AmbitFont.body,
-    fontSize: 14,
+    fontFamily: AmbitFont.medium,
+    fontSize: 13,
     color: Brand.inkBody,
-    lineHeight: 19,
+    lineHeight: 18,
   },
-  previewPending: {
-    // Synthesized italic on Plus Jakarta — the pending preview reads
-    // as a quoted line from the partner ("their voice"). When a real
-    // serif italic ships we'll swap fontFamily here.
-    fontStyle: 'italic',
-    fontSize: 14,
-  },
+  previewPending: { fontStyle: 'italic' },
   previewClosed: { color: Brand.inkMuted },
-  previewPrefix: { fontWeight: '700', color: Brand.inkPrimary },
+  previewPrefix: { fontFamily: AmbitFont.semibold, color: Brand.inkPrimary },
 
   chipRow: {
     flexDirection: 'row',
@@ -444,14 +433,22 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
     backgroundColor: Brand.tagMint,
   },
+  // Urgent tier (< 24h): solid danger fill, white ink — the countdown
+  // stops being a quiet outline and reads as a real deadline. Still on
+  // brand (uses the palette's `danger` + `inkOnBrand`).
+  chipUrgent: {
+    borderColor: 'transparent',
+    backgroundColor: Brand.danger,
+  },
   chipText: {
-    fontFamily: AmbitFont.body,
+    fontFamily: AmbitFont.bold,
     fontSize: 11,
-    fontWeight: '700',
     color: Brand.inkLabel,
     letterSpacing: 0.02,
   },
   chipTextSolid: { color: Brand.tagMintInk },
+  chipTextUrgent: { color: Brand.inkOnBrand },
+  chipTextMuted: { color: Brand.inkMuted, fontFamily: AmbitFont.semibold },
 
   // Swipe actions: one persistent ink panel (the row's hard-shadow black grown
   // to full height) holding the buttons as inset sections. The panel underlaps
@@ -483,12 +480,9 @@ const styles = StyleSheet.create({
   muteBtn:    { backgroundColor: Brand.accent },
   archiveBtn: { backgroundColor: Brand.inkLabel },
   actionLabel: {
-    fontFamily: AmbitFont.body,
+    fontFamily: AmbitFont.bold,
     fontSize: 11,
-    fontWeight: '700',
     letterSpacing: 0.5,
     color: Brand.inkOnBrand,
   },
-
-  timeRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
 });

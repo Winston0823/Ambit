@@ -8,6 +8,7 @@
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import {
+  AccessibilityInfo,
   Animated,
   Pressable,
   StyleSheet,
@@ -18,6 +19,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CheckCircle, Warning, Info } from 'phosphor-react-native';
 import { toast, ToastItem, ToastTone } from '../../lib/toast';
 import { Brand, AmbitFont, Radii, Space } from '../../constants/theme';
+import { useReducedMotion } from '../../hooks/useReducedMotion';
 
 const TONE: Record<
   ToastTone,
@@ -29,26 +31,40 @@ const TONE: Record<
 };
 
 function ToastRow({ item, onClose }: { item: ToastItem; onClose: (id: number) => void }) {
+  const reduceMotion = useReducedMotion();
+  // When reduced motion is on the toast sits still (no rise) and fades only.
   const opacity = useRef(new Animated.Value(0)).current;
-  const translateY = useRef(new Animated.Value(12)).current;
+  const translateY = useRef(new Animated.Value(reduceMotion ? 0 : 12)).current;
 
   const dismiss = useCallback(() => {
-    Animated.parallel([
-      Animated.timing(opacity, { toValue: 0, duration: 180, useNativeDriver: true }),
-      Animated.timing(translateY, { toValue: 12, duration: 180, useNativeDriver: true }),
-    ]).start(() => onClose(item.id));
-  }, [item.id, onClose, opacity, translateY]);
+    const anims = [Animated.timing(opacity, { toValue: 0, duration: 180, useNativeDriver: true })];
+    if (!reduceMotion) {
+      anims.push(Animated.timing(translateY, { toValue: 12, duration: 180, useNativeDriver: true }));
+    }
+    Animated.parallel(anims).start(() => onClose(item.id));
+  }, [item.id, onClose, opacity, translateY, reduceMotion]);
 
   useEffect(() => {
-    Animated.parallel([
-      Animated.timing(opacity, { toValue: 1, duration: 220, useNativeDriver: true }),
-      Animated.spring(translateY, { toValue: 0, friction: 8, tension: 80, useNativeDriver: true }),
-    ]).start();
+    // Announce for screen readers (covers Android + queued toasts, where the
+    // live-region role alone isn't reliably re-read).
+    AccessibilityInfo.announceForAccessibility(item.message);
+  }, [item.message]);
+
+  useEffect(() => {
+    if (reduceMotion) {
+      translateY.setValue(0);
+      Animated.timing(opacity, { toValue: 1, duration: 220, useNativeDriver: true }).start();
+    } else {
+      Animated.parallel([
+        Animated.timing(opacity, { toValue: 1, duration: 220, useNativeDriver: true }),
+        Animated.spring(translateY, { toValue: 0, friction: 8, tension: 80, useNativeDriver: true }),
+      ]).start();
+    }
     if (item.durationMs > 0) {
       const t = setTimeout(dismiss, item.durationMs);
       return () => clearTimeout(t);
     }
-  }, [dismiss, item.durationMs, opacity, translateY]);
+  }, [dismiss, item.durationMs, opacity, translateY, reduceMotion]);
 
   const tone = TONE[item.tone];
   const Icon = tone.Icon;
@@ -74,7 +90,13 @@ function ToastRow({ item, onClose }: { item: ToastItem; onClose: (id: number) =>
           <Text style={[styles.actionLabel, { color: tone.ink }]}>{item.actionLabel}</Text>
         </Pressable>
       ) : (
-        <Pressable onPress={dismiss} accessibilityRole="button" accessibilityLabel="Dismiss" hitSlop={8}>
+        <Pressable
+          onPress={dismiss}
+          accessibilityRole="button"
+          accessibilityLabel="Dismiss"
+          // ✕ glyph is ~14pt; pad out to a ≥44pt effective touch target.
+          hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+        >
           <Text style={[styles.dismiss, { color: Brand.inkMuted }]}>✕</Text>
         </Pressable>
       )}

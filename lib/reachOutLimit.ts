@@ -3,6 +3,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 /// How many reach-outs a user gets for free each calendar day.
 export const DAILY_FREE_LIMIT = 5;
 
+/// Cap on extra slots earnable via rewarded ads in a single day. Prevents a
+/// user from grinding ads to spam reach-outs (5 free + 3 bonus = 8 max/day).
+export const MAX_AD_BONUS = 3;
+
 const STORAGE_KEY = '@ambit/reach_out_daily';
 
 interface DailyCounter {
@@ -11,8 +15,15 @@ interface DailyCounter {
   adBonus: number;  // extra slots earned via rewarded ads today
 }
 
+/// Local-calendar day key ('YYYY-MM-DD'). Uses the device's own date parts,
+/// NOT toISOString() — the latter is UTC, so west-of-UTC users would see the
+/// quota reset mid-afternoon (~4–5pm PT) instead of at local midnight.
 function todayKey(): string {
-  return new Date().toISOString().slice(0, 10);
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 }
 
 async function getCounter(): Promise<DailyCounter> {
@@ -44,10 +55,17 @@ export async function recordReachOut(): Promise<void> {
   await setCounter({ ...c, count: c.count + 1 });
 }
 
-/// Call after a rewarded ad completes. Grants one extra reach-out slot.
+/// Call after a rewarded ad completes. Grants one extra reach-out slot, up to
+/// MAX_AD_BONUS per day so the daily cap can't be endlessly ground away.
 export async function addAdBonus(): Promise<void> {
   const c = await getCounter();
-  await setCounter({ ...c, adBonus: c.adBonus + 1 });
+  await setCounter({ ...c, adBonus: Math.min(c.adBonus + 1, MAX_AD_BONUS) });
+}
+
+/// True if the user can still earn another ad bonus today (below MAX_AD_BONUS).
+export async function canEarnAdBonus(): Promise<boolean> {
+  const c = await getCounter();
+  return c.adBonus < MAX_AD_BONUS;
 }
 
 /// Returns status for display in the limit sheet.

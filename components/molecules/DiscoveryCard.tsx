@@ -1,4 +1,4 @@
-import React, { useLayoutEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   Animated,
   Easing,
@@ -12,11 +12,13 @@ import {
   View,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BlurView } from 'expo-blur';
 import {
   AppStoreLogo,
-  ArrowClockwise,
+  CaretDown,
   CaretUp,
+  ChatCircle,
+  Clock,
+  DotsThree,
   GithubLogo,
   Globe,
   Lightning,
@@ -25,107 +27,111 @@ import {
 } from 'phosphor-react-native';
 import * as Haptics from 'expo-haptics';
 import {
+  Astra,
   Brand,
   AmbitFont,
   Radii,
 } from '../../constants/theme';
 import type { DiscoveryCardData, PortfolioItem, SeekerLinks } from '../../data/mock';
-import { responseTier } from '../../lib/responseRate';
 import { CAMPUSES } from '../../data/mock';
-import { HardShadow } from '../atoms';
+import { responseReward, type ResponseReward } from '../../lib/responseRate';
+import { useReducedMotion } from '../../hooks/useReducedMotion';
+
+/// Fire the swipe-up "peek" nudge only once per app session — the first
+/// discovery card that measures reveals a sliver of page 2, then settles. After
+/// that the user knows the gesture, so we don't re-nudge every card.
+let sessionNudged = false;
 
 interface Props {
   card: DiscoveryCardData;
-  /// Skills the viewer cares about (their project's skill list when an
-  /// owner is viewing seekers, the viewer's own skill list when a seeker
-  /// is viewing projects). Drives matched count + which skill chips are
-  /// tinted terracotta on the card.
+  /// Retained for API compatibility (the deck no longer tints matched chips).
   matchedSkills?: string[];
   onPortfolioPress?: (item: PortfolioItem) => void;
   activePortfolioId?: string | null;
   onReachOut?: (card: DiscoveryCardData) => void;
-  /// The swipe deck handles reach via its action row, so it hides the card's
-  /// own floating button. Other contexts (saved preview) keep it (default).
+  /// The swipe deck drives reach-out from its own footer button row, so it
+  /// hides the card's floating send circle. Preview contexts (Saved, chat/new,
+  /// project-edit) keep it (default true) — it's their only reach affordance.
   showReachButton?: boolean;
-  /// Render the reach button in a non-interactive, half-transparent preview
-  /// state — used by the owner's project-edit Preview so the gutter is filled
-  /// (content no longer squished) and the seeker CTA is honestly shown without
-  /// being tappable. Requires showReachButton.
+  /// Render the send circle in a non-interactive preview state.
   reachDisabled?: boolean;
-  /// Play the entry fade/slide on mount. Default true. The SwipeDeck sets this
-  /// false: it keeps each card instance alive across an advance (keyed list, no
-  /// remount), so a per-card mount fade would only ever read as a flash.
+  /// Play the entry fade on mount. Default true. The SwipeDeck sets it false.
   animateIn?: boolean;
+  /// Safety: when provided, renders a ⋯ overflow button that hands back the
+  /// OTHER user's id (seeker → card.id, project → card.ownerId) so the parent
+  /// can offer Report / Block. Omitted in the user's own profile preview.
+  onFlag?: (userId: string) => void;
 }
 
-/// Discovery card — H-overlay redesign. Photo fills the card edge-to-edge,
-/// dark vertical scrim at the bottom for legibility, identity + vibe +
-/// skills + portfolio mini-tile stack from the bottom up. Reach Out is a
-/// circular warm-tan liquid-glass button in the bottom-right corner.
-///
-/// Everything fits in one viewport — no scroll. SwipeDeck still wraps
-/// this with the PanResponder for swipe gestures.
+/// Discovery card — ASTRA two-section design with a swipe-up second screen.
+/// Page 1: a white island card (royal→iris gradient photo panel + white info
+/// panel). Swipe UP on the card and its content shifts up to reveal Page 2 —
+/// portfolio highlights for a seeker, an expanded detail sheet for a project.
+/// The deck's PanResponder claims only horizontal pans, so vertical drags fall
+/// through to this card's paging ScrollView.
 export function DiscoveryCard({
   card,
-  matchedSkills,
   onPortfolioPress,
   activePortfolioId,
   onReachOut,
   showReachButton = true,
   reachDisabled = false,
   animateIn = true,
+  onFlag,
 }: Props) {
-  const firstName = card.kind === 'seeker'
-    ? card.name.split(' ')[0]
-    : card.ownerName.split(' ')[0];
-
-  // Entry fade/slide on mount. Skipped when animateIn is false (the deck keeps
-  // the card mounted across advances, so a replayed fade would just be a flash).
-  const cardOpacity = useRef(new Animated.Value(animateIn ? 0 : 1)).current;
-  const cardTranslateY = useRef(new Animated.Value(animateIn ? 8 : 0)).current;
+  const otherUserId = card.kind === 'seeker' ? card.id : card.ownerId;
+  // Entry fade on mount (skipped in the deck, which keeps cards mounted).
+  const opacity = useRef(new Animated.Value(animateIn ? 0 : 1)).current;
+  const translateY = useRef(new Animated.Value(animateIn ? 8 : 0)).current;
   useLayoutEffect(() => {
     if (!animateIn) {
-      cardOpacity.setValue(1);
-      cardTranslateY.setValue(0);
+      opacity.setValue(1);
+      translateY.setValue(0);
       return;
     }
-    cardOpacity.setValue(0);
-    cardTranslateY.setValue(8);
+    opacity.setValue(0);
+    translateY.setValue(8);
     Animated.parallel([
-      Animated.timing(cardOpacity, {
-        toValue: 1,
-        duration: 240,
-        easing: Easing.bezier(0.16, 1, 0.3, 1),
-        useNativeDriver: true,
-      }),
-      Animated.timing(cardTranslateY, {
-        toValue: 0,
-        duration: 280,
-        easing: Easing.bezier(0.16, 1, 0.3, 1),
-        useNativeDriver: true,
-      }),
+      Animated.timing(opacity, { toValue: 1, duration: 240, easing: Easing.bezier(0.16, 1, 0.3, 1), useNativeDriver: true }),
+      Animated.timing(translateY, { toValue: 0, duration: 280, easing: Easing.bezier(0.16, 1, 0.3, 1), useNativeDriver: true }),
     ]).start();
-  }, [card.id, animateIn, cardOpacity, cardTranslateY]);
+  }, [card.id, animateIn, opacity, translateY]);
 
-  // Seeker cards are a vertical 2-page pager: screen 1 = overview (the
-  // photo card), screen 2 = portfolio highlights. We measure the card
-  // height so each page snaps to exactly one viewport. The deck's
-  // PanResponder only claims horizontal pans, so vertical drags fall
-  // through to this ScrollView. Project cards stay single-page.
+  // Vertical 2-page pager. We measure the card so each page snaps to exactly
+  // one card-height viewport; the deck only claims horizontal pans, so a
+  // vertical drag scrolls this instead of swiping the deck.
   const [cardH, setCardH] = useState(0);
   const [page, setPage] = useState(0);
+  const scrollRef = useRef<ScrollView>(null);
+  const reduced = useReducedMotion();
+
+  // The swipe-up second screen exists only for seekers with portfolio work or
+  // links. Project cards are single-page for now — no scrollable detail — so
+  // they get no down-arrow. (ProjectDetail is kept for a future project second
+  // screen, e.g. short video pitches.)
+  const seekerHasWork =
+    card.kind === 'seeker' &&
+    (card.portfolio.length > 0 ||
+      !!(card.links && (card.links.github || card.links.site || card.links.appStore)));
+  const hasSecondScreen = seekerHasWork;
+
+  // First-run peek nudge (once per session): briefly reveal a sliver of page 2
+  // then settle back, so the swipe-up affordance is discovered without a tap.
+  useEffect(() => {
+    if (!hasSecondScreen || cardH <= 0 || sessionNudged || reduced) return;
+    sessionNudged = true;
+    const peek = Math.min(46, cardH * 0.12);
+    const t = setTimeout(() => {
+      scrollRef.current?.scrollTo({ y: peek, animated: true });
+      setTimeout(() => scrollRef.current?.scrollTo({ y: 0, animated: true }), 540);
+    }, 700);
+    return () => clearTimeout(t);
+  }, [hasSecondScreen, cardH, reduced]);
+
+  const goToPage = (p: 0 | 1) => scrollRef.current?.scrollTo({ y: p * cardH, animated: true });
 
   return (
-    <Animated.View
-      style={[
-        styles.cardOuter,
-        {
-          opacity: cardOpacity,
-          transform: [{ translateY: cardTranslateY }],
-        },
-      ]}
-    >
-      <HardShadow radius={Radii.card} offset={7} style={styles.hsFill}>
+    <Animated.View style={[styles.cardOuter, { opacity, transform: [{ translateY }] }]}>
       <View
         style={styles.card}
         onLayout={(e) => {
@@ -133,373 +139,167 @@ export function DiscoveryCard({
           if (h > 0 && Math.abs(h - cardH) > 0.5) setCardH(h);
         }}
       >
-      {card.kind === 'seeker' ? (
-        <>
-          <ScrollView
-            style={StyleSheet.absoluteFill}
-            pagingEnabled
-            showsVerticalScrollIndicator={false}
-            scrollEventThrottle={16}
-            onScroll={(e) => {
-              if (cardH <= 0) return;
-              const i = Math.round(e.nativeEvent.contentOffset.y / cardH);
-              if (i !== page) setPage(i);
-            }}
-          >
-            <View style={{ height: cardH }}>
-              <SeekerContent
-                card={card}
-                matchedSkills={matchedSkills}
-                onPortfolioPress={onPortfolioPress}
-                activePortfolioId={activePortfolioId}
-                showReachButton={showReachButton}
-              />
-            </View>
-            <View style={{ height: cardH }}>
-              <PortfolioHighlights
-                card={card}
-                onPortfolioPress={onPortfolioPress}
-              />
-            </View>
-          </ScrollView>
-          {cardH > 0 && <PageDots count={2} index={page} />}
-        </>
-      ) : (
-        <ProjectContent card={card} matchedSkills={matchedSkills} />
-      )}
+        {hasSecondScreen ? (
+          <>
+            <ScrollView
+              ref={scrollRef}
+              style={StyleSheet.absoluteFill}
+              pagingEnabled
+              showsVerticalScrollIndicator={false}
+              scrollEventThrottle={16}
+              onScroll={(e) => {
+                if (cardH <= 0) return;
+                const i = Math.round(e.nativeEvent.contentOffset.y / cardH);
+                if (i !== page) setPage(i);
+              }}
+            >
+              <View style={{ height: cardH }}>
+                {card.kind === 'seeker' ? <SeekerFront card={card} /> : <ProjectFront card={card} />}
+              </View>
+              <View style={{ height: cardH }}>
+                {card.kind === 'seeker'
+                  ? <SeekerPortfolio card={card} onPortfolioPress={onPortfolioPress} activePortfolioId={activePortfolioId} />
+                  : <ProjectDetail card={card} />}
+              </View>
+            </ScrollView>
 
-      {showReachButton && (
-        <ReachOutCircle
-          firstName={firstName}
-          onPress={() => onReachOut?.(card)}
-          disabled={reachDisabled}
-        />
-      )}
+            {cardH > 0 && (
+              <PagerArrow
+                kind={card.kind}
+                page={page}
+                onPress={() => goToPage(page === 0 ? 1 : 0)}
+              />
+            )}
+          </>
+        ) : (
+          card.kind === 'seeker' ? <SeekerFront card={card} /> : <ProjectFront card={card} />
+        )}
+
+        {showReachButton && (
+          <SendCircle onPress={() => onReachOut?.(card)} disabled={reachDisabled} />
+        )}
+
+        {onFlag && (
+          <Pressable
+            onPress={() => onFlag(otherUserId)}
+            // Sit opposite the status badge (seeker badge is top-left, project
+            // "LIVE" is top-right) so they never overlap.
+            style={[styles.flagBtn, card.kind === 'seeker' ? styles.flagBtnRight : styles.flagBtnLeft]}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Report or block"
+          >
+            <DotsThree size={22} color={Brand.inkOnBrand} weight="bold" />
+          </Pressable>
+        )}
       </View>
-      </HardShadow>
     </Animated.View>
   );
 }
 
-// ─── Page dots (vertical depth indicator) ──────────────────────────────────
-// Sits on the right edge, vertically centered. Active page is a taller,
-// brighter pill. Non-interactive — purely a discoverability cue.
+// ─── Response reward pill (tiered color + icon + pulse on the top tier) ──────
 
-function PageDots({ count, index }: { count: number; index: number }) {
-  return (
-    <View style={styles.dots} pointerEvents="none">
-      {Array.from({ length: count }).map((_, i) => (
-        <View key={i} style={[styles.dot, i === index && styles.dotOn]} />
-      ))}
-    </View>
-  );
-}
+const TIER_STYLE: Record<
+  ResponseReward['tier'],
+  { color: string; bg: string; Icon: React.ComponentType<IconProps>; weight: IconProps['weight'] }
+> = {
+  fast:   { color: '#0E7A5C', bg: 'rgba(14,122,92,0.12)',  Icon: Lightning,   weight: 'fill' },
+  medium: { color: '#A9772B', bg: 'rgba(199,154,76,0.18)', Icon: ChatCircle,  weight: 'fill' },
+  steady: { color: Brand.inkMuted, bg: 'rgba(123,116,129,0.12)', Icon: Clock, weight: 'regular' },
+};
 
-// ─── Reach Out circle ──────────────────────────────────────────────────────
-// Warm-tan liquid-glass circle in the bottom-right. BlurView for the glass
-// effect, tinted overlay for the warm-tan color, inset top-edge highlight.
+function ResponsePill({ rate }: { rate?: number | null }) {
+  const reward = responseReward(rate);
+  const reduced = useReducedMotion();
+  const pulse = useRef(new Animated.Value(0)).current;
 
-function ReachOutCircle({
-  firstName,
-  onPress,
-  disabled = false,
-}: {
-  firstName: string;
-  onPress: () => void;
-  /// Non-interactive preview state (owner's project-edit Preview): half-opacity,
-  /// untappable, no haptics/press animation — purely shows what seekers see.
-  disabled?: boolean;
-}) {
-  const scale = useRef(new Animated.Value(1)).current;
-  const press = () => {
-    if (Platform.OS !== 'web') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+  useEffect(() => {
+    if (!reward?.reward || reduced) {
+      pulse.setValue(0);
+      return;
     }
-    onPress();
-  };
-
-  // Static, half-transparent, non-interactive — fills the bottom-right gutter
-  // so the content stack reads correctly while making clear it's just a preview.
-  if (disabled) {
-    return (
-      <View style={[styles.reachWrap, styles.reachPreview]} pointerEvents="none">
-        <View style={styles.reachContainer}>
-          <BlurView intensity={36} tint="default" style={styles.reachBlur}>
-            <View style={styles.reachTint} pointerEvents="none" />
-            <View style={styles.reachTopHighlight} pointerEvents="none" />
-            <PaperPlaneTilt size={20} color={Brand.actionInk} weight="fill" />
-          </BlurView>
-        </View>
-      </View>
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 1, duration: 900, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 0, duration: 900, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+      ]),
     );
-  }
+    loop.start();
+    return () => loop.stop();
+  }, [reward?.reward, reduced, pulse]);
+
+  if (!reward) return null;
+  const s = TIER_STYLE[reward.tier];
+  const scale = pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.06] });
 
   return (
-    <View style={styles.reachWrap} pointerEvents="box-none">
-      <Pressable
-        onPress={press}
-        onPressIn={() => Animated.spring(scale, {
-          toValue: 0.94,
-          friction: 8,
-          tension: 220,
-          useNativeDriver: true,
-        }).start()}
-        onPressOut={() => Animated.spring(scale, {
-          toValue: 1,
-          friction: 5,
-          tension: 180,
-          useNativeDriver: true,
-        }).start()}
-        accessibilityRole="button"
-        accessibilityLabel={`Reach out to ${firstName}`}
-      >
-        <Animated.View style={[styles.reachContainer, { transform: [{ scale }] }]}>
-          <BlurView intensity={36} tint="default" style={styles.reachBlur}>
-            <View style={styles.reachTint} pointerEvents="none" />
-            <View style={styles.reachTopHighlight} pointerEvents="none" />
-            <PaperPlaneTilt size={20} color={Brand.actionInk} weight="fill" />
-          </BlurView>
-        </Animated.View>
-      </Pressable>
-    </View>
+    <Animated.View style={[styles.respPill, { backgroundColor: s.bg, transform: [{ scale }] }]}>
+      <s.Icon size={13} color={s.color} weight={s.weight} />
+      <Text style={[styles.respText, { color: s.color }]} numberOfLines={1}>{reward.label}</Text>
+    </Animated.View>
   );
 }
 
-// ─── Photo backdrop ───────────────────────────────────────────────────────
-// Full-bleed image filling the card. If photoUri is null, falls back to a
-// warm tan→accent gradient placeholder (same approach as in Figma).
+// ─── Photo panel (shared) ───────────────────────────────────────────────────
 
-function PhotoBackdrop({
+function PhotoPanel({
   uri,
-  fallbackGradient,
-  fallbackInitials,
+  gradient,
+  scrim,
+  children,
 }: {
   uri: string | null;
-  fallbackGradient?: readonly [string, string];
-  fallbackInitials?: string;
+  gradient?: readonly [string, string];
+  scrim?: boolean;
+  children: React.ReactNode;
 }) {
-  if (uri) {
-    return (
-      <Image
-        source={{ uri }}
-        style={styles.photo}
-        resizeMode="cover"
-        // Android fades images in over 300ms by default — reads as a flash when
-        // a card is (re)mounted. The URI is already cached from the peek render.
-        fadeDuration={0}
-      />
-    );
-  }
+  // Polaroid framing: the photo is inset with an even white margin on top/left/
+  // right (the card's white showing through), and the info panel below is the
+  // thick bottom caption border. `photoFrame` = the margin; `photo` = the print.
   return (
-    <LinearGradient
-      colors={fallbackGradient ?? [Brand.primary, Brand.accent]}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={styles.photo}
-    >
-      {fallbackInitials && (
-        <Text style={styles.photoFallbackInitials}>{fallbackInitials}</Text>
-      )}
-    </LinearGradient>
-  );
-}
-
-// ─── Scrim ─────────────────────────────────────────────────────────────────
-// Vertical top→bottom dark gradient. Transparent at top, near-opaque at
-// bottom. Sits over the photo so the bottom content reads cleanly.
-
-function Scrim() {
-  return (
-    <LinearGradient
-      colors={[
-        'rgba(0, 0, 0, 0.00)',
-        'rgba(0, 0, 0, 0.05)',
-        'rgba(0, 0, 0, 0.55)',
-        'rgba(0, 0, 0, 1)',
-      ]}
-      locations={[0, 0.4, 0.66, 1]}
-      start={{ x: 0.5, y: 0 }}
-      end={{ x: 0.5, y: 1 }}
-      style={styles.scrim}
-      pointerEvents="none"
-    />
-  );
-}
-
-// ─── Top-right badge ──────────────────────────────────────────────────────
-
-/// `tone='match'` ties the skill-overlap badge to the card's match vocabulary
-/// (the warm-tan matched chips + sage trust pill) with a solid tan fill and a
-/// leading dot — visibly a "good fit" signal, distinct from the neutral white
-/// `default` badge used for the "Needs … by …" urgency line on project cards.
-function MatchBadge({ text, tone = 'default' }: { text: string; tone?: 'default' | 'match' }) {
-  const isMatch = tone === 'match';
-  return (
-    <View style={[styles.badge, isMatch && styles.badgeMatch]}>
-      {isMatch && <View style={styles.badgeDot} />}
-      <Text
-        style={[styles.badgeText, isMatch && styles.badgeTextMatch]}
-        numberOfLines={2}
-      >
-        {text}
-      </Text>
-    </View>
-  );
-}
-
-/// Format a `YYYY-MM-DD` deadline into a short "Apr 30" for the badge. Parsed
-/// from local calendar parts to avoid a UTC day-shift.
-function formatNeededBy(iso: string): string {
-  const [y, m, d] = iso.split('-').map(Number);
-  if (!y || !m || !d) return '';
-  return new Date(y, m - 1, d).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-}
-
-// ─── Reply-tier badge ─────────────────────────────────────────────────────
-// Warm, public-facing trust signal against the 72h reach-out SLA. Renders a
-// worded tier ("Replies fast" / "Responsive") instead of a raw percentage —
-// the number lives on the owner's private management card. Returns null below
-// the threshold so a weak rate is simply absent, never punishing. Fed the real
-// reply-within-72h rate (0–1) of the entity whose responsiveness is shown — the
-// seeker for a seeker card, the owner/founder for a project card.
-function ReplyTierBadge({ rate }: { rate: number | null | undefined }) {
-  const tier = responseTier(rate);
-  if (!tier) return null;
-  const Icon = tier.kind === 'fast' ? Lightning : ArrowClockwise;
-  return (
-    <View style={styles.replyBadge}>
-      <Icon
-        size={12}
-        color="#FFFFFF"
-        weight={tier.kind === 'fast' ? 'fill' : 'bold'}
-      />
-      <Text style={styles.replyBadgeText}>{tier.label}</Text>
-    </View>
-  );
-}
-
-// ─── Skill chip ───────────────────────────────────────────────────────────
-
-function SkillChip({
-  label,
-  matched,
-}: {
-  label: string;
-  matched: boolean;
-}) {
-  return (
-    <View style={[styles.chip, matched && styles.chipMatched]}>
-      <Text
-        style={[styles.chipText, matched && styles.chipTextMatched]}
-        numberOfLines={1}
-      >
-        {label}
-      </Text>
-    </View>
-  );
-}
-
-// ─── Portfolio-highlights mini-tile ───────────────────────────────────────
-// Teaser on screen 1 for the featured portfolio piece; doubles as the cue to
-// swipe up for the full Portfolio Highlights screen.
-
-function ShippingTile({
-  item,
-  count,
-  active,
-  onPress,
-}: {
-  item: PortfolioItem;
-  count: number;
-  active: boolean;
-  onPress: () => void;
-}) {
-  const scale = useRef(new Animated.Value(1)).current;
-  return (
-    <Pressable
-      onPress={onPress}
-      onPressIn={() => Animated.spring(scale, {
-        toValue: 0.97,
-        friction: 8,
-        tension: 220,
-        useNativeDriver: true,
-      }).start()}
-      onPressOut={() => Animated.spring(scale, {
-        toValue: 1,
-        friction: 5,
-        tension: 180,
-        useNativeDriver: true,
-      }).start()}
-    >
-      <Animated.View
-        style={[
-          styles.shipTile,
-          active && styles.shipTileActive,
-          { transform: [{ scale }] },
-        ]}
-      >
-        {item.imageUri ? (
-          <Image source={{ uri: item.imageUri }} style={styles.shipCover} resizeMode="cover" />
-        ) : (
+    <View style={styles.photoFrame}>
+      <View style={styles.photo}>
+        <LinearGradient
+          colors={gradient ?? [Astra.royal, Astra.iris]}
+          locations={[0, 0.71]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
+        {uri && <Image source={{ uri }} style={StyleSheet.absoluteFill} resizeMode="cover" fadeDuration={0} />}
+        {scrim && (
           <LinearGradient
-            colors={item.gradient}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.shipCover}
-          >
-            <View style={styles.shipCoverOutline} pointerEvents="none" />
-          </LinearGradient>
+            colors={['rgba(12,0,34,0)', 'rgba(12,0,34,0.55)']}
+            locations={[0.45, 1]}
+            start={{ x: 0.5, y: 0 }}
+            end={{ x: 0.5, y: 1 }}
+            style={StyleSheet.absoluteFill}
+            pointerEvents="none"
+          />
         )}
-        <View style={styles.shipBody}>
-          <View style={styles.shipEyebrowRow}>
-            <Text style={styles.shipEyebrow} numberOfLines={1}>
-              {count} PROJECT{count !== 1 ? 'S' : ''} · SWIPE UP
-            </Text>
-            <CaretUp size={9} color="rgba(255, 255, 255, 0.66)" weight="bold" />
-          </View>
-          <Text style={styles.shipTitle} numberOfLines={1}>{item.title}</Text>
-        </View>
-      </Animated.View>
-    </Pressable>
-  );
-}
-
-// ─── Decorative quote glyph (behind vibe text) ────────────────────────────
-
-function VibeBlock({ text, lines = 3 }: { text: string; lines?: number }) {
-  return (
-    <View style={styles.vibeBlock}>
-      <Text
-        style={styles.vibeGlyph}
-        allowFontScaling={false}
-        numberOfLines={1}
-        pointerEvents="none"
-      >
-        {'“'}
-      </Text>
-      <Text style={styles.vibeText} numberOfLines={lines}>{text}</Text>
+        {children}
+      </View>
     </View>
   );
 }
 
-// ─── Seeker content ────────────────────────────────────────────────────────
-
-interface SeekerContentProps {
-  card: Extract<DiscoveryCardData, { kind: 'seeker' }>;
-  matchedSkills?: string[];
-  onPortfolioPress?: (item: PortfolioItem) => void;
-  activePortfolioId?: string | null;
-  /// When the reach-out button is shown, the link rail stacks above it;
-  /// otherwise (e.g. profile preview) it sits in the bottom-right corner.
-  showReachButton?: boolean;
+function StatusBadge({ label }: { label: string }) {
+  return (
+    <View style={styles.statusBadge}>
+      <Text style={styles.statusBadgeText}>{label}</Text>
+    </View>
+  );
 }
 
-/// How many skill chips show before the "+N" expander.
-const SKILL_CAP = 5;
+function SkillChip({ label }: { label: string }) {
+  return (
+    <View style={styles.chip}>
+      <Text style={styles.chipText} numberOfLines={1}>{label}</Text>
+    </View>
+  );
+}
 
-/// First complete sentence of the blurb — a clean, full thought instead of a
-/// mid-sentence truncation. Falls back to the whole string when there's no
-/// terminal punctuation.
+/// First complete sentence of the blurb — a clean thought, not a mid-cut.
 function firstSentence(text: string): string {
   const t = (text ?? '').replace(/\s+/g, ' ').trim();
   if (!t) return '';
@@ -507,767 +307,516 @@ function firstSentence(text: string): string {
   return (m ? m[0] : t).trim();
 }
 
-/// Vertical rail of quick-link icon buttons, stacking up from the reach-out
-/// button in the bottom-right gutter. Hidden when the seeker has no links.
-function LinkRail({ links, bottom }: { links?: SeekerLinks; bottom: number }) {
-  const items = [
-    links?.github ? { Icon: GithubLogo, url: links.github } : null,
-    links?.site ? { Icon: Globe, url: links.site } : null,
-    links?.appStore ? { Icon: AppStoreLogo, url: links.appStore } : null,
-  ].filter(Boolean) as { Icon: React.ComponentType<IconProps>; url: string }[];
-  if (items.length === 0) return null;
-  return (
-    <View style={[styles.linkRail, { bottom }]} pointerEvents="box-none">
-      {items.map((it, i) => (
-        <Pressable
-          key={i}
-          onPress={() => Linking.openURL(it.url).catch(() => {})}
-          style={({ pressed }) => [styles.linkRailBtn, pressed && { opacity: 0.7 }]}
-          accessibilityRole="button"
-        >
-          <it.Icon size={18} color="#F5E9D8" weight="fill" />
-        </Pressable>
-      ))}
-    </View>
-  );
-}
-
-function SeekerContent({
-  card,
-  matchedSkills,
-  onPortfolioPress,
-  activePortfolioId,
-  showReachButton = true,
-}: SeekerContentProps) {
+function seekerEyebrow(card: Extract<DiscoveryCardData, { kind: 'seeker' }>): string {
   const campus = CAMPUSES.find((c) => c.id === card.campusId);
-  const matchedSet = new Set((matchedSkills ?? []).map((s) => s.toLowerCase()));
-  const sharedCount = card.skills.filter((s) => matchedSet.has(s.toLowerCase())).length;
-  const ordered = [...card.skills].sort((a, b) => {
-    const am = matchedSet.has(a.toLowerCase()) ? 0 : 1;
-    const bm = matchedSet.has(b.toLowerCase()) ? 0 : 1;
-    return am - bm;
-  });
-  const featured = card.portfolio[0];
-
-  // Skills: show SKILL_CAP, then a "+N" chip that expands the rest in place.
-  const [skillsExpanded, setSkillsExpanded] = useState(false);
-  const shownSkills = skillsExpanded ? ordered : ordered.slice(0, SKILL_CAP);
-  const overflow = ordered.length - SKILL_CAP;
-
-  // Top-right badge text — synthesized from match data
-  // Fit signal only — campus is already shown in the eyebrow below.
-  const badgeText = sharedCount > 0 ? `${sharedCount} matching skill${sharedCount !== 1 ? 's' : ''}` : '';
-
-  // Eyebrow — built only from data we actually have (major / campus / grad
-  // year). Anything missing is simply omitted; no fabricated "Computer
-  // Science '26" for everyone.
-  const eyebrowText = [
-    card.major?.toUpperCase(),
-    campus?.name.toUpperCase(),
-    card.gradYear ? `’${card.gradYear.replace(/^’/, '')}` : null,
-  ]
-    .filter(Boolean)
-    .join(' · ');
-
-  const vibeSentence = firstSentence(card.vibeBlurb);
-
-  return (
-    <>
-      <PhotoBackdrop uri={card.photoUri} />
-      <Scrim />
-
-      {badgeText && (
-        <View style={styles.badgePosition}>
-          <MatchBadge text={badgeText} tone="match" />
-        </View>
-      )}
-
-      <LinkRail links={card.links} bottom={showReachButton ? 92 : 22} />
-
-      <View style={[styles.stack, styles.stackFull]}>
-        {eyebrowText !== '' && (
-          <Text style={styles.eyebrow} numberOfLines={1}>{eyebrowText}</Text>
-        )}
-        <Text style={styles.name} numberOfLines={1}>{card.name.trim() || 'Someone on Ambit'}</Text>
-        <ReplyTierBadge rate={card.responseRate} />
-        {vibeSentence !== '' && <VibeBlock text={vibeSentence} />}
-        <View style={styles.skillsRow}>
-          {shownSkills.map((s) => (
-            <SkillChip
-              key={s}
-              label={s}
-              matched={matchedSet.has(s.toLowerCase())}
-            />
-          ))}
-          {!skillsExpanded && overflow > 0 && (
-            <Pressable
-              onPress={() => setSkillsExpanded(true)}
-              style={[styles.chip, styles.chipMore]}
-              accessibilityRole="button"
-              accessibilityLabel={`Show ${overflow} more skills`}
-            >
-              <Text style={styles.chipText}>+{overflow}</Text>
-            </Pressable>
-          )}
-        </View>
-        {featured && (
-          <ShippingTile
-            item={featured}
-            count={card.portfolio.length}
-            active={activePortfolioId === featured.id}
-            onPress={() => onPortfolioPress?.(featured)}
-          />
-        )}
-      </View>
-    </>
-  );
+  const yy = card.gradYear ? card.gradYear.replace(/^’/, '') : '';
+  return [
+    card.major && yy ? `${card.major} ’${yy}` : card.major || (yy ? `’${yy}` : ''),
+    campus?.name,
+  ].filter(Boolean).join(' · ');
 }
 
-// ─── Project content ───────────────────────────────────────────────────────
+// ─── Seeker — page 1 (front) ────────────────────────────────────────────────
 
-interface ProjectContentProps {
-  card: Extract<DiscoveryCardData, { kind: 'project' }>;
-  matchedSkills?: string[];
-}
-
-function ProjectContent({ card, matchedSkills }: ProjectContentProps) {
-  const initials = card.title
-    .split(' ')
-    .slice(0, 2)
-    .map((w) => w[0]?.toUpperCase() ?? '')
-    .join('');
-  const campus = CAMPUSES.find((c) => c.id === card.ownerCampusId);
-  const matchedSet = new Set((matchedSkills ?? []).map((s) => s.toLowerCase()));
-  const sharedCount = card.skillsSought.filter((s) => matchedSet.has(s.toLowerCase())).length;
-  const ordered = [...card.skillsSought].sort((a, b) => {
-    const am = matchedSet.has(a.toLowerCase()) ? 0 : 1;
-    const bm = matchedSet.has(b.toLowerCase()) ? 0 : 1;
-    return am - bm;
-  });
-
-  // Top-right urgency badge: the open need + deadline ("Needs Frontend · by
-  // Apr 30"). Both are optional — fall back to deadline-only, need-only, then
-  // a quiet skill-fit signal. Campus is intentionally omitted (it's already in
-  // the eyebrow below).
-  const headlineRole = card.rolesSought?.[0];
-  const byDate = card.neededBy ? formatNeededBy(card.neededBy) : '';
-  const by = byDate ? `by ${byDate}` : null;
-  const badgeText =
-    headlineRole && by ? `Needs ${headlineRole} · ${by}`
-    : headlineRole      ? `Needs ${headlineRole}`
-    : by                ? `Needs someone ${by}`
-    : sharedCount > 0   ? `${sharedCount} matching skill${sharedCount !== 1 ? 's' : ''}`
-    : '';
-  // Only the skill-overlap fallback gets the warm match tone; the "Needs …"
-  // variants stay neutral white (they're a need, not a fit signal).
-  const badgeTone = !headlineRole && !by && sharedCount > 0 ? 'match' : 'default';
-
-  const eyebrowText = campus
-    ? `BY ${card.ownerName.toUpperCase()} · ${campus.name.toUpperCase()}`
-    : `BY ${card.ownerName.toUpperCase()}`;
-
+function SeekerFront({ card }: { card: Extract<DiscoveryCardData, { kind: 'seeker' }> }) {
+  const subtitle = seekerEyebrow(card);
   return (
     <>
-      <PhotoBackdrop
-        uri={card.imageUri ?? card.ownerPhotoUri ?? null}
-        fallbackGradient={card.gradient}
-        fallbackInitials={initials}
-      />
-      <Scrim />
-
-      {badgeText !== '' && (
-        <View style={styles.badgePosition}>
-          <MatchBadge text={badgeText} tone={badgeTone} />
+      <PhotoPanel uri={card.photoUri} scrim>
+        <View style={styles.photoTopRow}>
+          <StatusBadge label="OPEN TO TEAMS" />
         </View>
-      )}
+        <View style={styles.identity}>
+          <Text style={styles.name} numberOfLines={1}>{card.name.trim() || 'Someone on Ambit'}</Text>
+          {subtitle !== '' && <Text style={styles.subtitle} numberOfLines={1}>{subtitle}</Text>}
+        </View>
+      </PhotoPanel>
 
-      <View style={[styles.stack, styles.stackFull]}>
-        <Text style={styles.eyebrow} numberOfLines={1}>{eyebrowText}</Text>
-        {card.rolesSought && card.rolesSought.length > 0 && (
-          <View style={styles.rolesRow}>
-            {card.rolesSought.slice(0, 3).map((r) => (
-              <View key={r} style={styles.roleChip}>
-                <Text style={styles.roleChipText}>{r}</Text>
-              </View>
-            ))}
+      <View style={styles.panel}>
+        <ResponsePill rate={card.responseRate} />
+        {card.vibeBlurb.trim() !== '' && (
+          <Text style={styles.desc} numberOfLines={3}>{firstSentence(card.vibeBlurb) || card.vibeBlurb}</Text>
+        )}
+        {card.skills.length > 0 && (
+          <View style={styles.chipRow}>
+            {card.skills.slice(0, 6).map((s) => <SkillChip key={s} label={s} />)}
           </View>
         )}
-        <Text style={styles.name} numberOfLines={2}>{card.title}</Text>
-        <ReplyTierBadge rate={card.responseRate} />
-        {card.pitch !== '' && <VibeBlock text={card.pitch} />}
-        {/* Only the bottom chip row sits beside the floating reach button, so
-            it (not the whole stack) reserves the gutter — the eyebrow/title/
-            blurb above use the full card width. Mirrors the seeker card. */}
-        <View style={[styles.skillsRow, styles.skillsRowGutter]}>
-          {ordered.slice(0, 4).map((s) => (
-            <SkillChip
-              key={s}
-              label={s}
-              matched={matchedSet.has(s.toLowerCase())}
-            />
-          ))}
-        </View>
       </View>
     </>
   );
 }
 
-// ─── Portfolio Highlights (screen 2) ───────────────────────────────────────
-// The swipe-up deep dive: same identity header as screen 1 (eyebrow + big
-// name), then the candidate's work as thumbnail + title + caption rows, and
-// optional external links as icon buttons. Reach-out + page dots float on
-// top from the parent, so this screen owns no chrome of its own.
+// ─── Seeker — page 2 (portfolio highlights) ─────────────────────────────────
 
-interface PortfolioHighlightsProps {
+function SeekerPortfolio({
+  card,
+  onPortfolioPress,
+  activePortfolioId,
+}: {
   card: Extract<DiscoveryCardData, { kind: 'seeker' }>;
   onPortfolioPress?: (item: PortfolioItem) => void;
-}
-
-function PortfolioHighlights({ card, onPortfolioPress }: PortfolioHighlightsProps) {
-  const campus = CAMPUSES.find((c) => c.id === card.campusId);
-  const eyebrowText = [
-    card.major?.toUpperCase(),
-    campus?.name.toUpperCase(),
-    card.gradYear ? `’${card.gradYear.replace(/^’/, '')}` : null,
-  ]
-    .filter(Boolean)
-    .join(' · ');
+  activePortfolioId?: string | null;
+}) {
   const links = card.links;
   const hasLinks = !!(links && (links.github || links.site || links.appStore));
-
   return (
     <View style={styles.page2}>
-      <View style={styles.page2Pad}>
-        {eyebrowText !== '' && (
-          <Text style={styles.eyebrow} numberOfLines={1}>{eyebrowText}</Text>
-        )}
-        <Text style={[styles.name, styles.page2Name]} numberOfLines={1}>{card.name}</Text>
+      <Text style={styles.page2Eyebrow} numberOfLines={1}>{seekerEyebrow(card).toUpperCase()}</Text>
+      <Text style={styles.page2Name} numberOfLines={1}>{card.name}</Text>
 
-        <Text style={styles.hlSection}>PORTFOLIO HIGHLIGHTS</Text>
-        {card.portfolio.slice(0, 3).map((item) => (
-          <HighlightRow
-            key={item.id}
-            item={item}
-            onPress={() => onPortfolioPress?.(item)}
-          />
-        ))}
+      <Text style={styles.page2Section}>PORTFOLIO HIGHLIGHTS</Text>
+      {card.portfolio.length > 0 ? (
+        // 2-up grid: up to 6 highlights (2×3) fill the fixed-height card face.
+        // Portfolios are capped at 6 at the source, so the slice is just a guard
+        // for any legacy rows that predate the cap.
+        <View style={styles.hlGrid}>
+          {card.portfolio.slice(0, 6).map((item) => (
+            <PortfolioTile
+              key={item.id}
+              item={item}
+              active={activePortfolioId === item.id}
+              onPress={() => onPortfolioPress?.(item)}
+            />
+          ))}
+        </View>
+      ) : (
+        <Text style={styles.page2Empty}>No portfolio highlights yet.</Text>
+      )}
 
-        {hasLinks && (
-          <>
-            <Text style={styles.hlSection}>LINKS</Text>
-            <View style={styles.linkRow}>
-              {links!.github && <LinkIcon Icon={GithubLogo} url={links!.github} label="GitHub" />}
-              {links!.site && <LinkIcon Icon={Globe} url={links!.site} label="Website" />}
-              {links!.appStore && <LinkIcon Icon={AppStoreLogo} url={links!.appStore} label="App Store" />}
-            </View>
-          </>
-        )}
-      </View>
+      {hasLinks && (
+        <>
+          <Text style={styles.page2Section}>LINKS</Text>
+          <View style={styles.linkRow}>
+            {links!.github && <LinkIcon Icon={GithubLogo} url={links!.github} label="GitHub" />}
+            {links!.site && <LinkIcon Icon={Globe} url={links!.site} label="Website" />}
+            {links!.appStore && <LinkIcon Icon={AppStoreLogo} url={links!.appStore} label="App Store" />}
+          </View>
+        </>
+      )}
     </View>
   );
 }
 
-function HighlightRow({
+function PortfolioTile({
   item,
+  active,
   onPress,
 }: {
   item: PortfolioItem;
+  active: boolean;
   onPress: () => void;
 }) {
   return (
     <Pressable
       onPress={onPress}
-      style={({ pressed }) => [styles.hlRow, pressed && { opacity: 0.78 }]}
+      style={({ pressed }) => [styles.hlTile, (pressed || active) && { opacity: 0.85 }]}
       accessibilityRole="button"
       accessibilityLabel={`Open ${item.title}`}
     >
       {item.imageUri ? (
-        <Image source={{ uri: item.imageUri }} style={styles.hlThumb} resizeMode="cover" />
+        <Image source={{ uri: item.imageUri }} style={styles.hlTileCover} resizeMode="cover" />
       ) : (
-        <LinearGradient
-          colors={item.gradient}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.hlThumb}
-        />
+        <LinearGradient colors={item.gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hlTileCover} />
       )}
-      <View style={styles.hlMeta}>
-        <Text style={styles.hlTitle} numberOfLines={1}>{item.title}</Text>
-        <Text style={styles.hlCap} numberOfLines={2}>{item.description}</Text>
-      </View>
+      <Text style={styles.hlTileTitle} numberOfLines={1}>{item.title}</Text>
+      <Text style={styles.hlTileSub} numberOfLines={1}>{item.description}</Text>
     </Pressable>
   );
 }
 
-function LinkIcon({
-  Icon,
-  url,
-  label,
-}: {
-  Icon: React.ComponentType<IconProps>;
-  url: string;
-  label: string;
-}) {
+function LinkIcon({ Icon, url, label }: { Icon: React.ComponentType<IconProps>; url: string; label: string }) {
   return (
     <Pressable
       onPress={() => Linking.openURL(url).catch(() => {})}
-      style={({ pressed }) => [styles.linkIcon, pressed && { opacity: 0.7 }]}
+      style={({ pressed }) => [styles.linkIcon, pressed && { opacity: 0.6 }]}
       accessibilityRole="button"
       accessibilityLabel={label}
     >
-      <Icon size={20} color="#F5E9D8" weight="regular" />
+      <Icon size={20} color={Brand.primary} weight="regular" />
     </Pressable>
   );
 }
 
-// ─── Styles ────────────────────────────────────────────────────────────────
+// ─── Project — page 1 (front) ───────────────────────────────────────────────
+
+function ProjectFront({ card }: { card: Extract<DiscoveryCardData, { kind: 'project' }> }) {
+  const ownerInitials =
+    card.ownerName.split(' ').slice(0, 2).map((w) => w[0]?.toUpperCase() ?? '').join('') || '?';
+  return (
+    <>
+      <PhotoPanel uri={card.imageUri ?? card.ownerPhotoUri ?? null} gradient={card.gradient}>
+        <View style={styles.photoTopRowRight}>
+          <StatusBadge label="LIVE" />
+        </View>
+      </PhotoPanel>
+
+      <View style={styles.panelProject}>
+        <Text style={styles.projectTitle} numberOfLines={1}>{card.title}</Text>
+        {card.pitch.trim() !== '' && <Text style={styles.desc} numberOfLines={2}>{card.pitch}</Text>}
+        <View style={styles.metaRow}>
+          <LinearGradient colors={[Astra.royal, Astra.iris]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.ownerAvatar}>
+            <Text style={styles.ownerAvatarText}>{ownerInitials}</Text>
+          </LinearGradient>
+          <ResponsePill rate={card.responseRate} />
+        </View>
+      </View>
+    </>
+  );
+}
+
+// ─── Project — page 2 (expanded detail) ─────────────────────────────────────
+
+function formatNeededBy(iso: string): string {
+  const [y, m, d] = iso.split('-').map(Number);
+  if (!y || !m || !d) return '';
+  return new Date(y, m - 1, d).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
+function ProjectDetail({ card }: { card: Extract<DiscoveryCardData, { kind: 'project' }> }) {
+  const campus = CAMPUSES.find((c) => c.id === card.ownerCampusId);
+  const eyebrow = campus
+    ? `BY ${card.ownerName.toUpperCase()} · ${campus.name.toUpperCase()}`
+    : `BY ${card.ownerName.toUpperCase()}`;
+  const by = card.neededBy ? formatNeededBy(card.neededBy) : '';
+
+  return (
+    <View style={styles.page2}>
+      <Text style={styles.page2Eyebrow} numberOfLines={1}>{eyebrow}</Text>
+      <Text style={styles.page2Name} numberOfLines={2}>{card.title}</Text>
+      <ResponsePill rate={card.responseRate} />
+
+      {card.pitch.trim() !== '' && <Text style={styles.detailBody} numberOfLines={5}>{card.pitch}</Text>}
+
+      {card.rolesSought && card.rolesSought.length > 0 && (
+        <>
+          <Text style={styles.page2Section}>ROLES SOUGHT</Text>
+          <View style={styles.chipRow}>
+            {card.rolesSought.map((r) => <SkillChip key={r} label={r} />)}
+          </View>
+        </>
+      )}
+
+      {card.skillsSought.length > 0 && (
+        <>
+          <Text style={styles.page2Section}>SKILLS</Text>
+          <View style={styles.chipRow}>
+            {card.skillsSought.slice(0, 8).map((s) => <SkillChip key={s} label={s} />)}
+          </View>
+        </>
+      )}
+
+      {by !== '' && <Text style={styles.detailNeeded}>Looking to bring someone on by {by}.</Text>}
+    </View>
+  );
+}
+
+// ─── Pager arrow (bouncing down-chevron, bottom-left) ───────────────────────
+// Page 1: a gently bouncing down-chevron — the "more below, keep going" cue that
+// teaches the swipe-up. Page 2: flips to a static up-chevron to return. Tappable
+// either way, so the second screen is reachable without the gesture.
+
+function PagerArrow({
+  kind,
+  page,
+  onPress,
+}: {
+  kind: 'seeker' | 'project';
+  page: number;
+  onPress: () => void;
+}) {
+  const onPage2 = page === 1;
+  const reduced = useReducedMotion();
+  const bob = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    // Only page 1's down-chevron bounces; page 2's back-chevron is calm.
+    if (onPage2 || reduced) {
+      bob.setValue(0);
+      return;
+    }
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(bob, { toValue: 1, duration: 620, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+        Animated.timing(bob, { toValue: 0, duration: 620, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [onPage2, reduced, bob]);
+
+  const translateY = bob.interpolate({ inputRange: [0, 1], outputRange: [0, 5] });
+  const Icon = onPage2 ? CaretUp : CaretDown;
+
+  return (
+    <Pressable
+      onPress={onPress}
+      hitSlop={12}
+      style={({ pressed }) => [styles.arrowBtn, pressed && { opacity: 0.55 }]}
+      accessibilityRole="button"
+      accessibilityLabel={
+        onPage2
+          ? 'Back to profile'
+          : kind === 'seeker'
+            ? 'Show portfolio highlights'
+            : 'Show project details'
+      }
+    >
+      <Animated.View style={{ transform: [{ translateY: onPage2 ? 0 : translateY }] }}>
+        <Icon size={22} color={Brand.selected} weight="bold" />
+      </Animated.View>
+    </Pressable>
+  );
+}
+
+// ─── Send circle (preview-only reach affordance) ────────────────────────────
+
+function SendCircle({ onPress, disabled }: { onPress: () => void; disabled: boolean }) {
+  const scale = useRef(new Animated.Value(1)).current;
+  if (disabled) {
+    return (
+      <View style={[styles.sendWrap, styles.sendPreview]} pointerEvents="none">
+        <View style={styles.sendCircle}>
+          <PaperPlaneTilt size={22} color={Brand.inkOnBrand} weight="fill" />
+        </View>
+      </View>
+    );
+  }
+  return (
+    <View style={styles.sendWrap} pointerEvents="box-none">
+      <Pressable
+        onPress={() => {
+          if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+          onPress();
+        }}
+        onPressIn={() => Animated.spring(scale, { toValue: 0.94, friction: 8, tension: 220, useNativeDriver: true }).start()}
+        onPressOut={() => Animated.spring(scale, { toValue: 1, friction: 5, tension: 180, useNativeDriver: true }).start()}
+        accessibilityRole="button"
+        accessibilityLabel="Reach out"
+      >
+        <Animated.View style={[styles.sendCircle, { transform: [{ scale }] }]}>
+          <PaperPlaneTilt size={22} color={Brand.inkOnBrand} weight="fill" />
+        </Animated.View>
+      </Pressable>
+    </View>
+  );
+}
+
+// ─── Styles ─────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  // Card frame — the H design uses a very dark backdrop behind the photo
-  // (visible if the photo failed to load or is transparent at edges).
-  cardOuter: { flex: 1 },
-  hsFill: { flex: 1 },
+  cardOuter: {
+    flex: 1,
+    borderRadius: Radii.sm,
+    backgroundColor: Brand.cardCream,
+    shadowColor: Astra.royal,
+    shadowOpacity: 0.12,
+    shadowRadius: 26,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 6,
+  },
   card: {
     flex: 1,
-    backgroundColor: '#2A1A0C',
-    borderRadius: Radii.card,
-    borderWidth: 1.5,
-    borderColor: Brand.actionInk,
-    overflow: 'hidden', // photo + scrim need to clip to the rounded corners
+    borderRadius: Radii.sm,
+    borderWidth: 1,
+    borderColor: Astra.hairlinePurple,
+    backgroundColor: Brand.cardCream,
+    overflow: 'hidden',
     position: 'relative',
   },
-
-  // ── Photo (full-bleed) ─────────────────────────────────────────────────
-  photo: {
-    ...StyleSheet.absoluteFillObject,
-    width: '100%',
-    height: '100%',
+  // ⋯ report/block overlay — a subtle scrim disc over the photo panel.
+  flagBtn: {
+    position: 'absolute',
+    top: 14,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: 'rgba(0,0,0,0.28)',
     alignItems: 'center',
     justifyContent: 'center',
+    zIndex: 20,
   },
-  photoFallbackInitials: {
-    fontFamily: AmbitFont.display,
-    fontSize: 96,
-    color: 'rgba(255, 255, 255, 0.88)',
-    letterSpacing: 2,
+  flagBtnRight: { right: 14 },
+  flagBtnLeft: { left: 14 },
+
+  // ── Photo panel (Polaroid) ────────────────────────────────────────────────
+  // The white margin around the print — even on top/left/right; the bottom is
+  // the info-panel caption, so no bottom padding here.
+  photoFrame: {
+    flex: 1,
+    paddingTop: 16,
+    paddingHorizontal: 16,
+  },
+  // The print itself — the image clips to a slightly-rounded rect with a faint
+  // edge so it reads as a photo sitting on the white card.
+  photo: {
+    flex: 1,
+    paddingTop: 14,
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    justifyContent: 'space-between',
+    overflow: 'hidden',
+    borderRadius: 2,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(28,27,27,0.10)',
+  },
+  photoTopRow: { flexDirection: 'row', alignItems: 'center' },
+  photoTopRowRight: { flexDirection: 'row', justifyContent: 'flex-end' },
+
+  statusBadge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 11,
+    paddingVertical: 6,
+    borderRadius: 6,
+    backgroundColor: 'rgba(12,0,34,0.35)',
+    borderWidth: 1,
+    borderColor: Astra.whiteA40,
+  },
+  statusBadgeText: {
+    fontFamily: AmbitFont.semibold,
+    fontSize: 10,
+    color: '#FFFFFF',
+    letterSpacing: 1,
   },
 
-  // ── Scrim (top→bottom dark gradient) ───────────────────────────────────
-  scrim: {
-    ...StyleSheet.absoluteFillObject,
-  },
+  identity: { gap: 3 },
+  name: { fontFamily: AmbitFont.display, fontSize: 30, color: '#FFFFFF', letterSpacing: -0.4 },
+  subtitle: { fontFamily: AmbitFont.medium, fontSize: 14, color: '#E9E2F4' },
 
-  // ── Badge (top-right) ──────────────────────────────────────────────────
-  badgePosition: {
-    position: 'absolute',
-    top: 16,
-    right: 16,
-    zIndex: 4,
-  },
-  badge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    maxWidth: 190,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 14,
-    backgroundColor: 'rgba(255, 255, 255, 0.92)',
-  },
-  // Warm-tan fill ties the skill-overlap badge to the matched-skill chips.
-  badgeMatch: {
-    backgroundColor: 'rgba(201, 164, 122, 0.95)',
-  },
-  badgeDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#3A332A',
-  },
-  badgeText: {
-    fontFamily: AmbitFont.body,
-    fontSize: 11.5,
-    fontWeight: '700',
-    color: '#3A332A',
-    letterSpacing: 0.2,
-    lineHeight: 15,
-    textAlign: 'right',
-  },
-  badgeTextMatch: {
-    color: '#2A1E12',
-    textAlign: 'left',
-  },
+  // ── White info panel (Polaroid caption) ───────────────────────────────────
+  // Modest bottom padding — just enough to clear the small corner arrow. (Was
+  // 44/40 to reserve room for a full-width pull-up pill, which left an awkward
+  // empty strip once that became a corner chevron.)
+  panel: { paddingTop: 16, paddingHorizontal: 16, paddingBottom: 26, gap: 12 },
+  panelProject: { paddingTop: 14, paddingHorizontal: 14, paddingBottom: 26, gap: 10 },
+  desc: { fontFamily: AmbitFont.body, fontSize: 14, lineHeight: 20, color: Brand.inkBody },
+  projectTitle: { fontFamily: AmbitFont.display, fontSize: 20, color: Brand.inkPrimary },
 
-  // ── Reply-tier badge (sage-frosted trust pill) ─────────────────────────
-  // Sage ties it to the card's existing trust vocabulary (the match-badge
-  // dot + the Venn sage), reading as a calm "good" signal distinct from the
-  // neutral white skill chips below it.
-  replyBadge: {
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 },
+  chip: {
+    paddingHorizontal: 11,
+    paddingVertical: 6,
+    borderRadius: 6,
+    backgroundColor: 'rgba(147,98,200,0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(111,77,162,0.28)',
+  },
+  chipText: { fontFamily: AmbitFont.medium, fontSize: 12, color: Brand.selected },
+
+  // ── Response reward pill ──────────────────────────────────────────────────
+  respPill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
     alignSelf: 'flex-start',
-    marginTop: -4,
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 999,
-    backgroundColor: 'rgba(138, 155, 122, 0.46)',
   },
-  replyBadgeText: {
-    fontFamily: AmbitFont.body,
-    fontSize: 11.5,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    letterSpacing: 0.3,
-  },
+  respText: { fontFamily: AmbitFont.semibold, fontSize: 12 },
 
-  // ── Bottom content stack ───────────────────────────────────────────────
-  stack: {
-    position: 'absolute',
-    left: 22,
-    right: 22,
-    bottom: 22,
-    // Reserve the bottom-right gutter so content never slides under the
-    // floating reach-out button + its label.
-    paddingRight: 72,
-    gap: 16,
-    zIndex: 3,
-  },
-  // Seeker override: full-width vibe + skills. The reach-out gutter is reserved
-  // only on the bottom portfolio tile (shipTile.marginRight), not the whole
-  // stack — so the text/chips above use the full card width.
-  stackFull: { paddingRight: 0 },
-  eyebrow: {
-    fontFamily: AmbitFont.body,
-    fontSize: 10.5,
-    fontWeight: '700',
-    // Brighter + tighter tracking than before: at 0.7 opacity with very wide
-    // letter-spacing the school line washed out over light photos. A subtle
-    // shadow separates it from whatever sits behind the top of the scrim.
-    color: 'rgba(245, 233, 216, 0.95)',
-    letterSpacing: 1.5,
-    textTransform: 'uppercase',
-    textShadowColor: 'rgba(0, 0, 0, 0.55)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
-  },
-  name: {
-    fontFamily: AmbitFont.display,
-    fontSize: 34,
-    color: '#F5E9D8',
-    letterSpacing: -0.6,
-    lineHeight: 38,
-    // Nudge the name up a touch, tightening it toward the eyebrow and
-    // opening room for the quote glyph to drop down onto the blurb.
-    marginTop: -8,
-  },
-
-  // ── Vibe block (italic body + decorative glyph behind) ─────────────────
-  vibeBlock: {
-    position: 'relative',
-    paddingTop: 4,
-    marginTop: -2,
-  },
-  vibeGlyph: {
-    position: 'absolute',
-    // Dropped from -54 → -40 so the glyph sits lower and overlaps the start
-    // of the vibe blurb instead of floating up by the name.
-    top: -40,
-    left: -14,
-    width: 240,
-    fontSize: 120,
-    fontFamily: Platform.select({ ios: 'Georgia', android: 'serif', default: 'serif' }),
-    fontStyle: 'italic',
-    color: 'rgba(232, 201, 160, 0.42)',
-    letterSpacing: -2,
-    includeFontPadding: false,
-    zIndex: 0,
-  },
-  vibeText: {
-    position: 'relative',
-    zIndex: 1,
-    fontFamily: Platform.select({ ios: 'Georgia', android: 'serif', default: 'serif' }),
-    fontStyle: 'italic',
-    fontSize: 19,
-    color: '#F5E9D8',
-    lineHeight: 26,
-    letterSpacing: -0.1,
-  },
-
-  // ── Role pills — open positions (above project title) ──────────────────
-  rolesRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 2,
-  },
-  roleChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 999,
-    backgroundColor: 'rgba(212, 180, 144, 0.28)',
-    borderWidth: 1,
-    borderColor: 'rgba(212, 180, 144, 0.55)',
-  },
-  roleChipText: {
-    fontFamily: AmbitFont.body,
-    fontSize: 10.5,
-    fontWeight: '600',
-    color: '#F5E9D8',
-    letterSpacing: 0.3,
-  },
-
-  // ── Skill chips row ────────────────────────────────────────────────────
-  skillsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  // Project card only: keep the bottom chip row clear of the reach button.
-  skillsRowGutter: { paddingRight: 72 },
-  // Modern frosted pills — no border. Matched skills get a warm-tan wash,
-  // the rest a neutral frosted white; both read on the dark scrim. Fills are
-  // a touch more opaque than before so a chip mid-scrim (over a bright photo
-  // patch) keeps its edge instead of dissolving into the image.
-  chip: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 999,
-    backgroundColor: 'rgba(255, 255, 255, 0.24)',
-  },
-  chipMatched: {
-    backgroundColor: 'rgba(201, 164, 122, 0.46)',
-  },
-  chipText: {
-    fontFamily: AmbitFont.body,
-    fontSize: 11.5,
-    fontWeight: '600',
-    color: '#FFFFFF',
-    letterSpacing: 0.1,
-    // Holds the label legible when the pill sits over a light photo region.
-    textShadowColor: 'rgba(0, 0, 0, 0.4)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
-  },
-  chipTextMatched: {
-    color: '#FFFFFF',
-  },
-  // "+N" expander — slightly dimmer so it reads as an affordance, not a skill.
-  chipMore: {
-    backgroundColor: 'rgba(255, 255, 255, 0.16)',
-  },
-
-  // ── Quick-links rail (stacks up from the reach-out button) ─────────────
-  linkRail: {
-    position: 'absolute',
-    right: 22,
-    alignItems: 'center',
-    gap: 10,
-    zIndex: 4,
-  },
-  linkRailBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.16)',
+  // ── Project meta row ──────────────────────────────────────────────────────
+  metaRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  ownerAvatar: {
+    width: 30,
+    height: 30,
+    borderRadius: 7,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: Brand.canvas,
   },
+  ownerAvatarText: { fontFamily: AmbitFont.display, fontSize: 12, color: '#FFFFFF' },
 
-  // ── Shipping mini-tile ─────────────────────────────────────────────────
-  // Frosted-white portfolio teaser — soft, borderless, on the dark scrim.
-  shipTile: {
-    marginTop: 4,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingLeft: 12,
-    paddingRight: 16,
-    paddingVertical: 12,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.16)',
-    alignSelf: 'flex-start',
-    maxWidth: '80%',
-  },
-  shipTileActive: {
-    backgroundColor: 'rgba(255, 255, 255, 0.24)',
-  },
-  shipCover: {
-    width: 34,
-    height: 34,
-    borderRadius: 9,
-    overflow: 'hidden',
-  },
-  shipCoverOutline: {
-    position: 'absolute',
-    top: 7,
-    left: 7,
-    right: 7,
-    bottom: 7,
-    borderRadius: 2,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.4)',
-  },
-  shipBody: {
-    flexShrink: 1,
-  },
-  shipEyebrowRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  shipEyebrow: {
-    fontFamily: AmbitFont.body,
-    fontSize: 8.5,
-    fontWeight: '700',
-    color: 'rgba(255, 255, 255, 0.66)',
-    letterSpacing: 1.5,
-  },
-  shipTitle: {
-    fontFamily: AmbitFont.display,
-    fontSize: 14,
-    color: '#FFFFFF',
-    letterSpacing: -0.1,
-    marginTop: 1,
-  },
-
-  // ── Portfolio Highlights (screen 2) ────────────────────────────────────
+  // ── Page 2 (portfolio / detail) ───────────────────────────────────────────
   page2: {
     flex: 1,
-    backgroundColor: '#000000',
+    backgroundColor: Brand.cardCream,
+    paddingHorizontal: 18,
+    paddingTop: 22,
+    paddingBottom: 30, // clears the corner arrow
   },
-  // Screen 1's name carries marginTop:-8 (it tucks under the eyebrow over
-  // the photo). Screen 2 has no stack gap, so override to a positive margin
-  // so the name clears the eyebrow instead of colliding with it.
+  page2Eyebrow: {
+    fontFamily: AmbitFont.semibold,
+    fontSize: 10.5,
+    letterSpacing: 1.4,
+    color: Brand.accent,
+  },
   page2Name: {
-    marginTop: 8,
-  },
-  page2Pad: {
-    flex: 1,
-    paddingTop: 32,
-    paddingHorizontal: 24,
-    // leave room at the bottom so the last row / links clear the floating
-    // reach-out button + its label.
-    paddingBottom: 112,
-  },
-  hlSection: {
-    fontFamily: AmbitFont.body,
-    fontSize: 9,
-    fontWeight: '700',
-    color: 'rgba(245, 233, 216, 0.6)',
-    letterSpacing: 1.8,
-    marginTop: 20,
-    marginBottom: 12,
-  },
-  hlRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginBottom: 16,
-  },
-  hlThumb: {
-    width: 78,
-    height: 78,
-    borderRadius: 12,
-    backgroundColor: 'rgba(245, 233, 216, 0.08)',
-    borderWidth: 1,
-    borderColor: 'rgba(245, 233, 216, 0.14)',
-  },
-  hlMeta: {
-    flex: 1,
-    minWidth: 0,
-  },
-  hlTitle: {
     fontFamily: AmbitFont.display,
-    fontSize: 17,
-    color: '#F5E9D8',
-    letterSpacing: -0.2,
+    fontSize: 24,
+    color: Brand.inkPrimary,
+    marginTop: 3,
+    letterSpacing: -0.3,
   },
-  hlCap: {
-    fontFamily: AmbitFont.body,
-    fontSize: 12,
-    lineHeight: 17,
-    color: 'rgba(245, 233, 216, 0.82)',
-    marginTop: 4,
+  page2Section: {
+    fontFamily: AmbitFont.semibold,
+    fontSize: 10,
+    letterSpacing: 1.6,
+    color: Brand.inkLabel,
+    marginTop: 20,
+    marginBottom: 10,
   },
-  linkRow: {
-    flexDirection: 'row',
-    gap: 12,
+  page2Empty: { fontFamily: AmbitFont.body, fontSize: 13, color: Brand.inkMuted, marginTop: 6 },
+
+  // 2-up grid: two tiles per row (each ~48% wide) with a landscape cover so two
+  // rows + the links section fit within the fixed-height card face.
+  hlGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  hlTile: { width: '48%' },
+  hlTileCover: {
+    width: '100%',
+    aspectRatio: 1.6,
+    borderRadius: Radii.md,
+    backgroundColor: Brand.surface2,
+    borderWidth: 1,
+    borderColor: Astra.hairlinePurple,
   },
+  hlTileTitle: { fontFamily: AmbitFont.semibold, fontSize: 13.5, color: Brand.inkPrimary, marginTop: 8 },
+  hlTileSub: { fontFamily: AmbitFont.body, fontSize: 12, lineHeight: 16, color: Brand.inkMuted, marginTop: 2 },
+
+  linkRow: { flexDirection: 'row', gap: 10 },
   linkIcon: {
     width: 44,
     height: 44,
-    borderRadius: 22,
+    borderRadius: Radii.md,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: Brand.cardCream,
     borderWidth: 1,
-    borderColor: 'rgba(245, 233, 216, 0.32)',
-    backgroundColor: 'rgba(245, 233, 216, 0.07)',
+    borderColor: 'rgba(111,77,162,0.28)',
   },
 
-  // ── Page dots (vertical depth indicator, right edge) ───────────────────
-  dots: {
+  detailBody: { fontFamily: AmbitFont.body, fontSize: 14, lineHeight: 21, color: Brand.inkBody, marginTop: 14 },
+  detailNeeded: { fontFamily: AmbitFont.medium, fontSize: 13, color: Brand.inkLabel, marginTop: 18 },
+
+  // ── Pager arrow (bouncing down-chevron, bottom-right) ─────────────────────
+  arrowBtn: {
     position: 'absolute',
-    right: 10,
-    top: 0,
-    bottom: 0,
-    justifyContent: 'center',
+    right: 12,
+    bottom: 6,
+    width: 28,
+    height: 28,
     alignItems: 'center',
-    gap: 8,
-    zIndex: 4,
-  },
-  dot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: 'rgba(245, 233, 216, 0.4)',
-  },
-  dotOn: {
-    height: 16,
-    backgroundColor: '#F5E9D8',
+    justifyContent: 'center',
+    zIndex: 6,
   },
 
-  // ── Reach Out circle (bottom-right liquid glass) ───────────────────────
-  reachWrap: {
-    position: 'absolute',
-    bottom: 22,
-    right: 22,
-    zIndex: 5,
-  },
-  // Non-interactive preview (owner project-edit Preview): half-transparent.
-  reachPreview: {
-    opacity: 0.5,
-  },
-  reachContainer: {
-    width: 58,
-    height: 58,
-    borderRadius: 29,
-    overflow: 'hidden',
-    shadowColor: '#281810',
-    shadowOpacity: 0.45,
-    shadowRadius: 28,
-    shadowOffset: { width: 0, height: 12 },
-    elevation: 10,
-    borderWidth: 1.6,
-    borderColor: Brand.actionInk,
-  },
-  reachBlur: {
-    width: '100%',
-    height: '100%',
+  // ── Send circle (preview reach affordance) ────────────────────────────────
+  sendWrap: { position: 'absolute', bottom: 16, right: 16, zIndex: 5 },
+  sendPreview: { opacity: 0.5 },
+  sendCircle: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     alignItems: 'center',
     justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  reachTint: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: Brand.action, // signature teal — pops on the dark photo
-  },
-  reachTopHighlight: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 1,
-    backgroundColor: Brand.glassHighlight,
+    backgroundColor: Brand.selected,
+    borderWidth: 1,
+    borderColor: 'rgba(111,77,162,0.3)',
+    shadowColor: Astra.royal,
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 6,
   },
 });

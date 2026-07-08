@@ -122,15 +122,23 @@ export async function setConversationArchived(conversationId: string, archived: 
 
 /// "Reached out to you" derivation. Lives client-side because it's a
 /// view-state, not a stored status. True when the conversation is
-/// active AND the partner sent the latest message AND the viewer has
-/// never replied. Caller passes `meId` because InboxItem doesn't
-/// carry it.
+/// active AND the partner sent the latest message (so it's on you to
+/// reply). Caller passes `meId` because InboxItem doesn't carry it.
+///
+/// NOTE (audit fix, 2026-07-01): this used to also require
+/// `unread_count > 0`, which meant that *reading* a reach-out flipped
+/// it false — hiding the 72h auto-decline countdown while the server's
+/// auto-decline clock kept ticking. Direction ("their turn vs mine")
+/// is a function of who sent last, not of read-state, so we key off
+/// `last_message_sender_id` alone. The inbox RPC doesn't expose whether
+/// *I've* ever replied earlier in the thread, so a partner who messages
+/// again after an earlier reply of mine still reads as "reached out";
+/// that's the closest correct client-side signal from the payload.
 export function isReachedOutToYou(item: InboxItem, meId: string): boolean {
   return (
     item.status === 'active' &&
     item.last_message_sender_id !== meId &&
-    item.last_message_sender_id !== null &&
-    item.unread_count > 0
+    item.last_message_sender_id !== null
   );
 }
 
@@ -248,6 +256,8 @@ export interface ProjectRefRow {
   vibe_blurb:      string;
   required_skills: string[];
   owner_id:        string;
+  /// Founder-uploaded cover; the attachment card shows it when present.
+  image_url:       string | null;
 }
 
 /// Send a message that carries an attached project. The body doubles as the
@@ -307,7 +317,7 @@ export async function fetchProjectRefs(ids: string[]): Promise<Map<string, Proje
   if (ids.length === 0) return out;
   const { data } = await supabase
     .from('projects')
-    .select('id, title, vibe_blurb, required_skills, owner_id')
+    .select('id, title, vibe_blurb, required_skills, owner_id, image_url')
     .in('id', ids);
   for (const r of (data ?? []) as ProjectRefRow[]) out.set(r.id, r);
   return out;

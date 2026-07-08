@@ -10,8 +10,8 @@
     "scheme": "ambit",
     "splash": {
       "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#FAFAF7"
+      "resizeMode": "cover",
+      "backgroundColor": "#0C0022"
     },
     "ios": {
       "supportsTablet": true,
@@ -19,6 +19,8 @@
       "bundleIdentifier": "com.winstongu.ambit",
       "buildNumber": "1",
       "infoPlist": {
+        "NSCameraUsageDescription": "Ambit uses your camera to take a profile photo.",
+        "NSPhotoLibraryUsageDescription": "Ambit needs photo access to set your profile picture, project covers, portfolio images, and to attach photos in chat.",
         "ITSAppUsesNonExemptEncryption": false
       }
     },
@@ -47,8 +49,8 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Ambit uses your photos so you can set a profile picture and add work to your portfolio.",
-          "cameraPermission": "Ambit uses your camera so you can take a profile picture or capture work for your portfolio."
+          "photosPermission": "Ambit needs photo access to set your profile picture, project covers, portfolio images, and to attach photos in chat.",
+          "cameraPermission": "Ambit uses your camera to take a profile photo."
         }
       ],
       [
@@ -61,11 +63,63 @@
         "expo-notifications",
         {
           "icon": "./assets/icon.png",
-          "color": "#D4B490",
+          "color": "#2D005E",
           "androidMode": "default",
           "androidCollapsedTitle": "New messages on Ambit"
         }
-      ]
+      ],
+      [
+        "react-native-google-mobile-ads",
+        {
+          "androidAppId": "ca-app-pub-3940256099942544~3347511713",
+          "iosAppId": "ca-app-pub-5182867477471868~6045132776",
+          "userTrackingUsageDescription": "Ambit uses this to show you relevant ads when you choose to unlock an extra reach-out.",
+          "skAdNetworkItems": [
+            "cstr6suwn9.skadnetwork",
+            "4fzdc2evr5.skadnetwork",
+            "2fnua5tdw4.skadnetwork",
+            "ydx93a7ass.skadnetwork",
+            "p78axxw29g.skadnetwork",
+            "v72qych5uu.skadnetwork",
+            "ludvb6z3bs.skadnetwork",
+            "cp8zw746q7.skadnetwork",
+            "3sh42y64q3.skadnetwork",
+            "c6k4g5qg8m.skadnetwork",
+            "s39g8k73mm.skadnetwork",
+            "3qy4746246.skadnetwork",
+            "f38h382jlk.skadnetwork",
+            "hs6bdukanm.skadnetwork",
+            "v4nxqhlyqp.skadnetwork",
+            "wzmmz9fp6w.skadnetwork",
+            "yclnxrl5pm.skadnetwork",
+            "t38b2kh725.skadnetwork",
+            "7ug5zh24hu.skadnetwork",
+            "9rd848q2bz.skadnetwork",
+            "n38lu8286q.skadnetwork",
+            "47vhws6wlr.skadnetwork",
+            "kbd757ywx3.skadnetwork",
+            "9t245vhmpl.skadnetwork",
+            "a2p9lx4jpn.skadnetwork",
+            "22mmun2rn5.skadnetwork",
+            "4468km3ulz.skadnetwork",
+            "2u9pt9hc89.skadnetwork",
+            "8s468mfl3y.skadnetwork",
+            "klf5c3l5u5.skadnetwork",
+            "ppxm28t8ap.skadnetwork",
+            "uw77j35x4d.skadnetwork",
+            "578prtvx9j.skadnetwork",
+            "4dzt52r2t5.skadnetwork",
+            "tl55sbb4fm.skadnetwork",
+            "c3frkrj4fj.skadnetwork",
+            "e5fvkxwrpn.skadnetwork",
+            "8c4e2ghe7u.skadnetwork",
+            "3rd42ekr43.skadnetwork",
+            "97r2b46745.skadnetwork",
+            "3qcr597p9d.skadnetwork"
+          ]
+        }
+      ],
+      "expo-secure-store"
     ],
     "extra": {
       "router": {},

@@ -27,7 +27,7 @@ interface Props {
   request: SchedulingRequestRow;
   meId:    string;
   /// Drives layout (right=mine, left=partner). The proposer's bubble
-  /// (mine when I proposed) gets the warm-tan fill; the recipient's
+  /// (mine when I proposed) gets the royal fill; the recipient's
   /// gets the neutral surface.
   isMine:  boolean;
 }

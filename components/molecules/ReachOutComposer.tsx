@@ -22,7 +22,16 @@ import { AmbitFont, Brand, Radii, Space } from '../../constants/theme';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { fetchPortfolioForUser } from '../../lib/portfolio';
+import { checkMinLength } from '../../lib/validation';
+import { getReachOutStatus } from '../../lib/reachOutLimit';
 import type { DiscoveryCardData } from '../../data/mock';
+
+/// Product spec: a personalized 50–300 char intent note. Below MIN the send is
+/// disabled with a live "why" counter; past NEAR_MAX we surface the remaining
+/// count so the 300 ceiling never truncates a message mid-thought.
+const MIN_NOTE = 50;
+const MAX_NOTE = 300;
+const NEAR_MAX = 250;
 
 interface Props {
   card: DiscoveryCardData | null;
@@ -53,12 +62,13 @@ const TAIL_H = 480;
 // Small gap so the input clears the keyboard's top edge.
 const SURFACE_GAP = 8;
 
+// ASTRA royal→iris family for attach-tile placeholders.
 const ATTACH_GRADIENTS: [string, string][] = [
-  [Brand.primary, Brand.accent],
-  ['#7FB2E5', '#3E6FB0'],
-  ['#E8945A', '#C2451F'],
-  ['#C9A57A', Brand.seekerInk],
-  ['#9FD0A8', '#3E8A5B'],
+  [Brand.primary, Brand.accent],   // royal → iris
+  ['#2D005E', '#9362C8'],           // royal → selected
+  ['#6F4DA2', '#CCC3D2'],           // mid-purple → lilac
+  ['#1B0140', '#9975CE'],           // deep royal → iris
+  ['#9362C8', '#CCC3D2'],           // selected → lilac
 ];
 
 /// Reach-out composer — a compact bottom sheet (does NOT cover the screen).
@@ -106,6 +116,18 @@ export function ReachOutComposer({ card, onDismiss, onSend, onSent, disableAttac
   // column, so it begins where the card actually was (not the centre).
   const [pickFromX, setPickFromX] = useState(0);
   const { width: winWidth } = useWindowDimensions();
+
+  // Daily reach-out quota, surfaced proactively as a quiet line so the cap
+  // never ambushes the user at send. Refetched each time the composer opens.
+  const [quota, setQuota] = useState<{ used: number; limit: number } | null>(null);
+  useEffect(() => {
+    if (!card) { setQuota(null); return; }
+    let cancelled = false;
+    getReachOutStatus()
+      .then((s) => { if (!cancelled) setQuota(s); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [card]);
 
   useEffect(() => {
     if (card) {
@@ -224,7 +246,24 @@ export function ReachOutComposer({ card, onDismiss, onSend, onSent, disableAttac
       ? `Tell ${firstName} what caught your eye…`
       : `Tell ${firstName} why you'd be a good fit…`;
 
-  const canSend = text.trim().length > 0;
+  const trimmedLen = text.trim().length;
+  const canSend = trimmedLen >= MIN_NOTE;
+
+  // Live coaching copy under the input. Below the minimum we lean on
+  // checkMinLength for the app-standard "why disabled" phrasing; near the
+  // ceiling we count down the remaining characters.
+  const minCheck = checkMinLength(text, MIN_NOTE);
+  const counterText =
+    trimmedLen === 0
+      ? `A personal note gets replies — write at least ${MIN_NOTE} characters.`
+      : trimmedLen < MIN_NOTE
+        ? `${minCheck.reason} Say why you're reaching out.`
+        : trimmedLen >= NEAR_MAX
+          ? `${MAX_NOTE - trimmedLen} characters left`
+          : '';
+  const remainingLow = trimmedLen >= NEAR_MAX;
+
+  const quotaLeft = quota ? Math.max(0, quota.limit - quota.used) : null;
 
   const handleDismiss = () => {
     if (Platform.OS !== 'web') Haptics.selectionAsync().catch(() => {});
@@ -315,6 +354,15 @@ export function ReachOutComposer({ card, onDismiss, onSend, onSent, disableAttac
             />
 
           <Animated.View style={{ opacity: formOpacity }} pointerEvents={phase === 'sending' ? 'none' : 'auto'}>
+            {/* Quiet daily-quota line — surfaced proactively so the cap never
+                ambushes the user at send. */}
+            {quotaLeft !== null && (
+              <Text style={styles.quotaLine}>
+                {quotaLeft > 0
+                  ? `${quotaLeft} of ${quota!.limit} reach-outs left today`
+                  : 'No reach-outs left today'}
+              </Text>
+            )}
             {/* Attach media — sits ABOVE the message bubble. Fades + rises in
                 as a second beat, after the white surface has settled. */}
             {attachMode && attachItems !== null && attachItems.length > 0 && (
@@ -379,7 +427,7 @@ export function ReachOutComposer({ card, onDismiss, onSend, onSent, disableAttac
                   multiline
                   autoFocus
                   style={styles.bubbleInput}
-                  maxLength={400}
+                  maxLength={MAX_NOTE}
                   editable={phase === 'compose'}
                 />
               </View>
@@ -394,7 +442,13 @@ export function ReachOutComposer({ card, onDismiss, onSend, onSent, disableAttac
               </Pressable>
             </View>
 
-            {error !== '' && <Text style={styles.errorNote}>{error}</Text>}
+            {error !== '' ? (
+              <Text style={styles.errorNote}>{error}</Text>
+            ) : counterText !== '' ? (
+              <Text style={[styles.counterNote, remainingLow && styles.counterNoteWarn]}>
+                {counterText}
+              </Text>
+            ) : null}
           </Animated.View>
 
             {/* Celebration overlays — scoped to the visible content. */}
@@ -409,7 +463,7 @@ export function ReachOutComposer({ card, onDismiss, onSend, onSent, disableAttac
             )}
             {phase === 'sending' && (
               <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.successWrap, { opacity: successOpacity, transform: [{ translateY: successRise }] }]}>
-                <Text style={styles.successText}>Your message is on its way to {firstName}.</Text>
+                <Text style={styles.successText}>Your message is on its way to {firstName} — find it in Chats.</Text>
               </Animated.View>
             )}
           </View>
@@ -690,6 +744,22 @@ const styles = StyleSheet.create({
     color: Brand.danger,
     marginTop: 8,
   },
+  quotaLine: {
+    fontFamily: AmbitFont.body,
+    fontSize: 12.5,
+    fontWeight: '600',
+    color: Brand.inkMuted,
+    marginBottom: 4,
+  },
+  counterNote: {
+    fontFamily: AmbitFont.body,
+    fontSize: 13,
+    color: Brand.inkMuted,
+    marginTop: 8,
+  },
+  counterNoteWarn: {
+    color: Brand.accent,
+  },
 
   // ── Animated tray (stack ↔ fan) ────────────────────────────────────────
   trayWrap: { alignItems: 'center', paddingTop: 2, paddingBottom: 4 },
@@ -749,7 +819,7 @@ const styles = StyleSheet.create({
     width: 230,
     height: 70,
     borderRadius: 120,
-    backgroundColor: 'rgba(212,180,144,0.24)',
+    backgroundColor: 'rgba(153,117,206,0.24)', // iris glow
   },
   fanLabel: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 15, backgroundColor: Brand.inkPrimary, maxWidth: 130 },
   fanLabelText: { fontFamily: AmbitFont.body, fontSize: 12.5, fontWeight: '700', color: Brand.inkOnBrand },

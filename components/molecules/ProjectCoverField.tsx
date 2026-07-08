@@ -3,7 +3,7 @@ import { Alert, Image, Platform, Pressable, StyleSheet, Text, View } from 'react
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
 import { ImageSquare, PencilSimple } from 'phosphor-react-native';
-import { AmbitFont, Brand, Radii } from '../../constants/theme';
+import { AmbitFont, Astra, Brand, Radii } from '../../constants/theme';
 
 interface Props {
   /// Current cover — a remote public URL (saved project) or a local picker URI
@@ -50,7 +50,7 @@ export function ProjectCoverField({ uri, onChange, label = 'COVER IMAGE' }: Prop
           </>
         ) : (
           <View style={styles.empty}>
-            <ImageSquare size={28} color={Brand.inkMuted} weight="regular" />
+            <ImageSquare size={28} color={Astra.iris} weight="regular" />
             <Text style={styles.emptyText}>Add a cover image</Text>
             <Text style={styles.emptyHint}>Portrait works best</Text>
           </View>
@@ -73,9 +73,10 @@ const styles = StyleSheet.create({
   frame: {
     height: 180,
     borderRadius: Radii.lg,
-    backgroundColor: Brand.surface1,
+    backgroundColor: Brand.surface2,
     borderWidth: 1.5,
-    borderColor: Brand.inkEdge,
+    borderStyle: 'dashed',
+    borderColor: Astra.hairlinePurple,
     overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
@@ -93,8 +94,8 @@ const styles = StyleSheet.create({
     gap: 4,
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 999,
-    backgroundColor: Brand.actionInk,
+    borderRadius: Radii.sm,
+    backgroundColor: Brand.action,
   },
   editText: { fontFamily: AmbitFont.body, fontSize: 12, fontWeight: '700', color: Brand.inkOnBrand },
 });

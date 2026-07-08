@@ -25,7 +25,7 @@ interface PortfolioBubbleProps {
   item: PortfolioItem;
   onPress: () => void;
   /// When true, the bubble is "active" (its modal is open). Adds a faint
-  /// brand-tan ring so the user keeps spatial context while the modal sits
+  /// iris ring so the user keeps spatial context while the modal sits
   /// in the foreground.
   active?: boolean;
 }

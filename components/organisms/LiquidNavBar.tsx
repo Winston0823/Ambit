@@ -7,10 +7,12 @@ import {
   Platform,
   Pressable,
   StyleSheet,
+  Text,
   UIManager,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import {
   Sailboat,
@@ -21,7 +23,7 @@ import {
   UserCircleDashed,
   IconProps,
 } from 'phosphor-react-native';
-import { Brand } from '../../constants/theme';
+import { Brand, TypeScale } from '../../constants/theme';
 
 export type NavTabKey = 'discovery' | 'chat' | 'projects' | 'profile';
 
@@ -47,7 +49,7 @@ const TABS: NavTab[] = [
   { key: 'discovery', label: 'Discovery', inactiveIcon: Sailboat,         activeIcon: Sailboat    },
   { key: 'chat',      label: 'Chat',      inactiveIcon: ChatCircle,       activeIcon: ChatCircleDots },
   { key: 'projects',  label: 'Projects',  inactiveIcon: Stack,            activeIcon: Stack       },
-  { key: 'profile',   label: 'Me!',       inactiveIcon: UserCircleDashed, activeIcon: UserCircle  },
+  { key: 'profile',   label: 'Profile',   inactiveIcon: UserCircleDashed, activeIcon: UserCircle  },
 ];
 
 interface Props {
@@ -63,8 +65,8 @@ interface Props {
   badgeTabs?: Set<NavTabKey>;
 }
 
-const ACTIVE_COLOR   = Brand.action;                      // teal active icon on dark nav
-const INACTIVE_COLOR = 'rgba(255, 255, 255, 0.55)';
+const ACTIVE_COLOR   = Brand.selected;   // #9362C8 active icon + label on light glass
+const INACTIVE_COLOR = '#A39FA8';        // muted inactive icon + label
 
 /// Icon glyph size. Bumped from 26 → 28 to sit closer to Instagram's
 /// chunkier bottom-bar weight. Paired with taller tab padding below so the
@@ -134,6 +136,9 @@ function NavTabButton({
         />
         {hasBadge && <View style={styles.badge} />}
       </Animated.View>
+      <Text style={[styles.label, { color: active ? ACTIVE_COLOR : INACTIVE_COLOR }]}>
+        {tab.label.toUpperCase()}
+      </Text>
     </Pressable>
   );
 }
@@ -226,6 +231,8 @@ export function LiquidNavBar({ activeKey, onChange, hidden = false, badgeTabs }:
           if (h > 0 && Math.abs(h - barHeight) > 0.5) setBarHeight(h);
         }}
       >
+        <BlurView intensity={24} tint="light" style={StyleSheet.absoluteFill} />
+        <View style={[StyleSheet.absoluteFill, styles.barFill]} pointerEvents="none" />
         {TABS.map((tab) => (
           <NavTabButton
             key={tab.key}
@@ -249,7 +256,9 @@ const styles = StyleSheet.create({
   },
   bar: {
     flexDirection: 'row',
-    backgroundColor: Brand.navBarBg,
+    // Light-glass surface: BlurView + translucent canvas fill are layered
+    // beneath as absoluteFill children (see barFill). overflow clips the blur.
+    overflow: 'hidden',
     borderTopLeftRadius: 10,
     borderTopRightRadius: 10,
     paddingTop: 16,
@@ -257,11 +266,15 @@ const styles = StyleSheet.create({
     borderTopWidth: 0.5,
     borderTopColor: Brand.navBarHairline,
   },
+  // Translucent warm-white fill behind the blur so the glass reads on any bg.
+  barFill: {
+    backgroundColor: 'rgba(252,249,248,0.85)', // canvas @0.85
+  },
   // Floating separation shadow — applied only when the bar is shown (see
   // the inline `!hidden` guard) so it never gets cast onto content mid-slide.
   barShadow: {
-    shadowColor: '#000',
-    shadowOpacity: 0.22,
+    shadowColor: '#2D005E',
+    shadowOpacity: 0.12,
     shadowRadius: 18,
     shadowOffset: { width: 0, height: -6 },
     elevation: 18,
@@ -273,9 +286,14 @@ const styles = StyleSheet.create({
     // Taller tap targets so the bar's overall height grows toward
     // Instagram's, not just the icon glyphs.
     paddingVertical: 8,
+    gap: 4,
   },
   iconWrap: {
     position: 'relative',
+  },
+  label: {
+    ...TypeScale.nav,
+    textAlign: 'center',
   },
   badge: {
     position: 'absolute',

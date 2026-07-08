@@ -115,9 +115,8 @@ const styles = StyleSheet.create({
 
   appleBtn: { backgroundColor: '#000' },
   appleLabel: {
-    fontFamily: AmbitFont.body,
+    fontFamily: AmbitFont.semibold,
     fontSize: 16,
-    fontWeight: '600',
     color: Brand.canvas,
   },
 
@@ -127,9 +126,8 @@ const styles = StyleSheet.create({
     borderColor: Brand.borderDefault,
   },
   googleLabel: {
-    fontFamily: AmbitFont.body,
+    fontFamily: AmbitFont.semibold,
     fontSize: 16,
-    fontWeight: '600',
     color: Brand.inkPrimary,
   },
 });

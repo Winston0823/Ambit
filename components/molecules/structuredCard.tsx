@@ -1,6 +1,17 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { AmbitFont, Brand } from '../../constants/theme';
+import { AmbitFont, Astra, Brand, Radii } from '../../constants/theme';
+
+/// Soft ASTRA card shadow — replaces the old crisp ink outline.
+const SOFT_CARD = {
+  borderWidth: 1,
+  borderColor: Brand.borderSoft,
+  shadowColor: Astra.royal,
+  shadowOpacity: 0.1,
+  shadowRadius: 14,
+  shadowOffset: { width: 0, height: 6 },
+  elevation: 2,
+} as const;
 
 /// Shared design language for "structured message" cards in chat — the media
 /// previews (project / portfolio attachments) and the interactive widgets
@@ -10,7 +21,7 @@ import { AmbitFont, Brand } from '../../constants/theme';
 /// so every rich message reads as one family.
 
 export const STRUCT_CARD_WIDTH = 268;
-export const STRUCT_CARD_RADIUS = 22;
+export const STRUCT_CARD_RADIUS = Radii.lg; // sharp 12pt (ASTRA)
 /// Warm dark surface — same as the project/portfolio attachment cards.
 /// Structured cards are now LIGHT cream on the eggshell canvas (was warm-dark).
 export const STRUCT_DARK = Brand.cardCream;
@@ -23,26 +34,24 @@ export const structInk = {
 };
 
 export const structuredStyles = StyleSheet.create({
-  // Light interactive surface (theirs) — matches the incoming message bubble:
-  // cream island fill with the crisp ink border (no soft shadow).
+  // Cream island card with a soft shadow (ASTRA) — was a crisp 1.5px ink
+  // outline, which read as the old design system next to the new soft cards.
   surfaceLight: {
     width: STRUCT_CARD_WIDTH,
     borderRadius: STRUCT_CARD_RADIUS,
     backgroundColor: Brand.cardCream,
-    borderWidth: 1.5,
-    borderColor: Brand.inkEdge,
     padding: 16,
     gap: 8,
+    ...SOFT_CARD,
   },
-  // Both surfaces are light cream now — same crafted card look.
+  // Both surfaces share the same soft card look.
   surfaceDark: {
     width: STRUCT_CARD_WIDTH,
     borderRadius: STRUCT_CARD_RADIUS,
     backgroundColor: Brand.cardCream,
-    borderWidth: 1.5,
-    borderColor: Brand.inkEdge,
     padding: 16,
     gap: 8,
+    ...SOFT_CARD,
   },
   eyebrow: {
     fontFamily: AmbitFont.body,

@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Check } from 'phosphor-react-native';
 import { Button } from '../../atoms';
-import { SocialAuthButtons } from '../../molecules';
+import { SocialAuthButtons, LegalModal } from '../../molecules';
 import { useAuth } from '../../../context/AuthContext';
-import { Brand, AmbitFont, Space } from '../../../constants/theme';
+import { PRIVACY_POLICY, TERMS_OF_USE, type LegalDoc } from '../../../constants/legal';
+import { Brand, AmbitFont, Radii, Space } from '../../../constants/theme';
 
 interface Props {
   onCreateAccount: () => void;
@@ -23,7 +25,21 @@ export function WelcomeScreen({ onCreateAccount, onSignIn, onSocialSignedIn }: P
   const { signInWithApple, signInWithGoogle } = useAuth();
   const [busy, setBusy] = useState<'apple' | 'google' | null>(null);
 
+  // EULA gate — account creation is blocked until the user agrees (Guideline 1.2).
+  const [agreed, setAgreed] = useState(false);
+  const [agreeError, setAgreeError] = useState(false);
+  const [legalDoc, setLegalDoc] = useState<LegalDoc | null>(null);
+
+  const toggleAgree = () => { setAgreed((a) => !a); setAgreeError(false); };
+  // Returns true if the user has agreed; otherwise flags the checkbox and stops.
+  const requireAgreement = (): boolean => {
+    if (agreed) return true;
+    setAgreeError(true);
+    return false;
+  };
+
   const handleApple = async () => {
+    if (!requireAgreement()) return;
     setBusy('apple');
     try {
       await signInWithApple();
@@ -36,6 +52,7 @@ export function WelcomeScreen({ onCreateAccount, onSignIn, onSocialSignedIn }: P
   };
 
   const handleGoogle = async () => {
+    if (!requireAgreement()) return;
     setBusy('google');
     try {
       await signInWithGoogle();
@@ -45,6 +62,11 @@ export function WelcomeScreen({ onCreateAccount, onSignIn, onSocialSignedIn }: P
     } finally {
       setBusy(null);
     }
+  };
+
+  const handleCreateAccount = () => {
+    if (!requireAgreement()) return;
+    onCreateAccount();
   };
 
   return (
@@ -60,6 +82,27 @@ export function WelcomeScreen({ onCreateAccount, onSignIn, onSocialSignedIn }: P
         </Text>
 
         <View style={styles.cta}>
+          <Pressable
+            style={styles.agreeRow}
+            onPress={toggleAgree}
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: agreed }}
+            accessibilityLabel="I agree to the Terms of Use and Privacy Policy"
+          >
+            <View style={[styles.checkbox, agreed && styles.checkboxOn, agreeError && !agreed && styles.checkboxError]}>
+              {agreed && <Check size={13} color={Brand.inkOnBrand} weight="bold" />}
+            </View>
+            <Text style={styles.agreeText}>
+              I agree to the{' '}
+              <Text style={styles.agreeLink} onPress={() => setLegalDoc(TERMS_OF_USE)}>Terms of Use</Text>
+              {' '}and{' '}
+              <Text style={styles.agreeLink} onPress={() => setLegalDoc(PRIVACY_POLICY)}>Privacy Policy</Text>.
+            </Text>
+          </Pressable>
+          {agreeError && !agreed && (
+            <Text style={styles.agreeErrorText}>Please agree to the Terms to continue.</Text>
+          )}
+
           <SocialAuthButtons
             onAppleSignIn={handleApple}
             onGoogleSignIn={handleGoogle}
@@ -74,7 +117,7 @@ export function WelcomeScreen({ onCreateAccount, onSignIn, onSocialSignedIn }: P
 
           <Button
             title="Create account"
-            onPress={onCreateAccount}
+            onPress={handleCreateAccount}
             variant="primary"
             trailingArrow
           />
@@ -85,12 +128,14 @@ export function WelcomeScreen({ onCreateAccount, onSignIn, onSocialSignedIn }: P
           />
         </View>
 
-        <Pressable onPress={onCreateAccount}>
+        <Pressable onPress={handleCreateAccount}>
           <Text style={styles.fineprint}>
             New here? Set up takes about two minutes.
           </Text>
         </Pressable>
       </View>
+
+      <LegalModal doc={legalDoc} onClose={() => setLegalDoc(null)} />
     </SafeAreaView>
   );
 }
@@ -108,7 +153,7 @@ const styles = StyleSheet.create({
   logoSquare: {
     width: 140,
     height: 140,
-    borderRadius: 32,
+    borderRadius: Radii.xl,
     backgroundColor: Brand.seekerSurface,
     alignItems: 'center',
     justifyContent: 'center',
@@ -138,6 +183,43 @@ const styles = StyleSheet.create({
   cta: {
     gap: 12,
     marginTop: 48,
+  },
+  agreeRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    paddingHorizontal: 2,
+    marginBottom: 4,
+  },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    borderWidth: 1.5,
+    borderColor: Brand.borderDefault,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 1,
+  },
+  checkboxOn: { backgroundColor: Brand.selected, borderColor: Brand.selected },
+  checkboxError: { borderColor: Brand.danger },
+  agreeText: {
+    flex: 1,
+    fontFamily: AmbitFont.body,
+    fontSize: 13,
+    lineHeight: 19,
+    color: Brand.inkMuted,
+  },
+  agreeLink: {
+    color: Brand.selected,
+    fontFamily: AmbitFont.semibold,
+  },
+  agreeErrorText: {
+    fontFamily: AmbitFont.body,
+    fontSize: 12.5,
+    color: Brand.danger,
+    marginTop: -4,
+    marginLeft: 32,
   },
   dividerRow: {
     flexDirection: 'row',

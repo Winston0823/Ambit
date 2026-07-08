@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Mailbox } from 'phosphor-react-native';
 import { KeyboardDismiss } from '../../atoms';
@@ -24,6 +24,11 @@ export function EduEmailScreen({ onBack, onContinue }: Props) {
   /// Surfaces the reset affordance once we KNOW the account exists (a sign-in
   /// that failed because the email was already registered = wrong password).
   const [accountExists, setAccountExists] = useState(false);
+  /// Sign-up succeeded but Supabase requires email confirmation → no session.
+  /// We can't advance (there's no authed user to submit a profile for), so we
+  /// hold here with a "check your inbox" state. (Audit P1: confirmation void.)
+  const [awaitingConfirmation, setAwaitingConfirmation] = useState(false);
+  const passwordRef = useRef<TextInput>(null);
 
   // Real semantic validation with inline "why" (audit theme 3). `.edu` and the
   // common international academic TLDs pass; junk shows a reason, not a silent
@@ -35,6 +40,7 @@ export function EduEmailScreen({ onBack, onContinue }: Props) {
     if (!isValid || sending) return;
     setSending(true);
     setError('');
+    setAwaitingConfirmation(false);
     try {
       // Existing account, correct password → straight through.
       await signInWithEmail(profile.eduEmail, password);
@@ -45,8 +51,14 @@ export function EduEmailScreen({ onBack, onContinue }: Props) {
       // instead of blindly showing the sign-up error (audit P0: wrong-password
       // was misclassified as a sign-up error with no recovery path).
       try {
-        await signUpWithEmail(profile.eduEmail, password);
-        onContinue();
+        const hasSession = await signUpWithEmail(profile.eduEmail, password);
+        // No session ⇒ email confirmation is required. Do NOT advance — the
+        // downstream submit would run with no authed user and silently no-op.
+        if (hasSession) {
+          onContinue();
+        } else {
+          setAwaitingConfirmation(true);
+        }
       } catch (signUpErr: any) {
         const msg = String(signUpErr?.message ?? '');
         if (/already registered|already exists|user already/i.test(msg)) {
@@ -92,7 +104,10 @@ export function EduEmailScreen({ onBack, onContinue }: Props) {
         <OnboardingContinue
           onPress={handleSubmit}
           disabled={!isValid || sending}
-          title={sending ? undefined : 'Continue'}
+          // OnboardingContinue/Button have no loading prop — swap the label so
+          // the busy state is actually visible (audit P2). Dimming is handled
+          // by the disabled state above.
+          title={sending ? 'One sec…' : 'Continue'}
         />
       }
     >
@@ -110,6 +125,8 @@ export function EduEmailScreen({ onBack, onContinue }: Props) {
               autoCorrect={false}
               style={styles.input}
               returnKeyType="next"
+              onSubmitEditing={() => passwordRef.current?.focus()}
+              blurOnSubmit={false}
               editable={!sending}
             />
             {emailCheck.reason !== '' && (
@@ -118,6 +135,7 @@ export function EduEmailScreen({ onBack, onContinue }: Props) {
 
             <Text style={[styles.fieldLabel, { marginTop: 16 }]}>Password</Text>
             <TextInput
+              ref={passwordRef}
               value={password}
               onChangeText={setPassword}
               placeholder="8+ characters"
@@ -132,6 +150,13 @@ export function EduEmailScreen({ onBack, onContinue }: Props) {
             />
 
             {error !== '' && <Text style={styles.errorNote}>{error}</Text>}
+
+            {awaitingConfirmation && (
+              <Text style={styles.confirmNote}>
+                Check your inbox to verify your email, then come back and tap
+                Continue to finish setting up.
+              </Text>
+            )}
 
             {/* Recovery path. Always available (existing users may land here
                 to sign in); emphasized once we know the account exists. */}
@@ -159,9 +184,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: Space.lg,
   },
   fieldLabel: {
-    fontFamily: AmbitFont.body,
+    fontFamily: AmbitFont.semibold,
     fontSize: 14,
-    fontWeight: '600',
     color: Brand.inkLabel,
     marginBottom: 8,
     letterSpacing: 0.2,
@@ -172,10 +196,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     backgroundColor: Brand.surface1,
     borderWidth: 0,
-    fontFamily: AmbitFont.body,
+    fontFamily: AmbitFont.medium,
     fontSize: 16,
     color: Brand.inkBody,
-    fontWeight: '600',
   },
   helperNote: {
     fontFamily: AmbitFont.body,
@@ -189,18 +212,24 @@ const styles = StyleSheet.create({
     color: Brand.danger,
     marginTop: 12,
   },
+  confirmNote: {
+    fontFamily: AmbitFont.body,
+    fontSize: 13,
+    color: Brand.actionDeep,
+    marginTop: 12,
+    lineHeight: 18,
+  },
   forgotWrap: {
     marginTop: 16,
     alignSelf: 'flex-start',
   },
   forgot: {
-    fontFamily: AmbitFont.body,
+    fontFamily: AmbitFont.semibold,
     fontSize: 13,
-    fontWeight: '600',
     color: Brand.actionDeep,
   },
   forgotEmphasized: {
-    fontWeight: '700',
+    fontFamily: AmbitFont.bold,
     textDecorationLine: 'underline',
   },
 });

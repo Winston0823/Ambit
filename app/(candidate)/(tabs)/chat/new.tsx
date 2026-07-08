@@ -13,7 +13,7 @@ import {
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MagnifyingGlass, X, CaretRight } from 'phosphor-react-native';
-import { BackChevron, Skeleton } from '../../../../components/atoms';
+import { BackChevron, GlassSurface, Skeleton } from '../../../../components/atoms';
 import { BottomSheet, DiscoveryCard, ReachOutComposer } from '../../../../components/molecules';
 import { supabase } from '../../../../lib/supabase';
 import { sendProjectAttachment, startConversationWithMessage } from '../../../../lib/messaging';
@@ -271,7 +271,7 @@ export default function NewChatScreen() {
 
       <Text style={[styles.headerTitle, { marginTop: insets.top + 14 }]}>New chat</Text>
 
-      <View style={[styles.searchBar, { marginTop: 20 }]}>
+      <GlassSurface hairline intensity={20} style={[styles.searchBar, { marginTop: 20 }]}>
         <MagnifyingGlass size={18} color={Brand.inkMuted} weight="regular" />
         <TextInput
           autoFocus
@@ -288,7 +288,7 @@ export default function NewChatScreen() {
             <X size={16} color={Brand.inkMuted} weight="bold" />
           </Pressable>
         )}
-      </View>
+      </GlassSurface>
 
       {results === null ? (
         <View style={styles.empty}>
@@ -419,14 +419,12 @@ const styles = StyleSheet.create({
     letterSpacing: -0.2,
   },
 
+  // Glass search bar — GlassSurface provides the blur/fill + purple hairline.
   searchBar: {
     marginHorizontal: Space.lg,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    backgroundColor: Brand.cardCream,
-    borderWidth: 1,
-    borderColor: Brand.borderSoft,
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderRadius: Radii.md,

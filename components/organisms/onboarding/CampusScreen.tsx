@@ -14,7 +14,7 @@ import { BackChevron, HardShadow } from '../../atoms';
 import { OnboardingContinue } from '../../molecules';
 import { useOnboarding } from '../../../context/OnboardingContext';
 import { CAMPUSES } from '../../../data/mock';
-import { Brand, AmbitFont, Radii, Space } from '../../../constants/theme';
+import { Brand, Astra, AmbitFont, Radii, Space } from '../../../constants/theme';
 
 /// Canvas-to-transparent endpoints — explicit rgba(255,255,255,0) so iOS
 /// doesn't interpolate 'transparent' through black and tint the fade gray.
@@ -106,7 +106,7 @@ export function CampusScreen({ onBack, onContinue }: Props) {
                 <View style={styles.rowIcon}>
                   <MapPin
                     size={20}
-                    color={selected ? Brand.actionInk : Brand.actionDeep}
+                    color={selected ? Brand.inkOnBrand : Brand.actionDeep}
                     weight={selected ? 'fill' : 'regular'}
                   />
                 </View>
@@ -121,7 +121,7 @@ export function CampusScreen({ onBack, onContinue }: Props) {
                 </View>
 
                 {selected && (
-                  <CheckCircle size={22} color={Brand.actionInk} weight="fill" />
+                  <CheckCircle size={22} color={Brand.inkOnBrand} weight="fill" />
                 )}
               </Pressable>
               </HardShadow>
@@ -168,12 +168,11 @@ const styles = StyleSheet.create({
     marginBottom: Space.lg,
   },
   kicker: {
-    fontFamily: AmbitFont.body,
+    fontFamily: AmbitFont.semibold,
     fontSize: 12,
-    fontWeight: '600',
     letterSpacing: 1.5,
     textTransform: 'uppercase',
-    color: Brand.actionDeep,
+    color: Brand.inkLabel,
     marginBottom: 12,
   },
   headline: {
@@ -221,10 +220,11 @@ const styles = StyleSheet.create({
     backgroundColor: Brand.cardCream,
     borderRadius: Radii.md,
     borderWidth: 1.5,
-    borderColor: Brand.actionInk,
+    borderColor: 'rgba(111,77,162,0.28)',
   },
   rowSelected: {
-    backgroundColor: Brand.action,
+    backgroundColor: Brand.selected,
+    borderColor: Brand.selected,
   },
   rowIcon: {
     width: 28,
@@ -232,17 +232,16 @@ const styles = StyleSheet.create({
   },
   rowText: { flex: 1 },
   rowName: {
-    fontFamily: AmbitFont.body,
+    fontFamily: AmbitFont.semibold,
     fontSize: 15,
-    fontWeight: '600',
     color: Brand.inkHigh,
   },
-  rowNameSelected: { color: Brand.actionInk },
+  rowNameSelected: { color: Brand.inkOnBrand },
   rowCity: {
     fontFamily: AmbitFont.body,
     fontSize: 12,
     color: Brand.inkMuted,
     marginTop: 2,
   },
-  rowCitySelected: { color: '#3A4F4D' },
+  rowCitySelected: { color: Astra.lilac },
 });

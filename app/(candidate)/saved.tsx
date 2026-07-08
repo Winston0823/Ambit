@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react';
 import {
   Alert,
   Animated,
+  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -15,9 +16,10 @@ import {
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Swipeable } from 'react-native-gesture-handler';
-import { NotePencil, PaperPlaneTilt, Trash, X } from 'phosphor-react-native';
-import { BackChevron, HardShadow, Tactile } from '../../components/atoms';
-import { DiscoveryCard, DiscoveryRowSummary, ReachOutComposer, ReachOutLimitSheet, SavedCarousel } from '../../components/molecules';
+import { LinearGradient } from 'expo-linear-gradient';
+import { CaretLeft, NotePencil, PaperPlaneTilt, Rocket, Trash, X } from 'phosphor-react-native';
+import { GlassSurface, HardShadow, Tactile } from '../../components/atoms';
+import { DiscoveryCard, ReachOutComposer, ReachOutLimitSheet, SavedCarousel } from '../../components/molecules';
 import { Motion } from '../../constants/motion';
 import { haptics } from '../../lib/haptics';
 import { useSavedDeck } from '../../context/SavedDeckContext';
@@ -32,7 +34,9 @@ import {
 import type { DiscoveryCardData } from '../../data/mock';
 import {
   AmbitFont,
+  Astra,
   Brand,
+  Radii,
   Space,
   TypeScale,
 } from '../../constants/theme';
@@ -41,11 +45,14 @@ import {
 /// Messaging only works on real rows.
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+const TOP_BAR_H = 52;
+
 /// Saved list. Reached via the bookmark icon on the Discovery feed. Each
-/// row has Message (opens the shared ReachOutComposer — sending starts the
-/// conversation, unsaves the card, and deep-links into the thread) and
-/// Trash (unsave only). Reusing ReachOutComposer keeps the reach-out
-/// experience identical to the feed (paper-plane celebration + all).
+/// row has a royal paper-plane "reach out" (opens the shared ReachOutComposer —
+/// sending starts the conversation, unsaves the card, and deep-links into the
+/// thread), a private note affordance, and swipe-to-remove (unsave only).
+/// Reusing ReachOutComposer keeps the reach-out experience identical to the
+/// feed (paper-plane celebration + all).
 export default function SavedScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
@@ -209,96 +216,158 @@ export default function SavedScreen() {
     setComposing(null);
     if (!sent) return;
     unsave(sent.card.id);
-    router.replace({ pathname: '/chat/[id]', params: { id: sent.conversationId } });
+    router.replace({ pathname: '/thread/[id]', params: { id: sent.conversationId } });
   };
+
+  const countCopy =
+    saved.length === 0
+      ? 'Nothing saved yet — swipe right on someone you like.'
+      : `${saved.length} ${saved.length === 1 ? 'pick' : 'picks'} you want to come back to.`;
 
   return (
     <View style={styles.root}>
-      <BackChevron onPress={() => router.back()} />
-
-      <View style={[styles.header, { marginTop: insets.top + 40 }]}>
-        <Text style={styles.headline}>Saved</Text>
-        <Text style={styles.subtitle}>
-          {saved.length === 0
-            ? 'Nothing saved yet — swipe right on someone you like.'
-            : `${saved.length} ${saved.length === 1 ? 'pick' : 'picks'} you want to come back to.`}
-        </Text>
-      </View>
-
       <ScrollView
-        contentContainerStyle={styles.list}
+        contentContainerStyle={[
+          styles.list,
+          { paddingTop: insets.top + TOP_BAR_H + Space.lg },
+        ]}
         showsVerticalScrollIndicator={false}
       >
+        {/* Page header — overline + Playfair headline + count. */}
+        <View style={styles.header}>
+          <Text style={styles.overline}>SAVED</Text>
+          <Text style={styles.headline}>Your shortlist.</Text>
+          <Text style={styles.count}>{countCopy}</Text>
+        </View>
+
         {saved.length >= 3 && (
           <View style={styles.carouselBleed}>
             <SavedCarousel cards={[...saved].reverse().slice(0, 8)} onPress={setPreviewing} />
           </View>
         )}
-        {saved.map((card) => (
-          <Swipeable
-            key={card.id}
-            ref={(r) => { swipeableRefs.current[card.id] = r; }}
-            friction={2}
-            rightThreshold={44}
-            overshootRight={false}
-            onSwipeableWillOpen={() => {
-              openRowRef.current = card.id;
-              justSwipedRef.current = true;
-              setTimeout(() => { justSwipedRef.current = false; }, 500);
-            }}
-            onSwipeableClose={() => { if (openRowRef.current === card.id) openRowRef.current = null; }}
-            renderRightActions={() => (
-              <Pressable
-                onPress={() => removeWithUndo(card)}
-                style={styles.swipeRemove}
-                accessibilityLabel="Remove from saved"
-              >
-                <Trash size={20} color={Brand.inkOnBrand} weight="bold" />
-                <Text style={styles.swipeRemoveText}>Remove</Text>
-              </Pressable>
-            )}
-          >
-            <View style={styles.savedItem}>
-              <DiscoveryRowSummary
-                card={card}
-                onPress={() => handleRowPress(card)}
-                trailing={
-                  <View style={styles.actions}>
-                    <Pressable
-                      onPress={() => openComposer(card)}
-                      hitSlop={6}
-                      style={styles.actionBtn}
-                      accessibilityLabel={
-                        card.kind === 'project' ? `Message ${card.ownerName}` : `Message ${card.name}`
-                      }
-                    >
-                      <PaperPlaneTilt size={18} color={Brand.accent} weight="fill" />
-                    </Pressable>
-                    <Pressable
-                      onPress={() => openNote(card)}
-                      hitSlop={6}
-                      style={styles.actionBtn}
-                      accessibilityLabel={notes[card.id] ? 'Edit note' : 'Add a note'}
-                    >
-                      <NotePencil
-                        size={18}
-                        color={notes[card.id] ? Brand.accent : Brand.inkMuted}
-                        weight={notes[card.id] ? 'fill' : 'regular'}
-                      />
-                    </Pressable>
-                  </View>
-                }
-              />
-              {notes[card.id] ? (
-                <Pressable onPress={() => openNote(card)} style={styles.noteTag}>
-                  <NotePencil size={12} color={Brand.accent} weight="fill" />
-                  <Text style={styles.noteTagText} numberOfLines={2}>{notes[card.id]}</Text>
+
+        {saved.map((card) => {
+          const isSeeker = card.kind === 'seeker';
+          const title = isSeeker ? card.name : card.title;
+          const sub = isSeeker ? (card.major ?? card.vibeBlurb) : card.ownerName;
+          const initial = title.charAt(0).toUpperCase() || '?';
+          const hasNote = !!notes[card.id];
+
+          return (
+            <Swipeable
+              key={card.id}
+              ref={(r) => { swipeableRefs.current[card.id] = r; }}
+              friction={2}
+              rightThreshold={44}
+              overshootRight={false}
+              onSwipeableWillOpen={() => {
+                openRowRef.current = card.id;
+                justSwipedRef.current = true;
+                setTimeout(() => { justSwipedRef.current = false; }, 500);
+              }}
+              onSwipeableClose={() => { if (openRowRef.current === card.id) openRowRef.current = null; }}
+              renderRightActions={() => (
+                <Pressable
+                  onPress={() => removeWithUndo(card)}
+                  style={styles.swipeRemove}
+                  accessibilityLabel="Remove from saved"
+                >
+                  <Trash size={20} color={Brand.inkOnBrand} weight="bold" />
+                  <Text style={styles.swipeRemoveText}>Remove</Text>
                 </Pressable>
-              ) : null}
-            </View>
-          </Swipeable>
-        ))}
+              )}
+            >
+              <HardShadow offset={4}>
+                <View
+                  style={styles.card}
+                  accessibilityActions={[{ name: 'remove', label: 'Remove from saved' }]}
+                  onAccessibilityAction={(e) => {
+                    if (e.nativeEvent.actionName === 'remove') removeWithUndo(card);
+                  }}
+                >
+                  <Pressable style={styles.rowMain} onPress={() => handleRowPress(card)} accessibilityRole="button">
+                    {/* Squared avatar/thumb — royal→iris gradient with Playfair
+                        initials (seeker) or a project icon. Seeker photos win. */}
+                    {isSeeker && card.photoUri ? (
+                      <Image source={{ uri: card.photoUri }} style={styles.avatar} />
+                    ) : (
+                      <LinearGradient
+                        colors={[Astra.royal, Astra.iris]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={styles.avatar}
+                      >
+                        {isSeeker ? (
+                          <Text style={styles.avatarInitial}>{initial}</Text>
+                        ) : (
+                          <Rocket size={22} color={Brand.inkOnBrand} weight="fill" />
+                        )}
+                      </LinearGradient>
+                    )}
+
+                    <View style={styles.meta}>
+                      <Text style={styles.name} numberOfLines={1}>{title}</Text>
+                      <Text style={styles.sub} numberOfLines={1}>{sub}</Text>
+                    </View>
+
+                    <View style={styles.actions}>
+                      <Pressable
+                        onPress={() => openNote(card)}
+                        hitSlop={6}
+                        style={styles.actionBtn}
+                        accessibilityLabel={hasNote ? 'Edit note' : 'Add a note'}
+                      >
+                        <NotePencil
+                          size={18}
+                          color={hasNote ? Brand.selected : Brand.inkLabel}
+                          weight={hasNote ? 'fill' : 'regular'}
+                        />
+                      </Pressable>
+                      <Pressable
+                        onPress={() => openComposer(card)}
+                        hitSlop={6}
+                        style={styles.reachBtn}
+                        accessibilityLabel={
+                          card.kind === 'project' ? `Reach out to ${card.ownerName}` : `Reach out to ${card.name}`
+                        }
+                      >
+                        <PaperPlaneTilt size={18} color={Brand.action} weight="fill" />
+                      </Pressable>
+                    </View>
+                  </Pressable>
+
+                  {hasNote ? (
+                    <Pressable onPress={() => openNote(card)} style={styles.noteTag}>
+                      <NotePencil size={12} color={Brand.selected} weight="fill" />
+                      <Text style={styles.noteTagText} numberOfLines={2}>{notes[card.id]}</Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+              </HardShadow>
+            </Swipeable>
+          );
+        })}
       </ScrollView>
+
+      {/* Glass top bar — floats over the scrolling list. */}
+      <GlassSurface
+        intensity={24}
+        tint="light"
+        style={[styles.topBar, { paddingTop: insets.top, height: insets.top + TOP_BAR_H }]}
+      >
+        <View style={styles.topBarRow}>
+          <Pressable
+            onPress={() => router.back()}
+            hitSlop={8}
+            style={styles.backBtn}
+            accessibilityRole="button"
+            accessibilityLabel="Back"
+          >
+            <CaretLeft size={22} color={Brand.inkBody} weight="bold" />
+          </Pressable>
+          <Text style={styles.wordmark}>ambit</Text>
+        </View>
+      </GlassSurface>
 
       {/* Full-card preview — tapping a saved row opens the same rich
           DiscoveryCard the deck shows, here with an X to dismiss. Reaching
@@ -426,24 +495,103 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Brand.canvas,
   },
-  header: {
-    paddingHorizontal: Space.lg,
-    marginBottom: Space.md,
+
+  // ── Glass top bar ──────────────────────────────────────────────
+  topBar: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: Brand.navBarHairline,
   },
-  headline: {
+  topBarRow: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    gap: 4,
+  },
+  backBtn: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  wordmark: {
     fontFamily: AmbitFont.display,
-    fontSize: 30,
+    fontSize: 22,
     color: Brand.inkPrimary,
   },
-  subtitle: {
+
+  // ── Page header ────────────────────────────────────────────────
+  header: {
+    marginBottom: Space.lg,
+  },
+  overline: {
+    ...TypeScale.labelSm,
+    textTransform: 'uppercase',
+    color: Brand.selected,
+    marginBottom: 6,
+  },
+  headline: {
+    ...TypeScale.h1,
+    color: Brand.inkPrimary,
+  },
+  count: {
     ...TypeScale.body,
-    color: Brand.inkMuted,
+    color: Brand.inkLabel,
     marginTop: 8,
   },
+
   list: {
     paddingHorizontal: Space.lg,
     paddingBottom: 120,
     gap: 12,
+  },
+
+  // Full-bleed the carousel past the list's horizontal padding.
+  carouselBleed: { marginHorizontal: -Space.lg },
+
+  // ── Saved row card ─────────────────────────────────────────────
+  card: {
+    backgroundColor: Brand.cardCream,
+    borderRadius: Radii.lg,
+    overflow: 'hidden',
+  },
+  rowMain: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+  },
+  avatar: {
+    width: 52,
+    height: 52,
+    borderRadius: Radii.md,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarInitial: {
+    fontFamily: AmbitFont.display,
+    fontSize: 22,
+    color: Brand.inkOnBrand,
+  },
+  meta: {
+    flex: 1,
+    gap: 3,
+  },
+  name: {
+    fontFamily: AmbitFont.semibold,
+    fontSize: 16,
+    color: Brand.inkPrimary,
+  },
+  sub: {
+    ...TypeScale.helper,
+    color: Brand.inkLabel,
   },
   actions: {
     flexDirection: 'row',
@@ -456,35 +604,40 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  reachBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: Radii.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Brand.surface2,
+  },
+  noteTag: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    marginTop: -2,
+    marginBottom: 12,
+    marginLeft: 14,
+    marginRight: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: Radii.md,
+    backgroundColor: Brand.seekerSurface,
+  },
+  noteTagText: { flex: 1, fontFamily: AmbitFont.body, fontSize: 12.5, color: Brand.seekerInk, lineHeight: 17 },
 
-  // Full-bleed the carousel past the list's horizontal padding.
-  carouselBleed: { marginHorizontal: -Space.lg },
-
-  // ── Swipe-to-remove + note ─────────────────────────────────────
-  savedItem: { backgroundColor: Brand.canvas },
+  // ── Swipe-to-remove ────────────────────────────────────────────
   swipeRemove: {
     width: 92,
     marginLeft: 8,
-    borderRadius: 16,
+    borderRadius: Radii.lg,
     backgroundColor: Brand.danger,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 3,
   },
-  swipeRemoveText: { fontFamily: AmbitFont.body, fontSize: 12, fontWeight: '700', color: Brand.inkOnBrand },
-  noteTag: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 8,
-    marginTop: 8,
-    marginLeft: 56,
-    marginRight: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 10,
-    backgroundColor: Brand.seekerSurface,
-  },
-  noteTagText: { flex: 1, fontFamily: AmbitFont.body, fontSize: 12.5, color: Brand.seekerInk, lineHeight: 17 },
+  swipeRemoveText: { fontFamily: AmbitFont.bold, fontSize: 12, color: Brand.inkOnBrand },
 
   // ── Undo toast ─────────────────────────────────────────────────
   toastWrap: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
@@ -497,20 +650,18 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 999,
     backgroundColor: Brand.inkPrimary,
-    borderWidth: 1.5,
-    borderColor: Brand.inkEdge,
   },
-  toastText: { fontFamily: AmbitFont.body, fontSize: 14, fontWeight: '600', color: Brand.canvas },
+  toastText: { fontFamily: AmbitFont.semibold, fontSize: 14, color: Brand.canvas },
   toastBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 999, backgroundColor: Brand.action },
-  toastBtnText: { fontFamily: AmbitFont.body, fontSize: 14, fontWeight: '700', color: Brand.actionInk },
+  toastBtnText: { fontFamily: AmbitFont.bold, fontSize: 14, color: Brand.inkOnBrand },
 
   // ── Note editor sheet ──────────────────────────────────────────
   noteModalRoot: { flex: 1, justifyContent: 'flex-end' },
-  noteScrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.4)' },
+  noteScrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(12,0,34,0.40)' }, // void @0.40
   noteSheet: {
     backgroundColor: Brand.canvas,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    borderTopLeftRadius: Radii.xl,
+    borderTopRightRadius: Radii.xl,
     padding: Space.lg,
     paddingBottom: Space.lg + 8,
     gap: 12,
@@ -521,7 +672,7 @@ const styles = StyleSheet.create({
   noteInput: {
     minHeight: 80,
     maxHeight: 160,
-    borderRadius: 14,
+    borderRadius: Radii.lg,
     padding: 16,
     backgroundColor: Brand.surface1,
     fontFamily: AmbitFont.body,
@@ -536,15 +687,13 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderRadius: 999,
     backgroundColor: Brand.action,
-    borderWidth: 1.6,
-    borderColor: Brand.actionInk,
   },
-  noteSaveText: { fontFamily: AmbitFont.body, fontSize: 15, fontWeight: '700', color: Brand.actionInk },
+  noteSaveText: { fontFamily: AmbitFont.bold, fontSize: 15, color: Brand.inkOnBrand },
 
   // ── Full-card preview ──────────────────────────────────────────
   previewRoot: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: 'rgba(12,0,34,0.60)', // void @0.60 scrim
   },
   previewCardWrap: {
     flex: 1,
@@ -555,10 +704,10 @@ const styles = StyleSheet.create({
     left: Space.lg + 12,
     width: 40,
     height: 40,
-    borderRadius: 20,
+    borderRadius: Radii.md,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.45)',
+    backgroundColor: 'rgba(12,0,34,0.45)', // void @0.45
     zIndex: 10,
   },
 });

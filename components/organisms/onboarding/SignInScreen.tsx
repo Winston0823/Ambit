@@ -1,11 +1,21 @@
-import React, { useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import React, { useRef, useState } from 'react';
+import {
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Eye, EyeSlash, HandWaving } from 'phosphor-react-native';
 import { BackChevron, Button, KeyboardDismiss } from '../../atoms';
 import { ANCHORED_CTA_BOTTOM } from '../../molecules/OnboardingContinue';
 import { SocialAuthButtons } from '../../molecules';
 import { useAuth } from '../../../context/AuthContext';
+import { toast } from '../../../lib/toast';
 import { Brand, AmbitFont, Radii, Space } from '../../../constants/theme';
 
 interface Props {
@@ -23,13 +33,15 @@ interface Props {
 /// Wire to Supabase Auth (or Clerk) when auth lands.
 export function SignInScreen({ onBack, onSignedIn }: Props) {
   const insets = useSafeAreaInsets();
-  const { signInWithEmail, signInWithApple, signInWithGoogle } = useAuth();
+  const { signInWithEmail, signInWithApple, signInWithGoogle, sendPasswordReset } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [resetting, setResetting] = useState(false);
   const [socialBusy, setSocialBusy] = useState<'apple' | 'google' | null>(null);
   const [error, setError] = useState('');
+  const passwordRef = useRef<TextInput>(null);
 
   const isValid =
     email.includes('@') && email.includes('.') && password.length >= 6;
@@ -74,6 +86,28 @@ export function SignInScreen({ onBack, onSignedIn }: Props) {
     }
   };
 
+  /// Account recovery. Mirrors EduEmailScreen's validate-email-first + toast
+  /// pattern: guard on a syntactically valid email, then fire the reset and
+  /// confirm via toast (audit P0: this button was dead).
+  const handleForgotPassword = async () => {
+    if (resetting) return;
+    const trimmed = email.trim();
+    if (!(trimmed.includes('@') && trimmed.includes('.'))) {
+      setError('Enter your email above first, then tap “Forgot password?”.');
+      return;
+    }
+    setResetting(true);
+    setError('');
+    try {
+      await sendPasswordReset(trimmed);
+      toast.success(`Reset link sent to ${trimmed}. Check your inbox.`);
+    } catch (e: any) {
+      toast.error(e?.message ?? 'Couldn’t send the reset email. Try again.');
+    } finally {
+      setResetting(false);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.root}>
       {/* Ambient HandWaving watermark — the "welcome back" greeting baked
@@ -87,6 +121,13 @@ export function SignInScreen({ onBack, onSignedIn }: Props) {
 
       <BackChevron onPress={onBack} />
 
+      {/* KAV is the positioning parent for the anchored CTA + errorNote, so
+          both ride up with the keyboard instead of hiding behind it (audit
+          P1, matching OnboardingScaffold's pattern). */}
+      <KeyboardAvoidingView
+        style={styles.kav}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
       <KeyboardDismiss>
         <View style={styles.header}>
           <Text style={styles.headline}>Welcome back</Text>
@@ -118,6 +159,9 @@ export function SignInScreen({ onBack, onSignedIn }: Props) {
               autoCapitalize="none"
               autoCorrect={false}
               style={styles.input}
+              returnKeyType="next"
+              onSubmitEditing={() => passwordRef.current?.focus()}
+              blurOnSubmit={false}
             />
           </View>
 
@@ -125,6 +169,7 @@ export function SignInScreen({ onBack, onSignedIn }: Props) {
             <Text style={styles.label}>Password</Text>
             <View style={styles.inputWrap}>
               <TextInput
+                ref={passwordRef}
                 value={password}
                 onChangeText={setPassword}
                 placeholder="••••••••"
@@ -133,6 +178,8 @@ export function SignInScreen({ onBack, onSignedIn }: Props) {
                 autoCapitalize="none"
                 autoCorrect={false}
                 style={[styles.input, styles.inputWithIcon]}
+                returnKeyType="done"
+                onSubmitEditing={handleSignIn}
               />
               <Pressable
                 onPress={() => setShowPassword((s) => !s)}
@@ -150,8 +197,17 @@ export function SignInScreen({ onBack, onSignedIn }: Props) {
             </View>
           </View>
 
-          <Pressable hitSlop={8} style={styles.forgotWrap}>
-            <Text style={styles.forgot}>Forgot password?</Text>
+          <Pressable
+            hitSlop={8}
+            style={styles.forgotWrap}
+            onPress={handleForgotPassword}
+            disabled={resetting}
+            accessibilityRole="button"
+            accessibilityLabel="Send a password reset email"
+          >
+            <Text style={styles.forgot}>
+              {resetting ? 'Sending reset link…' : 'Forgot password?'}
+            </Text>
           </Pressable>
         </View>
       </KeyboardDismiss>
@@ -166,12 +222,14 @@ export function SignInScreen({ onBack, onSignedIn }: Props) {
           trailingArrow
         />
       </View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Brand.canvas },
+  kav: { flex: 1 },
   watermark: {
     position: 'absolute',
     top: 380,
@@ -223,9 +281,8 @@ const styles = StyleSheet.create({
     gap: 20,
   },
   label: {
-    fontFamily: AmbitFont.body,
+    fontFamily: AmbitFont.semibold,
     fontSize: 14,
-    fontWeight: '600',
     color: Brand.inkLabel,
     marginBottom: 8,
     letterSpacing: 0.2,
@@ -241,10 +298,9 @@ const styles = StyleSheet.create({
     backgroundColor: Brand.surface1,
     borderWidth: 1.5,
     borderColor: Brand.borderDefault,
-    fontFamily: AmbitFont.body,
+    fontFamily: AmbitFont.medium,
     fontSize: 16,
     color: Brand.inkBody,
-    fontWeight: '600',
   },
   inputWithIcon: {
     paddingRight: 48,
@@ -263,10 +319,9 @@ const styles = StyleSheet.create({
     marginTop: -4,
   },
   forgot: {
-    fontFamily: AmbitFont.body,
+    fontFamily: AmbitFont.semibold,
     fontSize: 13,
     color: Brand.actionDeep,
-    fontWeight: '600',
   },
   errorNote: {
     fontFamily: AmbitFont.body,

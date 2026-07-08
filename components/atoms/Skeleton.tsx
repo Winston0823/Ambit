@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, StyleProp, ViewStyle, DimensionValue } from 'react-native';
+import { useReducedMotion } from '../../hooks/useReducedMotion';
 
 interface Props {
   width?: DimensionValue;
@@ -16,8 +17,14 @@ const SKELETON_TINT = 'rgba(28,28,26,0.07)'; // soft ink tint — reads on cream
 
 export function Skeleton({ width = '100%', height = 14, radius = 8, style }: Props) {
   const pulse = useRef(new Animated.Value(0.55)).current;
+  const reduceMotion = useReducedMotion();
 
   useEffect(() => {
+    if (reduceMotion) {
+      // Render the static base color — no infinite pulse loop.
+      pulse.setValue(1);
+      return;
+    }
     const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(pulse, { toValue: 1, duration: 750, useNativeDriver: true }),
@@ -26,7 +33,7 @@ export function Skeleton({ width = '100%', height = 14, radius = 8, style }: Pro
     );
     loop.start();
     return () => loop.stop();
-  }, [pulse]);
+  }, [pulse, reduceMotion]);
 
   return (
     <Animated.View

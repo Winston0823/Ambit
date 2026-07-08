@@ -2,6 +2,7 @@ import React, { createContext, ReactNode, useContext, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { readLocalFileAsArrayBuffer } from '../lib/messaging';
 import { setProfileRoleCache } from '../hooks/useProfileRole';
+import { toast } from '../lib/toast';
 
 export type Role = 'owner' | 'seeker';
 
@@ -67,7 +68,18 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<OnboardingProfile>(INITIAL);
 
   const update: Ctx['update'] = (key, value) =>
-    setProfile((p) => ({ ...p, [key]: value }));
+    setProfile((p) => {
+      const next = { ...p, [key]: value };
+      // Professors are implicitly Owners (they recruit) and skip the role
+      // screen, so their role is never picked. Coerce it the moment the
+      // demographic is chosen so in-flow branching (shouldShow) and submit
+      // stay consistent — otherwise the persisted role stays 'seeker' and
+      // app/index routes professors into the seeker app.
+      if (key === 'demographic' && value === 'professor') {
+        return { ...next, role: 'owner' as Role };
+      }
+      return next;
+    });
 
   const reset = () => setProfile(INITIAL);
 
@@ -100,6 +112,10 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
   };
 
   const submit = async (userId: string, userEmail?: string) => {
+    // Safety net for fix #1: even if the profile was hydrated with a stale
+    // role, professors always persist as Owners.
+    const resolvedRole: Role | null =
+      profile.demographic === 'professor' ? 'owner' : profile.role;
     let photoUrl: string | null = profile.photoUri;
 
     if (profile.photoUri?.startsWith('file://') || profile.photoUri?.startsWith('content://')) {
@@ -114,6 +130,12 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
       if (!uploadError) {
         const { data } = supabase.storage.from('avatars').getPublicUrl(path);
         photoUrl = data.publicUrl;
+      } else {
+        // Upload failed — never persist the local file:// URI: it's only
+        // resolvable on this device, so other users' decks would render a
+        // broken image. Drop it; the user can re-add from their profile.
+        photoUrl = null;
+        toast.error("Photo didn't upload — you can add it later from your profile");
       }
     }
 
@@ -124,7 +146,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
       name: profile.name,
       vibe_blurb: profile.vibeBlurb,
       skills: profile.skills,
-      role: profile.role,
+      role: resolvedRole,
       campus_id: profile.campusId,
       photo_url: photoUrl,
       github_url: profile.proofLinks.github,
@@ -139,7 +161,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
     // Write-through to the role cache so the app routes on the fresh role
     // immediately (the cache may hold a stale `null` from before the
     // profile row existed).
-    setProfileRoleCache(userId, profile.role);
+    setProfileRoleCache(userId, resolvedRole);
 
     // Fire-and-forget: generate vibe embedding via Edge Function.
     // Failures are non-fatal — the profile is already saved. Use invoke()

@@ -36,6 +36,10 @@ export function Chip({ label, selected = false, onPress }: Props) {
     <Animated.View style={{ transform: [{ scale }] }}>
       <Pressable
         onPress={press}
+        accessibilityRole="button"
+        accessibilityState={{ selected }}
+        // 40px visual height + 2px top/bottom → 44pt effective touch target.
+        hitSlop={{ top: 2, bottom: 2 }}
         style={[styles.base, selected ? styles.selected : styles.unselected]}
       >
         <Text style={[styles.label, selected ? styles.labelOn : styles.labelOff]}>
@@ -50,25 +54,22 @@ const styles = StyleSheet.create({
   base: {
     height: 40,
     paddingHorizontal: 16,
-    borderRadius: Radii.pill,
+    borderRadius: Radii.chip,
     alignItems: 'center',
     justifyContent: 'center',
   },
   unselected: {
-    backgroundColor: Brand.surface1,
-    borderWidth: 1.5,
-    borderColor: Brand.borderDefault,
+    backgroundColor: 'rgba(255,255,255,0.6)',
+    borderWidth: 1,
+    borderColor: 'rgba(111,77,162,0.28)',
   },
   selected: {
-    backgroundColor: Brand.action,
-    borderWidth: 1.5,
-    borderColor: Brand.actionInk,
+    backgroundColor: Brand.selected,
   },
   label: {
-    fontFamily: AmbitFont.body,
+    fontFamily: AmbitFont.medium,
     fontSize: 14,
-    fontWeight: '500',
   },
-  labelOff: { color: Brand.inkBody },
-  labelOn: { color: Brand.actionInk, fontWeight: '700' },
+  labelOff: { color: Brand.accent },
+  labelOn: { color: Brand.inkOnBrand, fontFamily: AmbitFont.semibold },
 });

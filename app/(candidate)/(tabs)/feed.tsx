@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
+  Image,
   Platform,
   Pressable,
   ScrollView,
@@ -9,6 +10,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowsClockwise, BookmarkSimple, CaretDown, Check, GraduationCap, MagnifyingGlass, Sparkle, X } from 'phosphor-react-native';
@@ -16,9 +18,10 @@ import type { IconProps } from 'phosphor-react-native';
 import * as Haptics from 'expo-haptics';
 import { DiscoveryOverview, SwipeDeck } from '../../../components/organisms';
 import type { SwipeDeckHandle } from '../../../components/organisms';
-import { PortfolioModal, ReachOutComposer, BottomSheet, ReachOutLimitSheet } from '../../../components/molecules';
-import { HardShadow, Skeleton as SkeletonBlock, Tactile } from '../../../components/atoms';
-import { CAMPUSES } from '../../../data/mock';
+import { PortfolioModal, ReachOutComposer, BottomSheet, ReachOutLimitSheet, ReportReasonSheet } from '../../../components/molecules';
+import { blockUser, type ReportTarget } from '../../../lib/safety';
+import { Skeleton as SkeletonBlock, Tactile, TopAppBar } from '../../../components/atoms';
+import { CAMPUSES, SKILL_CATEGORIES } from '../../../data/mock';
 import {
   canReachOut,
   recordReachOut,
@@ -29,6 +32,7 @@ import { useProfileRole } from '../../../hooks/useProfileRole';
 import { useSavedDeck } from '../../../context/SavedDeckContext';
 import {
   AmbitFont,
+  Astra,
   Brand,
   Radii,
   Space,
@@ -65,14 +69,15 @@ const isRealUuid = (s: string | null | undefined): s is string =>
 /// user's very first action would silently fail.
 const DEMO_FALLBACK = __DEV__;
 
+// ASTRA royal→iris family for project-card gradient placeholders.
 const CARD_GRADIENTS: [string, string][] = [
-  [Brand.primary, Brand.accent],
-  ['#C9A57A', Brand.seekerInk],
-  [Brand.seekerSurface, Brand.accent],
-  ['#E8C9A0', Brand.primary],
-  [Brand.accent, '#7A5A38'],
-  [Brand.primary, Brand.seekerInk],
-  [Brand.seekerSurface, Brand.accent],
+  [Brand.primary, Brand.accent],   // royal → iris
+  ['#2D005E', '#9362C8'],           // royal → selected
+  ['#6F4DA2', Brand.accent],        // mid-purple → iris
+  ['#1B0140', '#9975CE'],           // deep royal → iris
+  [Brand.accent, '#6F4DA2'],        // iris → mid-purple
+  [Brand.primary, Brand.selected],  // royal → selected
+  ['#9362C8', '#CCC3D2'],           // selected → lilac
 ];
 
 /// Fetches ranked projects for a seeker and maps them to ProjectCardData.
@@ -226,7 +231,7 @@ async function fetchSeekerDeck(userId: string): Promise<SeekerCardData[]> {
 ///   - consecutiveSkips reaches 5 → overlay DiscoveryOverview
 export default function DiscoveryFeed() {
   const { role, loading: roleLoading } = useProfileRole();
-  const { save, unsave } = useSavedDeck();
+  const { save, unsave, count: savedCount } = useSavedDeck();
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
 
@@ -258,6 +263,37 @@ export default function DiscoveryFeed() {
     })();
     return () => { cancelled = true; };
   }, [user]);
+
+  // Owner's first active project — anchors owner→seeker reach-outs and, per
+  // fix 7, supplies the REQUIRED skills used to highlight matches on seeker
+  // cards (the owner's own skills are irrelevant when they're recruiting).
+  const [ownerProject, setOwnerProject] = useState<{ id: string; skills: string[] } | null>(null);
+  useEffect(() => {
+    if (!user || role !== 'owner') { setOwnerProject(null); return; }
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from('projects')
+        .select('id, required_skills')
+        .eq('owner_id', user.id)
+        .eq('active', true)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (cancelled) return;
+      const row = data as { id: string; required_skills: string[] | null } | null;
+      setOwnerProject(row ? { id: row.id, skills: row.required_skills ?? [] } : null);
+    })();
+    return () => { cancelled = true; };
+  }, [user, role]);
+
+  // Skills used to highlight overlap on each card: the viewer's own skills for
+  // a seeker browsing projects; the active project's required skills for an
+  // owner browsing seekers (fix 7 — was wrongly the owner's own skills).
+  const matchedSkills = useMemo(
+    () => (role === 'owner' ? ownerProject?.skills ?? [] : viewerSkills),
+    [role, ownerProject, viewerSkills],
+  );
 
   const fetchDeck = useCallback(async () => {
     if (!user || roleLoading) return;
@@ -310,6 +346,42 @@ export default function DiscoveryFeed() {
   // Imperative handle so a confirmed reach-out can fly the current card up.
   const swipeDeckRef = useRef<SwipeDeckHandle>(null);
 
+  // Safety: ⋯ on a card → Report/Block action sheet, and the report reason sheet.
+  const [flaggedUserId, setFlaggedUserId] = useState<string | null>(null);
+  const [reportTarget, setReportTarget] = useState<ReportTarget | null>(null);
+
+  const dropUserFromDeck = useCallback((userId: string) => {
+    setLiveDeck((prev) =>
+      prev ? prev.filter((c) => (c.kind === 'seeker' ? c.id : c.ownerId) !== userId) : prev,
+    );
+  }, []);
+
+  const handleBlockFromCard = useCallback(() => {
+    const uid = flaggedUserId;
+    setFlaggedUserId(null);
+    if (!uid) return;
+    Alert.alert(
+      'Block this person?',
+      "They won't be able to message you, and you won't see each other in the feed or inbox.",
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Block',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await blockUser(uid);
+              dropUserFromDeck(uid);
+              toast.success('Blocked.');
+            } catch (e: any) {
+              toast.error(e?.message ?? "Couldn't block — try again.");
+            }
+          },
+        },
+      ],
+    );
+  }, [flaggedUserId, dropUserFromDeck]);
+
   /// Card whose Reach Out button was tapped. Non-null = modal composer open.
   /// SwipeDeck pauses its PanResponder via gesturesDisabled while non-null so
   /// the deck doesn't swipe out from under the composer.
@@ -323,6 +395,25 @@ export default function DiscoveryFeed() {
   const [pendingReachOutCard, setPendingReachOutCard] = useState<DiscoveryCardData | null>(null);
 
   const handleReachOutPress = async (card: DiscoveryCardData) => {
+    if (!user) return;
+    // Fail fast at OPEN on the cases that would otherwise let the user write a
+    // whole note and then hit a dead-end error at send (P2 quick wins):
+    //   • demo/placeholder cards (non-UUID ids) — mirrors saved.tsx.
+    const demo =
+      card.kind === 'project'
+        ? !isRealUuid(card.id) || !isRealUuid(card.ownerId)
+        : !isRealUuid(card.id);
+    if (demo) {
+      toast.error("This is a demo card — reach-outs aren't wired up for it yet.");
+      return;
+    }
+    //   • owner with no active project to anchor the reach-out.
+    if (role === 'owner' && !ownerProject) {
+      toast.error('Create a project before reaching out to seekers.');
+      return;
+    }
+    // Then the daily quota — checked BEFORE opening the composer so the cap
+    // surfaces as the limit sheet, not a mid-compose ambush.
     const ok = await canReachOut();
     if (ok) {
       setReachOutCard(card);
@@ -366,15 +457,23 @@ export default function DiscoveryFeed() {
     [activeDeck, filterSkills, filterCampus],
   );
 
-  const skillOptions = useMemo(
-    () => Array.from(new Set(activeDeck.flatMap(cardSkills))).sort((a, b) => a.localeCompare(b)),
-    [activeDeck],
-  );
+  // Filterable skills = the canonical taxonomy (so the search works even when
+  // the deck is empty / exhausted) unioned with any skills in the live deck.
+  const skillOptions = useMemo(() => {
+    const canonical = SKILL_CATEGORIES.flatMap((c) => c.tags);
+    const fromDeck = activeDeck.flatMap(cardSkills);
+    return Array.from(new Set([...canonical, ...fromDeck])).sort((a, b) => a.localeCompare(b));
+  }, [activeDeck]);
 
   const toggleFilter = (dim: 'skills' | 'campus', value: string) => {
     const [list, set] = dim === 'skills' ? [filterSkills, setFilterSkills] as const : [filterCampus, setFilterCampus] as const;
     set(list.includes(value) ? list.filter((v) => v !== value) : [...list, value]);
   };
+  // Campus is single-select: pick one (radio), tap again to clear. Kept as an
+  // array (length ≤ 1) so the filteredDeck `filterCampus.includes` logic is
+  // unchanged.
+  const selectCampus = (id: string) =>
+    setFilterCampus((prev) => (prev.includes(id) ? [] : [id]));
   const filterCount = filterSkills.length + filterCampus.length;
 
   // Options for the open sheet, narrowed by the search box.
@@ -395,10 +494,17 @@ export default function DiscoveryFeed() {
         ? next.slice(next.length - SKIP_OVERVIEW_THRESHOLD)
         : next;
     });
-    // Record skip in matches table for project cards
+    // Record the skip so the card stops resurfacing. Seeker→project keys on
+    // (me, project); owner→seeker keys on (seeker, my active project) — fix 8,
+    // owner actions previously left no server trace.
     if (card.kind === 'project' && user) {
       supabase.from('matches').upsert(
         { seeker_id: user.id, project_id: card.id, outcome: 'skipped' },
+        { onConflict: 'seeker_id,project_id' }
+      ).then(() => {});
+    } else if (card.kind === 'seeker' && user && ownerProject) {
+      supabase.from('matches').upsert(
+        { seeker_id: card.id, project_id: ownerProject.id, outcome: 'skipped' },
         { onConflict: 'seeker_id,project_id' }
       ).then(() => {});
     }
@@ -408,9 +514,16 @@ export default function DiscoveryFeed() {
     save(card);
     setConsecutiveSkips(0);
     setLastFiveSeen([]);
+    // Persist a 'saved' row for BOTH directions so the saved deck hydrates
+    // across restarts (SavedDeckContext reads matches where outcome='saved').
     if (card.kind === 'project' && user) {
       supabase.from('matches').upsert(
         { seeker_id: user.id, project_id: card.id, outcome: 'saved' },
+        { onConflict: 'seeker_id,project_id' }
+      ).then(() => {});
+    } else if (card.kind === 'seeker' && user && ownerProject) {
+      supabase.from('matches').upsert(
+        { seeker_id: card.id, project_id: ownerProject.id, outcome: 'saved' },
         { onConflict: 'seeker_id,project_id' }
       ).then(() => {});
     }
@@ -426,12 +539,20 @@ export default function DiscoveryFeed() {
     } else {
       unsave(card.id);
     }
+    // Reverse the server trace on either direction (fix 8 symmetry).
     if (card.kind === 'project' && user) {
       supabase
         .from('matches')
         .delete()
         .eq('seeker_id', user.id)
         .eq('project_id', card.id)
+        .then(() => {});
+    } else if (card.kind === 'seeker' && user && ownerProject) {
+      supabase
+        .from('matches')
+        .delete()
+        .eq('seeker_id', card.id)
+        .eq('project_id', ownerProject.id)
         .then(() => {});
     }
   };
@@ -510,6 +631,16 @@ export default function DiscoveryFeed() {
         }
         projectId = (proj as { id: string }).id;
         seekerId  = card.id;
+        // Mirror the seeker path's outcome write for the owner→seeker
+        // direction so the seeker stops resurfacing (fix 8 — owner reach-outs
+        // previously recorded no outcome).
+        supabase
+          .from('matches')
+          .upsert(
+            { seeker_id: card.id, project_id: projectId, outcome: 'applied' },
+            { onConflict: 'seeker_id,project_id' },
+          )
+          .then(() => {});
       }
 
       // Per-project semantics: each reach-out about a different project
@@ -591,27 +722,41 @@ export default function DiscoveryFeed() {
   const loading = roleLoading || deckLoading;
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
-      <View style={styles.topBar}>
-        <Pressable
-          onPress={handleRefresh}
-          hitSlop={12}
-          style={styles.refreshBtn}
-          accessibilityRole="button"
-          accessibilityLabel="Refresh deck"
-        >
-          <ArrowsClockwise size={22} color={Brand.inkPrimary} weight="regular" />
-        </Pressable>
-        <Text style={styles.wordmark}>ambit</Text>
-        <Pressable
-          onPress={goToSaved}
-          hitSlop={12}
-          style={styles.bookmarkBtn}
-          accessibilityRole="button"
-          accessibilityLabel="Open saved list"
-        >
-          <BookmarkSimple size={22} color={Brand.inkPrimary} weight="regular" />
-        </Pressable>
+    <View style={styles.root}>
+      <View style={{ paddingTop: insets.top }}>
+        <TopAppBar
+          right={
+            <View style={styles.headerActions}>
+              <Pressable
+                onPress={handleRefresh}
+                hitSlop={10}
+                style={styles.headerIconBtn}
+                accessibilityRole="button"
+                accessibilityLabel="Refresh deck"
+              >
+                <ArrowsClockwise size={22} color={Brand.inkPrimary} weight="regular" />
+              </Pressable>
+              <Pressable
+                onPress={goToSaved}
+                hitSlop={10}
+                style={styles.headerIconBtn}
+                accessibilityRole="button"
+                accessibilityLabel={savedCount > 0 ? `Open saved list, ${savedCount} saved` : 'Open saved list'}
+              >
+                <BookmarkSimple
+                  size={22}
+                  color={Brand.inkPrimary}
+                  weight={savedCount > 0 ? 'fill' : 'regular'}
+                />
+                {savedCount > 0 && (
+                  <View style={styles.savedBadge}>
+                    <Text style={styles.savedBadgeText}>{savedCount > 99 ? '99+' : savedCount}</Text>
+                  </View>
+                )}
+              </Pressable>
+            </View>
+          }
+        />
       </View>
 
       {/* Filter row — short rectangle buttons above the card. */}
@@ -650,17 +795,31 @@ export default function DiscoveryFeed() {
       ) : (
         <SwipeDeck
           ref={swipeDeckRef}
-          key={`${deckResetKey}-${filterSkills.join(',')}-${filterCampus.join(',')}`}
+          // Filters intentionally NOT in the key: changing a filter must
+          // recompose the deck WITHOUT remounting — remounting reset the deck
+          // to card #1 and replayed already-passed cards (fix 5). deckResetKey
+          // still forces a fresh mount on refresh / overview-pick.
+          key={`${deckResetKey}`}
           deck={filteredDeck}
-          matchedSkills={viewerSkills}
+          matchedSkills={matchedSkills}
           onPass={handlePass}
           onSave={handleSave}
           onRewind={handleRewind}
           onReachOut={handleReachOutPress}
           onPortfolioPress={setActivePortfolio}
           activePortfolioId={activePortfolio?.id ?? null}
-          gesturesDisabled={!!reachOutCard || !!activePortfolio}
-          emptyState={<DeckExhausted onRefresh={handleRefresh} isOwner={role === 'owner'} neverHadCards={activeDeck.length === 0} />}
+          onFlag={setFlaggedUserId}
+          gesturesDisabled={!!reachOutCard || !!activePortfolio || !!flaggedUserId || !!reportTarget}
+          emptyState={
+            filterCount > 0 && filteredDeck.length === 0 && activeDeck.length > 0 ? (
+              // Filters hide every card, but the deck itself isn't empty — offer
+              // a non-destructive Clear, never "Start over" (which deletes
+              // skipped-match rows). Fix 4.
+              <FilteredEmpty onClear={() => { setFilterSkills([]); setFilterCampus([]); }} />
+            ) : (
+              <DeckExhausted onRefresh={handleRefresh} isOwner={role === 'owner'} neverHadCards={activeDeck.length === 0} />
+            )
+          }
         />
       )}
 
@@ -721,26 +880,74 @@ export default function DiscoveryFeed() {
 
         <ScrollView
           style={styles.filterScroll}
-          contentContainerStyle={styles.filterSheetChips}
+          contentContainerStyle={filterSheet === 'campus' ? styles.filterSheetRows : styles.filterSheetChips}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {sheetOptions.map((opt) => {
-            const selected = (filterSheet === 'campus' ? filterCampus : filterSkills).includes(opt);
-            const label = filterSheet === 'campus' ? campusLabel(opt) : opt;
-            return (
-              <Tactile
-                key={opt}
-                haptic="selection"
-                onPress={() => toggleFilter(filterSheet === 'campus' ? 'campus' : 'skills', opt)}
-                style={[styles.filterSheetChip, selected && styles.filterSheetChipSel]}
-                accessibilityLabel={label}
-              >
-                {selected && <Check size={13} color={Brand.inkOnBrand} weight="bold" />}
-                <Text style={[styles.filterSheetChipText, selected && styles.filterSheetChipTextSel]}>{label}</Text>
-              </Tactile>
-            );
-          })}
+          {/* Campus → single-select radio list. Skills → multi-select chips. */}
+          {filterSheet === 'campus'
+            ? sheetOptions.map((opt, i) => {
+                const selected = filterCampus.includes(opt);
+                const c = CAMPUSES.find((x) => x.id === opt);
+                return (
+                  <Tactile
+                    key={opt}
+                    haptic="selection"
+                    onPress={() => selectCampus(opt)}
+                    style={styles.campusRow}
+                    accessibilityLabel={c?.name ?? opt}
+                  >
+                    {/* Campus photo bleeding in from the right, faded into the
+                        canvas on the left so the name/location stay readable. */}
+                    <View style={styles.campusImgWrap} pointerEvents="none">
+                      {c?.imageUrl ? (
+                        <Image source={{ uri: c.imageUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+                      ) : (
+                        <LinearGradient
+                          colors={CARD_GRADIENTS[i % CARD_GRADIENTS.length]}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 1 }}
+                          style={StyleSheet.absoluteFill}
+                        />
+                      )}
+                      <LinearGradient
+                        colors={[Brand.canvas, 'rgba(252,249,248,0)']}
+                        start={{ x: 0, y: 0.5 }}
+                        end={{ x: 1, y: 0.5 }}
+                        style={StyleSheet.absoluteFill}
+                      />
+                    </View>
+
+                    <View style={styles.campusText}>
+                      <Text style={styles.campusName} numberOfLines={1}>{c?.name ?? opt}</Text>
+                      <Text style={styles.campusLoc} numberOfLines={1}>{c ? `${c.city}, CA` : ''}</Text>
+                    </View>
+
+                    {selected ? (
+                      <View style={styles.campusCheck}>
+                        <Check size={14} color={Brand.inkOnBrand} weight="bold" />
+                      </View>
+                    ) : (
+                      <View style={styles.campusRadio} />
+                    )}
+                  </Tactile>
+                );
+              })
+            : sheetOptions.map((opt) => {
+                const selected = filterSkills.includes(opt);
+                return (
+                  <Tactile
+                    key={opt}
+                    haptic="selection"
+                    onPress={() => toggleFilter('skills', opt)}
+                    style={[styles.filterSheetChip, selected && styles.filterSheetChipSel]}
+                    accessibilityLabel={opt}
+                  >
+                    {selected && <Check size={13} color={Brand.inkOnBrand} weight="bold" />}
+                    <Text style={[styles.filterSheetChipText, selected && styles.filterSheetChipTextSel]}>{opt}</Text>
+                  </Tactile>
+                );
+              })}
           {sheetOptions.length === 0 && (
             <Text style={styles.filterSheetEmpty}>{filterSearch ? 'No matches.' : 'Nothing to filter on yet.'}</Text>
           )}
@@ -760,6 +967,33 @@ export default function DiscoveryFeed() {
           // Open the composer with the card they originally wanted to reach out to.
           if (pendingReachOutCard) setReachOutCard(pendingReachOutCard);
           setPendingReachOutCard(null);
+        }}
+      />
+
+      {/* Safety: ⋯ on a card opens Report / Block. */}
+      <BottomSheet visible={!!flaggedUserId} onClose={() => setFlaggedUserId(null)}>
+        <Pressable
+          style={styles.flagSheetItem}
+          onPress={() => {
+            const uid = flaggedUserId;
+            setFlaggedUserId(null);
+            if (uid) setReportTarget({ reportedUserId: uid, conversationId: null, messageId: null });
+          }}
+        >
+          <Text style={styles.flagSheetDanger}>Report</Text>
+        </Pressable>
+        <Pressable style={styles.flagSheetItem} onPress={handleBlockFromCard}>
+          <Text style={styles.flagSheetDanger}>Block user</Text>
+        </Pressable>
+      </BottomSheet>
+
+      <ReportReasonSheet
+        visible={!!reportTarget}
+        target={reportTarget}
+        onClose={() => setReportTarget(null)}
+        onReported={(t) => {
+          // A report is a strong signal — also drop them from the deck.
+          dropUserFromDeck(t.reportedUserId);
         }}
       />
     </View>
@@ -799,30 +1033,32 @@ function FilterButton({
 }
 
 function Skeleton() {
-  // Mirror the DiscoveryCard silhouette: one big rounded-20 card on a 7px hard
-  // shadow, with a badge top-right, a bottom-left stack (eyebrow → big title →
-  // ~2-line vibe → chip row), and the reach-out circle bottom-right.
+  // Mirror the two-section DiscoveryCard silhouette: a gradient/photo panel on
+  // top with a corner status badge, a white info panel (2-line blurb + chip
+  // row), then the three-button action row beneath the card.
   return (
     <View style={styles.skeletonWrap}>
-      <HardShadow radius={Radii.card} offset={7} style={{ flex: 1 }}>
-        <View style={styles.skeletonCard}>
-          <SkeletonBlock width={120} height={30} radius={14} style={styles.skelBadge} />
-          <View style={styles.skelStack}>
-            <SkeletonBlock width={120} height={11} radius={5} />
-            <SkeletonBlock width="68%" height={30} radius={8} />
-            <View style={{ gap: 7 }}>
-              <SkeletonBlock width="90%" height={15} radius={6} />
-              <SkeletonBlock width="62%" height={15} radius={6} />
-            </View>
-            <View style={{ flexDirection: 'row', gap: 8 }}>
-              {[70, 92, 64].map((w, i) => (
-                <SkeletonBlock key={i} width={w} height={33} radius={999} />
-              ))}
-            </View>
-          </View>
-          <SkeletonBlock width={58} height={58} radius={29} style={styles.skelReach} />
+      <View style={styles.skeletonCard}>
+        <View style={styles.skelPhoto}>
+          <SkeletonBlock width={128} height={24} radius={6} />
         </View>
-      </HardShadow>
+        <View style={styles.skelPanel}>
+          <SkeletonBlock width="92%" height={14} radius={6} />
+          <SkeletonBlock width="66%" height={14} radius={6} />
+          <View style={{ flexDirection: 'row', gap: 8, marginTop: 2 }}>
+            {[62, 84, 50].map((w, i) => (
+              <SkeletonBlock key={i} width={w} height={28} radius={6} />
+            ))}
+          </View>
+        </View>
+      </View>
+      <View style={styles.skelActionRow}>
+        {[0, 1, 2].map((i) => (
+          <View key={i} style={{ flex: 1 }}>
+            <SkeletonBlock width="100%" height={48} radius={Radii.md} />
+          </View>
+        ))}
+      </View>
     </View>
   );
 }
@@ -841,12 +1077,32 @@ function DeckError({ onRetry }: { onRetry: () => void }) {
       <Text style={styles.emptySub}>
         Something went wrong reaching the server. Check your connection and try again.
       </Text>
-      <HardShadow radius={999} offset={4} style={styles.refreshCtaWrap}>
+      <View style={styles.refreshCtaWrap}>
         <Pressable onPress={onRetry} style={styles.refreshCta}>
-          <ArrowsClockwise size={18} color={Brand.actionInk} weight="bold" />
+          <ArrowsClockwise size={18} color={Brand.inkOnBrand} weight="bold" />
           <Text style={styles.refreshCtaLabel}>Retry</Text>
         </Pressable>
-      </HardShadow>
+      </View>
+    </View>
+  );
+}
+
+/// Filters are active and hide every remaining card, but the deck itself
+/// still has cards. Offer a non-destructive Clear — never "Start over", which
+/// would delete skipped-match rows the user didn't ask to lose (fix 4).
+function FilteredEmpty({ onClear }: { onClear: () => void }) {
+  return (
+    <View style={styles.emptyWrap}>
+      <Text style={styles.emptyTitle}>No matches with these filters</Text>
+      <Text style={styles.emptySub}>
+        Nothing here fits the filters you set. Clear them to see the rest of your deck.
+      </Text>
+      <View style={styles.refreshCtaWrap}>
+        <Pressable onPress={onClear} style={styles.refreshCta}>
+          <X size={18} color={Brand.inkOnBrand} weight="bold" />
+          <Text style={styles.refreshCtaLabel}>Clear filters</Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -861,12 +1117,12 @@ function DeckExhausted({ onRefresh, isOwner, neverHadCards }: { onRefresh: () =>
             ? 'Compatible seekers show up here as they join. Make sure you have a live project so they can find you too.'
             : 'New projects land here as people post them — check back soon.'}
         </Text>
-        <HardShadow radius={999} offset={4} style={styles.refreshCtaWrap}>
+        <View style={styles.refreshCtaWrap}>
           <Pressable onPress={onRefresh} style={styles.refreshCta}>
-            <ArrowsClockwise size={18} color={Brand.actionInk} weight="bold" />
+            <ArrowsClockwise size={18} color={Brand.inkOnBrand} weight="bold" />
             <Text style={styles.refreshCtaLabel}>Refresh</Text>
           </Pressable>
-        </HardShadow>
+        </View>
       </View>
     );
   }
@@ -878,12 +1134,12 @@ function DeckExhausted({ onRefresh, isOwner, neverHadCards }: { onRefresh: () =>
           ? "Want to see more candidates? Bring back the people you passed on and start fresh."
           : "Want another look? Bring back the projects you skipped and start fresh."}
       </Text>
-      <HardShadow radius={999} offset={4} style={styles.refreshCtaWrap}>
+      <View style={styles.refreshCtaWrap}>
         <Pressable onPress={onRefresh} style={styles.refreshCta}>
-          <ArrowsClockwise size={18} color={Brand.actionInk} weight="bold" />
+          <ArrowsClockwise size={18} color={Brand.inkOnBrand} weight="bold" />
           <Text style={styles.refreshCtaLabel}>Start over</Text>
         </Pressable>
-      </HardShadow>
+      </View>
     </View>
   );
 }
@@ -893,8 +1149,19 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Brand.canvas,
   },
-  topBar: {
-    height: 44,
+  // Report/Block action-sheet rows.
+  flagSheetItem: { paddingVertical: 18, alignItems: 'center' },
+  flagSheetDanger: { fontFamily: AmbitFont.semibold, fontSize: 16, color: Brand.danger },
+  // Right-slot actions in the shared TopAppBar (wordmark sits left, matching
+  // the Projects / Profile headers).
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  headerIconBtn: {
+    width: 40,
+    height: 40,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -909,8 +1176,8 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 999, // only matters when the active tint shows
   },
-  filterBtnActive: { backgroundColor: 'rgba(166, 199, 194, 0.22)' }, // soft teal tint, no border
-  filterBtnText: { fontFamily: AmbitFont.body, fontSize: 14, fontWeight: '600', color: Brand.inkBody },
+  filterBtnActive: { backgroundColor: 'rgba(147, 98, 200, 0.14)' }, // soft purple tint, no border
+  filterBtnText: { fontFamily: AmbitFont.semibold, fontSize: 14, color: Brand.inkBody },
   filterBtnTextActive: { color: Brand.actionDeep },
   filterClear: { paddingHorizontal: 8, paddingVertical: 8 },
   filterClearText: { fontFamily: AmbitFont.body, fontSize: 13.5, fontWeight: '600', color: Brand.actionDeep },
@@ -925,9 +1192,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 5,
     borderRadius: 999,
-    backgroundColor: 'rgba(166, 199, 194, 0.22)',
+    backgroundColor: 'rgba(147, 98, 200, 0.14)',
   },
-  demoBannerText: { fontFamily: AmbitFont.body, fontSize: 12, fontWeight: '600', color: Brand.actionDeep },
+  demoBannerText: { fontFamily: AmbitFont.semibold, fontSize: 12, color: Brand.actionDeep },
 
   // ── Filter sheet (searchable, tall + scrollable) ───────────────────────
   filterSheetHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, paddingHorizontal: 4 },
@@ -953,59 +1220,105 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    borderRadius: 999,
+    borderRadius: Radii.chip,
     backgroundColor: Brand.surface1,
     borderWidth: 1,
     borderColor: Brand.borderDefault,
   },
-  filterSheetChipSel: { backgroundColor: Brand.action, borderWidth: 1.5, borderColor: Brand.actionInk },
-  filterSheetChipText: { fontFamily: AmbitFont.body, fontSize: 14, fontWeight: '600', color: Brand.inkBody },
-  filterSheetChipTextSel: { color: Brand.actionInk, fontWeight: '700' },
+  // Selected chip → selected purple #9362C8 with white label.
+  filterSheetChipSel: { backgroundColor: Brand.selected, borderWidth: 1, borderColor: Brand.selected },
+  filterSheetChipText: { fontFamily: AmbitFont.semibold, fontSize: 14, color: Brand.inkBody },
+  filterSheetChipTextSel: { color: Brand.inkOnBrand },
+
+  // ── Campus drawer rows (photo bleed + name + location + check) ─────────
+  filterSheetRows: { paddingBottom: 16, gap: 0 },
+  campusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 64,
+    paddingHorizontal: 16,
+    marginBottom: 8,
+    borderRadius: 10,
+    overflow: 'hidden',
+    backgroundColor: Brand.canvas,
+  },
+  // Photo occupies the right portion; the canvas→transparent fade over it
+  // blends its left edge into the row so the text stays legible.
+  campusImgWrap: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    right: 0,
+    width: '60%',
+  },
+  campusText: { flex: 1, minWidth: 0, gap: 2 },
+  campusName: { fontFamily: AmbitFont.medium, fontSize: 16, color: Brand.selected },
+  campusLoc: { fontFamily: AmbitFont.medium, fontSize: 13, color: Brand.inkLabel },
+  campusCheck: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: Brand.selected,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  campusRadio: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: Brand.inkPlaceholder,
+    backgroundColor: 'rgba(255,255,255,0.55)',
+  },
   filterSheetEmpty: { fontFamily: AmbitFont.body, fontSize: 14, color: Brand.inkMuted, paddingVertical: 12 },
-  wordmark: {
-    fontFamily: AmbitFont.display,
-    fontSize: 26,
-    color: Brand.inkPrimary,
-    // Matches the inbox wordmark tracking so the logotype reads identically
-    // across tabs (was 0.5 here vs -0.4 on inbox — an accidental drift).
-    letterSpacing: -0.4,
-  },
-  bookmarkBtn: {
+  savedBadge: {
     position: 'absolute',
-    right: Space.lg,
-    top: 0,
-    bottom: 0,
-    width: 44,
+    top: 4,
+    right: 2,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    paddingHorizontal: 4,
+    backgroundColor: Brand.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  refreshBtn: {
-    position: 'absolute',
-    left: Space.lg,
-    top: 0,
-    bottom: 0,
-    width: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
+  savedBadgeText: {
+    fontFamily: AmbitFont.body,
+    fontSize: 10,
+    fontWeight: '800',
+    color: Brand.inkOnBrand,
   },
   skeletonWrap: {
     flex: 1,
     paddingHorizontal: Space.lg,
-    paddingTop: Space.md,
+    paddingTop: Space.sm,
     paddingBottom: Space.md,
   },
   skeletonCard: {
     flex: 1,
-    backgroundColor: Brand.surface1,
-    borderRadius: Radii.card,
-    borderWidth: 1.5,
-    borderColor: Brand.inkEdge,
+    backgroundColor: Brand.cardCream,
+    borderRadius: Radii.sm,
+    borderWidth: 1,
+    borderColor: Astra.hairlinePurple,
     overflow: 'hidden',
-    position: 'relative',
   },
-  skelBadge: { position: 'absolute', top: 16, right: 16 },
-  skelStack: { position: 'absolute', left: 22, right: 22, bottom: 22, paddingRight: 72, gap: 16 },
-  skelReach: { position: 'absolute', bottom: 22, right: 22 },
+  skelPhoto: {
+    flex: 1,
+    backgroundColor: Brand.surface2,
+    padding: 16,
+    justifyContent: 'flex-start',
+  },
+  skelPanel: {
+    padding: 16,
+    gap: 10,
+    backgroundColor: Brand.cardCream,
+  },
+  skelActionRow: {
+    flexDirection: 'row',
+    gap: 12,
+    paddingTop: Space.md,
+  },
   emptyWrap: {
     flex: 1,
     alignItems: 'center',
@@ -1026,22 +1339,27 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 20,
   },
-  refreshCtaWrap: { marginTop: 12 },
+  refreshCtaWrap: { marginTop: 16 },
+  // Clean filled pill — royal fill, white label, soft shadow (was a dark-on-
+  // dark hard-shadow sticker, which read as an unreadable blob).
   refreshCta: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
     backgroundColor: Brand.action,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
+    paddingHorizontal: 22,
+    paddingVertical: 13,
     borderRadius: 999,
-    borderWidth: 1.6,
-    borderColor: Brand.actionInk,
+    shadowColor: Astra.royal,
+    shadowOpacity: 0.28,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 4,
   },
   refreshCtaLabel: {
-    fontFamily: AmbitFont.body,
+    fontFamily: AmbitFont.semibold,
     fontSize: 15,
-    fontWeight: '700',
-    color: Brand.actionInk,
+    color: Brand.inkOnBrand,
+    letterSpacing: 0.2,
   },
 });

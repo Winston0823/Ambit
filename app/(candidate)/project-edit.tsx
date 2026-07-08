@@ -7,28 +7,28 @@ import {
   StyleSheet,
   Switch,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Trash } from 'phosphor-react-native';
-import { BackChevron, HardShadow } from '../../components/atoms';
+import { BackChevron, Button, TextField } from '../../components/atoms';
 import { DiscoveryCard, ProjectCoverField, ProjectDeadlineField } from '../../components/molecules';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { uploadProjectImage, toDateOnly } from '../../lib/projects';
 import { ROLE_CATEGORIES, skillsForRoles, type ProjectCardData } from '../../data/mock';
 import { useDirtyGuard } from '../../hooks/useDirtyGuard';
-import { AmbitFont, Brand } from '../../constants/theme';
+import { checkMinLength } from '../../lib/validation';
+import { AmbitFont, Astra, Brand, Radii } from '../../constants/theme';
 
-/// Deterministic warm gradient per project id (matches the discovery deck's
-/// photo-fallback look).
+/// Deterministic royal→iris gradient per project id (matches the discovery
+/// deck's photo-fallback look).
 const CARD_GRADS: [string, string][] = [
-  [Brand.primary, Brand.accent],
-  ['#C9A57A', '#4D361D'],
-  ['#E8C9A0', Brand.primary],
-  [Brand.accent, '#7A5A38'],
+  [Astra.royal, Astra.iris],
+  [Astra.void, Astra.royal],
+  [Brand.selected, Astra.iris],
+  [Astra.royal, Brand.selected],
 ];
 const gradFor = (s: string): [string, string] => {
   let h = 0;
@@ -151,7 +151,10 @@ export default function ProjectEditScreen() {
   const toggleRole = (r: string) =>
     setRoles((rs) => (rs.includes(r) ? rs.filter((x) => x !== r) : [...rs, r]));
 
-  const valid = title.trim().length > 0 && vibe.trim().length >= BLURB_MIN && roles.length >= 1;
+  // Semantic validation → visible "why" copy under each offending field, so
+  // the dimmed Save button is never a silent wall (audit theme 3).
+  const blurbCheck = checkMinLength(vibe, BLURB_MIN);
+  const valid = title.trim().length > 0 && blurbCheck.valid && roles.length >= 1;
 
   // Dirty when any editable field differs from the loaded project. The pause
   // toggle (`active`) is part of the form, so flipping it counts as unsaved.
@@ -166,7 +169,7 @@ export default function ProjectEditScreen() {
       (neededBy ? toDateOnly(neededBy) : null) !== orig.neededBy ||
       active !== orig.active ||
       pickedUri !== null);
-  const guardBack = useDirtyGuard(isDirty);
+  const { guardBack, commit } = useDirtyGuard(isDirty);
 
   const save = async () => {
     if (!id || !user) return;
@@ -197,7 +200,8 @@ export default function ProjectEditScreen() {
           .invoke('embed-vibe', { body: { table: 'projects', id, text: `${title.trim()}\n\n${vibe.trim()}` } })
           .catch((e) => console.warn('embed-vibe failed:', e?.message ?? e));
       }
-      router.back();
+      // Saved — leave without the dirty-guard prompt (nothing to discard).
+      commit(() => router.back());
     } catch (e: any) {
       Alert.alert("Couldn't save", e?.message ?? 'Try again.');
       setSaving(false);
@@ -205,7 +209,7 @@ export default function ProjectEditScreen() {
   };
 
   const del = () => {
-    Alert.alert('Delete this project?', 'This permanently removes it. Anyone who saved it will see it disappear.', [
+    Alert.alert('Delete this project?', 'This permanently removes it, ends any open conversations with candidates, and anyone who saved it will see it disappear.', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete',
@@ -214,7 +218,8 @@ export default function ProjectEditScreen() {
           if (!id) return;
           const { error } = await supabase.from('projects').delete().eq('id', id);
           if (error) { Alert.alert('Delete failed', error.message); return; }
-          router.back();
+          // Deleted — leave without the dirty-guard prompt.
+          commit(() => router.back());
         },
       },
     ]);
@@ -292,12 +297,17 @@ export default function ProjectEditScreen() {
             <Text style={styles.kicker}>EDIT PROJECT</Text>
 
         <View style={styles.field}>
-          <Text style={styles.fieldLabel}>PROJECT NAME</Text>
-          <TextInput value={title} onChangeText={setTitle} style={styles.input} maxLength={60} placeholderTextColor={Brand.inkPlaceholder} />
+          <TextField label="Project name" value={title} onChangeText={setTitle} maxLength={60} />
         </View>
         <View style={styles.field}>
-          <Text style={styles.fieldLabel}>ONE LINE THAT CAPTURES IT</Text>
-          <TextInput value={vibe} onChangeText={setVibe} style={[styles.input, styles.inputMultiline]} multiline maxLength={140} placeholderTextColor={Brand.inkPlaceholder} />
+          <TextField
+            label="One line that captures it"
+            value={vibe}
+            onChangeText={setVibe}
+            textarea
+            maxLength={140}
+            helper={blurbCheck.reason ?? undefined}
+          />
         </View>
 
         <ProjectCoverField uri={pickedUri ?? coverUrl} onChange={setPickedUri} />
@@ -309,6 +319,7 @@ export default function ProjectEditScreen() {
             <SteerChip key={r} label={r} selected={roles.includes(r)} onPress={() => toggleRole(r)} />
           ))}
         </View>
+        {roles.length === 0 ? <Text style={styles.helper}>Pick at least one role to save.</Text> : null}
 
         <View style={styles.toggleRow}>
           <View style={{ flex: 1 }}>
@@ -328,11 +339,9 @@ export default function ProjectEditScreen() {
         <View style={{ height: 120 }} />
       </ScrollView>
 
-      <HardShadow radius={999} offset={4} style={[styles.ctaWrap, { bottom: insets.bottom + 24 }, (!valid || saving) && styles.ctaDisabled]}>
-        <Pressable onPress={save} disabled={!valid || saving} style={styles.cta}>
-          {saving ? <ActivityIndicator color={Brand.actionInk} /> : <Text style={styles.ctaText}>Save changes</Text>}
-        </Pressable>
-      </HardShadow>
+      <View style={[styles.ctaWrap, { bottom: insets.bottom + 24 }]}>
+        <Button title={saving ? 'Saving…' : 'Save changes'} onPress={save} disabled={!valid || saving} />
+      </View>
         </>
       )}
     </View>
@@ -348,57 +357,41 @@ const styles = StyleSheet.create({
   errorBtn: {
     marginTop: 28,
     backgroundColor: Brand.action,
-    borderWidth: 1.6,
-    borderColor: Brand.actionInk,
     paddingHorizontal: 40,
     paddingVertical: 14,
-    borderRadius: 999,
+    borderRadius: Radii.sm,
   },
-  errorBtnText: { fontFamily: AmbitFont.body, fontSize: 15, fontWeight: '700', color: Brand.actionInk },
+  errorBtnText: { fontFamily: AmbitFont.semibold, fontSize: 15, color: Brand.inkOnBrand },
 
   // Edit | Preview segment (mirrors profile)
   segHeader: { alignItems: 'center', paddingBottom: 12 },
-  segment: { flexDirection: 'row', backgroundColor: Brand.surface1, borderRadius: 999, padding: 4 },
-  segmentBtn: { paddingHorizontal: 24, paddingVertical: 8, borderRadius: 999 },
+  segment: { flexDirection: 'row', backgroundColor: Brand.surface2, borderRadius: Radii.sm, padding: 4 },
+  segmentBtn: { paddingHorizontal: 24, paddingVertical: 8, borderRadius: Radii.sm },
   segmentBtnActive: { backgroundColor: Brand.action },
-  segmentText: { fontFamily: AmbitFont.body, fontSize: 14, fontWeight: '600', color: Brand.inkMuted },
-  segmentTextActive: { color: Brand.actionInk, fontWeight: '700' },
+  segmentText: { fontFamily: AmbitFont.semibold, fontSize: 14, color: Brand.inkMuted },
+  segmentTextActive: { color: Brand.inkOnBrand },
   previewWrap: { flex: 1, paddingHorizontal: 20, paddingTop: 8, paddingBottom: 24 },
 
   scroll: { flex: 1 },
   content: { paddingHorizontal: 28 },
-  kicker: { fontFamily: AmbitFont.body, fontSize: 11, fontWeight: '700', letterSpacing: 1.6, color: Brand.inkMuted, marginBottom: 4 },
+  kicker: { fontFamily: AmbitFont.semibold, fontSize: 11, letterSpacing: 1.6, textTransform: 'uppercase', color: Brand.inkMuted, marginBottom: 4 },
 
   field: { marginTop: 32 },
-  fieldLabel: { fontFamily: AmbitFont.body, fontSize: 11, fontWeight: '600', letterSpacing: 1.2, color: Brand.inkLabel, marginBottom: 12 },
-  input: { fontFamily: AmbitFont.display, fontSize: 22, color: Brand.inkPrimary, borderBottomWidth: 1.5, borderBottomColor: Brand.borderDefault, paddingBottom: 12 },
-  inputMultiline: { fontSize: 18, lineHeight: 25, minHeight: 60, textAlignVertical: 'top' },
+  helper: { fontFamily: AmbitFont.body, fontSize: 13, color: Brand.inkMuted, marginTop: 10, lineHeight: 18 },
 
-  secLabel: { fontFamily: AmbitFont.body, fontSize: 11, fontWeight: '600', letterSpacing: 1.2, color: Brand.inkLabel, marginTop: 36, marginBottom: 16 },
+  secLabel: { fontFamily: AmbitFont.semibold, fontSize: 11, letterSpacing: 1.2, textTransform: 'uppercase', color: Brand.inkLabel, marginTop: 36, marginBottom: 16 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  chip: { paddingHorizontal: 16, paddingVertical: 12, borderRadius: 999, backgroundColor: Brand.cardCream, borderWidth: 1.5, borderColor: Brand.inkEdge },
-  chipOn: { backgroundColor: Brand.action, borderWidth: 1.5, borderColor: Brand.actionInk },
-  chipText: { fontFamily: AmbitFont.body, fontSize: 14.5, fontWeight: '600', color: Brand.inkPrimary },
-  chipTextOn: { color: Brand.actionInk, fontWeight: '700' },
+  chip: { paddingHorizontal: 16, paddingVertical: 12, borderRadius: Radii.sm, backgroundColor: Brand.cardCream, borderWidth: 1, borderColor: Astra.hairlinePurple },
+  chipOn: { backgroundColor: Brand.action, borderColor: Brand.action },
+  chipText: { fontFamily: AmbitFont.medium, fontSize: 14.5, color: Brand.inkPrimary },
+  chipTextOn: { color: Brand.inkOnBrand, fontFamily: AmbitFont.semibold },
 
   toggleRow: { flexDirection: 'row', alignItems: 'center', gap: 16, paddingVertical: 16, marginTop: 36, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: Brand.borderSoft },
-  toggleLabel: { fontFamily: AmbitFont.body, fontSize: 15, fontWeight: '600', color: Brand.inkPrimary },
+  toggleLabel: { fontFamily: AmbitFont.semibold, fontSize: 15, color: Brand.inkPrimary },
   toggleHelp: { fontFamily: AmbitFont.body, fontSize: 12.5, color: Brand.inkMuted, marginTop: 3, lineHeight: 17 },
 
   deleteBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 16, marginTop: 8 },
-  deleteLabel: { fontFamily: AmbitFont.body, fontSize: 15, fontWeight: '600', color: Brand.danger },
+  deleteLabel: { fontFamily: AmbitFont.semibold, fontSize: 15, color: Brand.danger },
 
-  ctaWrap: { position: 'absolute', alignSelf: 'center' },
-  cta: {
-    backgroundColor: Brand.action,
-    borderWidth: 1.6,
-    borderColor: Brand.actionInk,
-    paddingHorizontal: 56,
-    paddingVertical: 16,
-    borderRadius: 999,
-    minWidth: 200,
-    alignItems: 'center',
-  },
-  ctaDisabled: { opacity: 0.4 },
-  ctaText: { fontFamily: AmbitFont.body, fontSize: 16, fontWeight: '700', color: Brand.actionInk },
+  ctaWrap: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
 });

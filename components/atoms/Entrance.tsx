@@ -1,7 +1,8 @@
 import React, { useEffect, useRef } from 'react';
-import { AccessibilityInfo, Animated } from 'react-native';
+import { Animated } from 'react-native';
 import type { StyleProp, ViewStyle } from 'react-native';
 import { Motion } from '../../constants/motion';
+import { useReducedMotion } from '../../hooks/useReducedMotion';
 
 interface Props {
   children: React.ReactNode;
@@ -22,26 +23,22 @@ interface Props {
 /// when on, content simply appears with no movement.
 export function Entrance({ children, index = 0, step = Motion.stagger, offset = 14, style }: Props) {
   const t = useRef(new Animated.Value(0)).current;
+  const reduceMotion = useReducedMotion();
 
   useEffect(() => {
-    let cancelled = false;
-    AccessibilityInfo.isReduceMotionEnabled()
-      .then((reduce) => {
-        if (cancelled) return;
-        if (reduce) {
-          t.setValue(1);
-          return;
-        }
-        Animated.timing(t, {
-          toValue: 1,
-          ...Motion.timing,
-          delay: index * step,
-          useNativeDriver: true,
-        }).start();
-      })
-      .catch(() => t.setValue(1));
-    return () => { cancelled = true; };
-  }, [t, index, step]);
+    if (reduceMotion) {
+      t.setValue(1);
+      return;
+    }
+    const anim = Animated.timing(t, {
+      toValue: 1,
+      ...Motion.timing,
+      delay: index * step,
+      useNativeDriver: true,
+    });
+    anim.start();
+    return () => anim.stop();
+  }, [t, index, step, reduceMotion]);
 
   return (
     <Animated.View

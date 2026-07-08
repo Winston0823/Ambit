@@ -3,6 +3,7 @@ import {
   Image,
   Platform,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -10,7 +11,7 @@ import {
 } from 'react-native';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { PencilSimple } from 'phosphor-react-native';
+import { CaretRight, PencilSimple } from 'phosphor-react-native';
 import * as Haptics from 'expo-haptics';
 import { BackChevron, Skeleton } from '../../components/atoms';
 import { getInbox, type InboxItem } from '../../lib/messaging';
@@ -18,15 +19,25 @@ import { supabase } from '../../lib/supabase';
 import { optimistic } from '../../lib/mutation';
 import { AmbitFont, Brand, Radii, Space } from '../../constants/theme';
 
-type Stage = { key: string; label: string; statuses: InboxItem['status'][] };
+/// Soft rgba tint of a stage hex — for the per-row wash, stripe, and label.
+function tint(hex: string, a: number): string {
+  const h = hex.replace('#', '');
+  const r = parseInt(h.slice(0, 2), 16);
+  const g = parseInt(h.slice(2, 4), 16);
+  const b = parseInt(h.slice(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${a})`;
+}
 
-/// Pipeline stages, top → bottom. "Passed" folds in auto_declined since
-/// both mean the same thing to the owner: this one's closed.
+type Stage = { key: string; label: string; accent: string; statuses: InboxItem['status'][] };
+
+/// Pipeline stages, top → bottom, each with its ASTRA accent (In Conversation =
+/// iris, Decision Pending = amber, Hired = emerald, Passed = muted). "Passed"
+/// folds in auto_declined since both mean the same thing to the owner: closed.
 const STAGES: Stage[] = [
-  { key: 'talking',  label: 'In conversation', statuses: ['active'] },
-  { key: 'decision', label: 'Decision pending', statuses: ['hired_pending'] },
-  { key: 'hired',    label: 'Hired',            statuses: ['hired'] },
-  { key: 'passed',   label: 'Passed',           statuses: ['passed', 'auto_declined'] },
+  { key: 'talking',  label: 'In conversation',  accent: '#9975CE', statuses: ['active'] },
+  { key: 'decision', label: 'Decision pending',  accent: '#C79A4C', statuses: ['hired_pending'] },
+  { key: 'hired',    label: 'Hired',             accent: '#10B981', statuses: ['hired'] },
+  { key: 'passed',   label: 'Passed',            accent: '#7B7481', statuses: ['passed', 'auto_declined'] },
 ];
 
 /// S-025 Project pipeline. The default destination when an owner taps a
@@ -40,21 +51,39 @@ export default function ProjectManageScreen() {
   const [title, setTitle] = useState<string>('');
   const [active, setActive] = useState<boolean>(true);
   const [candidates, setCandidates] = useState<InboxItem[] | null>(null);
+  // Invalid deep-link / deleted project → honest error state (mirrors
+  // project-edit) instead of an endless skeleton or a blank-titled pipeline.
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
-    if (!id) return;
-    const [{ data: proj }, inbox] = await Promise.all([
+    if (!id) {
+      setLoadError('This project link is invalid.');
+      setCandidates([]);
+      return;
+    }
+    const [{ data: proj, error: projErr }, inbox] = await Promise.all([
       supabase.from('projects').select('title, active').eq('id', id).maybeSingle(),
       getInbox().catch(() => [] as InboxItem[]),
     ]);
-    if (proj) {
-      setTitle((proj as { title: string }).title);
-      setActive((proj as { active: boolean }).active);
+    if (projErr || !proj) {
+      setLoadError('Project not found. It may have been deleted.');
+      setCandidates([]);
+      return;
     }
-    setCandidates(inbox.filter((i) => i.project_id === id));
+    setLoadError(null);
+    setTitle((proj as { title: string }).title);
+    setActive((proj as { active: boolean }).active);
+    const cands = inbox.filter((i) => i.project_id === id);
+    setCandidates(cands);
   }, [id]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try { await load(); } finally { setRefreshing(false); }
+  }, [load]);
 
   const toggleActive = async () => {
     if (Platform.OS !== 'web') Haptics.selectionAsync().catch(() => {});
@@ -69,6 +98,23 @@ export default function ProjectManageScreen() {
       errorMessage: next ? "Couldn't activate this project" : "Couldn't pause this project",
     });
   };
+
+  // Invalid id / not found / deleted → honest error state with a way back,
+  // never an endless spinner or a blank-titled pipeline.
+  if (loadError) {
+    return (
+      <View style={[styles.root, styles.center]}>
+        <BackChevron onPress={() => router.back()} />
+        <View style={styles.errorWrap}>
+          <Text style={styles.errorTitle}>Can't open this project</Text>
+          <Text style={styles.errorBody}>{loadError}</Text>
+          <Pressable onPress={() => router.back()} style={styles.errorBtn} accessibilityRole="button">
+            <Text style={styles.errorBtnText}>Go back</Text>
+          </Pressable>
+        </View>
+      </View>
+    );
+  }
 
   if (candidates === null) {
     // Mirror the real pipeline: back chevron + header (kicker, title, a status
@@ -111,6 +157,7 @@ export default function ProjectManageScreen() {
     <ScrollView
       style={styles.root}
       contentContainerStyle={[styles.content, { paddingTop: insets.top + 12, paddingBottom: insets.bottom + 60 }]}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Brand.accent} />}
     >
       <BackChevron onPress={() => router.back()} />
 
@@ -160,19 +207,27 @@ export default function ProjectManageScreen() {
         STAGES.map((stage) => {
           const rows = candidates.filter((c) => stage.statuses.includes(c.status));
           if (rows.length === 0) return null;
+          const accent = stage.accent;
           return (
             <View key={stage.key} style={styles.stage}>
-              <Text style={styles.stageLabel}>
+              <Text style={[styles.stageLabel, { color: accent }]}>
                 {stage.label.toUpperCase()} · {rows.length}
               </Text>
               {rows.map((c) => (
+                // Each row carries its stage identity: a 3px left accent stripe,
+                // a ~7% color wash, and the tinted group label above.
                 <Pressable
                   key={c.conversation_id}
-                  onPress={() => router.push({ pathname: '/chat/[id]', params: { id: c.conversation_id } })}
-                  style={({ pressed }) => [styles.candidate, pressed && { opacity: 0.7 }]}
+                  onPress={() => router.push({ pathname: '/thread/[id]', params: { id: c.conversation_id } })}
+                  style={({ pressed }) => [
+                    styles.candidate,
+                    { backgroundColor: tint(accent, 0.07) },
+                    pressed && { opacity: 0.7 },
+                  ]}
                   accessibilityRole="button"
-                  accessibilityLabel={`Open chat with ${c.partner_name}`}
+                  accessibilityLabel={`Open chat with ${c.partner_name} — ${stage.label}`}
                 >
+                  <View style={[styles.stripe, { backgroundColor: accent }]} pointerEvents="none" />
                   {c.partner_photo_url ? (
                     <Image source={{ uri: c.partner_photo_url }} style={styles.avatar} />
                   ) : (
@@ -193,6 +248,7 @@ export default function ProjectManageScreen() {
                       <Text style={styles.unreadText}>{c.unread_count}</Text>
                     </View>
                   )}
+                  <CaretRight size={18} color={Brand.inkPlaceholder} weight="bold" />
                 </Pressable>
               ))}
             </View>
@@ -206,6 +262,19 @@ export default function ProjectManageScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Brand.canvas },
   center: { alignItems: 'center', justifyContent: 'center' },
+  errorWrap: { paddingHorizontal: 40, alignItems: 'center' },
+  errorTitle: { fontFamily: AmbitFont.display, fontSize: 24, color: Brand.inkPrimary, textAlign: 'center' },
+  errorBody: { fontFamily: AmbitFont.body, fontSize: 14.5, color: Brand.inkMuted, textAlign: 'center', marginTop: 12, lineHeight: 21 },
+  errorBtn: {
+    marginTop: 28,
+    backgroundColor: Brand.action,
+    borderWidth: 1.6,
+    borderColor: Brand.actionInk,
+    paddingHorizontal: 40,
+    paddingVertical: 14,
+    borderRadius: 999,
+  },
+  errorBtnText: { fontFamily: AmbitFont.body, fontSize: 15, fontWeight: '700', color: Brand.actionInk },
   skelRow: { flexDirection: 'row', alignItems: 'center', gap: 16, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: Brand.borderSoft },
   content: { paddingHorizontal: Space.lg, gap: Space.md },
 
@@ -292,13 +361,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    padding: 12,
-    backgroundColor: Brand.cardCream,
-    borderRadius: Radii.lg,
-    borderWidth: 1,
-    borderColor: Brand.borderSoft,
+    paddingVertical: 12,
+    paddingRight: 12,
+    paddingLeft: 15, // clears the 3px stripe + 12 gutter
+    borderRadius: Radii.md,
+    overflow: 'hidden', // clip the stripe to the rounded corners
+    // Soft-shadow card (ASTRA pipeline rows).
+    shadowColor: '#0C0022',
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
   },
-  avatar: { width: 44, height: 44, borderRadius: 14 },
+  stripe: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 3 },
+  avatar: { width: 44, height: 44, borderRadius: Radii.md },
   avatarFallback: {
     backgroundColor: Brand.surface2,
     alignItems: 'center',

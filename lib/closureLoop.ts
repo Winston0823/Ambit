@@ -81,6 +81,20 @@ export async function confirmHire(conversationId: string): Promise<void> {
   if (error) throw error;
 }
 
+/// Revert a `hired_pending` conversation back to `active`. Used by BOTH
+/// sides of a stuck proposal: the recipient's "Not yet" (decline the
+/// proposal) and the proposer's "Withdraw proposal". The server RPC
+/// (migration 029) guards that the caller is a participant and that the
+/// status is actually `hired_pending`, then clears `hired_proposed_by`
+/// so the loop is fully reset. Idempotent-ish: a no-op raise if not
+/// pending is surfaced to the caller.
+export async function revertHireProposal(conversationId: string): Promise<void> {
+  const { error } = await supabase.rpc('revert_hire_proposal', {
+    p_conversation_id: conversationId,
+  });
+  if (error) throw new Error(error.message);
+}
+
 /// Set the owner's private funnel stage for a conversation. Owner-only on the
 /// server (the RPC guards `owner_id = auth.uid()`); a seeker call is a no-op.
 export async function updateOwnerStage(

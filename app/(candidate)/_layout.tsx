@@ -13,6 +13,10 @@ export default function CandidateLayout() {
       <Stack.Screen name="project-edit" />
       <Stack.Screen name="project-manage" />
       <Stack.Screen name="resume-import" />
+      {/* Chat thread reached from outside the Chat tab (pipeline / projects /
+          saved) — pushed here on the outer stack so back returns to the entry
+          point instead of hijacking the Chat tab. */}
+      <Stack.Screen name="thread/[id]" />
     </Stack>
   );
 }

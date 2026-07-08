@@ -64,7 +64,7 @@ export function ResumeImportSheet({ visible, onClose, userId, onParsed }: Props)
           disabled={pasteText.trim().length < 20 || busy}
           style={[styles.primaryBtn, (pasteText.trim().length < 20 || busy) && styles.disabled]}
         >
-          <ClipboardText size={18} color={Brand.actionInk} weight="bold" />
+          <ClipboardText size={18} color={Brand.inkOnBrand} weight="bold" />
           <Text style={styles.primaryBtnText}>Parse pasted text</Text>
         </Pressable>
 
@@ -107,7 +107,7 @@ const styles = StyleSheet.create({
     marginTop: 12, paddingVertical: 14, borderRadius: 999,
     backgroundColor: Brand.action, borderWidth: 1.6, borderColor: Brand.actionInk,
   },
-  primaryBtnText: { fontFamily: AmbitFont.body, fontSize: 15, fontWeight: '700', color: Brand.actionInk },
+  primaryBtnText: { fontFamily: AmbitFont.body, fontSize: 15, fontWeight: '700', color: Brand.inkOnBrand },
   orRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 18 },
   orLine: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: Brand.borderDefault },
   orText: { fontFamily: AmbitFont.body, fontSize: 11, fontWeight: '700', letterSpacing: 1.2, color: Brand.inkMuted },

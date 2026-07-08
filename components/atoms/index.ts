@@ -10,3 +10,5 @@ export { Tactile } from './Tactile';
 export { Celebrate } from './Celebrate';
 export { HardShadow } from './HardShadow';
 export { Skeleton } from './Skeleton';
+export { GlassSurface } from './GlassSurface';
+export { TopAppBar } from './TopAppBar';

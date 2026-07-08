@@ -170,7 +170,7 @@ export function SkillTagsScreen({ onBack, onContinue }: Props) {
               value={customInput}
               onChangeText={setCustomInput}
               placeholder="Add a skill…"
-              placeholderTextColor="rgba(0,0,0,0.3)"
+              placeholderTextColor={Brand.inkPlaceholder}
               style={styles.customInput}
               returnKeyType="done"
               onSubmitEditing={addCustom}
@@ -227,9 +227,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 8,
     marginTop: 16, marginHorizontal: Space.lg,
     paddingHorizontal: 16, paddingVertical: 10, borderRadius: 999,
-    backgroundColor: 'rgba(166, 199, 194, 0.22)',
+    backgroundColor: Brand.seekerSurface,
   },
-  importBtnText: { fontFamily: AmbitFont.body, fontSize: 13.5, fontWeight: '700', color: Brand.actionDeep },
+  importBtnText: { fontFamily: AmbitFont.bold, fontSize: 13.5, color: Brand.actionDeep },
   watermark: {
     position: 'absolute',
     top: 110,
@@ -237,12 +237,11 @@ const styles = StyleSheet.create({
     opacity: 0.08,
   },
   kicker: {
-    fontFamily: AmbitFont.body,
+    fontFamily: AmbitFont.semibold,
     fontSize: 12,
-    fontWeight: '600',
     letterSpacing: 1.5,
     textTransform: 'uppercase',
-    color: Brand.actionDeep,
+    color: Brand.inkLabel,
     paddingHorizontal: Space.lg,
     marginTop: 40,
     marginBottom: 4,
@@ -269,10 +268,9 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   counterText: {
-    fontFamily: AmbitFont.body,
+    fontFamily: AmbitFont.bold,
     fontSize: 11,
-    fontWeight: '700',
-    color: Brand.actionInk,
+    color: Brand.inkOnBrand,
   },
   scrollWrap: {
     flex: 1,
@@ -315,18 +313,18 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 999,
     paddingHorizontal: 16,
-    backgroundColor: 'rgba(0,0,0,0.05)',
+    backgroundColor: Brand.surface1,
     borderWidth: 1.5,
-    borderColor: 'rgba(0,0,0,0.1)',
+    borderColor: Brand.borderDefault,
     fontFamily: AmbitFont.body,
     fontSize: 14,
-    color: '#141414',
+    color: Brand.inkBody,
   },
   customAddBtn: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#D4B490',
+    backgroundColor: Brand.action,
     alignItems: 'center',
     justifyContent: 'center',
   },
