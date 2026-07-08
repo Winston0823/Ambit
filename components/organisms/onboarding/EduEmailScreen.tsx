@@ -29,7 +29,7 @@ export function EduEmailScreen({ onBack, onContinue }: Props) {
   // common international academic TLDs pass; junk shows a reason, not a silent
   // disabled button.
   const emailCheck = checkEduEmail(profile.eduEmail);
-  const isValid = emailCheck.valid && password.length >= 6;
+  const isValid = emailCheck.valid && password.length >= 8;
 
   const handleSubmit = async () => {
     if (!isValid || sending) return;
@@ -120,7 +120,7 @@ export function EduEmailScreen({ onBack, onContinue }: Props) {
             <TextInput
               value={password}
               onChangeText={setPassword}
-              placeholder="6+ characters"
+              placeholder="8+ characters"
               placeholderTextColor={Brand.inkPlaceholder}
               secureTextEntry
               autoCapitalize="none"

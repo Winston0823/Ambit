@@ -184,20 +184,26 @@ export function PartnerProfileIsland({
           .eq('owner_id',  partnerId),
       ]);
       if (cancelled) return;
-      const rows = [...(a.data ?? []), ...(b.data ?? [])] as Array<{
+      // PostgREST types a to-one embed as an array, so `projects` can come
+      // back as an object OR a single-element array depending on introspection.
+      // Cast through `unknown` and normalize both shapes when reading.
+      const rows = [...(a.data ?? []), ...(b.data ?? [])] as unknown as Array<{
         id: string;
         last_message_at: string;
         status: SiblingChat['status'];
-        projects: { title: string } | null;
+        projects: { title: string } | { title: string }[] | null;
       }>;
       const sibs: SiblingChat[] = rows
         .filter((r) => r.id !== currentConversationId)
-        .map((r) => ({
-          id:              r.id,
-          project_title:   r.projects?.title ?? '(untitled project)',
-          last_message_at: r.last_message_at,
-          status:          r.status,
-        }))
+        .map((r) => {
+          const proj = Array.isArray(r.projects) ? r.projects[0] : r.projects;
+          return {
+            id:              r.id,
+            project_title:   proj?.title ?? '(untitled project)',
+            last_message_at: r.last_message_at,
+            status:          r.status,
+          };
+        })
         .sort((x, y) => y.last_message_at.localeCompare(x.last_message_at));
       setSiblings(sibs);
     })();
