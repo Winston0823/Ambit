@@ -61,6 +61,15 @@ Deno.serve(async (req) => {
     return new Response('Method not allowed', { status: 405 });
   }
 
+  // Only the database webhook may trigger this — it's configured to send the
+  // service-role key as a Bearer token. Without this check the endpoint would
+  // be public and anyone could POST a fake payload to spam/phish users with
+  // push notifications. Compare against the service-role key we hold in env.
+  const authHeader = req.headers.get('Authorization');
+  if (authHeader !== `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`) {
+    return new Response('Unauthorized', { status: 401 });
+  }
+
   let payload: WebhookPayload;
   try {
     payload = await req.json();

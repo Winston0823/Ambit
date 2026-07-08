@@ -164,14 +164,15 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
     setProfileRoleCache(userId, resolvedRole);
 
     // Fire-and-forget: generate vibe embedding via Edge Function.
-    // Failures are non-fatal — the profile is already saved.
+    // Failures are non-fatal — the profile is already saved. Use invoke()
+    // (not raw fetch) so the caller's JWT is attached — embed-vibe now
+    // requires auth + ownership, and the row id here IS the user id.
     if (profile.vibeBlurb.trim().length > 0) {
-      const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
-      fetch(`${supabaseUrl}/functions/v1/embed-vibe`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ table: 'profiles', id: userId, text: profile.vibeBlurb }),
-      }).catch(() => {/* non-blocking */});
+      supabase.functions
+        .invoke('embed-vibe', {
+          body: { table: 'profiles', id: userId, text: profile.vibeBlurb },
+        })
+        .catch(() => {/* non-blocking */});
     }
   };
 

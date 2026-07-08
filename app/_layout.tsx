@@ -21,6 +21,7 @@ import { AuthProvider, useAuth } from '../context/AuthContext';
 import { SavedDeckProvider } from '../context/SavedDeckContext';
 import { Brand } from '../constants/theme';
 import { OnboardingInline, ToastHost } from '../components/organisms';
+import { ErrorBoundary } from '../components/ErrorBoundary';
 import Constants from 'expo-constants';
 import { useProfileRole } from '../hooks/useProfileRole';
 import { clearBadge } from '../lib/pushNotifications';
@@ -51,15 +52,17 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={styles.root}>
       <SafeAreaProvider>
-        <AuthProvider>
-          <SavedDeckProvider>
-            <StatusBar style="dark" />
-            <Gate />
-            {/* Single app-wide toast surface — overlays onboarding + app so
-                any layer's toast.error(...) is visible (audit theme 1). */}
-            <ToastHost />
-          </SavedDeckProvider>
-        </AuthProvider>
+        <ErrorBoundary>
+          <AuthProvider>
+            <SavedDeckProvider>
+              <StatusBar style="dark" />
+              <Gate />
+              {/* Single app-wide toast surface — overlays onboarding + app so
+                  any layer's toast.error(...) is visible (audit theme 1). */}
+              <ToastHost />
+            </SavedDeckProvider>
+          </AuthProvider>
+        </ErrorBoundary>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

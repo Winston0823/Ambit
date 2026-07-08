@@ -155,6 +155,7 @@ returns table (
 language sql
 stable
 security definer
+set search_path = public
 as $$
   with proj as (
     select required_skills, vibe_embedding
