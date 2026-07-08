@@ -6,6 +6,7 @@ import { Button } from '../../atoms';
 import { SocialAuthButtons, LegalModal } from '../../molecules';
 import { useAuth } from '../../../context/AuthContext';
 import { PRIVACY_POLICY, TERMS_OF_USE, type LegalDoc } from '../../../constants/legal';
+import { toast } from '../../../lib/toast';
 import { Brand, AmbitFont, Radii, Space } from '../../../constants/theme';
 
 interface Props {
@@ -31,10 +32,12 @@ export function WelcomeScreen({ onCreateAccount, onSignIn, onSocialSignedIn }: P
   const [legalDoc, setLegalDoc] = useState<LegalDoc | null>(null);
 
   const toggleAgree = () => { setAgreed((a) => !a); setAgreeError(false); };
-  // Returns true if the user has agreed; otherwise flags the checkbox and stops.
+  // Returns true if the user has agreed; otherwise flags the checkbox (now at
+  // the bottom) and toasts, since the tapped CTA is up top away from it.
   const requireAgreement = (): boolean => {
     if (agreed) return true;
     setAgreeError(true);
+    toast.error('Please agree to the Terms & Privacy Policy first.');
     return false;
   };
 
@@ -82,39 +85,6 @@ export function WelcomeScreen({ onCreateAccount, onSignIn, onSocialSignedIn }: P
         </Text>
 
         <View style={styles.cta}>
-          <Pressable
-            style={styles.agreeRow}
-            onPress={toggleAgree}
-            accessibilityRole="checkbox"
-            accessibilityState={{ checked: agreed }}
-            accessibilityLabel="I agree to the Terms of Use and Privacy Policy"
-          >
-            <View style={[styles.checkbox, agreed && styles.checkboxOn, agreeError && !agreed && styles.checkboxError]}>
-              {agreed && <Check size={13} color={Brand.inkOnBrand} weight="bold" />}
-            </View>
-            <Text style={styles.agreeText}>
-              I agree to the{' '}
-              <Text style={styles.agreeLink} onPress={() => setLegalDoc(TERMS_OF_USE)}>Terms of Use</Text>
-              {' '}and{' '}
-              <Text style={styles.agreeLink} onPress={() => setLegalDoc(PRIVACY_POLICY)}>Privacy Policy</Text>.
-            </Text>
-          </Pressable>
-          {agreeError && !agreed && (
-            <Text style={styles.agreeErrorText}>Please agree to the Terms to continue.</Text>
-          )}
-
-          <SocialAuthButtons
-            onAppleSignIn={handleApple}
-            onGoogleSignIn={handleGoogle}
-            busy={busy}
-          />
-
-          <View style={styles.dividerRow}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>or</Text>
-            <View style={styles.dividerLine} />
-          </View>
-
           <Button
             title="Create account"
             onPress={handleCreateAccount}
@@ -126,13 +96,44 @@ export function WelcomeScreen({ onCreateAccount, onSignIn, onSocialSignedIn }: P
             onPress={onSignIn}
             variant="secondary"
           />
-        </View>
 
-        <Pressable onPress={handleCreateAccount}>
-          <Text style={styles.fineprint}>
-            New here? Set up takes about two minutes.
+          <View style={styles.dividerRow}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>or</Text>
+            <View style={styles.dividerLine} />
+          </View>
+
+          <SocialAuthButtons
+            onAppleSignIn={handleApple}
+            onGoogleSignIn={handleGoogle}
+            busy={busy}
+            layout="icons"
+          />
+        </View>
+      </View>
+
+      {/* Agree gate — pinned to the bottom. Gates every account-creation path. */}
+      <View style={[styles.agreeBar, { paddingBottom: 8 }]}>
+        <Pressable
+          style={styles.agreeRow}
+          onPress={toggleAgree}
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked: agreed }}
+          accessibilityLabel="I agree to the Terms of Use and Privacy Policy"
+        >
+          <View style={[styles.checkbox, agreed && styles.checkboxOn, agreeError && !agreed && styles.checkboxError]}>
+            {agreed && <Check size={13} color={Brand.inkOnBrand} weight="bold" />}
+          </View>
+          <Text style={styles.agreeText}>
+            I agree to the{' '}
+            <Text style={styles.agreeLink} onPress={() => setLegalDoc(TERMS_OF_USE)}>Terms of Use</Text>
+            {' '}and{' '}
+            <Text style={styles.agreeLink} onPress={() => setLegalDoc(PRIVACY_POLICY)}>Privacy Policy</Text>.
           </Text>
         </Pressable>
+        {agreeError && !agreed && (
+          <Text style={styles.agreeErrorText}>Please agree to the Terms to continue.</Text>
+        )}
       </View>
 
       <LegalModal doc={legalDoc} onClose={() => setLegalDoc(null)} />
@@ -183,6 +184,10 @@ const styles = StyleSheet.create({
   cta: {
     gap: 12,
     marginTop: 48,
+  },
+  // Bottom-anchored agree gate.
+  agreeBar: {
+    paddingTop: 12,
   },
   agreeRow: {
     flexDirection: 'row',
@@ -238,12 +243,5 @@ const styles = StyleSheet.create({
     color: Brand.inkMuted,
     textTransform: 'uppercase',
     letterSpacing: 1.2,
-  },
-  fineprint: {
-    fontFamily: AmbitFont.body,
-    fontSize: 13,
-    color: Brand.inkMuted,
-    textAlign: 'center',
-    marginTop: 20,
   },
 });

@@ -145,6 +145,9 @@ const styles = StyleSheet.create({
     width: 52,
     height: 18,
     marginLeft: 8,
+    // Light-purple (iris) decorative accent from the ASTRA design system,
+    // instead of the PNG's baked-in color.
+    tintColor: Brand.accent,
   },
   fullWidth: {
     alignSelf: 'stretch',
