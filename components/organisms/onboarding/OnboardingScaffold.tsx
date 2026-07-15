@@ -109,7 +109,9 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingHorizontal: Space.lg,
-    marginTop: 40,
+    // Clears the absolutely-positioned BackChevron (top: insets.top+8, ~44pt)
+    // so the kicker/headline don't crowd it.
+    marginTop: 60,
     marginBottom: Space.lg,
   },
   kicker: {
