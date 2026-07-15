@@ -585,8 +585,6 @@ const styles = StyleSheet.create({
   skelRowShadow: { marginBottom: 12 },
   skelCard: {
     backgroundColor: Brand.cardCream,
-    borderWidth: 1.5,
-    borderColor: Brand.inkEdge,
     borderRadius: Radii.card,
     padding: 16,
     gap: 8,
