@@ -21,6 +21,7 @@ export async function readLocalFileAsArrayBuffer(uri: string): Promise<ArrayBuff
 export interface ContactCard {
   name:          string | null;
   email:         string | null;
+  phone?:        string | null;
   github_url?:   string | null;
   linkedin_url?: string | null;
   portfolio_url?:string | null;

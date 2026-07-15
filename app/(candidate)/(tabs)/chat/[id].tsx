@@ -1000,15 +1000,16 @@ export default function ThreadScreen() {
     if (!user || !conversationId) return;
     const { data: prof } = await supabase
       .from('profiles')
-      .select('name, github_url, linkedin_url, portfolio_url')
+      .select('name, phone, github_url, linkedin_url, portfolio_url')
       .eq('id', user.id)
       .maybeSingle();
     const p = prof as
-      | { name: string | null; github_url: string | null; linkedin_url: string | null; portfolio_url: string | null }
+      | { name: string | null; phone: string | null; github_url: string | null; linkedin_url: string | null; portfolio_url: string | null }
       | null;
     const card: ContactCard = {
       name:          p?.name ?? null,
       email:         user.email ?? null,
+      phone:         p?.phone ?? null,
       github_url:    p?.github_url ?? null,
       linkedin_url:  p?.linkedin_url ?? null,
       portfolio_url: p?.portfolio_url ?? null,

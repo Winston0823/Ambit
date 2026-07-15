@@ -1,6 +1,6 @@
 import React from 'react';
 import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
-import { AddressBook, Envelope, GithubLogo, Globe, LinkedinLogo } from 'phosphor-react-native';
+import { AddressBook, Envelope, GithubLogo, Globe, LinkedinLogo, Phone } from 'phosphor-react-native';
 import type { ContactCard } from '../../lib/messaging';
 import { AmbitFont, Astra, Brand, Radii } from '../../constants/theme';
 
@@ -31,6 +31,16 @@ function safeEmail(raw: string | null | undefined): string | null {
   return /^[^\s@,;:<>()"?&]+@[^\s@,;:<>()"?&]+\.[^\s@,;:<>()"?&]+$/.test(e) ? e : null;
 }
 
+/// A dialable phone: digits with optional leading +, spaces, dashes, parens.
+/// Returns the display value + a stripped tel: target, or null if implausible.
+function safePhone(raw: string | null | undefined): { display: string; tel: string } | null {
+  if (!raw) return null;
+  const p = raw.trim();
+  if (!/^\+?[\d\s().-]{7,20}$/.test(p)) return null;
+  const tel = p.replace(/[^\d+]/g, '');
+  return tel.length >= 7 ? { display: p, tel: `tel:${tel}` } : null;
+}
+
 /// Contact-info card rendered in place of a normal bubble when a message carries
 /// a `contact_card` snapshot. Clean informational card (not the dark
 /// image-forward attachment shell) — name, email, and profile links, each row
@@ -40,11 +50,13 @@ export function ContactCardBubble({ card, isMine }: Props) {
   // Sanitize every actionable value before it becomes a tappable link. Rows
   // that don't sanitize cleanly are dropped rather than shown as a bad link.
   const email = safeEmail(card.email);
+  const phone = safePhone(card.phone);
   const gh    = safeHttpUrl(card.github_url);
   const li    = safeHttpUrl(card.linkedin_url);
   const site  = safeHttpUrl(card.portfolio_url);
   const rows: { key: string; Icon: typeof Envelope; label: string; url: string }[] = [];
   if (email) rows.push({ key: 'email', Icon: Envelope, label: email, url: `mailto:${email}` });
+  if (phone) rows.push({ key: 'phone', Icon: Phone, label: phone.display, url: phone.tel });
   if (gh)    rows.push({ key: 'gh', Icon: GithubLogo, label: 'GitHub', url: gh });
   if (li)    rows.push({ key: 'li', Icon: LinkedinLogo, label: 'LinkedIn', url: li });
   if (site)  rows.push({ key: 'site', Icon: Globe, label: 'Portfolio', url: site });
