@@ -1030,7 +1030,9 @@ export default function ThreadScreen() {
     markPending(clientId);
     scrollToEnd();
     try {
-      const real = await sendContactCard({ conversationId, senderId: user.id, card, clientId });
+      // The server rebuilds the card authoritatively from our profile; the
+      // optimistic `card` above is only the sender's instant preview.
+      const real = await sendContactCard({ conversationId, clientId });
       setMessages((prev) => prev.map((m) => (m.id === clientId ? real : m)));
       markSent(clientId);
     } catch {

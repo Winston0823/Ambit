@@ -9,17 +9,45 @@ interface Props {
   isMine: boolean;
 }
 
+/// Only ever open http/https URLs — reject javascript:, data:, tel:, custom
+/// app schemes, and anything with whitespace/control chars. A bare host gets
+/// https:// prepended. Returns null when the value can't be made safe.
+function safeHttpUrl(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  let u = raw.trim();
+  if (!u || /\s/.test(u)) return null;
+  if (!/^https?:\/\//i.test(u)) {
+    if (/^[a-z][a-z0-9+.-]*:/i.test(u)) return null; // some other scheme → reject
+    u = 'https://' + u;
+  }
+  return u;
+}
+
+/// A plausible single email with no characters that could inject extra mailto
+/// headers (?, &, commas, CR/LF, angle brackets). Returns null otherwise.
+function safeEmail(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const e = raw.trim();
+  return /^[^\s@,;:<>()"?&]+@[^\s@,;:<>()"?&]+\.[^\s@,;:<>()"?&]+$/.test(e) ? e : null;
+}
+
 /// Contact-info card rendered in place of a normal bubble when a message carries
 /// a `contact_card` snapshot. Clean informational card (not the dark
 /// image-forward attachment shell) — name, email, and profile links, each row
 /// tappable to open. ASTRA: cream surface, lilac hairline, royal accents.
 export function ContactCardBubble({ card, isMine }: Props) {
   const open = (url: string) => Linking.openURL(url).catch(() => {});
+  // Sanitize every actionable value before it becomes a tappable link. Rows
+  // that don't sanitize cleanly are dropped rather than shown as a bad link.
+  const email = safeEmail(card.email);
+  const gh    = safeHttpUrl(card.github_url);
+  const li    = safeHttpUrl(card.linkedin_url);
+  const site  = safeHttpUrl(card.portfolio_url);
   const rows: { key: string; Icon: typeof Envelope; label: string; url: string }[] = [];
-  if (card.email) rows.push({ key: 'email', Icon: Envelope, label: card.email, url: `mailto:${card.email}` });
-  if (card.github_url) rows.push({ key: 'gh', Icon: GithubLogo, label: 'GitHub', url: card.github_url });
-  if (card.linkedin_url) rows.push({ key: 'li', Icon: LinkedinLogo, label: 'LinkedIn', url: card.linkedin_url });
-  if (card.portfolio_url) rows.push({ key: 'site', Icon: Globe, label: 'Portfolio', url: card.portfolio_url });
+  if (email) rows.push({ key: 'email', Icon: Envelope, label: email, url: `mailto:${email}` });
+  if (gh)    rows.push({ key: 'gh', Icon: GithubLogo, label: 'GitHub', url: gh });
+  if (li)    rows.push({ key: 'li', Icon: LinkedinLogo, label: 'LinkedIn', url: li });
+  if (site)  rows.push({ key: 'site', Icon: Globe, label: 'Portfolio', url: site });
 
   return (
     <View style={styles.card}>

@@ -323,25 +323,18 @@ export async function sendPortfolioAttachment(args: {
   return data as MessageRow;
 }
 
-/// Share a contact card — a snapshot of the sender's own details. Mirrors the
-/// portfolio-attachment path (optimistic-friendly via clientId).
+/// Share a contact card. The card's identity (name, email, links) is built
+/// SERVER-SIDE from the caller's own profile via the `share_contact_card` RPC —
+/// the client can't supply it, so it can't be spoofed. `clientId` keeps the
+/// optimistic bubble reconcilable with the returned row.
 export async function sendContactCard(args: {
   conversationId: string;
-  senderId:       string;
-  card:           ContactCard;
   clientId?:      string;
 }): Promise<MessageRow> {
-  const { data, error } = await supabase
-    .from('messages')
-    .insert({
-      ...(args.clientId ? { id: args.clientId } : {}),
-      conversation_id: args.conversationId,
-      sender_id:       args.senderId,
-      body:            'Shared contact info',
-      contact_card:    args.card,
-    })
-    .select('*')
-    .single();
+  const { data, error } = await supabase.rpc('share_contact_card', {
+    p_conversation_id: args.conversationId,
+    p_client_id:       args.clientId ?? null,
+  });
   if (error) throw error;
   return data as MessageRow;
 }
