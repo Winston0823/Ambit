@@ -504,8 +504,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: Space.md,
     paddingTop: 20,
     backgroundColor: Brand.cardCream,
-    borderTopWidth: 1.5,
-    borderTopColor: Brand.inkEdge,
+    // ASTRA: soft lilac hairline, not the old hard ink edge.
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: Brand.navBarHairline,
   },
   attachGridRow: {
     flexDirection: 'row',
@@ -523,18 +524,20 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   attachTileDisabled: { opacity: 0.45 },
-  // Large tactile tile — the icon is the action's main signal. App button
-  // language: royal `action` fill, 1.5px ink border, soft lift (the
-  // <HardShadow> wrapper). Radius on the 4px grid (Radii.lg).
+  // Large tactile tile — the icon is the action's main signal. ASTRA: royal
+  // `action` fill lifted by a soft royal-tinted shadow, no hard ink border.
   attachTileIcon: {
     width: 64,
     height: 64,
     borderRadius: Radii.lg,
     backgroundColor: Brand.action,
-    borderWidth: 1.5,
-    borderColor: Brand.inkEdge,
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: Brand.action,
+    shadowOpacity: 0.22,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 7 },
+    elevation: 5,
   },
   attachTileLabel: {
     fontFamily: AmbitFont.body,
