@@ -31,7 +31,12 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.winstongu.ambit"
+      "package": "com.winstongu.ambit",
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.READ_CALENDAR",
+        "android.permission.WRITE_CALENDAR"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -115,6 +120,12 @@
         }
       ],
       "expo-secure-store"
-    ]
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "3cc15684-5f3c-4961-b268-179fe9f84800"
+      }
+    }
   }
 }
