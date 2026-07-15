@@ -113,11 +113,8 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: Radii.card,
     backgroundColor: Brand.cardCream,
-    borderWidth: 1.5,
-    borderColor: Brand.inkEdge,
     overflow: 'hidden',
-    // Depth comes from the <HardShadow> wrapper (crisp offset block) — the
-    // vocabulary forbids soft RN shadows.
+    // No border — depth comes from the <HardShadow> wrapper alone.
   },
   idz: { padding: 24 },
   idRow: { flexDirection: 'row', gap: 16, alignItems: 'center' },

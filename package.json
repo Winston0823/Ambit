@@ -6,7 +6,8 @@
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "postinstall": "patch-package"
   },
   "dependencies": {
     "@expo-google-fonts/playfair-display": "^0.4.2",
@@ -15,7 +16,7 @@
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-native-community/datetimepicker": "8.4.5",
     "@react-navigation/material-top-tabs": "^7.4.28",
-    "@supabase/supabase-js": "^2.106.1",
+    "@supabase/supabase-js": "2.106.1",
     "base64-arraybuffer": "^1.0.2",
     "expo": "~54.0.34",
     "expo-apple-authentication": "~8.0.7",
@@ -56,6 +57,7 @@
     "@types/react": "~19.1.0",
     "babel-plugin-transform-remove-console": "^6.9.4",
     "babel-preset-expo": "~54.0.10",
+    "patch-package": "^8.0.1",
     "typescript": "~5.9.2"
   },
   "private": true
