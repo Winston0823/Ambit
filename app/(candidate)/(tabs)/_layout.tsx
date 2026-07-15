@@ -29,7 +29,13 @@ const TAB_TO_ROUTE: Record<NavTabKey, string> = {
 export default function TabsLayout() {
   const { user } = useAuth();
   const segments = useSegments();
-  const inThread = segments[segments.length - 1] === '[id]';
+  const activeSegment = segments[segments.length - 1];
+  const inThread = activeSegment === '[id]';
+  // On Discovery, horizontal swipes must drive the card deck — never page the
+  // tab carousel. Driven at the NAVIGATOR level (not per-Screen options, which
+  // material-top-tabs applies unreliably on the initial route → the deck felt
+  // "dead" on first launch). Recomputed on every focus change.
+  const onDiscovery = activeSegment === 'feed';
 
   // Unread badge on the Chat tab (kept in sync via realtime).
   const [hasUnread, setHasUnread] = useState(false);
@@ -71,7 +77,9 @@ export default function TabsLayout() {
   return (
     <MaterialTopTabs
       tabBarPosition="bottom"
-      screenOptions={{ lazy: false, swipeEnabled: true }}
+      // Tab-swipe off on Discovery (deck owns the gesture) and inside a thread;
+      // on everywhere else so the tab carousel still feels swipeable.
+      screenOptions={{ lazy: false, swipeEnabled: !onDiscovery && !inThread }}
       tabBar={({ state, navigation }: any) => {
         const currentRoute = state.routes[state.index].name;
         const activeKey = ROUTE_TO_TAB[currentRoute] ?? 'discovery';
@@ -85,11 +93,11 @@ export default function TabsLayout() {
         );
       }}
     >
-      <MaterialTopTabs.Screen name="feed" options={{ swipeEnabled: false } as any} />
-      {/* Disable tab-swipe inside a thread: a horizontal drag there is the
-          stage rail (or just shouldn't page you out to Discovery). The inbox
-          (not inThread) keeps swipe-nav. */}
-      <MaterialTopTabs.Screen name="chat" options={{ swipeEnabled: !inThread } as any} />
+      {/* swipeEnabled is controlled at the navigator level above (off on
+          Discovery + inside a thread), not per-screen — per-screen options are
+          applied unreliably on the initial route. */}
+      <MaterialTopTabs.Screen name="feed" />
+      <MaterialTopTabs.Screen name="chat" />
       <MaterialTopTabs.Screen name="projects" />
       <MaterialTopTabs.Screen name="profile" />
     </MaterialTopTabs>
