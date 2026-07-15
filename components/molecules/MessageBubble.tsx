@@ -37,6 +37,7 @@ import type { ProjectRefRow } from '../../lib/messaging';
 import type { PortfolioItem } from '../../data/mock';
 import { ProjectAttachmentBubble } from './ProjectAttachmentBubble';
 import { PortfolioAttachmentBubble } from './PortfolioAttachmentBubble';
+import { ContactCardBubble } from './ContactCardBubble';
 import { AmbitFont, Brand, Radii, Space } from '../../constants/theme';
 import { Motion } from '../../constants/motion';
 
@@ -381,6 +382,16 @@ export function MessageBubble({
           isMine={isMine}
           onPress={() => onOpenPortfolioRef?.(portfolioRef)}
         />
+        {sendStatusRow}
+      </View>
+    );
+  }
+
+  // Contact-info card — the sender's shared contact details.
+  if (message.contact_card && !isDeleted) {
+    return (
+      <View style={[styles.row, isMine ? styles.rowMine : styles.rowTheirs]}>
+        <ContactCardBubble card={message.contact_card} isMine={isMine} />
         {sendStatusRow}
       </View>
     );

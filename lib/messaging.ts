@@ -17,6 +17,16 @@ export async function readLocalFileAsArrayBuffer(uri: string): Promise<ArrayBuff
 
 // ─── Types ──────────────────────────────────────────────────────────
 
+/// Snapshot of a person's contact details, shared as a chat message.
+export interface ContactCard {
+  name:          string | null;
+  email:         string | null;
+  phone?:        string | null;
+  github_url?:   string | null;
+  linkedin_url?: string | null;
+  portfolio_url?:string | null;
+}
+
 export interface MessageRow {
   id:              string;
   conversation_id: string;
@@ -37,6 +47,9 @@ export interface MessageRow {
   /// When set, this message carries a shared portfolio highlight; the bubble
   /// renders a tappable highlight card. Added in 014_message_portfolio_ref.
   portfolio_ref_id?: string | null;
+  /// When set, this message is a "Share contact info" card — a snapshot of the
+  /// sender's own contact details. Added in 033_contact_card.
+  contact_card?:   ContactCard | null;
   edited_at:       string | null;
   deleted_at:      string | null;
   created_at:      string;
@@ -307,6 +320,22 @@ export async function sendPortfolioAttachment(args: {
     })
     .select('*')
     .single();
+  if (error) throw error;
+  return data as MessageRow;
+}
+
+/// Share a contact card. The card's identity (name, email, links) is built
+/// SERVER-SIDE from the caller's own profile via the `share_contact_card` RPC —
+/// the client can't supply it, so it can't be spoofed. `clientId` keeps the
+/// optimistic bubble reconcilable with the returned row.
+export async function sendContactCard(args: {
+  conversationId: string;
+  clientId?:      string;
+}): Promise<MessageRow> {
+  const { data, error } = await supabase.rpc('share_contact_card', {
+    p_conversation_id: args.conversationId,
+    p_client_id:       args.clientId ?? null,
+  });
   if (error) throw error;
   return data as MessageRow;
 }

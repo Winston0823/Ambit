@@ -71,6 +71,9 @@ interface ProfileRow {
   role: 'owner' | 'seeker' | null;
   campus_id: string | null;
   photo_url: string | null;
+  /// Optional phone — only ever shared via the chat contact card, never on
+  /// discovery. Null until the user adds one.
+  phone: string | null;
   /// Closure-loop cache: fraction of reach-outs acted on within 72h.
   /// null until the user has at least one conversation aged past 72h.
   response_rate: number | null;
@@ -137,8 +140,10 @@ export default function ProfileTab() {
   // canonical row changes (focus refetch, résumé import, etc.).
   const [nameDraft, setNameDraft] = useState('');
   const [aboutDraft, setAboutDraft] = useState('');
+  const [phoneDraft, setPhoneDraft] = useState('');
   useEffect(() => { setNameDraft(profile?.name ?? ''); }, [profile?.name]);
   useEffect(() => { setAboutDraft(profile?.vibe_blurb ?? ''); }, [profile?.vibe_blurb]);
+  useEffect(() => { setPhoneDraft(profile?.phone ?? ''); }, [profile?.phone]);
 
   // Edit modal state
   const [skillsOpen, setSkillsOpen] = useState(false);
@@ -203,7 +208,7 @@ export default function ProfileTab() {
     setLoadError(false);
     const full = await supabase
       .from('profiles')
-      .select('id, name, vibe_blurb, skills, role, campus_id, photo_url, response_rate, avg_response_minutes')
+      .select('id, name, vibe_blurb, skills, role, campus_id, photo_url, phone, response_rate, avg_response_minutes')
       .eq('id', user.id)
       .maybeSingle();
     if (!full.error) {
@@ -228,7 +233,7 @@ export default function ProfileTab() {
     } else {
       setProfile(
         base.data
-          ? ({ ...(base.data as object), response_rate: null, avg_response_minutes: null } as ProfileRow)
+          ? ({ ...(base.data as object), phone: null, response_rate: null, avg_response_minutes: null } as ProfileRow)
           : null,
       );
     }
@@ -265,7 +270,7 @@ export default function ProfileTab() {
   /// Commit an inline text field on blur — only writes when the trimmed draft
   /// actually diverges from the saved value, so a focus/blur with no change is
   /// a no-op (no needless network write or embed refresh).
-  const commitText = (field: 'name' | 'vibe_blurb', draft: string) => {
+  const commitText = (field: 'name' | 'vibe_blurb' | 'phone', draft: string) => {
     const next = draft.trim();
     if (next === (profile?.[field] ?? '')) return;
     updateField(field, next);
@@ -621,6 +626,17 @@ export default function ProfileTab() {
             onBlur={() => commitText('vibe_blurb', aboutDraft)}
             placeholder="Two sentences on how you like to work"
             maxLength={280}
+          />
+          <TextField
+            label="Phone (optional)"
+            value={phoneDraft}
+            onChangeText={setPhoneDraft}
+            onEndEditing={() => commitText('phone', phoneDraft)}
+            onBlur={() => commitText('phone', phoneDraft)}
+            placeholder="Only shared when you send your contact card"
+            keyboardType="phone-pad"
+            maxLength={20}
+            returnKeyType="done"
           />
           <PickerField
             label="Campus"
