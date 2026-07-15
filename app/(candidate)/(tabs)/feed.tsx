@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
-  Image,
   Platform,
   Pressable,
   ScrollView,
@@ -11,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowsClockwise, BookmarkSimple, CaretDown, Check, GraduationCap, MagnifyingGlass, Sparkle, X } from 'phosphor-react-native';
@@ -901,7 +901,7 @@ export default function DiscoveryFeed() {
                         canvas on the left so the name/location stay readable. */}
                     <View style={styles.campusImgWrap} pointerEvents="none">
                       {c?.imageUrl ? (
-                        <Image source={{ uri: c.imageUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+                        <Image source={{ uri: c.imageUrl }} style={StyleSheet.absoluteFill} contentFit="cover" cachePolicy="memory-disk" transition={180} />
                       ) : (
                         <LinearGradient
                           colors={CARD_GRADIENTS[i % CARD_GRADIENTS.length]}

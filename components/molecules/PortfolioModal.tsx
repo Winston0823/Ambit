@@ -3,7 +3,6 @@ import {
   Alert,
   Animated,
   Easing,
-  Image,
   KeyboardAvoidingView,
   Linking,
   Modal,
@@ -17,6 +16,7 @@ import {
   View,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Image } from 'expo-image';
 import { HardShadow } from '../atoms';
 import { ArrowUpRight, Camera, PencilSimpleLine, Trash, X } from 'phosphor-react-native';
 import * as Haptics from 'expo-haptics';
@@ -254,7 +254,7 @@ export function PortfolioModal({ item, onDismiss, onSave, onDelete }: Props) {
             accessibilityLabel={mode === 'edit' ? 'Change cover photo' : undefined}
           >
             {coverUri ? (
-              <Image source={{ uri: coverUri }} style={styles.img} />
+              <Image source={{ uri: coverUri }} style={styles.img} cachePolicy="memory-disk" transition={180} />
             ) : (
               <LinearGradient colors={displayItem.gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.img}>
                 <Text style={styles.imgInitial}>{(draftTitle[0] ?? displayItem.title[0] ?? '').toUpperCase()}</Text>

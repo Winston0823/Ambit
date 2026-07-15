@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   Animated,
-  Image,
   LayoutAnimation,
   Pressable,
   StyleSheet,
@@ -10,6 +9,7 @@ import {
   View,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import { Image } from 'expo-image';
 import {
   AddressBook,
   CalendarPlus,
@@ -209,7 +209,9 @@ export function ChatComposer({
             <Image
               source={{ uri: pendingAttachment.uri }}
               style={styles.attachmentThumb}
-              resizeMode="cover"
+              contentFit="cover"
+              cachePolicy="memory-disk"
+              transition={180}
             />
             <Pressable
               onPress={clearPendingAttachment}

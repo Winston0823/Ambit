@@ -2,7 +2,6 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   Animated,
   Easing,
-  Image,
   Keyboard,
   Modal,
   Platform,
@@ -15,6 +14,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Image } from 'expo-image';
 import { Images, PaperPlaneTilt, Stack, X } from 'phosphor-react-native';
 import * as Haptics from 'expo-haptics';
 import { HardShadow } from '../atoms';
@@ -663,7 +663,7 @@ function TileFace({
     <HardShadow radius={radius} offset={4}>
     <View style={[styles.tileFace, { width: size, height: size * 1.18, borderRadius: radius }]}>
       {item.imageUrl ? (
-        <Image source={{ uri: item.imageUrl }} style={StyleSheet.absoluteFill} />
+        <Image source={{ uri: item.imageUrl }} style={StyleSheet.absoluteFill} cachePolicy="memory-disk" transition={180} />
       ) : (
         <LinearGradient colors={item.gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill}>
           <View style={styles.tileGlyph}>

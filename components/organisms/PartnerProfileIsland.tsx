@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   Dimensions,
-  Image,
   Platform,
   Pressable,
   ScrollView,
@@ -12,6 +11,7 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { BlurView } from 'expo-blur';
+import { Image } from 'expo-image';
 import {
   CaretRight,
   CaretUp,
@@ -332,7 +332,7 @@ export function PartnerProfileIsland({
             accessibilityLabel={`${partnerName} profile`}
           >
             {partnerPhotoUrl ? (
-              <Image source={{ uri: partnerPhotoUrl }} style={styles.pillAvatar} />
+              <Image source={{ uri: partnerPhotoUrl }} style={styles.pillAvatar} cachePolicy="memory-disk" transition={180} />
             ) : (
               <View style={[styles.pillAvatar, styles.pillAvatarFallback]}>
                 <Text style={styles.pillAvatarInitial}>

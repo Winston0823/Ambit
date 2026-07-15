@@ -1,6 +1,7 @@
 import React from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Image } from 'expo-image';
 import { CaretRight } from 'phosphor-react-native';
 import { Chip, HardShadow } from '../atoms';
 import { AmbitFont, Astra, Brand, Radii } from '../../constants/theme';
@@ -48,7 +49,7 @@ export function OwnerProfileCard({ name, photoUri, campusName, vibe, skills, pro
         <View style={styles.idRow}>
           <View style={styles.avatar}>
             {photoUri ? (
-              <Image source={{ uri: photoUri }} style={styles.avatarImg} />
+              <Image source={{ uri: photoUri }} style={styles.avatarImg} cachePolicy="memory-disk" transition={180} />
             ) : (
               <LinearGradient colors={[Astra.royal, Astra.iris]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.avatarImg}>
                 <Text style={styles.avatarInitial}>{initial}</Text>

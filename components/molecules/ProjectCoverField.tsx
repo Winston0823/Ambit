@@ -1,7 +1,8 @@
 import React from 'react';
-import { Alert, Image, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
+import { Image } from 'expo-image';
 import { ImageSquare, PencilSimple } from 'phosphor-react-native';
 import { AmbitFont, Astra, Brand, Radii } from '../../constants/theme';
 
@@ -42,7 +43,7 @@ export function ProjectCoverField({ uri, onChange, label = 'COVER IMAGE' }: Prop
       <Pressable onPress={pick} style={styles.frame} accessibilityLabel="Add or change project cover image">
         {uri ? (
           <>
-            <Image source={{ uri }} style={styles.image} resizeMode="cover" />
+            <Image source={{ uri }} style={styles.image} contentFit="cover" cachePolicy="memory-disk" transition={180} />
             <View style={styles.editBadge}>
               <PencilSimple size={13} color={Brand.inkOnBrand} weight="bold" />
               <Text style={styles.editText}>Change</Text>

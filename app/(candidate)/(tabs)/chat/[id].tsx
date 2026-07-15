@@ -6,7 +6,6 @@ import {
   Animated,
   Alert,
   FlatList,
-  Image,
   Keyboard,
   KeyboardAvoidingView,
   LayoutAnimation,
@@ -19,6 +18,7 @@ import {
   UIManager,
   View,
 } from 'react-native';
+import { Image } from 'expo-image';
 
 // Android needs an explicit opt-in for LayoutAnimation; iOS is on by default.
 // Safe to call repeatedly — RN no-ops on subsequent calls.
@@ -1709,7 +1709,7 @@ export default function ThreadScreen() {
               accessibilityLabel={`Share ${it.title}`}
             >
               {it.imageUri ? (
-                <Image source={{ uri: it.imageUri }} style={styles.pickerThumb} resizeMode="cover" />
+                <Image source={{ uri: it.imageUri }} style={styles.pickerThumb} contentFit="cover" cachePolicy="memory-disk" transition={180} />
               ) : (
                 <LinearGradient colors={it.gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.pickerThumb} />
               )}

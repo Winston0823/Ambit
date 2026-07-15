@@ -1,6 +1,5 @@
 import React, { useCallback, useState } from 'react';
 import {
-  Image,
   Platform,
   Pressable,
   RefreshControl,
@@ -13,6 +12,7 @@ import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CaretRight, PencilSimple } from 'phosphor-react-native';
 import * as Haptics from 'expo-haptics';
+import { Image } from 'expo-image';
 import { BackChevron, Skeleton } from '../../components/atoms';
 import { getInbox, type InboxItem } from '../../lib/messaging';
 import { supabase } from '../../lib/supabase';
@@ -229,7 +229,7 @@ export default function ProjectManageScreen() {
                 >
                   <View style={[styles.stripe, { backgroundColor: accent }]} pointerEvents="none" />
                   {c.partner_photo_url ? (
-                    <Image source={{ uri: c.partner_photo_url }} style={styles.avatar} />
+                    <Image source={{ uri: c.partner_photo_url }} style={styles.avatar} cachePolicy="memory-disk" transition={180} />
                   ) : (
                     <View style={[styles.avatar, styles.avatarFallback]}>
                       <Text style={styles.avatarInitial}>

@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -16,6 +15,7 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   Camera,
@@ -567,7 +567,7 @@ export default function ProfileTab() {
         <View style={styles.avatarBlock}>
           <Pressable onPress={pickPhoto} style={styles.avatarSquare} accessibilityLabel="Change photo">
             {profile?.photo_url ? (
-              <Image source={{ uri: profile.photo_url }} style={styles.avatarSquareImg} />
+              <Image source={{ uri: profile.photo_url }} style={styles.avatarSquareImg} cachePolicy="memory-disk" transition={180} />
             ) : (
               <LinearGradient
                 colors={[Astra.royal, Astra.iris]}
@@ -711,7 +711,7 @@ export default function ProfileTab() {
                 >
                   <View style={[styles.tileImgWrap, activePortfolio?.id === item.id && styles.tileActive]}>
                     {item.imageUri ? (
-                      <Image source={{ uri: item.imageUri }} style={styles.tileImg} />
+                      <Image source={{ uri: item.imageUri }} style={styles.tileImg} cachePolicy="memory-disk" transition={180} />
                     ) : (
                       <LinearGradient
                         colors={item.gradient}

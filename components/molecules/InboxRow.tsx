@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Image } from 'expo-image';
 import { Archive, ArrowBendUpLeft, Bell, BellSlash, Clock, PushPin, X } from 'phosphor-react-native';
 import type { InboxItem } from '../../lib/messaging';
 import { inboxState, isReachedOutToYou } from '../../lib/messaging';
@@ -213,7 +214,7 @@ export function InboxRow({ item, meId, onPress, onPassRequest, onPin, onMute, on
       >
         {/* Avatar — 46pt gradient monogram (or partner photo). */}
         {item.partner_photo_url ? (
-          <Image source={{ uri: item.partner_photo_url }} style={styles.avatar} />
+          <Image source={{ uri: item.partner_photo_url }} style={styles.avatar} cachePolicy="memory-disk" transition={180} />
         ) : (
           <LinearGradient
             colors={[Astra.royal, Astra.iris]}

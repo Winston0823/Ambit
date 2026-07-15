@@ -3,7 +3,6 @@ import {
   ActivityIndicator,
   Animated,
   Dimensions,
-  Image,
   Linking,
   Pressable,
   StyleSheet,
@@ -11,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Image } from 'expo-image';
 import { Paperclip, Warning } from 'phosphor-react-native';
 import { toast } from '../../lib/toast';
 
@@ -167,7 +167,9 @@ function Avatar({
         <Image
           source={{ uri: url! }}
           style={styles.avatarImg}
-          resizeMode="cover"
+          contentFit="cover"
+          cachePolicy="memory-disk"
+          transition={180}
           onError={() => setFailed(true)}
         />
       ) : (
@@ -524,7 +526,7 @@ export function MessageBubble({
 
         {/* Image attachment. */}
         {attachmentUrl && !isDeleted && (
-          <Image source={{ uri: attachmentUrl }} style={styles.image} resizeMode="cover" />
+          <Image source={{ uri: attachmentUrl }} style={styles.image} contentFit="cover" cachePolicy="memory-disk" transition={180} />
         )}
 
         {/* Body. iMessage parity: no inline timestamp / checkmark — the

@@ -2,7 +2,6 @@ import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   Animated,
   Easing,
-  Image,
   Linking,
   Platform,
   Pressable,
@@ -12,6 +11,7 @@ import {
   View,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Image } from 'expo-image';
 import {
   AppStoreLogo,
   CaretDown,
@@ -266,7 +266,7 @@ function PhotoPanel({
           end={{ x: 1, y: 1 }}
           style={StyleSheet.absoluteFill}
         />
-        {uri && <Image source={{ uri }} style={StyleSheet.absoluteFill} resizeMode="cover" fadeDuration={0} />}
+        {uri && <Image source={{ uri }} style={StyleSheet.absoluteFill} contentFit="cover" cachePolicy="memory-disk" />}
         {scrim && (
           <LinearGradient
             colors={['rgba(12,0,34,0)', 'rgba(12,0,34,0.55)']}
@@ -415,7 +415,7 @@ function PortfolioTile({
       accessibilityLabel={`Open ${item.title}`}
     >
       {item.imageUri ? (
-        <Image source={{ uri: item.imageUri }} style={styles.hlTileCover} resizeMode="cover" />
+        <Image source={{ uri: item.imageUri }} style={styles.hlTileCover} contentFit="cover" cachePolicy="memory-disk" transition={180} />
       ) : (
         <LinearGradient colors={item.gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hlTileCover} />
       )}

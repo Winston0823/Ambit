@@ -2,7 +2,6 @@ import React, { useRef, useState } from 'react';
 import {
   Alert,
   Animated,
-  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -17,6 +16,7 @@ import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Swipeable } from 'react-native-gesture-handler';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Image } from 'expo-image';
 import { CaretLeft, NotePencil, PaperPlaneTilt, Rocket, Trash, X } from 'phosphor-react-native';
 import { GlassSurface, HardShadow, Tactile } from '../../components/atoms';
 import { DiscoveryCard, ReachOutComposer, ReachOutLimitSheet, SavedCarousel } from '../../components/molecules';
@@ -289,7 +289,7 @@ export default function SavedScreen() {
                     {/* Squared avatar/thumb — royal→iris gradient with Playfair
                         initials (seeker) or a project icon. Seeker photos win. */}
                     {isSeeker && card.photoUri ? (
-                      <Image source={{ uri: card.photoUri }} style={styles.avatar} />
+                      <Image source={{ uri: card.photoUri }} style={styles.avatar} cachePolicy="memory-disk" transition={180} />
                     ) : (
                       <LinearGradient
                         colors={[Astra.royal, Astra.iris]}
