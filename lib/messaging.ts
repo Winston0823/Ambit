@@ -17,6 +17,15 @@ export async function readLocalFileAsArrayBuffer(uri: string): Promise<ArrayBuff
 
 // ─── Types ──────────────────────────────────────────────────────────
 
+/// Snapshot of a person's contact details, shared as a chat message.
+export interface ContactCard {
+  name:          string | null;
+  email:         string | null;
+  github_url?:   string | null;
+  linkedin_url?: string | null;
+  portfolio_url?:string | null;
+}
+
 export interface MessageRow {
   id:              string;
   conversation_id: string;
@@ -37,6 +46,9 @@ export interface MessageRow {
   /// When set, this message carries a shared portfolio highlight; the bubble
   /// renders a tappable highlight card. Added in 014_message_portfolio_ref.
   portfolio_ref_id?: string | null;
+  /// When set, this message is a "Share contact info" card — a snapshot of the
+  /// sender's own contact details. Added in 033_contact_card.
+  contact_card?:   ContactCard | null;
   edited_at:       string | null;
   deleted_at:      string | null;
   created_at:      string;
@@ -304,6 +316,29 @@ export async function sendPortfolioAttachment(args: {
       sender_id:        args.senderId,
       body:             `Shared a highlight · ${args.portfolioTitle}`,
       portfolio_ref_id: args.portfolioId,
+    })
+    .select('*')
+    .single();
+  if (error) throw error;
+  return data as MessageRow;
+}
+
+/// Share a contact card — a snapshot of the sender's own details. Mirrors the
+/// portfolio-attachment path (optimistic-friendly via clientId).
+export async function sendContactCard(args: {
+  conversationId: string;
+  senderId:       string;
+  card:           ContactCard;
+  clientId?:      string;
+}): Promise<MessageRow> {
+  const { data, error } = await supabase
+    .from('messages')
+    .insert({
+      ...(args.clientId ? { id: args.clientId } : {}),
+      conversation_id: args.conversationId,
+      sender_id:       args.senderId,
+      body:            'Shared contact info',
+      contact_card:    args.card,
     })
     .select('*')
     .single();

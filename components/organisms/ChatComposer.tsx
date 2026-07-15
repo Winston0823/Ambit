@@ -11,8 +11,10 @@ import {
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import {
+  AddressBook,
   CalendarPlus,
   Clock,
+  Handshake,
   ImageSquare,
   Images,
   PaperPlaneTilt,
@@ -54,6 +56,15 @@ interface Props {
   /// Opens the portfolio-highlight picker so the user can share one of their
   /// own highlights into the thread. Hidden when undefined.
   onOpenPortfolio?: () => void;
+  /// Share the current user's own contact card (name, email, links). Always
+  /// available to both participants. Hidden when undefined.
+  onShareContact?: () => void;
+  /// Propose the hire handshake. Only passed to the reach-out RECEIVER, so the
+  /// tile is receiver-gated. Label flips by role via `hireLabel`. Hidden when
+  /// undefined (the reacher never sees it — they wait for the receiver + confirm).
+  onProposeHire?: () => void;
+  /// "Make an offer" (owner receiver) or "Accept" (seeker receiver).
+  hireLabel?: string;
   /// Fired on every meaningful keystroke. Caller debounces & broadcasts
   /// presence; the composer just signals intent.
   onTypingPing:    () => void;
@@ -83,6 +94,9 @@ export function ChatComposer({
   onOpenScheduling,
   onOpenAvailabilityPoll,
   onOpenPortfolio,
+  onShareContact,
+  onProposeHire,
+  hireLabel,
   onTypingPing,
   attachMenuOpen,
   onToggleAttachMenu,
@@ -336,6 +350,28 @@ export function ChatComposer({
                 onPress={() => {
                   onCloseAttachMenu();
                   onOpenPortfolio();
+                }}
+              />
+            )}
+            {/* Share contact — both participants, always. */}
+            {onShareContact && (
+              <AttachTile
+                Icon={AddressBook}
+                label="Contact info"
+                onPress={() => {
+                  onCloseAttachMenu();
+                  onShareContact();
+                }}
+              />
+            )}
+            {/* Hire / accept — only the reach-out receiver gets this handler. */}
+            {onProposeHire && (
+              <AttachTile
+                Icon={Handshake}
+                label={hireLabel ?? 'Make an offer'}
+                onPress={() => {
+                  onCloseAttachMenu();
+                  onProposeHire();
                 }}
               />
             )}

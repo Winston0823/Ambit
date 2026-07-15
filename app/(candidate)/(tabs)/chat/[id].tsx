@@ -84,10 +84,12 @@ import {
   listMessages,
   listReactions,
   markConversationRead,
+  sendContactCard,
   sendImageMessage,
   sendPortfolioAttachment,
   sendTextMessage,
   toggleReaction,
+  type ContactCard,
   type MessageRow,
   type ProjectRefRow,
   type ReactionRow,
@@ -146,6 +148,26 @@ export default function ThreadScreen() {
 
   const [meta, setMeta] = useState<ConvoMeta | null>(null);
   const isOwner = !!user && !!meta && meta.owner_id === user.id;
+
+  // Who reached out first = sender of the earliest message. Queried directly
+  // (not derived from the paginated `messages` list, whose first row may not be
+  // the true first message). The RECEIVER of the reach-out is the one who holds
+  // the hire/accept action; the reacher waits for the receiver + confirms.
+  const [reacherId, setReacherId] = useState<string | null>(null);
+  useEffect(() => {
+    if (!conversationId) return;
+    let cancelled = false;
+    supabase
+      .from('messages')
+      .select('sender_id')
+      .eq('conversation_id', conversationId)
+      .order('created_at', { ascending: true })
+      .limit(1)
+      .maybeSingle()
+      .then(({ data }) => { if (!cancelled) setReacherId((data as { sender_id: string } | null)?.sender_id ?? null); });
+    return () => { cancelled = true; };
+  }, [conversationId]);
+  const iAmReceiver = !!reacherId && !!user && reacherId !== user.id;
   /// Signed-in user's avatar URL, fetched once on screen mount and
   /// passed to MessageBubble so my own bubbles get an avatar too.
   const [myPhotoUrl, setMyPhotoUrl] = useState<string | null>(null);
@@ -317,17 +339,24 @@ export default function ThreadScreen() {
   const handleProposeHire = () => {
     setOverflowOpen(false);
     if (!conversationId) return;
-    Alert.alert('Propose hire?', "They'll be notified that you want to hire them.", [
+    // Only the reach-out receiver reaches this. Owner receiver = making an offer;
+    // seeker receiver = accepting. Either way the other party confirms next.
+    const title = isOwner ? 'Make an offer?' : 'Accept this match?';
+    const body  = isOwner
+      ? "They'll get your offer and confirm to make it official."
+      : "They'll be asked to confirm — then you're on the team.";
+    const cta   = isOwner ? 'Make offer' : 'Accept';
+    Alert.alert(title, body, [
       { text: 'Cancel', style: 'cancel' },
       {
-        text: 'Propose',
+        text: cta,
         onPress: async () => {
           try {
             await proposeHire(conversationId);
             // Optimistic: bump status locally so the banner reflects right away.
             setMeta((m) => (m ? { ...m, status: 'hired_pending', hired_proposed_by: user?.id ?? null } : m));
           } catch (e: any) {
-            Alert.alert('Could not propose hire', e?.message ?? 'Try again.');
+            Alert.alert("Couldn't send that", e?.message ?? 'Try again.');
           }
         },
       },
@@ -965,6 +994,50 @@ export default function ThreadScreen() {
     }
   };
 
+  /// Share the current user's own contact card (name, .edu email, profile
+  /// links). Snapshotted at send time; optimistic like the other attachments.
+  const handleShareContact = async () => {
+    if (!user || !conversationId) return;
+    const { data: prof } = await supabase
+      .from('profiles')
+      .select('name, github_url, linkedin_url, portfolio_url')
+      .eq('id', user.id)
+      .maybeSingle();
+    const p = prof as
+      | { name: string | null; github_url: string | null; linkedin_url: string | null; portfolio_url: string | null }
+      | null;
+    const card: ContactCard = {
+      name:          p?.name ?? null,
+      email:         user.email ?? null,
+      github_url:    p?.github_url ?? null,
+      linkedin_url:  p?.linkedin_url ?? null,
+      portfolio_url: p?.portfolio_url ?? null,
+    };
+    const clientId = randomUUID();
+    const optimistic: MessageRow = {
+      id:              clientId,
+      conversation_id: conversationId,
+      sender_id:       user.id,
+      body:            'Shared contact info',
+      attachment_url:  null,
+      contact_card:    card,
+      parent_id:       null,
+      edited_at:       null,
+      deleted_at:      null,
+      created_at:      new Date().toISOString(),
+    };
+    setMessages((prev) => [...prev, optimistic]);
+    markPending(clientId);
+    scrollToEnd();
+    try {
+      const real = await sendContactCard({ conversationId, senderId: user.id, card, clientId });
+      setMessages((prev) => prev.map((m) => (m.id === clientId ? real : m)));
+      markSent(clientId);
+    } catch {
+      markFailed(clientId);
+    }
+  };
+
   const handleSendImage = async (localUri: string, body?: string) => {
     if (!user || !conversationId) return;
     const clientId = randomUUID();
@@ -1495,6 +1568,9 @@ export default function ThreadScreen() {
             onOpenScheduling={() => setSchedulingOpen(true)}
             onOpenAvailabilityPoll={() => setPollComposerOpen(true)}
             onOpenPortfolio={openPortfolioPicker}
+            onShareContact={handleShareContact}
+            onProposeHire={iAmReceiver && meta?.status === 'active' ? handleProposeHire : undefined}
+            hireLabel={isOwner ? 'Make an offer' : 'Accept'}
             onTypingPing={handleTypingPing}
             attachMenuOpen={attachMenuOpen}
             onToggleAttachMenu={toggleAttachMenu}
@@ -1517,15 +1593,9 @@ export default function ThreadScreen() {
       {/* Overflow menu — hire / pass. Lives above the
           keyboard so it stays usable even with the composer focused. */}
       <BottomSheet visible={overflowOpen} onClose={() => setOverflowOpen(false)}>
-        <Pressable
-          style={styles.overflowItem}
-          onPress={handleProposeHire}
-          disabled={!!meta && meta.status !== 'active'}
-        >
-          <Text style={[styles.overflowLabel, !!meta && meta.status !== 'active' && styles.overflowLabelDisabled]}>
-            Mark as Hired
-          </Text>
-        </Pressable>
+        {/* Hire now lives in the composer drawer, gated to the reach-out
+            receiver ("Make an offer" / "Accept"). The overflow keeps Pass +
+            Report only. */}
         <Pressable
           style={styles.overflowItem}
           onPress={handleOpenPass}
