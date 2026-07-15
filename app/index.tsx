@@ -16,8 +16,10 @@ export default function Index() {
     );
   }
 
+  // Both roles land on discovery (the feed) at launch — owners browse seekers,
+  // seekers browse projects — rather than owners opening on their projects tab.
   const isOwner = role === 'owner';
-  return <Redirect href={isOwner ? '/(founder)/(tabs)/projects' : '/(candidate)/(tabs)/feed'} />;
+  return <Redirect href={isOwner ? '/(founder)/(tabs)/feed' : '/(candidate)/(tabs)/feed'} />;
 }
 
 const styles = StyleSheet.create({
