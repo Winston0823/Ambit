@@ -1,0 +1,18 @@
+diff --git a/node_modules/react-native-pager-view/ios/Fabric/RNCPagerViewComponentView.mm b/node_modules/react-native-pager-view/ios/Fabric/RNCPagerViewComponentView.mm
+index 067f92e..04ade13 100644
+--- a/node_modules/react-native-pager-view/ios/Fabric/RNCPagerViewComponentView.mm
++++ b/node_modules/react-native-pager-view/ios/Fabric/RNCPagerViewComponentView.mm
+@@ -57,6 +57,13 @@ - (void)initializeNativePageViewController {
+             ((UIScrollView *)subview).delegate = self;
+             ((UIScrollView *)subview).delaysContentTouches = NO;
+             scrollView = (UIScrollView *)subview;
++            // PATCH(ambit): apply the mount-time scrollEnabled prop. Fabric runs
++            // updateProps before this scroll view exists, and its change-guard
++            // (newProps.scrollEnabled != scrollView.scrollEnabled) compares
++            // against nil — so a pager MOUNTED with scrollEnabled=false was
++            // silently left scrollable forever (updateProps only re-fires on
++            // changes). Sync the freshly-discovered scroll view to the props.
++            scrollView.scrollEnabled = viewProps.scrollEnabled;
+         }
+     }
+ }
