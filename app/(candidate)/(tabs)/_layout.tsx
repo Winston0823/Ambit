@@ -29,13 +29,7 @@ const TAB_TO_ROUTE: Record<NavTabKey, string> = {
 export default function TabsLayout() {
   const { user } = useAuth();
   const segments = useSegments();
-  const activeSegment = segments[segments.length - 1];
-  const inThread = activeSegment === '[id]';
-  // On Discovery, horizontal swipes must drive the card deck — never page the
-  // tab carousel. Driven at the NAVIGATOR level (not per-Screen options, which
-  // material-top-tabs applies unreliably on the initial route → the deck felt
-  // "dead" on first launch). Recomputed on every focus change.
-  const onDiscovery = activeSegment === 'feed';
+  const inThread = segments[segments.length - 1] === '[id]';
 
   // Unread badge on the Chat tab (kept in sync via realtime).
   const [hasUnread, setHasUnread] = useState(false);
@@ -77,9 +71,18 @@ export default function TabsLayout() {
   return (
     <MaterialTopTabs
       tabBarPosition="bottom"
-      // Tab-swipe off on Discovery (deck owns the gesture) and inside a thread;
-      // on everywhere else so the tab carousel still feels swipeable.
-      screenOptions={{ lazy: false, swipeEnabled: !onDiscovery && !inThread }}
+      initialRouteName="feed"
+      // Tab-swipe off on Discovery (the deck owns horizontal gestures) and
+      // inside a chat thread; on everywhere else. Derived per-route as a
+      // FUNCTION of route.name — material-top-tabs reads swipeEnabled from the
+      // focused route's options, so this is synchronously correct on the very
+      // first render (a segments-derived value lagged one render, mounting the
+      // native pager scrollEnabled=true; on Fabric/Android the later prop
+      // update never reached the pager — see patches/react-native-tab-view).
+      screenOptions={({ route }) => ({
+        lazy: false,
+        swipeEnabled: route.name !== 'feed' && !inThread,
+      })}
       tabBar={({ state, navigation }: any) => {
         const currentRoute = state.routes[state.index].name;
         const activeKey = ROUTE_TO_TAB[currentRoute] ?? 'discovery';
