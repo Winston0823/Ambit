@@ -208,14 +208,17 @@ export function ReachOutComposer({ card, onDismiss, onSend, onSent, disableAttac
       if (attachMode === 'project') {
         const { data } = await supabase
           .from('projects')
-          .select('id, title')
+          .select('id, title, image_url')
           .eq('owner_id', user.id)
           .order('created_at', { ascending: false });
         if (!cancelled) {
           setAttachItems(
-            ((data ?? []) as { id: string; title: string }[]).map((p, idx) => ({
+            ((data ?? []) as { id: string; title: string; image_url: string | null }[]).map((p, idx) => ({
               id: p.id,
               label: p.title,
+              // The project's real cover — tiles fall back to the gradient
+              // glyph only when the project has no image.
+              imageUrl: p.image_url,
               gradient: ATTACH_GRADIENTS[idx % ATTACH_GRADIENTS.length],
             })),
           );
