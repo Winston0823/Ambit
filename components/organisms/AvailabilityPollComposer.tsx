@@ -600,8 +600,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderRadius: 999,
     backgroundColor: Brand.selected,
-    borderWidth: 1.6,
-    borderColor: Brand.actionInk,
+    // ASTRA: no ink outline — the HardShadow wrapper provides the lift.
   },
   primaryBtnText: {
     fontFamily: AmbitFont.body,
@@ -613,9 +612,8 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     paddingHorizontal: 24,
     borderRadius: Radii.md,
-    backgroundColor: Brand.surface1,
-    borderWidth: 1.5,
-    borderColor: Brand.borderDefault,
+    // ASTRA: quiet borderless secondary on the mist surface.
+    backgroundColor: Brand.surface2,
   },
   secondaryBtnText: {
     fontFamily: AmbitFont.body,

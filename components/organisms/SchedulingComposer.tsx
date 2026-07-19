@@ -265,7 +265,7 @@ export function SchedulingComposer({
                           {formatCellLabel(d)}
                         </Text>
                         {isSelected && (
-                          <Check size={12} color={Brand.actionInk} weight="bold" />
+                          <Check size={12} color={Brand.inkOnBrand} weight="bold" />
                         )}
                       </Pressable>
                     );
@@ -321,7 +321,7 @@ export function SchedulingComposer({
                 disabled={sending || !conversationId || !canSend}
                 style={[styles.sendBtn, (sending || !conversationId || !canSend) && styles.sendBtnDisabled]}
               >
-                <CalendarPlus size={16} color={Brand.actionInk} weight="bold" />
+                <CalendarPlus size={16} color={Brand.inkOnBrand} weight="bold" />
                 <Text style={styles.sendBtnText}>
                   {sending ? 'Sending…' : 'Send request'}
                 </Text>
@@ -563,7 +563,7 @@ const styles = StyleSheet.create({
   },
   durationChipSelected: {
     backgroundColor: Brand.selected,
-    borderColor: Brand.actionInk,
+    borderColor: 'transparent',
   },
   durationChipText: {
     fontFamily: AmbitFont.body,
@@ -600,7 +600,7 @@ const styles = StyleSheet.create({
   },
   overlapChipSelected: {
     backgroundColor: Brand.selected,
-    borderColor: Brand.actionInk,
+    borderColor: 'transparent',
   },
   overlapChipDisabled: { opacity: 0.4 },
   overlapChipText: {
@@ -678,8 +678,7 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderRadius: 999,
     backgroundColor: Brand.selected,
-    borderWidth: 1.6,
-    borderColor: Brand.actionInk,
+    // ASTRA: no ink outline — shadow-based elevation only.
   },
   sendBtnDisabled: { opacity: 0.45 },
   sendBtnText: {
