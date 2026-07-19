@@ -350,17 +350,18 @@ export default function ProfileTab() {
     (async () => {
       const { data } = await supabase
         .from('projects')
-        .select('id, title, vibe_blurb, roles_sought')
+        .select('id, title, vibe_blurb, roles_sought, image_url')
         .eq('owner_id', user.id)
         .eq('active', true)
         .order('created_at', { ascending: false });
       if (cancelled) return;
       setOwnerProjects(
-        (data ?? []).map((p: { id: string; title: string | null; vibe_blurb: string | null; roles_sought: string[] | null }) => ({
+        (data ?? []).map((p: { id: string; title: string | null; vibe_blurb: string | null; roles_sought: string[] | null; image_url: string | null }) => ({
           id: p.id,
           title: p.title ?? '',
           pitch: p.vibe_blurb ?? '',
           roles: p.roles_sought ?? [],
+          imageUrl: p.image_url,
         })),
       );
     })();

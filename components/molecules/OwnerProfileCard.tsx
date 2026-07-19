@@ -11,6 +11,8 @@ export interface OwnerProject {
   title: string;
   pitch: string;
   roles: string[];
+  /// Project cover (projects.image_url). Null → gradient placeholder thumb.
+  imageUrl?: string | null;
 }
 
 interface Props {
@@ -91,7 +93,11 @@ export function OwnerProfileCard({ name, photoUri, campusName, vibe, skills, pro
               style={[styles.proj, i < projects.length - 1 && styles.projDivider]}
               accessibilityLabel={`Open ${p.title}`}
             >
-              <LinearGradient colors={THUMBS[i % THUMBS.length]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.thumb} />
+              {p.imageUrl ? (
+                <Image source={{ uri: p.imageUrl }} style={styles.thumb} contentFit="cover" cachePolicy="memory-disk" transition={180} />
+              ) : (
+                <LinearGradient colors={THUMBS[i % THUMBS.length]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.thumb} />
+              )}
               <View style={styles.projBody}>
                 <Text style={styles.projTitle} numberOfLines={1}>{p.title}</Text>
                 {!!p.pitch && <Text style={styles.projPitch} numberOfLines={1}>{p.pitch}</Text>}
