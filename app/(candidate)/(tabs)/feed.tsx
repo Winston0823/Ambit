@@ -494,12 +494,13 @@ export default function DiscoveryFeed() {
         ? next.slice(next.length - SKIP_OVERVIEW_THRESHOLD)
         : next;
     });
-    // Record the skip so the card stops resurfacing. Seeker→project keys on
-    // (me, project); owner→seeker keys on (seeker, my active project) — fix 8,
-    // owner actions previously left no server trace.
+    // Record the skip. Passes are a 30-day COOLDOWN, not permanent (see
+    // migration 035): the deck RPC only excludes skips younger than the
+    // window, so people/projects resurface after they've had time to grow.
+    // created_at is bumped on re-skip so passing again restarts the clock.
     if (card.kind === 'project' && user) {
       supabase.from('matches').upsert(
-        { seeker_id: user.id, project_id: card.id, outcome: 'skipped' },
+        { seeker_id: user.id, project_id: card.id, outcome: 'skipped', created_at: new Date().toISOString() },
         { onConflict: 'seeker_id,project_id' }
       ).then(() => {});
     } else if (card.kind === 'seeker' && user && ownerProject) {
