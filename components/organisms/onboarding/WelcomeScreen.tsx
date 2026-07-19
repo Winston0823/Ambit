@@ -1,12 +1,10 @@
 import React, { useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Check } from 'phosphor-react-native';
 import { Button } from '../../atoms';
 import { SocialAuthButtons, LegalModal } from '../../molecules';
 import { useAuth } from '../../../context/AuthContext';
 import { PRIVACY_POLICY, TERMS_OF_USE, type LegalDoc } from '../../../constants/legal';
-import { toast } from '../../../lib/toast';
 import { Brand, AmbitFont, Radii, Space } from '../../../constants/theme';
 
 interface Props {
@@ -26,23 +24,12 @@ export function WelcomeScreen({ onCreateAccount, onSignIn, onSocialSignedIn }: P
   const { signInWithApple, signInWithGoogle } = useAuth();
   const [busy, setBusy] = useState<'apple' | 'google' | null>(null);
 
-  // EULA gate — account creation is blocked until the user agrees (Guideline 1.2).
-  const [agreed, setAgreed] = useState(false);
-  const [agreeError, setAgreeError] = useState(false);
+  // The ACTIVE agree checkbox lives on the credential screens (sign-in +
+  // edu-email), where consent is meaningful. Social auth creates accounts
+  // directly from here, so it's covered by the passive "By continuing…" line.
   const [legalDoc, setLegalDoc] = useState<LegalDoc | null>(null);
 
-  const toggleAgree = () => { setAgreed((a) => !a); setAgreeError(false); };
-  // Returns true if the user has agreed; otherwise flags the checkbox (now at
-  // the bottom) and toasts, since the tapped CTA is up top away from it.
-  const requireAgreement = (): boolean => {
-    if (agreed) return true;
-    setAgreeError(true);
-    toast.error('Please agree to the Terms & Privacy Policy first.');
-    return false;
-  };
-
   const handleApple = async () => {
-    if (!requireAgreement()) return;
     setBusy('apple');
     try {
       await signInWithApple();
@@ -55,7 +42,6 @@ export function WelcomeScreen({ onCreateAccount, onSignIn, onSocialSignedIn }: P
   };
 
   const handleGoogle = async () => {
-    if (!requireAgreement()) return;
     setBusy('google');
     try {
       await signInWithGoogle();
@@ -67,10 +53,6 @@ export function WelcomeScreen({ onCreateAccount, onSignIn, onSocialSignedIn }: P
     }
   };
 
-  const handleCreateAccount = () => {
-    if (!requireAgreement()) return;
-    onCreateAccount();
-  };
 
   return (
     <SafeAreaView style={styles.root}>
@@ -87,7 +69,7 @@ export function WelcomeScreen({ onCreateAccount, onSignIn, onSocialSignedIn }: P
         <View style={styles.cta}>
           <Button
             title="Create account"
-            onPress={handleCreateAccount}
+            onPress={onCreateAccount}
             variant="primary"
             trailingArrow
           />
@@ -112,28 +94,15 @@ export function WelcomeScreen({ onCreateAccount, onSignIn, onSocialSignedIn }: P
         </View>
       </View>
 
-      {/* Agree gate — pinned to the bottom. Gates every account-creation path. */}
-      <View style={[styles.agreeBar, { paddingBottom: 8 }]}>
-        <Pressable
-          style={styles.agreeRow}
-          onPress={toggleAgree}
-          accessibilityRole="checkbox"
-          accessibilityState={{ checked: agreed }}
-          accessibilityLabel="I agree to the Terms of Use and Privacy Policy"
-        >
-          <View style={[styles.checkbox, agreed && styles.checkboxOn, agreeError && !agreed && styles.checkboxError]}>
-            {agreed && <Check size={13} color={Brand.inkOnBrand} weight="bold" />}
-          </View>
-          <Text style={styles.agreeText}>
-            I agree to the{' '}
-            <Text style={styles.agreeLink} onPress={() => setLegalDoc(TERMS_OF_USE)}>Terms of Use</Text>
-            {' '}and{' '}
-            <Text style={styles.agreeLink} onPress={() => setLegalDoc(PRIVACY_POLICY)}>Privacy Policy</Text>.
-          </Text>
-        </Pressable>
-        {agreeError && !agreed && (
-          <Text style={styles.agreeErrorText}>Please agree to the Terms to continue.</Text>
-        )}
+      {/* Passive legal coverage for the direct social paths; the ACTIVE
+          checkbox lives on the sign-in and edu-email screens. */}
+      <View style={{ paddingBottom: 8 }}>
+        <Text style={styles.legalLine}>
+          By continuing, you agree to our{' '}
+          <Text style={styles.agreeLink} onPress={() => setLegalDoc(TERMS_OF_USE)}>Terms of Use</Text>
+          {' '}and{' '}
+          <Text style={styles.agreeLink} onPress={() => setLegalDoc(PRIVACY_POLICY)}>Privacy Policy</Text>.
+        </Text>
       </View>
 
       <LegalModal doc={legalDoc} onClose={() => setLegalDoc(null)} />
@@ -186,45 +155,17 @@ const styles = StyleSheet.create({
     marginTop: 48,
   },
   // Bottom-anchored agree gate.
-  agreeBar: {
-    paddingTop: 12,
-  },
-  agreeRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 10,
-    paddingHorizontal: 2,
-    marginBottom: 4,
-  },
-  checkbox: {
-    width: 22,
-    height: 22,
-    borderRadius: 6,
-    borderWidth: 1.5,
-    borderColor: Brand.borderDefault,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 1,
-  },
-  checkboxOn: { backgroundColor: Brand.selected, borderColor: Brand.selected },
-  checkboxError: { borderColor: Brand.danger },
-  agreeText: {
-    flex: 1,
+  legalLine: {
     fontFamily: AmbitFont.body,
-    fontSize: 13,
-    lineHeight: 19,
+    fontSize: 12.5,
+    lineHeight: 18,
     color: Brand.inkMuted,
+    textAlign: 'center',
+    paddingHorizontal: Space.lg,
   },
   agreeLink: {
     color: Brand.selected,
     fontFamily: AmbitFont.semibold,
-  },
-  agreeErrorText: {
-    fontFamily: AmbitFont.body,
-    fontSize: 12.5,
-    color: Brand.danger,
-    marginTop: -4,
-    marginLeft: 32,
   },
   dividerRow: {
     flexDirection: 'row',

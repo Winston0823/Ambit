@@ -13,7 +13,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Eye, EyeSlash, HandWaving } from 'phosphor-react-native';
 import { BackChevron, Button, KeyboardDismiss } from '../../atoms';
 import { ANCHORED_CTA_BOTTOM } from '../../molecules/OnboardingContinue';
-import { SocialAuthButtons } from '../../molecules';
+import { SocialAuthButtons, TermsAgreeRow } from '../../molecules';
 import { useAuth } from '../../../context/AuthContext';
 import { toast } from '../../../lib/toast';
 import { Brand, AmbitFont, Radii, Space } from '../../../constants/theme';
@@ -43,11 +43,23 @@ export function SignInScreen({ onBack, onSignedIn }: Props) {
   const [error, setError] = useState('');
   const passwordRef = useRef<TextInput>(null);
 
+  // Terms agree-gate (Guideline 1.2) at the credential moment. Social buttons
+  // here can CREATE accounts (first-time Apple/Google), so they gate too.
+  const [agreed, setAgreed] = useState(false);
+  const [agreeFlagged, setAgreeFlagged] = useState(false);
+  const requireAgreement = (): boolean => {
+    if (agreed) return true;
+    setAgreeFlagged(true);
+    toast.error('Please agree to the Terms & Privacy Policy first.');
+    return false;
+  };
+
   const isValid =
     email.includes('@') && email.includes('.') && password.length >= 6;
 
   const handleSignIn = async () => {
     if (!isValid || loading) return;
+    if (!requireAgreement()) return;
     setLoading(true);
     setError('');
     try {
@@ -61,6 +73,7 @@ export function SignInScreen({ onBack, onSignedIn }: Props) {
   };
 
   const handleApple = async () => {
+    if (!requireAgreement()) return;
     setSocialBusy('apple');
     setError('');
     try {
@@ -74,6 +87,7 @@ export function SignInScreen({ onBack, onSignedIn }: Props) {
   };
 
   const handleGoogle = async () => {
+    if (!requireAgreement()) return;
     setSocialBusy('google');
     setError('');
     try {
@@ -132,6 +146,14 @@ export function SignInScreen({ onBack, onSignedIn }: Props) {
         <View style={styles.header}>
           <Text style={styles.headline}>Welcome back</Text>
           <Text style={styles.subtitle}>Pick up where you left off.</Text>
+        </View>
+
+        <View style={styles.agreeWrap}>
+          <TermsAgreeRow
+            agreed={agreed}
+            onToggle={() => { setAgreed((v) => !v); setAgreeFlagged(false); }}
+            flagged={agreeFlagged}
+          />
         </View>
 
         <View style={styles.socialWrap}>
@@ -240,6 +262,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: Space.lg,
     marginTop: 40,
     marginBottom: Space.lg,
+  },
+  agreeWrap: {
+    paddingHorizontal: Space.lg,
+    marginBottom: 4,
   },
   socialWrap: {
     paddingHorizontal: Space.lg,

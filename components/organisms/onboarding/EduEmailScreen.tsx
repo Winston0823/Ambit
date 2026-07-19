@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Mailbox } from 'phosphor-react-native';
 import { KeyboardDismiss } from '../../atoms';
 import { Entrance } from '../../atoms/Entrance';
-import { OnboardingContinue } from '../../molecules';
+import { OnboardingContinue, TermsAgreeRow } from '../../molecules';
 import { OnboardingScaffold } from './OnboardingScaffold';
 import { useOnboarding } from '../../../context/OnboardingContext';
 import { useAuth } from '../../../context/AuthContext';
@@ -36,8 +36,18 @@ export function EduEmailScreen({ onBack, onContinue }: Props) {
   const emailCheck = checkEduEmail(profile.eduEmail);
   const isValid = emailCheck.valid && password.length >= 8;
 
+  // Terms agree-gate (Guideline 1.2) — consent is collected here, at the
+  // credential step, not on the welcome screen.
+  const [agreed, setAgreed] = useState(false);
+  const [agreeFlagged, setAgreeFlagged] = useState(false);
+
   const handleSubmit = async () => {
     if (!isValid || sending) return;
+    if (!agreed) {
+      setAgreeFlagged(true);
+      toast.error('Please agree to the Terms & Privacy Policy first.');
+      return;
+    }
     setSending(true);
     setError('');
     setAwaitingConfirmation(false);
@@ -172,6 +182,14 @@ export function EduEmailScreen({ onBack, onContinue }: Props) {
                 {resetting ? 'Sending reset link…' : 'Forgot password?'}
               </Text>
             </Pressable>
+
+            <View style={{ marginTop: 20 }}>
+              <TermsAgreeRow
+                agreed={agreed}
+                onToggle={() => { setAgreed((a) => !a); setAgreeFlagged(false); }}
+                flagged={agreeFlagged}
+              />
+            </View>
           </View>
         </Entrance>
       </KeyboardDismiss>
