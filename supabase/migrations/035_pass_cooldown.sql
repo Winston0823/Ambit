@@ -11,7 +11,7 @@
 -- reply window, instead of appending into a locked thread.
 
 -- ─────────────────────────────────────────────────────────────
--- 1. Seeker deck: 30-day skip cooldown.
+-- 1. Seeker deck: 7-day skip cooldown.
 --    Body copied from 031_safety.sql (roles_sought/image_url/needed_by +
 --    block filter); only the matches exclusion changes.
 -- ─────────────────────────────────────────────────────────────
@@ -78,7 +78,7 @@ as $$
           and m.project_id = pr.id
           and (
             m.outcome = 'applied'
-            or (m.outcome = 'skipped' and m.created_at > now() - interval '30 days')
+            or (m.outcome = 'skipped' and m.created_at > now() - interval '7 days')
           )
       )
       -- Safety: drop projects whose owner blocked the seeker or is blocked by them.

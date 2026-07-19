@@ -494,7 +494,7 @@ export default function DiscoveryFeed() {
         ? next.slice(next.length - SKIP_OVERVIEW_THRESHOLD)
         : next;
     });
-    // Record the skip. Passes are a 30-day COOLDOWN, not permanent (see
+    // Record the skip. Passes are a 7-day COOLDOWN, not permanent (see
     // migration 035): the deck RPC only excludes skips younger than the
     // window, so people/projects resurface after they've had time to grow.
     // created_at is bumped on re-skip so passing again restarts the clock.
