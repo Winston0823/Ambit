@@ -296,12 +296,28 @@ export function ReachOutComposer({ card, onDismiss, onSend, onSent, disableAttac
     // project card in the thread); portfolio still rides in the text for now.
     const attachment =
       selected && attachMode === 'project' ? { id: selected.id, title: selected.label } : null;
-    const refLine =
-      selected && attachMode === 'portfolio' ? `\n\n📎 Sharing my work: ${selected.label}` : '';
+
+    // Portfolio rides in the text as a ref-line. The composed body must stay
+    // under the 300-char DB cap — the user's note is sacrosanct, so any overflow
+    // is absorbed by ellipsizing the appended title, not by cutting their words.
+    const note = text.trim();
+    let body = note;
+    if (selected && attachMode === 'portfolio') {
+      const prefix = '\n\n📎 Sharing my work: ';
+      const room = MAX_NOTE - note.length - prefix.length;
+      if (room >= 1) {
+        const title =
+          selected.label.length > room
+            ? selected.label.slice(0, Math.max(0, room - 1)).trimEnd() + '…'
+            : selected.label;
+        body = note + prefix + title;
+      }
+      // No room even for a one-char title → drop the ref-line entirely.
+    }
 
     let ok = false;
     try {
-      ok = (await onSend(card, text.trim() + refLine, attachment)) !== false;
+      ok = (await onSend(card, body, attachment)) !== false;
     } catch {
       ok = false;
     }
@@ -338,7 +354,14 @@ export function ReachOutComposer({ card, onDismiss, onSend, onSent, disableAttac
     <Modal transparent animationType="fade" visible={!!card} onRequestClose={onDismiss} statusBarTranslucent>
       <View style={styles.root}>
         <Animated.View style={[StyleSheet.absoluteFill, styles.scrim, { opacity: enter }]}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={handleDismiss} />
+          {/* Once the send is underway the scrim stops dismissing — abandoning
+              mid-send would strand the terminal onSent path (card fly-off +
+              counter reset). The user can dismiss again after it lands. */}
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={phase === 'sending' ? undefined : handleDismiss}
+            disabled={phase === 'sending'}
+          />
         </Animated.View>
 
         {/* ONE continuous surface: [media → input → white tail]. The tail hangs

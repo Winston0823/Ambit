@@ -71,7 +71,7 @@ as $$
     where pr.active = true
       and pr.owner_id <> p_seeker_id
       -- Reach-outs stay excluded (a conversation exists); skips only cool the
-      -- project down for 30 days, then it may resurface.
+      -- project down for 7 days, then it may resurface.
       and not exists (
         select 1 from matches m
         where m.seeker_id = p_seeker_id

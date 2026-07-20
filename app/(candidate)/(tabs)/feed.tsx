@@ -242,8 +242,8 @@ export default function DiscoveryFeed() {
   // retry affordance instead of cards or the honest empty state.
   const [deckError, setDeckError] = useState(false);
 
-  // Viewer's own skills — drives the matched-first ordering, the SHARED
-  // tags, and the shared-count in the OverlapVenn on every card. Loaded
+  // Viewer's own skills — used to highlight the skills a seeker shares with
+  // the project they're browsing (the matched chips on each card). Loaded
   // once on mount from the profiles row. Empty array on first paint /
   // for users without skills; everything still renders, just without
   // matches highlighted.
@@ -703,17 +703,31 @@ export default function DiscoveryFeed() {
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
     }
-    await supabase
-      .from('matches')
-      .delete()
-      .eq('seeker_id', user.id)
-      .eq('outcome', 'skipped');
+    // Clear the SKIPPED rows this side owns. Seeker skips are keyed by
+    // seeker_id = me; owner skips are keyed by project_id = my active project
+    // (seeker_id there is the passed-over seeker, not me), so the seeker-only
+    // delete never cleared an owner's passes. Keep 'applied'/'saved' rows.
+    if (role === 'owner') {
+      if (ownerProject) {
+        await supabase
+          .from('matches')
+          .delete()
+          .eq('project_id', ownerProject.id)
+          .eq('outcome', 'skipped');
+      }
+    } else {
+      await supabase
+        .from('matches')
+        .delete()
+        .eq('seeker_id', user.id)
+        .eq('outcome', 'skipped');
+    }
     setReinserted([]);
     setConsecutiveSkips(0);
     setLastFiveSeen([]);
     setDeckResetKey((k) => k + 1);
     await fetchDeck();
-  }, [user, fetchDeck]);
+  }, [user, role, ownerProject, fetchDeck]);
 
   const goToSaved = () => {
     if (Platform.OS !== 'web') Haptics.selectionAsync().catch(() => {});
@@ -963,11 +977,18 @@ export default function DiscoveryFeed() {
           setLimitSheetVisible(false);
           setPendingReachOutCard(null);
         }}
-        onAdComplete={() => {
+        onAdComplete={async () => {
           setLimitSheetVisible(false);
-          // Open the composer with the card they originally wanted to reach out to.
-          if (pendingReachOutCard) setReachOutCard(pendingReachOutCard);
+          // Re-verify capacity before opening — the ad bonus is only granted up
+          // to MAX_AD_BONUS/day, so a completed ad past that cap must NOT open
+          // the composer (which would otherwise let a send bypass the limit).
+          const card = pendingReachOutCard;
           setPendingReachOutCard(null);
+          if (await canReachOut()) {
+            if (card) setReachOutCard(card);
+          } else {
+            toast.error("You're out of reach-outs for today.");
+          }
         }}
       />
 
