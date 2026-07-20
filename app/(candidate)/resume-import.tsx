@@ -76,21 +76,24 @@ export default function ResumeImportScreen() {
   // The user's CURRENT profile — import is additive, so we merge against this
   // and never overwrite a name/blurb they've already written or drop existing
   // skills.
-  const [existing, setExisting] = useState<{ name: string; blurb: string; skills: string[] }>({
-    name: '', blurb: '', skills: [],
+  const [existing, setExisting] = useState<{ name: string; blurb: string; skills: string[]; role: string | null }>({
+    name: '', blurb: '', skills: [], role: null,
   });
+  // Owners have no visible portfolio, so we hide (and skip) the highlight
+  // sections for them — those would save invisibly.
+  const isOwner = existing.role === 'owner';
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
     (async () => {
       const { data } = await supabase
         .from('profiles')
-        .select('name, vibe_blurb, skills')
+        .select('name, vibe_blurb, skills, role')
         .eq('id', user.id)
         .maybeSingle();
       if (cancelled || !data) return;
-      const d = data as { name: string | null; vibe_blurb: string | null; skills: string[] | null };
-      setExisting({ name: d.name ?? '', blurb: d.vibe_blurb ?? '', skills: d.skills ?? [] });
+      const d = data as { name: string | null; vibe_blurb: string | null; skills: string[] | null; role: string | null };
+      setExisting({ name: d.name ?? '', blurb: d.vibe_blurb ?? '', skills: d.skills ?? [], role: d.role });
     })();
     return () => { cancelled = true; };
   }, [user?.id]);
@@ -208,19 +211,24 @@ export default function ResumeImportScreen() {
       }
 
       // 2. Selected experiences + projects → portfolio highlights (no images).
+      // Owners have no visible portfolio, so skip highlight insertion entirely —
+      // the review sections are hidden for them, and highlights would save
+      // invisibly.
       const highlights: { title: string; description: string; linkUrl: string | null }[] = [];
-      parsed.experience.forEach((e, i) => {
-        if (!expOn.has(i)) return;
-        const title = clampTitle(e.org ? `${e.title} @ ${e.org}` : e.title);
-        const description = clampDesc(e.summary || e.title);
-        if (title && description) highlights.push({ title, description, linkUrl: null });
-      });
-      parsed.portfolio.forEach((p, i) => {
-        if (!projOn.has(i)) return;
-        const title = clampTitle(p.title);
-        const description = clampDesc(p.description || p.title);
-        if (title && description) highlights.push({ title, description, linkUrl: p.link || null });
-      });
+      if (!isOwner) {
+        parsed.experience.forEach((e, i) => {
+          if (!expOn.has(i)) return;
+          const title = clampTitle(e.org ? `${e.title} @ ${e.org}` : e.title);
+          const description = clampDesc(e.summary || e.title);
+          if (title && description) highlights.push({ title, description, linkUrl: null });
+        });
+        parsed.portfolio.forEach((p, i) => {
+          if (!projOn.has(i)) return;
+          const title = clampTitle(p.title);
+          const description = clampDesc(p.description || p.title);
+          if (title && description) highlights.push({ title, description, linkUrl: p.link || null });
+        });
+      }
 
       // Dedupe by normalized title — against BOTH what's already on the profile
       // (so a re-import doesn't stack duplicate highlights) and within this
@@ -268,7 +276,7 @@ export default function ResumeImportScreen() {
         <ScrollView contentContainerStyle={[styles.sourceContent, { paddingTop: insets.top + 52 }]} keyboardShouldPersistTaps="handled">
           <Text style={styles.h}>Import Résumé</Text>
           <Text style={styles.subtitle}>Let's set up your profile</Text>
-          <Text style={styles.sub}>Paste it, upload a file, or snap a photo — we'll pull out your skills, blurb, and projects. You review everything before anything saves.</Text>
+          <Text style={styles.sub}>Paste it, upload a file, or add a photo — we'll pull out your skills, blurb, and projects. You review everything before anything saves.</Text>
 
           {noResults && (
             <View style={styles.noResults}>
@@ -374,7 +382,7 @@ export default function ResumeImportScreen() {
             </View>
           )}
 
-          {parsed.experience.length > 0 && (
+          {!isOwner && parsed.experience.length > 0 && (
             <View style={styles.field}>
               <Text style={styles.fieldLabel}>EXPERIENCE · PICK ANY TO SHOWCASE</Text>
               <Text style={styles.fieldHint}>Add roles, ventures, or projects from your experience as portfolio highlights.</Text>
@@ -390,7 +398,7 @@ export default function ResumeImportScreen() {
             </View>
           )}
 
-          {parsed.portfolio.length > 0 && (
+          {!isOwner && parsed.portfolio.length > 0 && (
             <View style={styles.field}>
               <Text style={styles.fieldLabel}>PROJECTS · PICK ANY TO SHOWCASE</Text>
               {parsed.portfolio.map((p, i) => (
@@ -468,7 +476,9 @@ const styles = StyleSheet.create({
   parseBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
     marginTop: 14, paddingVertical: 14, borderRadius: 999,
-    backgroundColor: Brand.action, borderWidth: 1.6, borderColor: Brand.actionInk,
+    backgroundColor: Brand.action,
+    // ASTRA: borderless purple CTA lifted by a soft shadow.
+    shadowColor: Brand.action, shadowOpacity: 0.2, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 4,
   },
   parseBtnText: { fontFamily: AmbitFont.body, fontSize: 15, fontWeight: '700', color: Brand.inkOnBrand },
 
@@ -539,7 +549,7 @@ const styles = StyleSheet.create({
 
   ctaWrap: { position: 'absolute', alignSelf: 'center' },
   cta: {
-    backgroundColor: Brand.action, borderWidth: 1.6, borderColor: Brand.actionInk,
+    backgroundColor: Brand.action,
     paddingHorizontal: 48, paddingVertical: 16, borderRadius: 999, minWidth: 220, alignItems: 'center',
   },
   ctaText: { fontFamily: AmbitFont.body, fontSize: 16, fontWeight: '700', color: Brand.inkOnBrand },

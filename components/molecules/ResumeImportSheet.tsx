@@ -105,7 +105,9 @@ const styles = StyleSheet.create({
   primaryBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
     marginTop: 12, paddingVertical: 14, borderRadius: 999,
-    backgroundColor: Brand.action, borderWidth: 1.6, borderColor: Brand.actionInk,
+    backgroundColor: Brand.action,
+    // ASTRA: borderless purple CTA lifted by a soft shadow.
+    shadowColor: Brand.action, shadowOpacity: 0.2, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 4,
   },
   primaryBtnText: { fontFamily: AmbitFont.body, fontSize: 15, fontWeight: '700', color: Brand.inkOnBrand },
   orRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 18 },

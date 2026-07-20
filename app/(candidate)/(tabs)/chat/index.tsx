@@ -687,8 +687,12 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
     borderRadius: 999,
     backgroundColor: Brand.action,
-    borderWidth: 1.4,
-    borderColor: Brand.actionInk,
+    // ASTRA: borderless purple CTA lifted by a soft shadow.
+    shadowColor: Brand.action,
+    shadowOpacity: 0.2,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 4,
   },
   unarchiveBtnText: {
     fontFamily: AmbitFont.bold,

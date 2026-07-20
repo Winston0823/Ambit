@@ -268,13 +268,17 @@ const styles = StyleSheet.create({
   errorBtn: {
     marginTop: 28,
     backgroundColor: Brand.action,
-    borderWidth: 1.6,
-    borderColor: Brand.actionInk,
     paddingHorizontal: 40,
     paddingVertical: 14,
     borderRadius: 999,
+    // ASTRA: borderless purple CTA lifted by a soft shadow.
+    shadowColor: Brand.action,
+    shadowOpacity: 0.2,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 4,
   },
-  errorBtnText: { fontFamily: AmbitFont.body, fontSize: 15, fontWeight: '700', color: Brand.actionInk },
+  errorBtnText: { fontFamily: AmbitFont.body, fontSize: 15, fontWeight: '700', color: Brand.inkOnBrand },
   skelRow: { flexDirection: 'row', alignItems: 'center', gap: 16, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: Brand.borderSoft },
   content: { paddingHorizontal: Space.lg, gap: Space.md },
 
@@ -407,6 +411,6 @@ const styles = StyleSheet.create({
     fontFamily: AmbitFont.body,
     fontSize: 11,
     fontWeight: '700',
-    color: Brand.actionInk,
+    color: Brand.inkOnBrand,
   },
 });

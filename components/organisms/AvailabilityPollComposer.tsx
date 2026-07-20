@@ -562,7 +562,8 @@ const styles = StyleSheet.create({
   },
   hourChipSelected: {
     backgroundColor: Brand.selected,
-    borderColor: Brand.actionInk,
+    // ASTRA: border matches the purple fill (no ink outline).
+    borderColor: Brand.selected,
   },
   hourChipText: {
     fontFamily: AmbitFont.body,
@@ -582,7 +583,8 @@ const styles = StyleSheet.create({
   },
   durationChipSelected: {
     backgroundColor: Brand.selected,
-    borderColor: Brand.actionInk,
+    // ASTRA: border matches the purple fill (no ink outline).
+    borderColor: Brand.selected,
   },
   durationChipText: {
     fontFamily: AmbitFont.body,

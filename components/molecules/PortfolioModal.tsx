@@ -122,11 +122,12 @@ export function PortfolioModal({ item, onDismiss, onSave, onDelete }: Props) {
   if (!mounted || !displayItem) return null;
 
   const isEditable = !!onSave;
+  // Timeframe is optional — imported highlights carry none, and requiring it
+  // would trap edits on those.
   const canSave =
     mode === 'edit' &&
     draftTitle.trim().length > 0 &&
-    draftDescription.trim().length > 0 &&
-    draftTimeframe.trim().length > 0;
+    draftDescription.trim().length > 0;
 
   // Parsed previews used in both edit (live) and view.
   const contributions =
@@ -200,6 +201,11 @@ export function PortfolioModal({ item, onDismiss, onSave, onDelete }: Props) {
   const handleSave = () => {
     if (!canSave || !onSave) return;
     if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    // Normalize the link so a bare "acme.com" becomes a tappable https URL.
+    const trimmedLink = draftLink.trim();
+    const linkUrl = trimmedLink
+      ? (/^https?:\/\//i.test(trimmedLink) ? trimmedLink : `https://${trimmedLink}`)
+      : null;
     onSave({
       ...displayItem,
       title: draftTitle.trim(),
@@ -207,7 +213,7 @@ export function PortfolioModal({ item, onDismiss, onSave, onDelete }: Props) {
       imageUri: draftImageUri,
       timeframe: draftTimeframe.trim(),
       contributions,
-      linkUrl: draftLink.trim() || null,
+      linkUrl,
       tools,
     });
   };
@@ -602,6 +608,6 @@ const styles = StyleSheet.create({
   editFooter: { marginTop: 16, flexDirection: 'row', alignItems: 'center', gap: 12 },
   deleteBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8, paddingHorizontal: 4 },
   deleteLabel: { fontFamily: AmbitFont.body, fontSize: 14, fontWeight: '600', color: Brand.danger },
-  saveBtn: { paddingHorizontal: 20, paddingVertical: 12, backgroundColor: Brand.action, borderRadius: 999, borderWidth: 1.6, borderColor: Brand.actionInk },
+  saveBtn: { paddingHorizontal: 20, paddingVertical: 12, backgroundColor: Brand.action, borderRadius: 999 },
   saveLabel: { fontFamily: AmbitFont.body, fontSize: 14, fontWeight: '700', color: Brand.inkOnBrand },
 });
