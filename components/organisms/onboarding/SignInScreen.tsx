@@ -1,6 +1,5 @@
 import React, { useRef, useState } from 'react';
 import {
-  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -13,7 +12,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Eye, EyeSlash, HandWaving } from 'phosphor-react-native';
 import { BackChevron, Button, KeyboardDismiss } from '../../atoms';
 import { ANCHORED_CTA_BOTTOM } from '../../molecules/OnboardingContinue';
-import { SocialAuthButtons, TermsAgreeRow } from '../../molecules';
+import { TermsAgreeRow } from '../../molecules';
 import { useAuth } from '../../../context/AuthContext';
 import { toast } from '../../../lib/toast';
 import { Brand, AmbitFont, Radii, Space } from '../../../constants/theme';
@@ -28,22 +27,22 @@ interface Props {
 }
 
 /// Sign-in branch (returning user). Lives outside the linear STEPS array;
-/// reached from WelcomeScreen's "Sign in" CTA. Authenticates against Supabase
-/// via AuthContext (signInWithEmail / signInWithApple / signInWithGoogle).
+/// reached from WelcomeScreen's "Sign in" CTA. Email + password only —
+/// returning Apple/Google users tap their provider on the Welcome screen, so
+/// offering social here would be a redundant second door.
 export function SignInScreen({ onBack, onSignedIn }: Props) {
   const insets = useSafeAreaInsets();
-  const { signInWithEmail, signInWithApple, signInWithGoogle, sendPasswordReset } = useAuth();
+  const { signInWithEmail, sendPasswordReset } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [resetting, setResetting] = useState(false);
-  const [socialBusy, setSocialBusy] = useState<'apple' | 'google' | null>(null);
   const [error, setError] = useState('');
   const passwordRef = useRef<TextInput>(null);
 
-  // Terms agree-gate (Guideline 1.2) at the credential moment. Social buttons
-  // here can CREATE accounts (first-time Apple/Google), so they gate too.
+  // Terms agree-gate (Guideline 1.2), rendered directly above the Sign in
+  // CTA so consent sits visually welded to the action it gates.
   const [agreed, setAgreed] = useState(false);
   const [agreeFlagged, setAgreeFlagged] = useState(false);
   const requireAgreement = (): boolean => {
@@ -71,33 +70,7 @@ export function SignInScreen({ onBack, onSignedIn }: Props) {
     }
   };
 
-  const handleApple = async () => {
-    if (!requireAgreement()) return;
-    setSocialBusy('apple');
-    setError('');
-    try {
-      await signInWithApple();
-      onSignedIn();
-    } catch (e: any) {
-      Alert.alert('Apple sign-in failed', e?.message ?? 'Try again.');
-    } finally {
-      setSocialBusy(null);
-    }
-  };
 
-  const handleGoogle = async () => {
-    if (!requireAgreement()) return;
-    setSocialBusy('google');
-    setError('');
-    try {
-      await signInWithGoogle();
-      onSignedIn();
-    } catch (e: any) {
-      Alert.alert('Google sign-in failed', e?.message ?? 'Try again.');
-    } finally {
-      setSocialBusy(null);
-    }
-  };
 
   /// Account recovery. Mirrors EduEmailScreen's validate-email-first + toast
   /// pattern: guard on a syntactically valid email, then fire the reset and
@@ -145,27 +118,6 @@ export function SignInScreen({ onBack, onSignedIn }: Props) {
         <View style={styles.header}>
           <Text style={styles.headline}>Welcome back</Text>
           <Text style={styles.subtitle}>Pick up where you left off.</Text>
-        </View>
-
-        <View style={styles.agreeWrap}>
-          <TermsAgreeRow
-            agreed={agreed}
-            onToggle={() => { setAgreed((v) => !v); setAgreeFlagged(false); }}
-            flagged={agreeFlagged}
-          />
-        </View>
-
-        <View style={styles.socialWrap}>
-          <SocialAuthButtons
-            onAppleSignIn={handleApple}
-            onGoogleSignIn={handleGoogle}
-            busy={socialBusy}
-          />
-          <View style={styles.dividerRow}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>or email</Text>
-            <View style={styles.dividerLine} />
-          </View>
         </View>
 
         <View style={styles.form}>
@@ -236,6 +188,13 @@ export function SignInScreen({ onBack, onSignedIn }: Props) {
       {error !== '' && <Text style={styles.errorNote}>{error}</Text>}
 
       <View style={[styles.cta, { bottom: insets.bottom + ANCHORED_CTA_BOTTOM }]}>
+        <View style={styles.agreeAboveCta}>
+          <TermsAgreeRow
+            agreed={agreed}
+            onToggle={() => { setAgreed((v) => !v); setAgreeFlagged(false); }}
+            flagged={agreeFlagged}
+          />
+        </View>
         <Button
           title="Sign in"
           onPress={handleSignIn}
@@ -259,35 +218,10 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingHorizontal: Space.lg,
-    marginTop: 40,
-    marginBottom: Space.lg,
-  },
-  agreeWrap: {
-    paddingHorizontal: Space.lg,
-    marginBottom: 4,
-  },
-  socialWrap: {
-    paddingHorizontal: Space.lg,
-    gap: 16,
-    marginBottom: Space.lg,
-  },
-  dividerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginTop: 4,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: Brand.borderDefault,
-  },
-  dividerText: {
-    fontFamily: AmbitFont.body,
-    fontSize: 12,
-    color: Brand.inkMuted,
-    textTransform: 'uppercase',
-    letterSpacing: 1.2,
+    // Clears the self-positioned BackChevron row, matching the onboarding
+    // scaffold's rhythm.
+    marginTop: 64,
+    marginBottom: 28,
   },
   headline: {
     fontFamily: AmbitFont.display,
@@ -355,6 +289,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Space.lg,
     marginTop: 8,
   },
+  agreeAboveCta: { marginBottom: 14 },
   cta: {
     position: 'absolute',
     left: Space.lg,
