@@ -588,21 +588,33 @@ export default function ProfileTab() {
           </Pressable>
         </View>
 
-        {/* Résumé import — a clearly-labeled CTA so the feature is discoverable
-            (the header icon alone read as "missing"). Seekers only; owners'
-            profiles are project-centric, not portfolio-driven. */}
-        {profile?.role === 'seeker' && (
+        {/* Résumé import — multi-use and for BOTH roles (it fills name, blurb,
+            skills, and links, which owners have too). Prominence follows
+            profile completeness: a sparse profile gets the big fast-fill CTA;
+            once there's content it demotes to a quiet link in the same spot. */}
+        {skills.length === 0 && portfolio.length === 0 ? (
           <HardShadow radius={999} offset={3} style={styles.resumeImportShadow}>
             <Pressable
               onPress={openResumeImport}
               style={styles.resumeImportBtn}
               accessibilityRole="button"
-              accessibilityLabel="Resume Import"
+              accessibilityLabel="Import your résumé"
             >
               <FileArrowUp size={18} color={Brand.inkOnBrand} weight="regular" />
-              <Text style={styles.resumeImportLabel}>Resume Import</Text>
+              <Text style={styles.resumeImportLabel}>Import your résumé</Text>
             </Pressable>
           </HardShadow>
+        ) : (
+          <Pressable
+            onPress={openResumeImport}
+            style={styles.resumeImportQuiet}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Import from résumé"
+          >
+            <FileArrowUp size={14} color={Brand.selected} weight="regular" />
+            <Text style={styles.resumeImportQuietLabel}>Import from résumé</Text>
+          </Pressable>
         )}
 
         {/* Core fields — inline TextField editing; commits on blur. Campus +
@@ -1230,6 +1242,21 @@ const styles = StyleSheet.create({
 
   // Clearly-labeled résumé-import CTA in the edit form (ASTRA pill language).
   resumeImportShadow: { alignSelf: 'center', marginTop: Space.sm },
+  // Demoted variant once the profile has content — same spot, quiet link.
+  resumeImportQuiet: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    alignSelf: 'center',
+    marginTop: 2,
+    paddingVertical: 4,
+  },
+  resumeImportQuietLabel: {
+    fontFamily: AmbitFont.semibold,
+    fontSize: 13,
+    color: Brand.selected,
+  },
   resumeImportBtn: {
     flexDirection: 'row',
     alignItems: 'center',
