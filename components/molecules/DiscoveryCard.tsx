@@ -26,6 +26,7 @@ import {
   type IconProps,
 } from 'phosphor-react-native';
 import * as Haptics from 'expo-haptics';
+import { VibeQuote } from '../atoms';
 import {
   Astra,
   Brand,
@@ -335,7 +336,7 @@ function SeekerFront({ card }: { card: Extract<DiscoveryCardData, { kind: 'seeke
       <View style={styles.panel}>
         <ResponsePill rate={card.responseRate} />
         {card.vibeBlurb.trim() !== '' && (
-          <Text style={styles.desc} numberOfLines={3}>{firstSentence(card.vibeBlurb) || card.vibeBlurb}</Text>
+          <VibeQuote text={firstSentence(card.vibeBlurb) || card.vibeBlurb} lines={3} />
         )}
         {card.skills.length > 0 && (
           <View style={styles.chipRow}>
@@ -453,7 +454,7 @@ function ProjectFront({ card }: { card: Extract<DiscoveryCardData, { kind: 'proj
 
       <View style={styles.panelProject}>
         <Text style={styles.projectTitle} numberOfLines={1}>{card.title}</Text>
-        {card.pitch.trim() !== '' && <Text style={styles.desc} numberOfLines={2}>{card.pitch}</Text>}
+        {card.pitch.trim() !== '' && <VibeQuote text={card.pitch} lines={2} />}
         <View style={styles.metaRow}>
           <LinearGradient colors={[Astra.royal, Astra.iris]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.ownerAvatar}>
             <Text style={styles.ownerAvatarText}>{ownerInitials}</Text>

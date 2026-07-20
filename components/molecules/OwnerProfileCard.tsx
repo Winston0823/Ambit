@@ -3,7 +3,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Image } from 'expo-image';
 import { CaretRight } from 'phosphor-react-native';
-import { Chip, HardShadow } from '../atoms';
+import { Chip, HardShadow, VibeQuote } from '../atoms';
 import { AmbitFont, Astra, Brand, Radii } from '../../constants/theme';
 
 export interface OwnerProject {
@@ -64,7 +64,7 @@ export function OwnerProfileCard({ name, photoUri, campusName, vibe, skills, pro
           </View>
         </View>
 
-        {!!vibe && <Text style={styles.vibe}>{vibe}</Text>}
+        {!!vibe && <View style={{ marginTop: 16 }}><VibeQuote text={vibe} lines={3} size="inline" /></View>}
 
         {skills.length > 0 && (
           <View style={styles.chips}>
