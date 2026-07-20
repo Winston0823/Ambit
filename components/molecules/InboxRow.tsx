@@ -272,7 +272,7 @@ export function InboxRow({ item, meId, onPress, onPassRequest, onPin, onMute, on
                 <View style={[styles.chip, styles.chipOutline]}>
                   <Clock size={11} color={Brand.inkMuted} weight="regular" />
                   <Text style={[styles.chipText, styles.chipTextMuted]}>
-                    {awaitingExpiryLabel(countdown.minutesLeft)}
+                    Waiting on them
                   </Text>
                 </View>
               )}
@@ -294,17 +294,6 @@ export function InboxRow({ item, meId, onPress, onPassRequest, onPin, onMute, on
     </Swipeable>
     </View>
   );
-}
-
-/// Sender-side expiry phrasing — mirrors the recipient's countdown but
-/// framed from the waiting side: "expires in 21h" / "expires in 2d".
-function awaitingExpiryLabel(minutesLeft: number): string {
-  if (minutesLeft >= 24 * 60) {
-    const days = Math.floor(minutesLeft / (24 * 60));
-    return `expires in ${days}d`;
-  }
-  if (minutesLeft >= 60) return `expires in ${Math.floor(minutesLeft / 60)}h`;
-  return `expires in ${minutesLeft}m`;
 }
 
 function formatRelative(iso: string): string {

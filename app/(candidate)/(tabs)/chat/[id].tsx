@@ -209,6 +209,13 @@ export default function ThreadScreen() {
   /// Monotonic guard so a superseded load (conversation switch, rapid retry)
   /// can't clobber the state of the newest one.
   const loadSeqRef = useRef(0);
+  /// Thread pagination. The initial fetch caps at the newest 200 messages;
+  /// `hasMore` is true when that cap was hit, so a "Load earlier" header can
+  /// page backwards via listMessages' `before` cursor. The ref guards against
+  /// firing a second page fetch while one is already in flight.
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingEarlier, setLoadingEarlier] = useState(false);
+  const loadingEarlierRef = useRef(false);
 
   const [replyTo, setReplyTo] = useState<MessageRow | null>(null);
   const [editing, setEditing] = useState<MessageRow | null>(null);
@@ -528,6 +535,8 @@ export default function ThreadScreen() {
       if (isStale()) return;
       setMeta(partner);
       setMessages(msgs);
+      // Hitting the 200 cap means there's older history to page back into.
+      setHasMore(msgs.length >= 200);
       setReactions(reacts);
       setSchedulingRequests(schedReqs);
       setPolls(availPolls);
@@ -900,6 +909,32 @@ export default function ThreadScreen() {
     setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 50);
   };
 
+  /// Page one screen of older messages into the top of the thread. Uses the
+  /// oldest loaded row's timestamp as the `before` cursor and prepends the
+  /// result (deduped). The in-flight ref means a double-tap can't double-fetch.
+  const loadEarlier = useCallback(async () => {
+    if (!conversationId || loadingEarlierRef.current || !hasMore) return;
+    const oldest = messages[0];
+    if (!oldest) return;
+    loadingEarlierRef.current = true;
+    setLoadingEarlier(true);
+    try {
+      const older = await listMessages(conversationId, { limit: 50, before: oldest.created_at });
+      setMessages((prev) => {
+        const seen = new Set(prev.map((m) => m.id));
+        const fresh = older.filter((m) => !seen.has(m.id));
+        return fresh.length > 0 ? [...fresh, ...prev] : prev;
+      });
+      // A short page means we've reached the start of the thread.
+      setHasMore(older.length >= 50);
+    } catch (e: any) {
+      toast.error("Couldn't load earlier messages.");
+    } finally {
+      loadingEarlierRef.current = false;
+      setLoadingEarlier(false);
+    }
+  }, [conversationId, hasMore, messages]);
+
   const handleSendText = async (body: string) => {
     if (!user || !conversationId) return;
     const clientId = randomUUID();
@@ -1192,6 +1227,20 @@ export default function ThreadScreen() {
     setReportTarget({ reportedUserId: meta.partner_id, conversationId, messageId: null });
   };
 
+  /// Shared block action — block the partner, confirm with a toast, and leave
+  /// the (now-blocked) thread. Reused by the overflow "Block user" flow and the
+  /// post-report "Also block?" follow-up so both behave identically.
+  const performBlock = async (name: string) => {
+    if (!meta) return;
+    try {
+      await blockUser(meta.partner_id);
+      toast.success(`Blocked ${name}.`);
+      router.back();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Couldn't block — try again.");
+    }
+  };
+
   const handleBlockUser = () => {
     setOverflowOpen(false);
     if (!meta) return;
@@ -1201,21 +1250,27 @@ export default function ThreadScreen() {
       `They won't be able to message you, and you won't see each other in the feed or inbox.`,
       [
         { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Block',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await blockUser(meta.partner_id);
-              toast.success(`Blocked ${name}.`);
-              router.back();
-            } catch (e: any) {
-              toast.error(e?.message ?? "Couldn't block — try again.");
-            }
-          },
-        },
+        { text: 'Block', style: 'destructive', onPress: () => performBlock(name) },
       ],
     );
+  };
+
+  /// After a report lands, offer the natural follow-up: block the same person.
+  /// Deferred slightly so the report sheet finishes dismissing before the Alert
+  /// presents (iOS can't cleanly stack an Alert over a dismissing modal).
+  const handleReported = () => {
+    if (!meta) return;
+    const name = meta.partner_name || 'this person';
+    setTimeout(() => {
+      Alert.alert(
+        `Also block ${name}?`,
+        `Blocking stops all contact and hides you from each other in the feed and inbox.`,
+        [
+          { text: 'Not now', style: 'cancel' },
+          { text: 'Block', style: 'destructive', onPress: () => performBlock(name) },
+        ],
+      );
+    }, 350);
   };
 
   const handleQuickReact = async (emoji: string) => {
@@ -1308,6 +1363,7 @@ export default function ThreadScreen() {
             status={meta.status}
             passReason={meta.pass_reason}
             hiredProposedBy={meta.hired_proposed_by}
+            proposerIsOwner={meta.hired_proposed_by === meta.owner_id}
             partnerName={meta.partner_name}
             meId={user?.id ?? ''}
             onConfirmHire={handleConfirmHire}
@@ -1500,6 +1556,21 @@ export default function ThreadScreen() {
               </>
             );
           }}
+          ListHeaderComponent={hasMore ? (
+            <Pressable
+              onPress={loadEarlier}
+              disabled={loadingEarlier}
+              style={({ pressed }) => [styles.loadEarlierRow, pressed && { opacity: 0.7 }]}
+              accessibilityRole="button"
+              accessibilityLabel="Load earlier messages"
+            >
+              {loadingEarlier ? (
+                <ActivityIndicator color={Brand.accent} />
+              ) : (
+                <Text style={styles.loadEarlierText}>Load earlier messages</Text>
+              )}
+            </Pressable>
+          ) : null}
           ListFooterComponent={partnerTyping ? (
             <TypingIndicator name={meta.partner_name.split(' ')[0]} />
           ) : null}
@@ -1759,6 +1830,7 @@ export default function ThreadScreen() {
         visible={!!reportTarget}
         target={reportTarget}
         onClose={() => setReportTarget(null)}
+        onReported={handleReported}
       />
     </View>
   );
@@ -1829,6 +1901,7 @@ function StatusBanner({
   status,
   passReason,
   hiredProposedBy,
+  proposerIsOwner,
   partnerName,
   meId,
   onConfirmHire,
@@ -1837,6 +1910,11 @@ function StatusBanner({
   status: ConversationStatus;
   passReason: string | null;
   hiredProposedBy: string | null;
+  /// Whether the party who PROPOSED the hire is the project owner. The
+  /// proposer can be either role — an owner-receiver "makes an offer", a
+  /// seeker-receiver "accepts" — so the confirm/waiting copy branches on
+  /// this, not on a hard-coded "hiring founder" assumption.
+  proposerIsOwner: boolean;
   partnerName: string;
   meId: string;
   onConfirmHire: () => void;
@@ -1849,7 +1927,9 @@ function StatusBanner({
         {iProposed ? (
           <>
             <Text style={styles.bannerText}>
-              Waiting for {partnerName} to confirm the hire.
+              {proposerIsOwner
+                ? `Waiting for ${partnerName} to confirm your offer.`
+                : `You accepted — waiting for ${partnerName} to confirm.`}
             </Text>
             {/* Proposer can retract a premature / mistaken proposal. */}
             <Pressable onPress={onRevertHire} style={styles.bannerGhostCta}>
@@ -1859,7 +1939,9 @@ function StatusBanner({
         ) : (
           <>
             <Text style={[styles.bannerText, styles.bannerTextEmphatic]}>
-              {partnerName} marked this as Hired. Confirm?
+              {proposerIsOwner
+                ? `${partnerName} sent you an offer. Confirm to join the team?`
+                : `${partnerName} accepted your match. Confirm the hire?`}
             </Text>
             {/* Recipient can decline ("Not yet") — reverts to active so the
                 thread stays usable instead of dead-ending on Confirm. */}
@@ -1954,6 +2036,20 @@ const styles = StyleSheet.create({
   },
 
   root: { flex: 1, backgroundColor: Brand.canvas },
+
+  // "Load earlier messages" pager header — quiet tappable row at the top of
+  // the thread when older history remains beyond the initial 200-message page.
+  loadEarlierRow: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    marginBottom: 4,
+  },
+  loadEarlierText: {
+    fontFamily: AmbitFont.semibold,
+    fontSize: 13,
+    color: Brand.accent,
+  },
 
   // ── Mock iOS status bar + Dynamic Island (decorative iPhone chrome) ─────
   // ── Thread load-error state (mirrors feed DeckError) ────────────

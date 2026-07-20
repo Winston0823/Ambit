@@ -72,7 +72,7 @@ export function AvailabilityGrid({
           <View style={styles.timeCol}>
             {timeLabels.map((t, i) => (
               <View key={i} style={[styles.timeCell, { height: CELL_H }]}>
-                <Text style={styles.timeCellText}>{t}</Text>
+                <Text style={styles.timeCellText} numberOfLines={1}>{t}</Text>
               </View>
             ))}
           </View>
@@ -163,7 +163,7 @@ function formatTimeLabel(d: Date): string {
   return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
 }
 
-const TIME_COL_W = 56;
+const TIME_COL_W = 66;
 
 const styles = StyleSheet.create({
   root: { gap: 8 },
