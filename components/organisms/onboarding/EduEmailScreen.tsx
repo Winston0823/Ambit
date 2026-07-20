@@ -11,10 +11,17 @@ import { checkEduEmail } from '../../../lib/validation';
 import { toast } from '../../../lib/toast';
 import { Brand, AmbitFont, Radii, Space } from '../../../constants/theme';
 
-interface Props { onBack: () => void; onContinue: () => void; }
+interface Props {
+  onBack: () => void;
+  /// A session was established (existing-account sign-in, warm-resume after
+  /// email confirmation, or a sign-up that returned an immediate session). The
+  /// flow decides where to go next: fully-onboarded users leave the flow,
+  /// partial users jump to their first incomplete step. (Audit P1.)
+  onSignedIn: () => void;
+}
 
 /// S-004 .edu Verification. Email + password sign-up / sign-in.
-export function EduEmailScreen({ onBack, onContinue }: Props) {
+export function EduEmailScreen({ onBack, onSignedIn }: Props) {
   const { profile, update } = useOnboarding();
   const { signUpWithEmail, signInWithEmail, sendPasswordReset } = useAuth();
   const [password, setPassword] = useState('');
@@ -52,9 +59,11 @@ export function EduEmailScreen({ onBack, onContinue }: Props) {
     setError('');
     setAwaitingConfirmation(false);
     try {
-      // Existing account, correct password → straight through.
+      // Existing account, correct password → hand off to the flow, which
+      // dismisses fully-onboarded users (don't re-onboard / overwrite their
+      // profile) or resumes partial users at their first incomplete step.
       await signInWithEmail(profile.eduEmail, password);
-      onContinue();
+      onSignedIn();
     } catch {
       // Sign-in failed. Either there's no account yet, OR the password was
       // wrong on an existing account. Disambiguate via the sign-up result
@@ -65,7 +74,7 @@ export function EduEmailScreen({ onBack, onContinue }: Props) {
         // No session ⇒ email confirmation is required. Do NOT advance — the
         // downstream submit would run with no authed user and silently no-op.
         if (hasSession) {
-          onContinue();
+          onSignedIn();
         } else {
           setAwaitingConfirmation(true);
         }

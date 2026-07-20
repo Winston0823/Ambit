@@ -78,6 +78,13 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
       if (key === 'demographic' && value === 'professor') {
         return { ...next, role: 'owner' as Role };
       }
+      // Reverting to student: the 'owner' role may have been coerced by the
+      // professor branch above, never picked by the user. Reset to the default
+      // so they land on the role screen with a clean 'seeker' rather than a
+      // silently sticky 'owner'.
+      if (key === 'demographic' && value === 'student' && p.role === 'owner') {
+        return { ...next, role: 'seeker' as Role };
+      }
       return next;
     });
 

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, Dimensions, Platform, StyleSheet, Text, View } from 'react-native';
+import { Animated, Dimensions, Platform, StyleSheet, Text, View } from 'react-native';
 import { Check } from 'phosphor-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -86,12 +86,6 @@ export function CompleteScreen({ onDone }: Props) {
           disabled={submitting}
           trailingArrow
         />
-        {submitting && (
-          <ActivityIndicator
-            style={styles.spinner}
-            color={Brand.inkOnBrand}
-          />
-        )}
       </Animated.View>
 
       {/* Confetti — warm-palette colors, fires once on mount via the timeout
@@ -137,11 +131,5 @@ const styles = StyleSheet.create({
   cta: {
     alignSelf: 'stretch',
     paddingBottom: Space.ctaBottom,
-  },
-  spinner: {
-    position: 'absolute',
-    top: 0,
-    bottom: Space.ctaBottom,
-    right: Space.lg,
   },
 });

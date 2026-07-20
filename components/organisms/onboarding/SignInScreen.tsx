@@ -28,9 +28,8 @@ interface Props {
 }
 
 /// Sign-in branch (returning user). Lives outside the linear STEPS array;
-/// reached from WelcomeScreen's "Sign in" CTA. No backend wired — for now
-/// "Sign in" treats any valid-looking email + password ≥ 6 chars as success.
-/// Wire to Supabase Auth (or Clerk) when auth lands.
+/// reached from WelcomeScreen's "Sign in" CTA. Authenticates against Supabase
+/// via AuthContext (signInWithEmail / signInWithApple / signInWithGoogle).
 export function SignInScreen({ onBack, onSignedIn }: Props) {
   const insets = useSafeAreaInsets();
   const { signInWithEmail, signInWithApple, signInWithGoogle, sendPasswordReset } = useAuth();
