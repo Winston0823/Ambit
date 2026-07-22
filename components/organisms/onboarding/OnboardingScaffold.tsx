@@ -66,13 +66,14 @@ export function OnboardingScaffold({
 
       {onBack && <BackChevron onPress={onBack} />}
 
-      {/* KeyboardAvoidingView lifts the header/body AND the absolutely-anchored
-          footer (it's the footer's positioning parent) so the CTA and lower
-          fields never hide behind the keyboard — the root cause the audit
-          flagged for VibeBlurb/ProofLinks/EduEmail/SignIn (theme 2). */}
+      {/* iOS: 'padding' gently lifts the body/footer so lower fields clear the
+          keyboard. Android: 'height' shrank the container and dragged the
+          bottom-anchored CTA up with the keyboard (unwanted, and janky under
+          edge-to-edge). behavior={undefined} keeps the layout still — the
+          upper inputs stay visible above the keyboard and the CTA stays put. */}
       <KeyboardAvoidingView
         style={styles.kav}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <View style={styles.header}>
           {kicker ? (

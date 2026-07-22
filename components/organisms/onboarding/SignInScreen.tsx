@@ -126,7 +126,9 @@ export function SignInScreen({ onBack, onSignedIn }: Props) {
           P1, matching OnboardingScaffold's pattern). */}
       <KeyboardAvoidingView
         style={styles.kav}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        // Android: don't lift the anchored sign-in button with the keyboard
+        // (unwanted + janky under edge-to-edge). iOS keeps the smooth padding lift.
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
       <KeyboardDismiss>
         <View style={styles.header}>
