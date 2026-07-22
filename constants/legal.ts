@@ -14,13 +14,13 @@
 // (contact email, entity name, governing law, hosted URLs).
 
 export const LEGAL_EFFECTIVE_DATE = 'July 8, 2026';
-export const LEGAL_CONTACT_EMAIL = 'support@ambit.app'; // TODO: real support/privacy inbox
+export const LEGAL_CONTACT_EMAIL = 'ambitaimail@gmail.com'; // interim shared inbox; upgrade to support@ambit.app with the domain
 export const LEGAL_ENTITY = 'Ambit'; // TODO: legal company name if incorporated
 
 // Hosted copies for App Store Connect metadata (Privacy Policy URL required).
 export const LEGAL_URLS = {
-  terms: 'https://ambit.app/terms',
-  privacy: 'https://ambit.app/privacy',
+  terms: 'https://winston0823.github.io/ambit-site/terms.html',
+  privacy: 'https://winston0823.github.io/ambit-site/privacy.html',
 };
 
 export interface LegalSection {
