@@ -14,9 +14,10 @@ import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MagnifyingGlass, X, CaretRight } from 'phosphor-react-native';
 import { BackChevron, GlassSurface, Skeleton } from '../../../../components/atoms';
-import { BottomSheet, DiscoveryCard, ReachOutComposer } from '../../../../components/molecules';
+import { DiscoveryCard, ReachOutComposer } from '../../../../components/molecules';
 import { supabase } from '../../../../lib/supabase';
 import { sendProjectAttachment, startConversationWithMessage } from '../../../../lib/messaging';
+import { canReachOut, recordReachOut } from '../../../../lib/reachOutLimit';
 import { fetchPortfoliosByUser } from '../../../../lib/portfolio';
 import { useAuth } from '../../../../context/AuthContext';
 import { CAMPUSES, type SeekerCardData } from '../../../../data/mock';
@@ -48,13 +49,6 @@ interface ProjectRow {
 
 /// A concrete way to start the thread: which project anchors it and, derived
 /// from that project's owner, who is owner vs seeker on the new conversation.
-interface ReachOption {
-  projectId: string;
-  title:     string;
-  seekerId:  string;  // the party that is NOT the project owner
-  mine:      boolean;  // true = my project (they join), false = their project (I join)
-}
-
 const cardFromPerson = (p: Person, portfolio: SeekerCardData['portfolio'] = []): SeekerCardData => ({
   kind:      'seeker',
   id:        p.id,
@@ -83,9 +77,6 @@ export default function NewChatScreen() {
   // Full discovery card for the previewed person — null = preview closed.
   // Built from the search row immediately; portfolio is patched in async.
   const [previewCard, setPreviewCard] = useState<SeekerCardData | null>(null);
-
-  // Project picker — surfaced when more than one project could anchor the chat.
-  const [pickerOptions, setPickerOptions] = useState<ReachOption[] | null>(null);
 
   // Card handed to the ReachOutComposer. Non-null = composer open.
   const [reachCard, setReachCard] = useState<SeekerCardData | null>(null);
@@ -161,6 +152,12 @@ export default function NewChatScreen() {
     if (!user || reachingOut) return;
     setReachingOut(true);
     try {
+    // Same daily cap as Discovery — without this, the chat "+" flow would
+    // bypass the reach-out limit entirely.
+    if (!(await canReachOut())) {
+      toast.error('No reach-outs left today — resets tomorrow.');
+      return;
+    }
     const [mineRes, theirsRes] = await Promise.all([
       supabase.from('projects').select('id, title')
         .eq('owner_id', user.id).eq('active', true)
@@ -179,12 +176,7 @@ export default function NewChatScreen() {
     const mine   = (mineRes.data   as ProjectRow[] | null) ?? [];
     const theirs = (theirsRes.data as ProjectRow[] | null) ?? [];
 
-    const options: ReachOption[] = [
-      ...mine.map((p)   => ({ projectId: p.id, title: p.title, seekerId: person.id, mine: true })),
-      ...theirs.map((p) => ({ projectId: p.id, title: p.title, seekerId: user.id,  mine: false })),
-    ];
-
-    if (options.length === 0) {
+    if (mine.length === 0 && theirs.length === 0) {
       Alert.alert(
         'Nothing to anchor on',
         `Every chat hangs off a project, and neither you nor ${person.name} has an active one yet. Post a project to start the conversation.`,
@@ -196,30 +188,20 @@ export default function NewChatScreen() {
       return;
     }
 
-    if (options.length === 1) {
-      openComposer(person, options[0]);
-      return;
+    // Anchor silently on the most recent project — mine first (they're the
+    // seeker), else theirs (I'm the seeker) — mirroring Discovery, where the
+    // owner→seeker composer never asks. Attaching a project in the composer
+    // stays optional and re-anchors the chat on the attached project.
+    if (mine.length > 0) {
+      chosenProjectId.current = mine[0].id;
+      chosenSeekerId.current  = person.id;
+    } else {
+      chosenProjectId.current = theirs[0].id;
+      chosenSeekerId.current  = user.id;
     }
-    setPickerOptions(options);
+    setReachCard(cardFromPerson(person));
     } finally {
       setReachingOut(false);
-    }
-  };
-
-  const openComposer = (person: Person, option: ReachOption) => {
-    chosenProjectId.current = option.projectId;
-    chosenSeekerId.current  = option.seekerId;
-    // Keep `previewCard` mounted — the composer is a transparent sheet that
-    // sits over the card, so the person's card stays visible behind it.
-    if (pickerOptions) {
-      // Coming from the project picker (a Modal). Dismiss it first, then
-      // present the composer only AFTER it has animated out + unmounted
-      // (~220ms). Presenting one modal while another dismisses in the same
-      // tick deadlocks iOS nested-modal transitions → frozen UI.
-      setPickerOptions(null);
-      setTimeout(() => setReachCard(cardFromPerson(person)), 300);
-    } else {
-      setReachCard(cardFromPerson(person));
     }
   };
 
@@ -232,8 +214,14 @@ export default function NewChatScreen() {
     text: string,
     attachment?: { id: string; title: string } | null,
   ): Promise<boolean> => {
-    const projectId = chosenProjectId.current;
-    const seekerId  = chosenSeekerId.current;
+    let projectId = chosenProjectId.current;
+    let seekerId  = chosenSeekerId.current;
+    // An attached project is one of MY projects — anchor the chat on it so
+    // the thread hangs off the project the note is actually about.
+    if (attachment && selected) {
+      projectId = attachment.id;
+      seekerId  = selected.id;
+    }
     if (!projectId || !seekerId || !user) return false;
     try {
       const conversationId = await startConversationWithMessage({
@@ -250,6 +238,7 @@ export default function NewChatScreen() {
         }).catch(() => {});
       }
       lastConvId.current = conversationId;
+      recordReachOut().catch(() => {});
       return true;
     } catch {
       return false;
@@ -371,33 +360,12 @@ export default function NewChatScreen() {
             )}
           </View>
 
-          {/* Picker + composer render INSIDE the preview modal so they overlay
-              the card (same as Discovery). As siblings outside, they presented
+          {/* Composer renders INSIDE the preview modal so it overlays the
+              card (same as Discovery). As a sibling outside, it presented
               behind the already-open preview — invisible until you backed out. */}
-          <BottomSheet visible={!!pickerOptions} onClose={() => setPickerOptions(null)}>
-        <Text style={styles.pickerTitle}>Reach out about…</Text>
-        {(pickerOptions ?? []).map((opt) => (
-          <Pressable
-            key={opt.projectId}
-            style={({ pressed }) => [styles.pickerRow, pressed && { opacity: 0.7 }]}
-            onPress={() => selected && openComposer(selected, opt)}
-            accessibilityRole="button"
-            accessibilityLabel={`Reach out about ${opt.title}`}
-          >
-            <View style={{ flex: 1 }}>
-              <Text style={styles.pickerRowText} numberOfLines={1}>{opt.title}</Text>
-              <Text style={styles.pickerRowSub} numberOfLines={1}>
-                {opt.mine ? 'Your project' : `${selected?.name ?? 'Their'}’s project`}
-              </Text>
-            </View>
-            <CaretRight size={15} color={Brand.inkLabel} weight="regular" />
-          </Pressable>
-        ))}
-      </BottomSheet>
 
           <ReachOutComposer
             card={reachCard}
-            disableAttach
             onDismiss={() => setReachCard(null)}
             onSend={(card, text, attachment) => handleSend(card as SeekerCardData, text, attachment)}
             onSent={handleSent}
@@ -512,36 +480,4 @@ const styles = StyleSheet.create({
     paddingBottom: Space.lg,
   },
 
-  // ── Project picker (bottom sheet content) ─────────────────────
-  pickerTitle: {
-    fontFamily: AmbitFont.display,
-    fontSize: 18,
-    color: Brand.inkPrimary,
-    marginBottom: 8,
-  },
-  pickerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 16,
-    paddingHorizontal: 16,
-    backgroundColor: Brand.cardCream,
-    borderWidth: 1,
-    borderColor: Brand.borderSoft,
-    borderRadius: Radii.md,
-    gap: 12,
-    marginTop: 8,
-  },
-  pickerRowText: {
-    fontFamily: AmbitFont.body,
-    fontSize: 15,
-    fontWeight: '600',
-    color: Brand.inkBody,
-  },
-  pickerRowSub: {
-    fontFamily: AmbitFont.body,
-    fontSize: 12,
-    color: Brand.inkMuted,
-    marginTop: 2,
-  },
 });

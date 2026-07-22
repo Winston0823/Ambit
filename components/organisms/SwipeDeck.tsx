@@ -350,6 +350,7 @@ export const SwipeDeck = forwardRef<SwipeDeckHandle, Props>(function SwipeDeck({
                 onReachOut={isActive ? onReachOut : undefined}
                 onFlag={isActive ? onFlag : undefined}
                 showReachButton={false}
+                showPagerDots={isActive}
                 animateIn={false}
               />
 
