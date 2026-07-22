@@ -203,8 +203,6 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 999,
     backgroundColor: Brand.selected,
-    borderWidth: 1.6,
-    borderColor: Brand.actionInk,
     alignItems: 'center',
   },
   primaryBtnText: {

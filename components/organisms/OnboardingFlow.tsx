@@ -202,6 +202,12 @@ function Steps({ onDismiss }: { onDismiss: () => void }) {
   const resumeJumpedRef = useRef(false);
   const ENTRY_STEPS: readonly Step[] = ['splash', 'welcome', 'preview', 'signIn'];
 
+  /// Set true when eduEmail establishes a session (sign-in of an existing
+  /// account, warm-resume after email confirmation, or a sign-up that returned
+  /// an immediate session). Once true, the effect below waits for the session
+  /// to propagate, then routes — see handleEduSignedIn. (Audit P1.)
+  const [resumeFromEdu, setResumeFromEdu] = useState(false);
+
   /// First mount with a signed-in user: pull their partial profile (if any)
   /// from Supabase and jump straight to the first step they haven't filled.
   /// Brand-new users (no session yet) start at splash as normal. This is also
@@ -226,6 +232,32 @@ function Steps({ onDismiss }: { onDismiss: () => void }) {
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
+
+  /// eduEmail established a session. `signInWithEmail` returns void and the
+  /// session/user propagate asynchronously through AuthContext, so we can't
+  /// decide synchronously in the handler — instead flag it and act here once
+  /// `user` is truthy. We route off the *hydrated* profile (not hasProfile,
+  /// which races behind the same session change): a fully-onboarded returning
+  /// user resolves to `complete` and is dismissed rather than re-onboarded
+  /// (the final submit would overwrite their profile — Audit P1); a partial /
+  /// brand-new user jumps to their first incomplete step (index-based advance
+  /// no-ops here because eduEmail is absent from `steps` once a session exists
+  /// — Audit P1 warm-resume dead-end).
+  useEffect(() => {
+    if (!resumeFromEdu) return;
+    if (!user) return; // wait for the fresh session to propagate
+    setResumeFromEdu(false);
+    let cancelled = false;
+    (async () => {
+      const merged = await hydrate(user.id);
+      if (cancelled) return;
+      const target = firstIncompleteStep(merged, true);
+      if (target === 'complete') dismiss();
+      else setStep(target);
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resumeFromEdu, user?.id]);
 
   const dismiss = () => {
     onDismiss();
@@ -304,6 +336,12 @@ function Steps({ onDismiss }: { onDismiss: () => void }) {
     if (hasProfile === true) dismiss();
   };
 
+  /// Called by EduEmailScreen once its email+password step establishes a
+  /// session. Defers the routing decision to the resumeFromEdu effect above
+  /// (which waits for the session to land, then dismisses fully-onboarded
+  /// users or jumps partial users to their first incomplete step). (Audit P1.)
+  const handleEduSignedIn = () => setResumeFromEdu(true);
+
   /// Final submit. Throws on failure so CompleteScreen can keep the user on
   /// the celebration screen, surface the reason, and offer Retry. We only
   /// dismiss/reset after a confirmed successful upsert. (Audit P0: final
@@ -339,7 +377,7 @@ function Steps({ onDismiss }: { onDismiss: () => void }) {
       case 'preview':
         return <PathPreviewScreen onBack={back} onContinue={advance} />;
       case 'eduEmail':
-        return <EduEmailScreen onBack={back} onContinue={advance} />;
+        return <EduEmailScreen onBack={back} onSignedIn={handleEduSignedIn} />;
       case 'demographic':
         return <DemographicScreen onBack={back} onContinue={advance} />;
       case 'photo':

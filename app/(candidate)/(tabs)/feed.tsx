@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
-  Image,
   Platform,
   Pressable,
   ScrollView,
@@ -11,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowsClockwise, BookmarkSimple, CaretDown, Check, GraduationCap, MagnifyingGlass, Sparkle, X } from 'phosphor-react-native';
@@ -20,7 +20,7 @@ import { DiscoveryOverview, SwipeDeck } from '../../../components/organisms';
 import type { SwipeDeckHandle } from '../../../components/organisms';
 import { PortfolioModal, ReachOutComposer, BottomSheet, ReachOutLimitSheet, ReportReasonSheet } from '../../../components/molecules';
 import { blockUser, type ReportTarget } from '../../../lib/safety';
-import { Skeleton as SkeletonBlock, Tactile, TopAppBar } from '../../../components/atoms';
+import { Button, Skeleton as SkeletonBlock, Tactile, TopAppBar } from '../../../components/atoms';
 import { CAMPUSES, SKILL_CATEGORIES } from '../../../data/mock';
 import {
   canReachOut,
@@ -242,8 +242,8 @@ export default function DiscoveryFeed() {
   // retry affordance instead of cards or the honest empty state.
   const [deckError, setDeckError] = useState(false);
 
-  // Viewer's own skills — drives the matched-first ordering, the SHARED
-  // tags, and the shared-count in the OverlapVenn on every card. Loaded
+  // Viewer's own skills — used to highlight the skills a seeker shares with
+  // the project they're browsing (the matched chips on each card). Loaded
   // once on mount from the profiles row. Empty array on first paint /
   // for users without skills; everything still renders, just without
   // matches highlighted.
@@ -440,7 +440,14 @@ export default function DiscoveryFeed() {
   const [filterCampus, setFilterCampus] = useState<string[]>([]);
   const [filterSheet, setFilterSheet] = useState<null | 'skills' | 'campus'>(null);
   const [filterSearch, setFilterSearch] = useState('');
-  const openFilterSheet = (dim: 'skills' | 'campus') => { setFilterSearch(''); setFilterSheet(dim); };
+  // Skills edit in a DRAFT committed by Apply — atomic (no per-toggle deck
+  // recompose) and dismissing the sheet discards changes.
+  const [draftSkills, setDraftSkills] = useState<string[]>([]);
+  const openFilterSheet = (dim: 'skills' | 'campus') => {
+    setFilterSearch('');
+    if (dim === 'skills') setDraftSkills(filterSkills);
+    setFilterSheet(dim);
+  };
   const campusLabel = (id: string) => CAMPUSES.find((c) => c.id === id)?.name ?? id;
 
   const cardSkills = (c: DiscoveryCardData) => (c.kind === 'project' ? c.skillsSought : c.skills) ?? [];
@@ -465,10 +472,32 @@ export default function DiscoveryFeed() {
     return Array.from(new Set([...canonical, ...fromDeck])).sort((a, b) => a.localeCompare(b));
   }, [activeDeck]);
 
-  const toggleFilter = (dim: 'skills' | 'campus', value: string) => {
-    const [list, set] = dim === 'skills' ? [filterSkills, setFilterSkills] as const : [filterCampus, setFilterCampus] as const;
-    set(list.includes(value) ? list.filter((v) => v !== value) : [...list, value]);
-  };
+  const toggleDraftSkill = (value: string) =>
+    setDraftSkills((prev) => (prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value]));
+  const applySkillFilter = () => { setFilterSkills(draftSkills); setFilterSheet(null); };
+
+  // Supply-aware filtering: skills nobody in the current deck has are greyed
+  // out, so the user can't build a guaranteed-zero-result filter.
+  const availableSkills = useMemo(() => {
+    const set = new Set<string>();
+    activeDeck.forEach((c) => cardSkills(c).forEach((k) => set.add(k.toLowerCase())));
+    return set;
+  }, [activeDeck]);
+
+  // Category sections (same taxonomy as the profile editor), narrowed by
+  // search; deck-only skills outside the taxonomy land in a MORE bucket.
+  const skillSections = useMemo(() => {
+    const q = filterSearch.trim().toLowerCase();
+    const inTaxonomy = new Set(SKILL_CATEGORIES.flatMap((c) => c.tags).map((t) => t.toLowerCase()));
+    const extras = skillOptions.filter((t) => !inTaxonomy.has(t.toLowerCase()));
+    const cats = [
+      ...SKILL_CATEGORIES.map((c) => ({ label: c.label, tags: c.tags })),
+      ...(extras.length ? [{ label: 'MORE', tags: extras }] : []),
+    ];
+    return cats
+      .map((c) => ({ ...c, tags: q ? c.tags.filter((t) => t.toLowerCase().includes(q)) : c.tags }))
+      .filter((c) => c.tags.length > 0);
+  }, [filterSearch, skillOptions]);
   // Campus is single-select: pick one (radio), tap again to clear. Kept as an
   // array (length ≤ 1) so the filteredDeck `filterCampus.includes` logic is
   // unchanged.
@@ -494,12 +523,13 @@ export default function DiscoveryFeed() {
         ? next.slice(next.length - SKIP_OVERVIEW_THRESHOLD)
         : next;
     });
-    // Record the skip so the card stops resurfacing. Seeker→project keys on
-    // (me, project); owner→seeker keys on (seeker, my active project) — fix 8,
-    // owner actions previously left no server trace.
+    // Record the skip. Passes are a 7-day COOLDOWN, not permanent (see
+    // migration 035): the deck RPC only excludes skips younger than the
+    // window, so people/projects resurface after they've had time to grow.
+    // created_at is bumped on re-skip so passing again restarts the clock.
     if (card.kind === 'project' && user) {
       supabase.from('matches').upsert(
-        { seeker_id: user.id, project_id: card.id, outcome: 'skipped' },
+        { seeker_id: user.id, project_id: card.id, outcome: 'skipped', created_at: new Date().toISOString() },
         { onConflict: 'seeker_id,project_id' }
       ).then(() => {});
     } else if (card.kind === 'seeker' && user && ownerProject) {
@@ -702,17 +732,31 @@ export default function DiscoveryFeed() {
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
     }
-    await supabase
-      .from('matches')
-      .delete()
-      .eq('seeker_id', user.id)
-      .eq('outcome', 'skipped');
+    // Clear the SKIPPED rows this side owns. Seeker skips are keyed by
+    // seeker_id = me; owner skips are keyed by project_id = my active project
+    // (seeker_id there is the passed-over seeker, not me), so the seeker-only
+    // delete never cleared an owner's passes. Keep 'applied'/'saved' rows.
+    if (role === 'owner') {
+      if (ownerProject) {
+        await supabase
+          .from('matches')
+          .delete()
+          .eq('project_id', ownerProject.id)
+          .eq('outcome', 'skipped');
+      }
+    } else {
+      await supabase
+        .from('matches')
+        .delete()
+        .eq('seeker_id', user.id)
+        .eq('outcome', 'skipped');
+    }
     setReinserted([]);
     setConsecutiveSkips(0);
     setLastFiveSeen([]);
     setDeckResetKey((k) => k + 1);
     await fetchDeck();
-  }, [user, fetchDeck]);
+  }, [user, role, ownerProject, fetchDeck]);
 
   const goToSaved = () => {
     if (Platform.OS !== 'web') Haptics.selectionAsync().catch(() => {});
@@ -848,16 +892,33 @@ export default function DiscoveryFeed() {
 
       {/* Filter sheet — searchable + drag-to-expand (half → near-top). */}
       <BottomSheet visible={filterSheet !== null} onClose={() => setFilterSheet(null)} snapPoints={FILTER_SNAP_POINTS}>
-        <View style={styles.filterSheetHead}>
-          <Text style={styles.filterSheetTitle}>
-            {filterSheet === 'campus' ? 'Campus' : 'Skills'}
-          </Text>
-          {filterCount > 0 && (
-            <Tactile haptic="tap" onPress={() => { setFilterSkills([]); setFilterCampus([]); }} style={styles.filterSheetClear} accessibilityLabel="Clear all filters">
-              <Text style={styles.filterSheetClearText}>Clear all</Text>
-            </Tactile>
-          )}
-        </View>
+        {filterSheet === 'campus' ? (
+          <View style={styles.filterSheetHead}>
+            <Text style={styles.filterSheetTitle}>Campus</Text>
+            {filterCampus.length > 0 && (
+              <Tactile haptic="tap" onPress={() => setFilterCampus([])} style={styles.filterSheetClear} accessibilityLabel="Clear campus filter">
+                <Text style={styles.filterSheetClearText}>Clear all</Text>
+              </Tactile>
+            )}
+          </View>
+        ) : (
+          <View>
+            <Text style={styles.filterSheetTitle}>Skills</Text>
+            <Text style={styles.filterSheetSub}>Match on what they build with</Text>
+            <View style={styles.filterCountRow}>
+              <Text style={styles.filterCountText}>
+                {draftSkills.length > 0
+                  ? `${draftSkills.length} skill${draftSkills.length === 1 ? '' : 's'} selected`
+                  : 'Faded skills aren’t in your deck right now'}
+              </Text>
+              {draftSkills.length > 0 && (
+                <Tactile haptic="tap" onPress={() => setDraftSkills([])} style={styles.filterSheetClear} accessibilityLabel="Clear selected skills">
+                  <Text style={styles.filterSheetClearText}>Clear all</Text>
+                </Tactile>
+              )}
+            </View>
+          </View>
+        )}
 
         <View style={styles.filterSearchBar}>
           <MagnifyingGlass size={16} color={Brand.inkMuted} weight="bold" />
@@ -880,7 +941,7 @@ export default function DiscoveryFeed() {
 
         <ScrollView
           style={styles.filterScroll}
-          contentContainerStyle={filterSheet === 'campus' ? styles.filterSheetRows : styles.filterSheetChips}
+          contentContainerStyle={filterSheet === 'campus' ? styles.filterSheetRows : styles.filterSheetSections}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
@@ -901,7 +962,7 @@ export default function DiscoveryFeed() {
                         canvas on the left so the name/location stay readable. */}
                     <View style={styles.campusImgWrap} pointerEvents="none">
                       {c?.imageUrl ? (
-                        <Image source={{ uri: c.imageUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+                        <Image source={{ uri: c.imageUrl }} style={StyleSheet.absoluteFill} contentFit="cover" cachePolicy="memory-disk" transition={180} />
                       ) : (
                         <LinearGradient
                           colors={CARD_GRADIENTS[i % CARD_GRADIENTS.length]}
@@ -933,25 +994,45 @@ export default function DiscoveryFeed() {
                   </Tactile>
                 );
               })
-            : sheetOptions.map((opt) => {
-                const selected = filterSkills.includes(opt);
-                return (
-                  <Tactile
-                    key={opt}
-                    haptic="selection"
-                    onPress={() => toggleFilter('skills', opt)}
-                    style={[styles.filterSheetChip, selected && styles.filterSheetChipSel]}
-                    accessibilityLabel={opt}
-                  >
-                    {selected && <Check size={13} color={Brand.inkOnBrand} weight="bold" />}
-                    <Text style={[styles.filterSheetChipText, selected && styles.filterSheetChipTextSel]}>{opt}</Text>
-                  </Tactile>
-                );
-              })}
-          {sheetOptions.length === 0 && (
+            : skillSections.map((section) => (
+                <View key={section.label} style={styles.filterSection}>
+                  <Text style={styles.filterSectionLabel}>{section.label}</Text>
+                  <View style={styles.filterSectionChips}>
+                    {section.tags.map((opt) => {
+                      const selected = draftSkills.includes(opt);
+                      // Selected chips stay interactive even if supply moved on,
+                      // so a stale selection can always be un-picked.
+                      const unavailable = !selected && !availableSkills.has(opt.toLowerCase());
+                      return (
+                        <Tactile
+                          key={opt}
+                          haptic="selection"
+                          onPress={unavailable ? undefined : () => toggleDraftSkill(opt)}
+                          style={[
+                            styles.filterSheetChip,
+                            selected && styles.filterSheetChipSel,
+                            unavailable && styles.filterSheetChipOff,
+                          ]}
+                          accessibilityLabel={unavailable ? `${opt}, none nearby` : opt}
+                        >
+                          {selected && <Check size={13} color={Brand.inkOnBrand} weight="bold" />}
+                          <Text style={[styles.filterSheetChipText, selected && styles.filterSheetChipTextSel]}>{opt}</Text>
+                        </Tactile>
+                      );
+                    })}
+                  </View>
+                </View>
+              ))}
+          {(filterSheet === 'campus' ? sheetOptions.length === 0 : skillSections.length === 0) && (
             <Text style={styles.filterSheetEmpty}>{filterSearch ? 'No matches.' : 'Nothing to filter on yet.'}</Text>
           )}
         </ScrollView>
+
+        {filterSheet === 'skills' && (
+          <View style={styles.filterApplyWrap}>
+            <Button title="Apply" onPress={applySkillFilter} />
+          </View>
+        )}
       </BottomSheet>
 
       <ReachOutLimitSheet
@@ -962,11 +1043,18 @@ export default function DiscoveryFeed() {
           setLimitSheetVisible(false);
           setPendingReachOutCard(null);
         }}
-        onAdComplete={() => {
+        onAdComplete={async () => {
           setLimitSheetVisible(false);
-          // Open the composer with the card they originally wanted to reach out to.
-          if (pendingReachOutCard) setReachOutCard(pendingReachOutCard);
+          // Re-verify capacity before opening — the ad bonus is only granted up
+          // to MAX_AD_BONUS/day, so a completed ad past that cap must NOT open
+          // the composer (which would otherwise let a send bypass the limit).
+          const card = pendingReachOutCard;
           setPendingReachOutCard(null);
+          if (await canReachOut()) {
+            if (card) setReachOutCard(card);
+          } else {
+            toast.error("You're out of reach-outs for today.");
+          }
         }}
       />
 
@@ -1214,6 +1302,27 @@ const styles = StyleSheet.create({
   filterSearchInput: { flex: 1, fontFamily: AmbitFont.body, fontSize: 15, color: Brand.inkBody, padding: 0 },
   filterScroll: { flex: 1 },
   filterSheetChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingBottom: 16 },
+  filterSheetSections: { gap: 18, paddingBottom: 16 },
+  filterSection: { gap: 10 },
+  filterSectionLabel: {
+    fontFamily: AmbitFont.semibold,
+    fontSize: 11,
+    letterSpacing: 1.4,
+    textTransform: 'uppercase',
+    color: Brand.inkLabel,
+  },
+  filterSectionChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  filterSheetChipOff: { opacity: 0.35 },
+  filterSheetSub: { fontFamily: AmbitFont.body, fontSize: 13, color: Brand.inkMuted, marginTop: 4 },
+  filterCountRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  filterCountText: { fontFamily: AmbitFont.semibold, fontSize: 13, color: Brand.selected },
+  filterApplyWrap: { paddingTop: 10, paddingBottom: 4 },
   filterSheetChip: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -1,8 +1,7 @@
-import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   Easing,
-  Image,
   Linking,
   Platform,
   Pressable,
@@ -12,6 +11,7 @@ import {
   View,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Image } from 'expo-image';
 import {
   AppStoreLogo,
   CaretDown,
@@ -26,6 +26,7 @@ import {
   type IconProps,
 } from 'phosphor-react-native';
 import * as Haptics from 'expo-haptics';
+import { VibeQuote } from '../atoms';
 import {
   Astra,
   Brand,
@@ -44,7 +45,10 @@ let sessionNudged = false;
 
 interface Props {
   card: DiscoveryCardData;
-  /// Retained for API compatibility (the deck no longer tints matched chips).
+  /// Skills to highlight as shared: skill chips whose label appears here render
+  /// in the selected (filled) state. For a seeker browsing projects these are
+  /// the viewer's own skills; for an owner browsing seekers, the active
+  /// project's required skills.
   matchedSkills?: string[];
   onPortfolioPress?: (item: PortfolioItem) => void;
   activePortfolioId?: string | null;
@@ -71,6 +75,7 @@ interface Props {
 /// through to this card's paging ScrollView.
 export function DiscoveryCard({
   card,
+  matchedSkills,
   onPortfolioPress,
   activePortfolioId,
   onReachOut,
@@ -80,6 +85,11 @@ export function DiscoveryCard({
   onFlag,
 }: Props) {
   const otherUserId = card.kind === 'seeker' ? card.id : card.ownerId;
+  // Case-insensitive lookup of the shared skills, so chips can flag matches.
+  const matchedSet = useMemo(
+    () => new Set((matchedSkills ?? []).map((s) => s.toLowerCase())),
+    [matchedSkills],
+  );
   // Entry fade on mount (skipped in the deck, which keeps cards mounted).
   const opacity = useRef(new Animated.Value(animateIn ? 0 : 1)).current;
   const translateY = useRef(new Animated.Value(animateIn ? 8 : 0)).current;
@@ -154,12 +164,12 @@ export function DiscoveryCard({
               }}
             >
               <View style={{ height: cardH }}>
-                {card.kind === 'seeker' ? <SeekerFront card={card} /> : <ProjectFront card={card} />}
+                {card.kind === 'seeker' ? <SeekerFront card={card} matchedSet={matchedSet} /> : <ProjectFront card={card} />}
               </View>
               <View style={{ height: cardH }}>
                 {card.kind === 'seeker'
                   ? <SeekerPortfolio card={card} onPortfolioPress={onPortfolioPress} activePortfolioId={activePortfolioId} />
-                  : <ProjectDetail card={card} />}
+                  : <ProjectDetail card={card} matchedSet={matchedSet} />}
               </View>
             </ScrollView>
 
@@ -172,7 +182,7 @@ export function DiscoveryCard({
             )}
           </>
         ) : (
-          card.kind === 'seeker' ? <SeekerFront card={card} /> : <ProjectFront card={card} />
+          card.kind === 'seeker' ? <SeekerFront card={card} matchedSet={matchedSet} /> : <ProjectFront card={card} />
         )}
 
         {showReachButton && (
@@ -266,7 +276,7 @@ function PhotoPanel({
           end={{ x: 1, y: 1 }}
           style={StyleSheet.absoluteFill}
         />
-        {uri && <Image source={{ uri }} style={StyleSheet.absoluteFill} resizeMode="cover" fadeDuration={0} />}
+        {uri && <Image source={{ uri }} style={StyleSheet.absoluteFill} contentFit="cover" cachePolicy="memory-disk" />}
         {scrim && (
           <LinearGradient
             colors={['rgba(12,0,34,0)', 'rgba(12,0,34,0.55)']}
@@ -291,10 +301,12 @@ function StatusBadge({ label }: { label: string }) {
   );
 }
 
-function SkillChip({ label }: { label: string }) {
+/// A skill chip. When `matched` (the label is in the viewer/project's matched
+/// skills) it fills with the selected state to signal shared overlap.
+function SkillChip({ label, matched = false }: { label: string; matched?: boolean }) {
   return (
-    <View style={styles.chip}>
-      <Text style={styles.chipText} numberOfLines={1}>{label}</Text>
+    <View style={[styles.chip, matched && styles.chipMatched]}>
+      <Text style={[styles.chipText, matched && styles.chipTextMatched]} numberOfLines={1}>{label}</Text>
     </View>
   );
 }
@@ -318,7 +330,7 @@ function seekerEyebrow(card: Extract<DiscoveryCardData, { kind: 'seeker' }>): st
 
 // ─── Seeker — page 1 (front) ────────────────────────────────────────────────
 
-function SeekerFront({ card }: { card: Extract<DiscoveryCardData, { kind: 'seeker' }> }) {
+function SeekerFront({ card, matchedSet }: { card: Extract<DiscoveryCardData, { kind: 'seeker' }>; matchedSet: Set<string> }) {
   const subtitle = seekerEyebrow(card);
   return (
     <>
@@ -335,11 +347,11 @@ function SeekerFront({ card }: { card: Extract<DiscoveryCardData, { kind: 'seeke
       <View style={styles.panel}>
         <ResponsePill rate={card.responseRate} />
         {card.vibeBlurb.trim() !== '' && (
-          <Text style={styles.desc} numberOfLines={3}>{firstSentence(card.vibeBlurb) || card.vibeBlurb}</Text>
+          <VibeQuote text={firstSentence(card.vibeBlurb) || card.vibeBlurb} lines={3} />
         )}
         {card.skills.length > 0 && (
           <View style={styles.chipRow}>
-            {card.skills.slice(0, 6).map((s) => <SkillChip key={s} label={s} />)}
+            {card.skills.slice(0, 6).map((s) => <SkillChip key={s} label={s} matched={matchedSet.has(s.toLowerCase())} />)}
           </View>
         )}
       </View>
@@ -415,7 +427,7 @@ function PortfolioTile({
       accessibilityLabel={`Open ${item.title}`}
     >
       {item.imageUri ? (
-        <Image source={{ uri: item.imageUri }} style={styles.hlTileCover} resizeMode="cover" />
+        <Image source={{ uri: item.imageUri }} style={styles.hlTileCover} contentFit="cover" cachePolicy="memory-disk" transition={180} />
       ) : (
         <LinearGradient colors={item.gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hlTileCover} />
       )}
@@ -453,7 +465,7 @@ function ProjectFront({ card }: { card: Extract<DiscoveryCardData, { kind: 'proj
 
       <View style={styles.panelProject}>
         <Text style={styles.projectTitle} numberOfLines={1}>{card.title}</Text>
-        {card.pitch.trim() !== '' && <Text style={styles.desc} numberOfLines={2}>{card.pitch}</Text>}
+        {card.pitch.trim() !== '' && <VibeQuote text={card.pitch} lines={2} />}
         <View style={styles.metaRow}>
           <LinearGradient colors={[Astra.royal, Astra.iris]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.ownerAvatar}>
             <Text style={styles.ownerAvatarText}>{ownerInitials}</Text>
@@ -473,7 +485,7 @@ function formatNeededBy(iso: string): string {
   return new Date(y, m - 1, d).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
-function ProjectDetail({ card }: { card: Extract<DiscoveryCardData, { kind: 'project' }> }) {
+function ProjectDetail({ card, matchedSet }: { card: Extract<DiscoveryCardData, { kind: 'project' }>; matchedSet: Set<string> }) {
   const campus = CAMPUSES.find((c) => c.id === card.ownerCampusId);
   const eyebrow = campus
     ? `BY ${card.ownerName.toUpperCase()} · ${campus.name.toUpperCase()}`
@@ -501,7 +513,7 @@ function ProjectDetail({ card }: { card: Extract<DiscoveryCardData, { kind: 'pro
         <>
           <Text style={styles.page2Section}>SKILLS</Text>
           <View style={styles.chipRow}>
-            {card.skillsSought.slice(0, 8).map((s) => <SkillChip key={s} label={s} />)}
+            {card.skillsSought.slice(0, 8).map((s) => <SkillChip key={s} label={s} matched={matchedSet.has(s.toLowerCase())} />)}
           </View>
         </>
       )}
@@ -702,6 +714,10 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(111,77,162,0.28)',
   },
   chipText: { fontFamily: AmbitFont.medium, fontSize: 12, color: Brand.selected },
+  // Matched (shared) skill → selected fill + white label, mirroring the
+  // selected state of the Chip atom / filter-sheet chips.
+  chipMatched: { backgroundColor: Brand.selected, borderColor: Brand.selected },
+  chipTextMatched: { color: Brand.inkOnBrand },
 
   // ── Response reward pill ──────────────────────────────────────────────────
   respPill: {

@@ -256,6 +256,13 @@ export const SwipeDeck = forwardRef<SwipeDeckHandle, Props>(function SwipeDeck({
           if (gesturesDisabled) return false;
           return Math.abs(g.dx) > 12 && Math.abs(g.dx) > Math.abs(g.dy) * 1.2;
         },
+        // Once a card drag is active, refuse hand-off requests from ancestor
+        // responders (pager/scroll views) — without this, Android's native
+        // gesture negotiation could steal the drag mid-swipe and the deck felt
+        // dead. Blocking the native responder keeps ViewPager2 from
+        // intercepting the rest of the gesture.
+        onPanResponderTerminationRequest: () => false,
+        onShouldBlockNativeResponder: () => true,
         onPanResponderMove: (_e, g) => {
           position.setValue({ x: g.dx, y: 0 });
         },

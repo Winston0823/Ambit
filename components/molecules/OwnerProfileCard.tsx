@@ -1,8 +1,9 @@
 import React from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Image } from 'expo-image';
 import { CaretRight } from 'phosphor-react-native';
-import { Chip, HardShadow } from '../atoms';
+import { Chip, HardShadow, VibeQuote } from '../atoms';
 import { AmbitFont, Astra, Brand, Radii } from '../../constants/theme';
 
 export interface OwnerProject {
@@ -10,6 +11,8 @@ export interface OwnerProject {
   title: string;
   pitch: string;
   roles: string[];
+  /// Project cover (projects.image_url). Null → gradient placeholder thumb.
+  imageUrl?: string | null;
 }
 
 interface Props {
@@ -48,7 +51,7 @@ export function OwnerProfileCard({ name, photoUri, campusName, vibe, skills, pro
         <View style={styles.idRow}>
           <View style={styles.avatar}>
             {photoUri ? (
-              <Image source={{ uri: photoUri }} style={styles.avatarImg} />
+              <Image source={{ uri: photoUri }} style={styles.avatarImg} cachePolicy="memory-disk" transition={180} />
             ) : (
               <LinearGradient colors={[Astra.royal, Astra.iris]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.avatarImg}>
                 <Text style={styles.avatarInitial}>{initial}</Text>
@@ -61,7 +64,7 @@ export function OwnerProfileCard({ name, photoUri, campusName, vibe, skills, pro
           </View>
         </View>
 
-        {!!vibe && <Text style={styles.vibe}>{vibe}</Text>}
+        {!!vibe && <View style={{ marginTop: 16 }}><VibeQuote text={vibe} lines={3} size="inline" /></View>}
 
         {skills.length > 0 && (
           <View style={styles.chips}>
@@ -90,7 +93,11 @@ export function OwnerProfileCard({ name, photoUri, campusName, vibe, skills, pro
               style={[styles.proj, i < projects.length - 1 && styles.projDivider]}
               accessibilityLabel={`Open ${p.title}`}
             >
-              <LinearGradient colors={THUMBS[i % THUMBS.length]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.thumb} />
+              {p.imageUrl ? (
+                <Image source={{ uri: p.imageUrl }} style={styles.thumb} contentFit="cover" cachePolicy="memory-disk" transition={180} />
+              ) : (
+                <LinearGradient colors={THUMBS[i % THUMBS.length]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.thumb} />
+              )}
               <View style={styles.projBody}>
                 <Text style={styles.projTitle} numberOfLines={1}>{p.title}</Text>
                 {!!p.pitch && <Text style={styles.projPitch} numberOfLines={1}>{p.pitch}</Text>}

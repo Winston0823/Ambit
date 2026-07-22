@@ -1,7 +1,6 @@
 import React, { useRef } from 'react';
 import {
   Animated,
-  Image,
   Platform,
   Pressable,
   StyleSheet,
@@ -9,6 +8,7 @@ import {
   View,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Image } from 'expo-image';
 import { Plus } from 'phosphor-react-native';
 import * as Haptics from 'expo-haptics';
 import {
@@ -52,7 +52,7 @@ export function PortfolioBubble({ item, onPress, active }: PortfolioBubbleProps)
       <Pressable onPress={press} style={styles.thumbWrap} hitSlop={6}>
         <View style={[styles.thumb, active && styles.thumbActive]}>
           {item.imageUri ? (
-            <Image source={{ uri: item.imageUri }} style={styles.thumbImg} />
+            <Image source={{ uri: item.imageUri }} style={styles.thumbImg} cachePolicy="memory-disk" transition={180} />
           ) : (
             <LinearGradient
               colors={item.gradient}

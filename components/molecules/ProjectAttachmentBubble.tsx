@@ -1,6 +1,7 @@
 import React from 'react';
-import { Image, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Image } from 'expo-image';
 import type { ProjectRefRow } from '../../lib/messaging';
 import { AmbitFont, Astra, Brand } from '../../constants/theme';
 
@@ -54,7 +55,7 @@ export function ProjectAttachmentBubble({ project, isMine, onPress }: Props) {
         style={StyleSheet.absoluteFill}
       />
       {project.image_url ? (
-        <Image source={{ uri: project.image_url }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+        <Image source={{ uri: project.image_url }} style={StyleSheet.absoluteFill} contentFit="cover" cachePolicy="memory-disk" transition={180} />
       ) : (
         initials !== '' && (
           <Text style={styles.watermark} numberOfLines={1} pointerEvents="none" allowFontScaling={false}>

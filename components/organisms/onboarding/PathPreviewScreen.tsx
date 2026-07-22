@@ -38,7 +38,7 @@ export function PathPreviewScreen({ onBack, onContinue }: Props) {
       watermarkIcon={Rocket}
       kicker="Almost there"
       headline={`A few quick\nsteps.`}
-      subtitle="About a minute. We save as you go."
+      subtitle="About a minute, quick and easy."
       footer={<OnboardingContinue title="Let's go" onPress={onContinue} />}
     >
       <View style={styles.path}>

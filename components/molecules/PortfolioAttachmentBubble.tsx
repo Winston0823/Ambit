@@ -1,6 +1,7 @@
 import React from 'react';
-import { Image, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Image } from 'expo-image';
 import type { PortfolioItem } from '../../data/mock';
 import { AmbitFont, Astra } from '../../constants/theme';
 
@@ -31,7 +32,7 @@ export function PortfolioAttachmentBubble({ item, isMine, onPress }: Props) {
     >
       {/* Backdrop — the cover photo (image-forward), else the warm gradient. */}
       {item.imageUri ? (
-        <Image source={{ uri: item.imageUri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+        <Image source={{ uri: item.imageUri }} style={StyleSheet.absoluteFill} contentFit="cover" cachePolicy="memory-disk" transition={180} />
       ) : (
         <>
           <LinearGradient colors={item.gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />

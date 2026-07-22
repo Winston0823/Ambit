@@ -2,13 +2,13 @@ import React, { useRef } from 'react';
 import {
   ActivityIndicator,
   Animated,
-  Image,
   Pressable,
   StyleSheet,
   Text,
   TextStyle,
   ViewStyle,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { Brand, Radii, AmbitFont } from '../../constants/theme';
 import { Motion } from '../../constants/motion';
 import { haptics } from '../../lib/haptics';
@@ -86,7 +86,8 @@ export function Button({
             <Image
               source={require('../../assets/icons/ArrowSwirl.png')}
               style={styles.arrow}
-              resizeMode="contain"
+              contentFit="contain"
+              cachePolicy="memory-disk"
             />
           )}
         </>

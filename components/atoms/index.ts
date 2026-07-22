@@ -12,3 +12,4 @@ export { HardShadow } from './HardShadow';
 export { Skeleton } from './Skeleton';
 export { GlassSurface } from './GlassSurface';
 export { TopAppBar } from './TopAppBar';
+export { VibeQuote } from './VibeQuote';

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Modal,
@@ -11,7 +11,7 @@ import {
 import * as Haptics from 'expo-haptics';
 import { FilmSlate } from 'phosphor-react-native';
 import { AmbitFont, Brand, Radii, Space } from '../../constants/theme';
-import { DAILY_FREE_LIMIT, addAdBonus } from '../../lib/reachOutLimit';
+import { DAILY_FREE_LIMIT, addAdBonus, canEarnAdBonus } from '../../lib/reachOutLimit';
 import { showRewardedAd } from '../../lib/ads';
 import { toast } from '../../lib/toast';
 
@@ -40,9 +40,21 @@ export function ReachOutLimitSheet({
   onAdComplete,
 }: Props) {
   const [adState, setAdState] = useState<'idle' | 'loading' | 'done'>('idle');
+  // Whether another ad bonus can still be earned today (below MAX_AD_BONUS).
+  // When exhausted, the ad CTA becomes a disabled "resets tomorrow" state so
+  // grinding ads can't push past the daily bonus cap. Re-checked each open.
+  const [canEarn, setCanEarn] = useState(true);
+  useEffect(() => {
+    if (!visible) return;
+    let cancelled = false;
+    canEarnAdBonus()
+      .then((ok) => { if (!cancelled) setCanEarn(ok); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [visible]);
 
   const handleWatchAd = async () => {
-    if (adState !== 'idle') return;
+    if (adState !== 'idle' || !canEarn) return;
     if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     setAdState('loading');
 
@@ -98,25 +110,38 @@ export function ReachOutLimitSheet({
             ))}
           </View>
 
-          {/* Watch Ad CTA */}
-          <Pressable
-            onPress={handleWatchAd}
-            disabled={adState !== 'idle'}
-            style={[styles.watchBtn, adState !== 'idle' && styles.watchBtnLoading]}
-            accessibilityRole="button"
-            accessibilityLabel="Watch an ad to unlock a reach-out"
-          >
-            {adState === 'loading' ? (
-              <>
-                <ActivityIndicator color={Brand.inkOnBrand} size="small" />
-                <Text style={styles.watchBtnText}>Ad loading…</Text>
-              </>
-            ) : adState === 'done' ? (
-              <Text style={styles.watchBtnText}>Unlocked ✓</Text>
-            ) : (
-              <Text style={styles.watchBtnText}>Watch a short ad</Text>
-            )}
-          </Pressable>
+          {/* Watch Ad CTA — becomes a disabled "resets tomorrow" state once the
+              daily ad-bonus cap (MAX_AD_BONUS) is hit, so ads can't be ground
+              past the limit. */}
+          {!canEarn ? (
+            <View
+              style={[styles.watchBtn, styles.watchBtnDisabled]}
+              accessibilityRole="text"
+            >
+              <Text style={styles.watchBtnText}>
+                No more bonus reach-outs today — resets tomorrow.
+              </Text>
+            </View>
+          ) : (
+            <Pressable
+              onPress={handleWatchAd}
+              disabled={adState !== 'idle'}
+              style={[styles.watchBtn, adState !== 'idle' && styles.watchBtnLoading]}
+              accessibilityRole="button"
+              accessibilityLabel="Watch an ad to unlock a reach-out"
+            >
+              {adState === 'loading' ? (
+                <>
+                  <ActivityIndicator color={Brand.inkOnBrand} size="small" />
+                  <Text style={styles.watchBtnText}>Ad loading…</Text>
+                </>
+              ) : adState === 'done' ? (
+                <Text style={styles.watchBtnText}>Unlocked ✓</Text>
+              ) : (
+                <Text style={styles.watchBtnText}>Watch a short ad</Text>
+              )}
+            </Pressable>
+          )}
 
           {/* Dismiss */}
           {adState === 'idle' && (
@@ -203,6 +228,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   watchBtnLoading: { opacity: 0.75 },
+  watchBtnDisabled: { backgroundColor: Brand.inkMuted, opacity: 0.6 },
   watchBtnText: {
     fontFamily: AmbitFont.body,
     fontSize: 15,

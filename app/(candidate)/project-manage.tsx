@@ -1,6 +1,5 @@
 import React, { useCallback, useState } from 'react';
 import {
-  Image,
   Platform,
   Pressable,
   RefreshControl,
@@ -13,6 +12,7 @@ import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CaretRight, PencilSimple } from 'phosphor-react-native';
 import * as Haptics from 'expo-haptics';
+import { Image } from 'expo-image';
 import { BackChevron, Skeleton } from '../../components/atoms';
 import { getInbox, type InboxItem } from '../../lib/messaging';
 import { supabase } from '../../lib/supabase';
@@ -229,7 +229,7 @@ export default function ProjectManageScreen() {
                 >
                   <View style={[styles.stripe, { backgroundColor: accent }]} pointerEvents="none" />
                   {c.partner_photo_url ? (
-                    <Image source={{ uri: c.partner_photo_url }} style={styles.avatar} />
+                    <Image source={{ uri: c.partner_photo_url }} style={styles.avatar} cachePolicy="memory-disk" transition={180} />
                   ) : (
                     <View style={[styles.avatar, styles.avatarFallback]}>
                       <Text style={styles.avatarInitial}>
@@ -268,13 +268,17 @@ const styles = StyleSheet.create({
   errorBtn: {
     marginTop: 28,
     backgroundColor: Brand.action,
-    borderWidth: 1.6,
-    borderColor: Brand.actionInk,
     paddingHorizontal: 40,
     paddingVertical: 14,
     borderRadius: 999,
+    // ASTRA: borderless purple CTA lifted by a soft shadow.
+    shadowColor: Brand.action,
+    shadowOpacity: 0.2,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 4,
   },
-  errorBtnText: { fontFamily: AmbitFont.body, fontSize: 15, fontWeight: '700', color: Brand.actionInk },
+  errorBtnText: { fontFamily: AmbitFont.body, fontSize: 15, fontWeight: '700', color: Brand.inkOnBrand },
   skelRow: { flexDirection: 'row', alignItems: 'center', gap: 16, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: Brand.borderSoft },
   content: { paddingHorizontal: Space.lg, gap: Space.md },
 
@@ -407,6 +411,6 @@ const styles = StyleSheet.create({
     fontFamily: AmbitFont.body,
     fontSize: 11,
     fontWeight: '700',
-    color: Brand.actionInk,
+    color: Brand.inkOnBrand,
   },
 });

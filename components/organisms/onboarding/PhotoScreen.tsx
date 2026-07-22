@@ -1,8 +1,9 @@
 import React from 'react';
-import { Alert, Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Camera } from 'phosphor-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
+import { Image } from 'expo-image';
 import { BackChevron, KeyboardDismiss } from '../../atoms';
 import { OnboardingContinue } from '../../molecules';
 import { useOnboarding } from '../../../context/OnboardingContext';
@@ -75,7 +76,7 @@ export function PhotoScreen({ onBack, onContinue }: Props) {
 
           <Pressable onPress={openPicker} style={styles.avatarBtn}>
             {profile.photoUri ? (
-              <Image source={{ uri: profile.photoUri }} style={styles.avatarImg} />
+              <Image source={{ uri: profile.photoUri }} style={styles.avatarImg} cachePolicy="memory-disk" transition={180} />
             ) : (
               <View style={styles.avatarPlaceholder}>
                 <Camera size={36} color={Brand.actionDeep} weight="duotone" />

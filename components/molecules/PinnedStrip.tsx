@@ -1,12 +1,12 @@
 import React from 'react';
 import {
   FlatList,
-  Image,
   Pressable,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import { Image } from 'expo-image';
 import type { InboxItem } from '../../lib/messaging';
 import { isReachedOutToYou } from '../../lib/messaging';
 import { AmbitFont, Brand } from '../../constants/theme';
@@ -80,7 +80,7 @@ function PinnedTile({
     >
       <View style={styles.avatarWrap}>
         {item.partner_photo_url ? (
-          <Image source={{ uri: item.partner_photo_url }} style={styles.avatar} />
+          <Image source={{ uri: item.partner_photo_url }} style={styles.avatar} cachePolicy="memory-disk" transition={180} />
         ) : (
           <View style={[styles.avatar, styles.avatarFallback]}>
             <Text style={styles.avatarInitial}>{initial}</Text>

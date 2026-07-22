@@ -71,7 +71,18 @@ export default function TabsLayout() {
   return (
     <MaterialTopTabs
       tabBarPosition="bottom"
-      screenOptions={{ lazy: false, swipeEnabled: true }}
+      initialRouteName="feed"
+      // Tab-swipe off on Discovery (the deck owns horizontal gestures) and
+      // inside a chat thread; on everywhere else. Derived per-route as a
+      // FUNCTION of route.name — material-top-tabs reads swipeEnabled from the
+      // focused route's options, so this is synchronously correct on the very
+      // first render (a segments-derived value lagged one render, mounting the
+      // native pager scrollEnabled=true; on Fabric/Android the later prop
+      // update never reached the pager — see patches/react-native-tab-view).
+      screenOptions={({ route }) => ({
+        lazy: false,
+        swipeEnabled: route.name !== 'feed' && !inThread,
+      })}
       tabBar={({ state, navigation }: any) => {
         const currentRoute = state.routes[state.index].name;
         const activeKey = ROUTE_TO_TAB[currentRoute] ?? 'discovery';
@@ -85,11 +96,11 @@ export default function TabsLayout() {
         );
       }}
     >
-      <MaterialTopTabs.Screen name="feed" options={{ swipeEnabled: false } as any} />
-      {/* Disable tab-swipe inside a thread: a horizontal drag there is the
-          stage rail (or just shouldn't page you out to Discovery). The inbox
-          (not inThread) keeps swipe-nav. */}
-      <MaterialTopTabs.Screen name="chat" options={{ swipeEnabled: !inThread } as any} />
+      {/* swipeEnabled is controlled at the navigator level above (off on
+          Discovery + inside a thread), not per-screen — per-screen options are
+          applied unreliably on the initial route. */}
+      <MaterialTopTabs.Screen name="feed" />
+      <MaterialTopTabs.Screen name="chat" />
       <MaterialTopTabs.Screen name="projects" />
       <MaterialTopTabs.Screen name="profile" />
     </MaterialTopTabs>

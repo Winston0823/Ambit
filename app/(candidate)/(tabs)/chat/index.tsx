@@ -3,7 +3,6 @@ import { HardShadow, Skeleton } from '../../../../components/atoms';
 import {
   Alert,
   FlatList,
-  Image,
   Platform,
   Pressable,
   RefreshControl,
@@ -15,6 +14,7 @@ import { router, useFocusEffect, useSegments } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Archive, ArrowCounterClockwise, CaretRight, MagnifyingGlass, Plus } from 'phosphor-react-native';
 import * as Haptics from 'expo-haptics';
+import { Image } from 'expo-image';
 import {
   InboxRow,
   PassReasonSheet,
@@ -392,7 +392,7 @@ function ArchivedRow({
       <Pressable style={styles.archivedRowMain} onPress={onOpen}>
         <View style={styles.archivedAvatar}>
           {item.partner_photo_url ? (
-            <Image source={{ uri: item.partner_photo_url }} style={styles.archivedAvatarImg} />
+            <Image source={{ uri: item.partner_photo_url }} style={styles.archivedAvatarImg} cachePolicy="memory-disk" transition={180} />
           ) : (
             <Text style={styles.archivedAvatarInitial}>{initial}</Text>
           )}
@@ -687,8 +687,12 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
     borderRadius: 999,
     backgroundColor: Brand.action,
-    borderWidth: 1.4,
-    borderColor: Brand.actionInk,
+    // ASTRA: borderless purple CTA lifted by a soft shadow.
+    shadowColor: Brand.action,
+    shadowOpacity: 0.2,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 4,
   },
   unarchiveBtnText: {
     fontFamily: AmbitFont.bold,

@@ -1,6 +1,5 @@
 import React, { useCallback, useState } from 'react';
 import {
-  Image,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -11,6 +10,7 @@ import {
 import { router, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Image } from 'expo-image';
 import {
   ArrowClockwise,
   Compass,
@@ -258,7 +258,7 @@ export default function ProjectsTab() {
                       gradient — with a glass status badge top-right. */}
                   <View style={styles.cover}>
                     {p.image_url ? (
-                      <Image source={{ uri: p.image_url }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+                      <Image source={{ uri: p.image_url }} style={StyleSheet.absoluteFill} contentFit="cover" cachePolicy="memory-disk" transition={180} />
                     ) : (
                       <LinearGradient
                         colors={[Astra.royal, Astra.iris]}
@@ -286,7 +286,7 @@ export default function ProjectsTab() {
                           {s.faces.map((f, i) => (
                             <View key={f.conversation_id} style={[styles.face, i > 0 && styles.faceOverlap]}>
                               {f.partner_photo_url ? (
-                                <Image source={{ uri: f.partner_photo_url }} style={styles.faceImg} />
+                                <Image source={{ uri: f.partner_photo_url }} style={styles.faceImg} cachePolicy="memory-disk" transition={180} />
                               ) : (
                                 <View style={[styles.faceImg, styles.faceFallback]}>
                                   <Text style={styles.faceInitial}>
@@ -344,7 +344,7 @@ export default function ProjectsTab() {
                 accessibilityLabel={`Open ${item.project_title}`}
               >
                 {item.partner_photo_url ? (
-                  <Image source={{ uri: item.partner_photo_url }} style={styles.engAvatar} />
+                  <Image source={{ uri: item.partner_photo_url }} style={styles.engAvatar} cachePolicy="memory-disk" transition={180} />
                 ) : (
                   <View style={[styles.engAvatar, styles.engAvatarFallback]}>
                     <Text style={styles.engInitial}>{(item.partner_name ?? '?').slice(0, 1).toUpperCase()}</Text>

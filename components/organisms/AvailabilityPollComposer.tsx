@@ -335,15 +335,15 @@ export function AvailabilityPollComposer({
               >
                 <Text style={styles.secondaryBtnText}>Cancel</Text>
               </Pressable>
-              <HardShadow radius={999} offset={4} style={posting ? { opacity: 0.5 } : undefined}>
+              <HardShadow radius={999} offset={4} style={[{ flex: 1 }, posting && { opacity: 0.5 }]}>
                 <Pressable
                   onPress={post}
                   disabled={posting}
                   style={styles.primaryBtn}
                 >
-                  <CalendarPlus size={16} color={Brand.actionInk} weight="bold" />
-                  <Text style={styles.primaryBtnText}>
-                    {posting ? 'Posting…' : `Post poll  ·  ${mineKeys.size}`}
+                  <CalendarPlus size={16} color={Brand.inkOnBrand} weight="bold" />
+                  <Text style={styles.primaryBtnText} numberOfLines={1}>
+                    {posting ? 'Posting…' : `Post poll · ${mineKeys.size}`}
                   </Text>
                 </Pressable>
               </HardShadow>
@@ -562,7 +562,8 @@ const styles = StyleSheet.create({
   },
   hourChipSelected: {
     backgroundColor: Brand.selected,
-    borderColor: Brand.actionInk,
+    // ASTRA: border matches the purple fill (no ink outline).
+    borderColor: Brand.selected,
   },
   hourChipText: {
     fontFamily: AmbitFont.body,
@@ -582,7 +583,8 @@ const styles = StyleSheet.create({
   },
   durationChipSelected: {
     backgroundColor: Brand.selected,
-    borderColor: Brand.actionInk,
+    // ASTRA: border matches the purple fill (no ink outline).
+    borderColor: Brand.selected,
   },
   durationChipText: {
     fontFamily: AmbitFont.body,
@@ -597,10 +599,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     paddingVertical: 16,
+    paddingHorizontal: 16,
     borderRadius: 999,
     backgroundColor: Brand.selected,
-    borderWidth: 1.6,
-    borderColor: Brand.actionInk,
+    // ASTRA: no ink outline — the HardShadow wrapper provides the lift.
   },
   primaryBtnText: {
     fontFamily: AmbitFont.body,
@@ -612,9 +614,8 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     paddingHorizontal: 24,
     borderRadius: Radii.md,
-    backgroundColor: Brand.surface1,
-    borderWidth: 1.5,
-    borderColor: Brand.borderDefault,
+    // ASTRA: quiet borderless secondary on the mist surface.
+    backgroundColor: Brand.surface2,
   },
   secondaryBtnText: {
     fontFamily: AmbitFont.body,

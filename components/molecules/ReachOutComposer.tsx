@@ -2,7 +2,6 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   Animated,
   Easing,
-  Image,
   Keyboard,
   Modal,
   Platform,
@@ -15,6 +14,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Image } from 'expo-image';
 import { Images, PaperPlaneTilt, Stack, X } from 'phosphor-react-native';
 import * as Haptics from 'expo-haptics';
 import { HardShadow } from '../atoms';
@@ -208,14 +208,17 @@ export function ReachOutComposer({ card, onDismiss, onSend, onSent, disableAttac
       if (attachMode === 'project') {
         const { data } = await supabase
           .from('projects')
-          .select('id, title')
+          .select('id, title, image_url')
           .eq('owner_id', user.id)
           .order('created_at', { ascending: false });
         if (!cancelled) {
           setAttachItems(
-            ((data ?? []) as { id: string; title: string }[]).map((p, idx) => ({
+            ((data ?? []) as { id: string; title: string; image_url: string | null }[]).map((p, idx) => ({
               id: p.id,
               label: p.title,
+              // The project's real cover — tiles fall back to the gradient
+              // glyph only when the project has no image.
+              imageUrl: p.image_url,
               gradient: ATTACH_GRADIENTS[idx % ATTACH_GRADIENTS.length],
             })),
           );
@@ -293,12 +296,28 @@ export function ReachOutComposer({ card, onDismiss, onSend, onSent, disableAttac
     // project card in the thread); portfolio still rides in the text for now.
     const attachment =
       selected && attachMode === 'project' ? { id: selected.id, title: selected.label } : null;
-    const refLine =
-      selected && attachMode === 'portfolio' ? `\n\n📎 Sharing my work: ${selected.label}` : '';
+
+    // Portfolio rides in the text as a ref-line. The composed body must stay
+    // under the 300-char DB cap — the user's note is sacrosanct, so any overflow
+    // is absorbed by ellipsizing the appended title, not by cutting their words.
+    const note = text.trim();
+    let body = note;
+    if (selected && attachMode === 'portfolio') {
+      const prefix = '\n\n📎 Sharing my work: ';
+      const room = MAX_NOTE - note.length - prefix.length;
+      if (room >= 1) {
+        const title =
+          selected.label.length > room
+            ? selected.label.slice(0, Math.max(0, room - 1)).trimEnd() + '…'
+            : selected.label;
+        body = note + prefix + title;
+      }
+      // No room even for a one-char title → drop the ref-line entirely.
+    }
 
     let ok = false;
     try {
-      ok = (await onSend(card, text.trim() + refLine, attachment)) !== false;
+      ok = (await onSend(card, body, attachment)) !== false;
     } catch {
       ok = false;
     }
@@ -335,7 +354,14 @@ export function ReachOutComposer({ card, onDismiss, onSend, onSent, disableAttac
     <Modal transparent animationType="fade" visible={!!card} onRequestClose={onDismiss} statusBarTranslucent>
       <View style={styles.root}>
         <Animated.View style={[StyleSheet.absoluteFill, styles.scrim, { opacity: enter }]}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={handleDismiss} />
+          {/* Once the send is underway the scrim stops dismissing — abandoning
+              mid-send would strand the terminal onSent path (card fly-off +
+              counter reset). The user can dismiss again after it lands. */}
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={phase === 'sending' ? undefined : handleDismiss}
+            disabled={phase === 'sending'}
+          />
         </Animated.View>
 
         {/* ONE continuous surface: [media → input → white tail]. The tail hangs
@@ -663,7 +689,7 @@ function TileFace({
     <HardShadow radius={radius} offset={4}>
     <View style={[styles.tileFace, { width: size, height: size * 1.18, borderRadius: radius }]}>
       {item.imageUrl ? (
-        <Image source={{ uri: item.imageUrl }} style={StyleSheet.absoluteFill} />
+        <Image source={{ uri: item.imageUrl }} style={StyleSheet.absoluteFill} cachePolicy="memory-disk" transition={180} />
       ) : (
         <LinearGradient colors={item.gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill}>
           <View style={styles.tileGlyph}>

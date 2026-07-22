@@ -2,9 +2,8 @@
 /// (lib/toast.ts). Mount ONCE near the app root, above both onboarding and
 /// the main app, so any layer's `toast.error(...)` surfaces consistently.
 ///
-/// House style: RN Animated (no reanimated), eggshell/ink tokens, the
-/// signature tactile ink edge on the action button. Stacks bottom-up and
-/// auto-dismisses per item.
+/// House style: RN Animated (no reanimated), ASTRA toned surfaces with a soft
+/// royal shadow (borderless). Stacks bottom-up and auto-dismisses per item.
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import {
@@ -147,14 +146,13 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: Space.md,
     borderRadius: Radii.lg,
-    borderWidth: 1.5,
-    borderColor: Brand.inkEdge,
-    // Signature hard offset edge (matches the tactile button language).
-    shadowColor: Brand.inkEdge,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 4,
+    // ASTRA: borderless surface lifted by a soft royal shadow (the toned fill
+    // is applied inline per tone).
+    shadowColor: '#2D005E',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.18,
+    shadowRadius: 16,
+    elevation: 6,
   },
   message: {
     flex: 1,

@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Alert,
   FlatList,
-  Image,
   Modal,
   Pressable,
   StyleSheet,
@@ -11,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import { router } from 'expo-router';
+import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MagnifyingGlass, X, CaretRight } from 'phosphor-react-native';
 import { BackChevron, GlassSurface, Skeleton } from '../../../../components/atoms';
@@ -328,7 +328,7 @@ export default function NewChatScreen() {
               accessibilityLabel={`View ${item.name}'s profile`}
             >
               {item.photo_url ? (
-                <Image source={{ uri: item.photo_url }} style={styles.rowAvatar} />
+                <Image source={{ uri: item.photo_url }} style={styles.rowAvatar} cachePolicy="memory-disk" transition={180} />
               ) : (
                 <View style={[styles.rowAvatar, styles.rowAvatarFallback]}>
                   <Text style={styles.rowAvatarInitial}>

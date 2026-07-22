@@ -315,10 +315,8 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     backgroundColor: Brand.selected, // brighter iris purple (was dark royal)
     alignItems: 'center',
-    borderWidth: 1.6,
-    borderColor: Brand.actionInk,
-    // Hard offset edge comes from the <HardShadow> wrapper — RN shadow
-    // props render nothing on Android and were off-vocabulary anyway.
+    // ASTRA: borderless — hard offset edge comes from the <HardShadow> wrapper.
+    // RN shadow props render nothing on Android and were off-vocabulary anyway.
   },
   saveBtnDisabled: { opacity: 0.5 },
   saveBtnText: {

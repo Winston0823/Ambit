@@ -3,7 +3,6 @@ import {
   ActivityIndicator,
   Animated,
   Dimensions,
-  Image,
   Linking,
   Pressable,
   StyleSheet,
@@ -11,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Image } from 'expo-image';
 import { Paperclip, Warning } from 'phosphor-react-native';
 import { toast } from '../../lib/toast';
 
@@ -167,7 +167,9 @@ function Avatar({
         <Image
           source={{ uri: url! }}
           style={styles.avatarImg}
-          resizeMode="cover"
+          contentFit="cover"
+          cachePolicy="memory-disk"
+          transition={180}
           onError={() => setFailed(true)}
         />
       ) : (
@@ -524,7 +526,7 @@ export function MessageBubble({
 
         {/* Image attachment. */}
         {attachmentUrl && !isDeleted && (
-          <Image source={{ uri: attachmentUrl }} style={styles.image} resizeMode="cover" />
+          <Image source={{ uri: attachmentUrl }} style={styles.image} contentFit="cover" cachePolicy="memory-disk" transition={180} />
         )}
 
         {/* Body. iMessage parity: no inline timestamp / checkmark — the
@@ -625,9 +627,12 @@ function systemPrefix(kind: NonNullable<MessageRow['kind']>, senderDisplayName?:
   const who = senderDisplayName ?? 'They';
   switch (kind) {
     case 'system_pass':            return `${who} passed`;
-    case 'system_hire_proposed':   return `${who} proposed marking this as Hired`;
+    // Neutral, role-agnostic: the proposer can be either party (owner-receiver
+    // "makes an offer" or seeker-receiver "accepts"), and the bubble doesn't
+    // know roles — so avoid the founder-voiced phrasing.
+    case 'system_hire_proposed':   return `${who} proposed making it official`;
     case 'system_hired':           return `It's a match — hired!`;
-    case 'system_auto_declined':   return `${who} is reviewing other candidates`;
+    case 'system_auto_declined':   return `This reach-out expired without a reply.`;
     case 'user':
     default:                       return '';
   }

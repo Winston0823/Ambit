@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -16,6 +15,7 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   Camera,
@@ -350,17 +350,18 @@ export default function ProfileTab() {
     (async () => {
       const { data } = await supabase
         .from('projects')
-        .select('id, title, vibe_blurb, roles_sought')
+        .select('id, title, vibe_blurb, roles_sought, image_url')
         .eq('owner_id', user.id)
         .eq('active', true)
         .order('created_at', { ascending: false });
       if (cancelled) return;
       setOwnerProjects(
-        (data ?? []).map((p: { id: string; title: string | null; vibe_blurb: string | null; roles_sought: string[] | null }) => ({
+        (data ?? []).map((p: { id: string; title: string | null; vibe_blurb: string | null; roles_sought: string[] | null; image_url: string | null }) => ({
           id: p.id,
           title: p.title ?? '',
           pitch: p.vibe_blurb ?? '',
           roles: p.roles_sought ?? [],
+          imageUrl: p.image_url,
         })),
       );
     })();
@@ -558,16 +559,18 @@ export default function ProfileTab() {
       </GlassSurface>
 
       {editing ? (
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
         {/* Photo — centered squared avatar (royal→iris) + Change photo */}
         <View style={styles.avatarBlock}>
           <Pressable onPress={pickPhoto} style={styles.avatarSquare} accessibilityLabel="Change photo">
             {profile?.photo_url ? (
-              <Image source={{ uri: profile.photo_url }} style={styles.avatarSquareImg} />
+              <Image source={{ uri: profile.photo_url }} style={styles.avatarSquareImg} cachePolicy="memory-disk" transition={180} />
             ) : (
               <LinearGradient
                 colors={[Astra.royal, Astra.iris]}
@@ -587,21 +590,33 @@ export default function ProfileTab() {
           </Pressable>
         </View>
 
-        {/* Résumé import — a clearly-labeled CTA so the feature is discoverable
-            (the header icon alone read as "missing"). Seekers only; owners'
-            profiles are project-centric, not portfolio-driven. */}
-        {profile?.role === 'seeker' && (
+        {/* Résumé import — multi-use and for BOTH roles (it fills name, blurb,
+            skills, and links, which owners have too). Prominence follows
+            profile completeness: a sparse profile gets the big fast-fill CTA;
+            once there's content it demotes to a quiet link in the same spot. */}
+        {skills.length === 0 && portfolio.length === 0 ? (
           <HardShadow radius={999} offset={3} style={styles.resumeImportShadow}>
             <Pressable
               onPress={openResumeImport}
               style={styles.resumeImportBtn}
               accessibilityRole="button"
-              accessibilityLabel="Resume Import"
+              accessibilityLabel="Import your résumé"
             >
               <FileArrowUp size={18} color={Brand.inkOnBrand} weight="regular" />
-              <Text style={styles.resumeImportLabel}>Resume Import</Text>
+              <Text style={styles.resumeImportLabel}>Import your résumé</Text>
             </Pressable>
           </HardShadow>
+        ) : (
+          <Pressable
+            onPress={openResumeImport}
+            style={styles.resumeImportQuiet}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Import from résumé"
+          >
+            <FileArrowUp size={14} color={Brand.selected} weight="regular" />
+            <Text style={styles.resumeImportQuietLabel}>Import from résumé</Text>
+          </Pressable>
         )}
 
         {/* Core fields — inline TextField editing; commits on blur. Campus +
@@ -681,12 +696,28 @@ export default function ProfileTab() {
                 <Text style={styles.projAddText}>Create your first project</Text>
               </Pressable>
             ) : (
-              ownerProjects.map((p) => (
+              ownerProjects.map((p, i) => (
                 <Pressable
                   key={p.id}
                   onPress={() => router.push({ pathname: '/project-manage', params: { id: p.id } })}
                   style={styles.projEditRow}
                 >
+                  {/* Cover thumb mirrors the preview card so the edit list reads
+                      the same. Gradient fallback when a project has no image. */}
+                  <View style={styles.projThumb}>
+                    {p.imageUrl ? (
+                      <Image source={{ uri: p.imageUrl }} style={styles.projThumbImg} cachePolicy="memory-disk" transition={180} />
+                    ) : (
+                      <LinearGradient
+                        colors={PORTFOLIO_GRADIENTS[i % PORTFOLIO_GRADIENTS.length]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={styles.projThumbImg}
+                      >
+                        <Text style={styles.projThumbInitial}>{(p.title[0] ?? '?').toUpperCase()}</Text>
+                      </LinearGradient>
+                    )}
+                  </View>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.projEditTitle} numberOfLines={1}>{p.title}</Text>
                     <Text style={styles.projEditSub} numberOfLines={1}>
@@ -711,7 +742,7 @@ export default function ProfileTab() {
                 >
                   <View style={[styles.tileImgWrap, activePortfolio?.id === item.id && styles.tileActive]}>
                     {item.imageUri ? (
-                      <Image source={{ uri: item.imageUri }} style={styles.tileImg} />
+                      <Image source={{ uri: item.imageUri }} style={styles.tileImg} cachePolicy="memory-disk" transition={180} />
                     ) : (
                       <LinearGradient
                         colors={item.gradient}
@@ -793,6 +824,7 @@ export default function ProfileTab() {
 
         <View style={{ height: Space.xl }} />
       </ScrollView>
+      </KeyboardAvoidingView>
       ) : profile?.role === 'owner' ? (
         <View style={styles.previewWrap}>
             <OwnerProfileCard
@@ -961,6 +993,11 @@ function SkillsEditModal({
               <X size={20} color={Brand.inkMuted} weight="bold" />
             </Pressable>
           </View>
+          {/* The discovery card only surfaces the first 6 skills — flag it once
+              the selection runs past that so the extras aren't a surprise. */}
+          {draft.length > 6 && (
+            <Text style={modalStyles.cardCapHint}>First 6 show on your card</Text>
+          )}
 
           <ScrollView
             contentContainerStyle={{ gap: Space.lg, paddingBottom: Space.lg }}
@@ -1229,6 +1266,21 @@ const styles = StyleSheet.create({
 
   // Clearly-labeled résumé-import CTA in the edit form (ASTRA pill language).
   resumeImportShadow: { alignSelf: 'center', marginTop: Space.sm },
+  // Demoted variant once the profile has content — same spot, quiet link.
+  resumeImportQuiet: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    alignSelf: 'center',
+    marginTop: 2,
+    paddingVertical: 4,
+  },
+  resumeImportQuietLabel: {
+    fontFamily: AmbitFont.semibold,
+    fontSize: 13,
+    color: Brand.selected,
+  },
   resumeImportBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1237,8 +1289,6 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 999,
     backgroundColor: Brand.action,
-    borderWidth: 1.6,
-    borderColor: Brand.actionInk,
   },
   resumeImportLabel: {
     fontFamily: AmbitFont.body,
@@ -1332,6 +1382,15 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: Brand.borderSoft,
   },
+  projThumb: {
+    width: 44,
+    height: 44,
+    borderRadius: Radii.md,
+    overflow: 'hidden',
+    backgroundColor: Brand.surface2,
+  },
+  projThumbImg: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' },
+  projThumbInitial: { fontFamily: AmbitFont.display, fontSize: 18, color: Brand.inkOnBrand },
   projEditTitle: { fontFamily: AmbitFont.display, fontSize: 17, color: Brand.inkPrimary },
   projEditSub: { fontFamily: AmbitFont.body, fontSize: 12.5, color: Brand.inkMuted, marginTop: 2 },
 
@@ -1492,10 +1551,14 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 20,
     backgroundColor: Brand.action,
-    borderWidth: 1.6,
-    borderColor: Brand.actionInk,
     alignItems: 'center',
     justifyContent: 'center',
+    // ASTRA: borderless purple CTA lifted by a soft shadow.
+    shadowColor: Brand.action,
+    shadowOpacity: 0.2,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 4,
   },
   customAddBtnDisabled: { opacity: 0.4 },
   // Dashed "＋ Add" skill chip — matches the Chip atom's 40pt height.
@@ -1582,6 +1645,12 @@ const modalStyles = StyleSheet.create({
     fontSize: 20,
     color: Brand.inkPrimary,
   },
+  cardCapHint: {
+    fontFamily: AmbitFont.body,
+    fontSize: 12.5,
+    color: Brand.inkMuted,
+    marginTop: -4,
+  },
   input: {
     fontFamily: AmbitFont.body,
     fontSize: 16,
@@ -1614,8 +1683,6 @@ const modalStyles = StyleSheet.create({
     paddingVertical: 12,
     backgroundColor: Brand.action,
     borderRadius: 999,
-    borderWidth: 1.6,
-    borderColor: Brand.actionInk,
   },
   saveLabel: {
     fontFamily: AmbitFont.body,

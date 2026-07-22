@@ -2,7 +2,7 @@ import React from 'react';
 import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { AddressBook, Envelope, GithubLogo, Globe, LinkedinLogo, Phone } from 'phosphor-react-native';
 import type { ContactCard } from '../../lib/messaging';
-import { AmbitFont, Astra, Brand, Radii } from '../../constants/theme';
+import { AmbitFont, Astra, Brand } from '../../constants/theme';
 
 interface Props {
   card:   ContactCard;

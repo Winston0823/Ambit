@@ -19,6 +19,7 @@ import {
   getStoredLocalEventId,
 } from '../../lib/deviceCalendar';
 import { settleOpenPolls } from '../../lib/availability';
+import { toast } from '../../lib/toast';
 import { AmbitFont, Brand, Radii } from '../../constants/theme';
 import { StructuredHeader, structuredStyles } from './structuredCard';
 import { Tactile } from '../atoms';
@@ -81,8 +82,16 @@ export function SchedulingBubble({ request, meId, isMine }: Props) {
         status: 'accepted' as const,
         accepted_slot: request.proposed_slots[slotIndex],
       };
-      const id = await addAcceptedMeetingToCalendar(accepted);
-      if (id) setLocalEventId(id);
+      // The accept itself has succeeded; a calendar-add failure (permission
+      // denied → null, or a native throw) must not read as "couldn't accept".
+      // Surface it as its own toast instead of swallowing it.
+      try {
+        const id = await addAcceptedMeetingToCalendar(accepted);
+        if (id) setLocalEventId(id);
+        else toast.error("Meeting accepted — couldn't add to your calendar.");
+      } catch {
+        toast.error("Meeting accepted — couldn't add to your calendar.");
+      }
     } catch (e: any) {
       Alert.alert('Could not accept', e?.message ?? '');
     } finally {
