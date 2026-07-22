@@ -323,6 +323,10 @@ export function ReachOutComposer({ card, onDismiss, onSend, onSent, disableAttac
     }
 
     if (ok) {
+      // Optimistic: the parent records the reach-out asynchronously, so bump
+      // the displayed quota now — otherwise the pill lags until the next
+      // AsyncStorage read and "5 of 5" survives a successful send.
+      setQuota((q) => (q ? { ...q, used: q.used + 1 } : q));
       if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       Animated.parallel([
         Animated.timing(successOpacity, { toValue: 1, duration: 360, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
@@ -380,15 +384,6 @@ export function ReachOutComposer({ card, onDismiss, onSend, onSent, disableAttac
             />
 
           <Animated.View style={{ opacity: formOpacity }} pointerEvents={phase === 'sending' ? 'none' : 'auto'}>
-            {/* Quiet daily-quota line — surfaced proactively so the cap never
-                ambushes the user at send. */}
-            {quotaLeft !== null && (
-              <Text style={styles.quotaLine}>
-                {quotaLeft > 0
-                  ? `${quotaLeft} of ${quota!.limit} reach-outs left today`
-                  : 'No reach-outs left today'}
-              </Text>
-            )}
             {/* Attach media — sits ABOVE the message bubble. Fades + rises in
                 as a second beat, after the white surface has settled. */}
             {attachMode && attachItems !== null && attachItems.length > 0 && (
@@ -442,8 +437,20 @@ export function ReachOutComposer({ card, onDismiss, onSend, onSent, disableAttac
               </Animated.View>
             )}
 
-            {/* Message bubble + send — just above the keyboard. */}
-            <View style={styles.inputRow}>
+            {/* Quiet daily-quota pill — anchored to the input cluster (fully
+                on the solid-white zone) so the cap never ambushes at send. */}
+            {quotaLeft !== null && (
+              <Text style={styles.quotaLine}>
+                {quotaLeft > 0
+                  ? `${quotaLeft} of ${quota!.limit} reach-outs left today`
+                  : 'No reach-outs left today'}
+              </Text>
+            )}
+
+            {/* Message bubble + send — just above the keyboard. When the
+                quota pill is present it owns the spacing above, so the row
+                pulls in tight beneath it. */}
+            <View style={[styles.inputRow, quotaLeft !== null && { marginTop: 10 }]}>
               <View style={styles.bubble}>
                 <TextInput
                   value={text}
@@ -770,12 +777,22 @@ const styles = StyleSheet.create({
     color: Brand.danger,
     marginTop: 8,
   },
+  // Pill-backed so it stays legible: it renders in the zone where the white
+  // surface gradient is still semi-transparent, i.e. over the card photo.
   quotaLine: {
     fontFamily: AmbitFont.body,
     fontSize: 12.5,
     fontWeight: '600',
-    color: Brand.inkMuted,
-    marginBottom: 4,
+    color: Brand.inkBody,
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(255,255,255,0.92)',
+    borderWidth: 1,
+    borderColor: 'rgba(28,27,27,0.08)',
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    marginTop: 24,
+    overflow: 'hidden',
   },
   counterNote: {
     fontFamily: AmbitFont.body,

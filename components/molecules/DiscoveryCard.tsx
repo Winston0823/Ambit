@@ -14,8 +14,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Image } from 'expo-image';
 import {
   AppStoreLogo,
-  CaretDown,
-  CaretUp,
   ChatCircle,
   Clock,
   DotsThree,
@@ -59,6 +57,10 @@ interface Props {
   showReachButton?: boolean;
   /// Render the send circle in a non-interactive preview state.
   reachDisabled?: boolean;
+  /// The gutter pager rail renders outside the card bounds, so the SwipeDeck's
+  /// peek (next) card must hide its own or two rails stack in the gutter.
+  /// Default true for standalone/preview contexts.
+  showPagerDots?: boolean;
   /// Play the entry fade on mount. Default true. The SwipeDeck sets it false.
   animateIn?: boolean;
   /// Safety: when provided, renders a ⋯ overflow button that hands back the
@@ -81,6 +83,7 @@ export function DiscoveryCard({
   onReachOut,
   showReachButton = true,
   reachDisabled = false,
+  showPagerDots = true,
   animateIn = true,
   onFlag,
 }: Props) {
@@ -150,37 +153,27 @@ export function DiscoveryCard({
         }}
       >
         {hasSecondScreen ? (
-          <>
-            <ScrollView
-              ref={scrollRef}
-              style={StyleSheet.absoluteFill}
-              pagingEnabled
-              showsVerticalScrollIndicator={false}
-              scrollEventThrottle={16}
-              onScroll={(e) => {
-                if (cardH <= 0) return;
-                const i = Math.round(e.nativeEvent.contentOffset.y / cardH);
-                if (i !== page) setPage(i);
-              }}
-            >
-              <View style={{ height: cardH }}>
-                {card.kind === 'seeker' ? <SeekerFront card={card} matchedSet={matchedSet} /> : <ProjectFront card={card} />}
-              </View>
-              <View style={{ height: cardH }}>
-                {card.kind === 'seeker'
-                  ? <SeekerPortfolio card={card} onPortfolioPress={onPortfolioPress} activePortfolioId={activePortfolioId} />
-                  : <ProjectDetail card={card} matchedSet={matchedSet} />}
-              </View>
-            </ScrollView>
-
-            {cardH > 0 && (
-              <PagerArrow
-                kind={card.kind}
-                page={page}
-                onPress={() => goToPage(page === 0 ? 1 : 0)}
-              />
-            )}
-          </>
+          <ScrollView
+            ref={scrollRef}
+            style={StyleSheet.absoluteFill}
+            pagingEnabled
+            showsVerticalScrollIndicator={false}
+            scrollEventThrottle={16}
+            onScroll={(e) => {
+              if (cardH <= 0) return;
+              const i = Math.round(e.nativeEvent.contentOffset.y / cardH);
+              if (i !== page) setPage(i);
+            }}
+          >
+            <View style={{ height: cardH }}>
+              {card.kind === 'seeker' ? <SeekerFront card={card} matchedSet={matchedSet} /> : <ProjectFront card={card} />}
+            </View>
+            <View style={{ height: cardH }}>
+              {card.kind === 'seeker'
+                ? <SeekerPortfolio card={card} onPortfolioPress={onPortfolioPress} activePortfolioId={activePortfolioId} />
+                : <ProjectDetail card={card} matchedSet={matchedSet} />}
+            </View>
+          </ScrollView>
         ) : (
           card.kind === 'seeker' ? <SeekerFront card={card} matchedSet={matchedSet} /> : <ProjectFront card={card} />
         )}
@@ -203,6 +196,14 @@ export function DiscoveryCard({
           </Pressable>
         )}
       </View>
+
+      {showPagerDots && hasSecondScreen && cardH > 0 && (
+        <PagerDots
+          kind={card.kind}
+          page={page}
+          onPress={() => goToPage(page === 0 ? 1 : 0)}
+        />
+      )}
     </Animated.View>
   );
 }
@@ -523,12 +524,14 @@ function ProjectDetail({ card, matchedSet }: { card: Extract<DiscoveryCardData, 
   );
 }
 
-// ─── Pager arrow (bouncing down-chevron, bottom-left) ───────────────────────
-// Page 1: a gently bouncing down-chevron — the "more below, keep going" cue that
-// teaches the swipe-up. Page 2: flips to a static up-chevron to return. Tappable
-// either way, so the second screen is reachable without the gesture.
+// ─── Pager dots (vertical rail in the side gutter) ──────────────────────────
+// Position indicator for the 2-page card. Sits OFF the card, centered in the
+// deck's 24px side gutter, so it reads as deliberate chrome rather than an
+// overlay. Current page = tall Brand.selected pill; other page = grey dot.
+// The rail is also the tap affordance (replaces the old caret) — tapping it
+// toggles pages, so the second screen stays reachable without the gesture.
 
-function PagerArrow({
+function PagerDots({
   kind,
   page,
   onPress,
@@ -537,48 +540,44 @@ function PagerArrow({
   page: number;
   onPress: () => void;
 }) {
-  const onPage2 = page === 1;
-  const reduced = useReducedMotion();
-  const bob = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    // Only page 1's down-chevron bounces; page 2's back-chevron is calm.
-    if (onPage2 || reduced) {
-      bob.setValue(0);
-      return;
-    }
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(bob, { toValue: 1, duration: 620, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
-        Animated.timing(bob, { toValue: 0, duration: 620, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
-      ]),
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [onPage2, reduced, bob]);
-
-  const translateY = bob.interpolate({ inputRange: [0, 1], outputRange: [0, 5] });
-  const Icon = onPage2 ? CaretUp : CaretDown;
-
   return (
     <Pressable
       onPress={onPress}
-      hitSlop={12}
-      style={({ pressed }) => [styles.arrowBtn, pressed && { opacity: 0.55 }]}
+      hitSlop={14}
+      style={styles.dotsRail}
       accessibilityRole="button"
       accessibilityLabel={
-        onPage2
+        page === 1
           ? 'Back to profile'
           : kind === 'seeker'
             ? 'Show portfolio highlights'
             : 'Show project details'
       }
     >
-      <Animated.View style={{ transform: [{ translateY: onPage2 ? 0 : translateY }] }}>
-        <Icon size={22} color={Brand.selected} weight="bold" />
-      </Animated.View>
+      {[0, 1].map((i) => (
+        <PagerDot key={i} active={page === i} />
+      ))}
     </Pressable>
   );
+}
+
+function PagerDot({ active }: { active: boolean }) {
+  const anim = useRef(new Animated.Value(active ? 1 : 0)).current;
+  useEffect(() => {
+    Animated.timing(anim, {
+      toValue: active ? 1 : 0,
+      duration: 220,
+      easing: Easing.out(Easing.quad),
+      // Height + color interpolation — layout props, so no native driver.
+      useNativeDriver: false,
+    }).start();
+  }, [active, anim]);
+  const height = anim.interpolate({ inputRange: [0, 1], outputRange: [6, 28] });
+  const backgroundColor = anim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['rgba(28,27,27,0.18)', Brand.selected],
+  });
+  return <Animated.View style={[styles.dot, { height, backgroundColor }]} />;
 }
 
 // ─── Send circle (preview-only reach affordance) ────────────────────────────
@@ -806,16 +805,24 @@ const styles = StyleSheet.create({
   detailNeeded: { fontFamily: AmbitFont.medium, fontSize: 13, color: Brand.inkLabel, marginTop: 18 },
 
   // ── Pager arrow (bouncing down-chevron, bottom-right) ─────────────────────
-  arrowBtn: {
+  // Rail lives OUTSIDE the card, centered in the deck's 24px side gutter
+  // (right: -15 puts the 6px dot's center 12px off the card edge). Needs
+  // overflow left visible on cardOuter — fine on iOS and Fabric Android.
+  dotsRail: {
     position: 'absolute',
-    right: 12,
-    bottom: 6,
-    width: 28,
-    height: 28,
-    alignItems: 'center',
+    right: -15,
+    top: 0,
+    bottom: 0,
     justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
     zIndex: 6,
   },
+  dot: {
+    width: 6,
+    borderRadius: 999,
+  },
+
 
   // ── Send circle (preview reach affordance) ────────────────────────────────
   sendWrap: { position: 'absolute', bottom: 16, right: 16, zIndex: 5 },

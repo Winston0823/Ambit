@@ -272,7 +272,7 @@ export function InboxRow({ item, meId, onPress, onPassRequest, onPin, onMute, on
                 <View style={[styles.chip, styles.chipOutline]}>
                   <Clock size={11} color={Brand.inkMuted} weight="regular" />
                   <Text style={[styles.chipText, styles.chipTextMuted]}>
-                    Waiting on them
+                    Waiting on them · {shortTimeLeft(countdown.minutesLeft)} left
                   </Text>
                 </View>
               )}
@@ -294,6 +294,19 @@ export function InboxRow({ item, meId, onPress, onPassRequest, onPin, onMute, on
     </Swipeable>
     </View>
   );
+}
+
+/// Compact remaining-time for the sender-side awaiting chip. The receiver's
+/// countdown.label ("21h to reply") reads as MY deadline, so the awaiting chip
+/// composes its own neutral form: "2d 14h" / "21h" / "14m".
+function shortTimeLeft(minutesLeft: number): string {
+  if (minutesLeft >= 24 * 60) {
+    const days  = Math.floor(minutesLeft / (24 * 60));
+    const hours = Math.floor((minutesLeft - days * 24 * 60) / 60);
+    return hours > 0 ? `${days}d ${hours}h` : `${days}d`;
+  }
+  if (minutesLeft >= 60) return `${Math.floor(minutesLeft / 60)}h`;
+  return `${minutesLeft}m`;
 }
 
 function formatRelative(iso: string): string {
