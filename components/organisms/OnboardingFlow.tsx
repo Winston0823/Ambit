@@ -22,9 +22,9 @@ import { WelcomeScreen } from './onboarding/WelcomeScreen';
 import { PathPreviewScreen } from './onboarding/PathPreviewScreen';
 import { SignInScreen } from './onboarding/SignInScreen';
 import { EduEmailScreen } from './onboarding/EduEmailScreen';
-import { DemographicScreen } from './onboarding/DemographicScreen';
-import { PhotoScreen } from './onboarding/PhotoScreen';
-import { CampusScreen } from './onboarding/CampusScreen';
+import { IdentityScreen } from './onboarding/IdentityScreen';
+import { VicinityScreen } from './onboarding/VicinityScreen';
+import { HighlightsScreen } from './onboarding/HighlightsScreen';
 import { SkillTagsScreen } from './onboarding/SkillTagsScreen';
 import { RoleDeclarationScreen } from './onboarding/RoleDeclarationScreen';
 import { CompleteScreen } from './onboarding/CompleteScreen';
@@ -42,33 +42,31 @@ interface InlineProps {
 }
 
 /// Canonical step order — the ENTRY GATE only. This is the minimum a user
-/// completes to get into the app and receive a real deck: identity (.edu +
-/// student/professor), the role branch, campus, and (for seekers) skills.
+/// completes to get into the app and receive a real deck: eduEmail (.edu
+/// sign-up), identity (monster mark + name + optional photo), the role pick,
+/// (for seekers) skills, vicinity, and the optional highlights showcase.
 ///
-/// `vibe` and `proof` are intentionally NOT in this spine — they only
-/// matter once other people see the user's card, so they're deferred to
-/// in-app progressive completion (the Profile tab is already a fully
-/// editable surface for them) rather than gating first launch.
+/// `identity` is where the user's NAME is captured — without a name the user
+/// renders as "?" and is filtered out of everyone's deck (feed's
+/// `name`-presence filter), making them invisible. The photo on that screen
+/// stays optional (only revealed to others after they connect).
 ///
-/// `photo` IS in the spine because it's where the user's NAME is captured —
-/// without a name the user renders as "?" and is filtered out of everyone's
-/// deck (feed's `name`-presence filter), making them invisible. The photo
-/// itself stays optional on that screen.
+/// `highlights` is in the spine but always "complete" (skippable) — it's the
+/// user's optional portfolio showcase and must never trap the resume jump.
 ///
-/// The user's branch (student vs. professor + the student's role pick)
-/// determines which of these actually render — see shouldShow + activeSteps
-/// below. Order here is the narrative spine; the branching is purely
-/// subtractive.
+/// The user's role pick determines which of these actually render — see
+/// shouldShow + activeSteps below. Order here is the narrative spine; the
+/// branching is purely subtractive.
 const STEPS = [
   'splash',
   'welcome',
   'preview',
   'eduEmail',
-  'demographic',
-  'photo',
+  'identity',
   'role',
-  'campus',
   'skills',
+  'vicinity',
+  'highlights',
   'complete',
 ] as const;
 type LinearStep = typeof STEPS[number];
@@ -77,22 +75,20 @@ type Step = LinearStep | 'signIn';
 /// Steps that appear in the progress bar. Splash + welcome + signIn are
 /// entry moments; complete is the celebration — none of them benefit from
 /// orientation. The actual progress denominator is filtered through
-/// shouldShow() so professors don't see "5 / 8" when only 6 screens exist
-/// in their branch.
+/// shouldShow() so an Owner (who skips `skills`) doesn't see a gap in their
+/// branch.
 const PROGRESS_STEPS_ALL: LinearStep[] = [
   'eduEmail',
-  'demographic',
-  'photo',
+  'identity',
   'role',
-  'campus',
   'skills',
+  'vicinity',
+  'highlights',
 ];
 
 /// Whether a step should render for a given profile.
-///   - Professors skip `role` (implicitly Owners — they recruit) and
-///     `skills` (their value prop is the research, not a personal chip list).
-///   - Student Owners (not Seeker, not Both) skip `skills` for the same
-///     reason — they pitch the project, not themselves.
+///   - Owners (not Seeker, not Both) skip `skills` — they pitch the project,
+///     not themselves.
 function shouldShow(
   step: LinearStep,
   profile: OnboardingProfile,
@@ -103,9 +99,6 @@ function shouldShow(
   // has an account, so demanding credentials again would just try to sign
   // them up a second time. Skip it. (Audit P0: social sign-in loop.)
   if (step === 'eduEmail' && hasSession) return false;
-  if (profile.demographic === 'professor') {
-    return step !== 'role' && step !== 'skills';
-  }
   if (step === 'skills' && profile.role === 'owner') return false;
   return true;
 }
@@ -130,17 +123,18 @@ function activeProgressSteps(
 /// user re-enters the flow.
 function isComplete(step: LinearStep, profile: OnboardingProfile): boolean {
   switch (step) {
-    case 'eduEmail':    return profile.eduEmail.toLowerCase().endsWith('.edu') && profile.eduEmail.includes('@');
-    case 'demographic': return profile.demographic !== null;
-    case 'photo':       return profile.name.trim().length > 1;
-    case 'campus':      return profile.campusId !== null;
-    case 'role':        return profile.role !== null;
-    case 'skills':      return profile.skills.length >= 2;
+    case 'eduEmail':   return profile.eduEmail.toLowerCase().endsWith('.edu') && profile.eduEmail.includes('@');
+    case 'identity':   return profile.name.trim().length > 1;
+    case 'role':       return profile.role !== null;
+    case 'skills':     return profile.skills.length >= 2;
+    case 'vicinity':   return profile.openToNearby !== null;
+    // Skippable — must never trap the resume jump.
+    case 'highlights': return true;
     // splash/welcome/preview/complete have no "field" — they're transitions.
     case 'splash':
     case 'welcome':
     case 'preview':
-    case 'complete':    return true;
+    case 'complete':   return true;
   }
 }
 
@@ -212,7 +206,7 @@ function Steps({ onDismiss }: { onDismiss: () => void }) {
   /// from Supabase and jump straight to the first step they haven't filled.
   /// Brand-new users (no session yet) start at splash as normal. This is also
   /// the routing path for social sign-in from the entry screens: a new social
-  /// user lands on the first incomplete spine step (demographic — eduEmail is
+  /// user lands on the first incomplete spine step (identity — eduEmail is
   /// skipped because they already have a session).
   useEffect(() => {
     if (!user) return;
@@ -268,8 +262,8 @@ function Steps({ onDismiss }: { onDismiss: () => void }) {
   };
 
   /// advance / back walk the *active* sub-flow (after applying shouldShow),
-  /// so e.g. a professor advancing from `campus` lands on `proof`, skipping
-  /// the role + skills screens that don't apply to them.
+  /// so e.g. an Owner advancing from `role` lands on `vicinity`, skipping the
+  /// `skills` screen that doesn't apply to them.
   const advance = () => {
     if (step === 'signIn') return;
     const steps = activeSteps(profile, hasSession);
@@ -331,7 +325,7 @@ function Steps({ onDismiss }: { onDismiss: () => void }) {
   /// social user (no profile row) must NOT dismiss — dismissing resets to
   /// splash and the resume-hydrate would later strand them on eduEmail →
   /// duplicate account. The hydrate effect routes them into the spine at the
-  /// first incomplete step (demographic). (Audit P0: social sign-in loop.)
+  /// first incomplete step (identity). (Audit P0: social sign-in loop.)
   const handleSocialSignedIn = () => {
     if (hasProfile === true) dismiss();
   };
@@ -378,16 +372,16 @@ function Steps({ onDismiss }: { onDismiss: () => void }) {
         return <PathPreviewScreen onBack={back} onContinue={advance} />;
       case 'eduEmail':
         return <EduEmailScreen onBack={back} onSignedIn={handleEduSignedIn} />;
-      case 'demographic':
-        return <DemographicScreen onBack={back} onContinue={advance} />;
-      case 'photo':
-        return <PhotoScreen onBack={back} onContinue={advance} />;
-      case 'campus':
-        return <CampusScreen onBack={back} onContinue={advance} />;
-      case 'skills':
-        return <SkillTagsScreen onBack={back} onContinue={advance} />;
+      case 'identity':
+        return <IdentityScreen onBack={back} onContinue={advance} />;
       case 'role':
         return <RoleDeclarationScreen onBack={back} onContinue={advance} />;
+      case 'skills':
+        return <SkillTagsScreen onBack={back} onContinue={advance} />;
+      case 'vicinity':
+        return <VicinityScreen onBack={back} onContinue={advance} />;
+      case 'highlights':
+        return <HighlightsScreen onBack={back} onContinue={advance} />;
       case 'complete':
         return <CompleteScreen onDone={handleDone} />;
     }

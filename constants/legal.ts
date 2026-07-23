@@ -56,7 +56,7 @@ You never have to pay a fee or trade a benefit to exercise these rights.`,
       body: `You share some information with us directly when you set up your profile and use the app:
 
 • **Account information.** Such as your university (.edu) email address and your name.
-• **Profile details.** Such as your photo, bio, skills, campus, role (seeker or owner), and whether you're a student or professor.
+• **Profile details.** Such as your photo, bio, skills, campus, role (seeker or owner), and your status as a current student.
 • **Links you add.** Such as your GitHub, LinkedIn, personal site, and any résumé you upload, which we process to help fill in your profile.
 • **Content you create.** Such as portfolio items and images, projects and cover images, and the messages and photos you send to other users.`,
     },
