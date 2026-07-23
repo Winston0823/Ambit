@@ -72,12 +72,9 @@ export interface InboxItem {
   partner_id:                  string;
   partner_name:                string;
   /// Partner's picked monster mark (profiles.avatar_id) — the identity
-  /// visual chat surfaces render by default. Real photos are never in this
+  /// visual every surface renders by default. Real photos are NEVER in this
   /// payload; they arrive only through fetchPeerPhotos' mutual-reveal gate.
   partner_avatar_id:           string | null;
-  /// Legacy raw photo (still surfaced to the out-of-scope projects tab).
-  /// Chat surfaces MUST NOT render this — use avatar_id + the reveal map.
-  partner_photo_url:           string | null;
   last_message_at:             string;
   last_message_body:           string | null;
   last_message_attachment_url: string | null;

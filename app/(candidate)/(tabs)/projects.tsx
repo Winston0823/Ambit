@@ -23,7 +23,7 @@ import { supabase } from '../../../lib/supabase';
 import { getInbox, type InboxItem } from '../../../lib/messaging';
 import { formatResponseRate } from '../../../lib/closureLoop';
 import { SwipeRevealRow } from '../../../components/molecules/SwipeRevealRow';
-import { HardShadow, Skeleton, TopAppBar } from '../../../components/atoms';
+import { Avatar, HardShadow, Skeleton, TopAppBar } from '../../../components/atoms';
 import { AmbitFont, Astra, Brand, Radii, Space, TypeScale } from '../../../constants/theme';
 
 interface ProjectRow {
@@ -285,15 +285,7 @@ export default function ProjectsTab() {
                         <View style={styles.faces}>
                           {s.faces.map((f, i) => (
                             <View key={f.conversation_id} style={[styles.face, i > 0 && styles.faceOverlap]}>
-                              {f.partner_photo_url ? (
-                                <Image source={{ uri: f.partner_photo_url }} style={styles.faceImg} cachePolicy="memory-disk" transition={180} />
-                              ) : (
-                                <View style={[styles.faceImg, styles.faceFallback]}>
-                                  <Text style={styles.faceInitial}>
-                                    {(f.partner_name ?? '?').slice(0, 1).toUpperCase()}
-                                  </Text>
-                                </View>
-                              )}
+                              <Avatar avatarId={f.partner_avatar_id} size={26} />
                             </View>
                           ))}
                           {s.total > s.faces.length && (
@@ -343,13 +335,7 @@ export default function ProjectsTab() {
                 accessibilityRole="button"
                 accessibilityLabel={`Open ${item.project_title}`}
               >
-                {item.partner_photo_url ? (
-                  <Image source={{ uri: item.partner_photo_url }} style={styles.engAvatar} cachePolicy="memory-disk" transition={180} />
-                ) : (
-                  <View style={[styles.engAvatar, styles.engAvatarFallback]}>
-                    <Text style={styles.engInitial}>{(item.partner_name ?? '?').slice(0, 1).toUpperCase()}</Text>
-                  </View>
-                )}
+                <Avatar avatarId={item.partner_avatar_id} size={44} />
                 <View style={styles.engText}>
                   <Text style={styles.engTitle} numberOfLines={1}>{item.project_title}</Text>
                   <Text style={styles.engSub} numberOfLines={1}>

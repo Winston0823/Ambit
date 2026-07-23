@@ -1,17 +1,19 @@
 -- ============================================================
 -- 040_inbox_avatar_id.sql · Surface the partner's monster mark
--- (profiles.avatar_id) through get_inbox so chat surfaces can render
--- the identity visual without ever reading photo_url on the client.
+-- (profiles.avatar_id) through get_inbox and CLOSE the photo leak.
 --
--- Additive: partner_photo_url stays in the payload (still consumed by
--- the projects tab, out of scope here). Chat surfaces render the monster
--- mark by default and swap in a real photo ONLY via fetch_peer_photos
--- (039) — the single mutual-reveal gate. partner.avatar_id is public
--- (selectable), so exposing it here leaks nothing.
+-- get_inbox is security-definer, so its old `partner.photo_url` select
+-- bypassed 039's column-level revoke and returned real photos for
+-- one-sided (non-mutual) threads too. This recreation drops photo_url
+-- from both the RETURNS TABLE and the select list entirely, and returns
+-- partner_avatar_id instead. fetch_peer_photos (039) stays the ONE and
+-- ONLY path to a real photo — the mutual-reveal gate. partner.avatar_id
+-- is public (selectable), so exposing it here leaks nothing.
 --
--- Body copied verbatim from 031_safety.sql; the only change is the added
--- partner_avatar_id column in the RETURNS TABLE + select list. DROP first
--- because the return signature changes.
+-- Body copied verbatim from 031_safety.sql; the only changes swap the
+-- partner photo column for partner_avatar_id in the RETURNS TABLE and
+-- select partner.avatar_id instead. DROP first because the return
+-- signature changes.
 -- ============================================================
 
 drop function if exists get_inbox();
@@ -23,7 +25,6 @@ returns table (
   partner_id                   uuid,
   partner_name                 text,
   partner_avatar_id            text,
-  partner_photo_url            text,
   last_message_at              timestamptz,
   last_message_body            text,
   last_message_attachment_url  text,
@@ -57,7 +58,6 @@ begin
     case when c.owner_id = (select id from me) then c.seeker_id else c.owner_id end,
     partner.name,
     partner.avatar_id,
-    partner.photo_url,
     c.last_message_at,
     last_msg.body,
     last_msg.attachment_url,

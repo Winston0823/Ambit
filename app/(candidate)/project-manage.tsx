@@ -12,8 +12,7 @@ import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CaretRight, PencilSimple } from 'phosphor-react-native';
 import * as Haptics from 'expo-haptics';
-import { Image } from 'expo-image';
-import { BackChevron, Skeleton } from '../../components/atoms';
+import { Avatar, BackChevron, Skeleton } from '../../components/atoms';
 import { getInbox, type InboxItem } from '../../lib/messaging';
 import { supabase } from '../../lib/supabase';
 import { optimistic } from '../../lib/mutation';
@@ -228,15 +227,7 @@ export default function ProjectManageScreen() {
                   accessibilityLabel={`Open chat with ${c.partner_name} — ${stage.label}`}
                 >
                   <View style={[styles.stripe, { backgroundColor: accent }]} pointerEvents="none" />
-                  {c.partner_photo_url ? (
-                    <Image source={{ uri: c.partner_photo_url }} style={styles.avatar} cachePolicy="memory-disk" transition={180} />
-                  ) : (
-                    <View style={[styles.avatar, styles.avatarFallback]}>
-                      <Text style={styles.avatarInitial}>
-                        {(c.partner_name ?? '?').slice(0, 1).toUpperCase()}
-                      </Text>
-                    </View>
-                  )}
+                  <Avatar avatarId={c.partner_avatar_id} size={44} />
                   <View style={styles.candidateText}>
                     <Text style={styles.candidateName} numberOfLines={1}>{c.partner_name}</Text>
                     <Text style={styles.candidateMsg} numberOfLines={1}>

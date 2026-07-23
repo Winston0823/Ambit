@@ -572,10 +572,13 @@ export default function ThreadScreen() {
   // and every incoming message flows through the realtime handler into
   // `messages`, so keying on the incoming count hooks that stream.
   const partnerId = meta?.partner_id ?? null;
+  // Count ANY non-deleted message from the peer — matches the server's
+  // fetch_peer_photos mutuality predicate (any non-deleted message, no kind
+  // filter), so the reveal refetch fires on exactly the events that can flip it.
   const incomingCount = useMemo(
     () =>
       partnerId
-        ? messages.filter((m) => m.sender_id === partnerId && (!m.kind || m.kind === 'user')).length
+        ? messages.filter((m) => m.sender_id === partnerId && !m.deleted_at).length
         : 0,
     [messages, partnerId],
   );
