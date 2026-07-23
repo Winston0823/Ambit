@@ -3,28 +3,39 @@ import { supabase } from '../lib/supabase';
 import { readLocalFileAsArrayBuffer } from '../lib/messaging';
 import { setProfileRoleCache } from '../hooks/useProfileRole';
 import { toast } from '../lib/toast';
+import { randomAvatarId } from '../components/atoms';
+import { upsertPortfolioItem, uploadPortfolioImage } from '../lib/portfolio';
 
 export type Role = 'owner' | 'seeker';
 
-/// Who is on the platform. Students are the primary v1 audience; professors
-/// join to recruit students into research projects, so they live alongside.
-export type Demographic = 'student' | 'professor';
+/// A portfolio highlight collected during onboarding. `id` is a client-side
+/// UUID (expo-crypto randomUUID, minted by the highlight screen); `imageUri`
+/// holds a local picker URI that is uploaded to storage at submit time.
+export interface OnboardingHighlight {
+  id: string;
+  title: string;
+  description: string;
+  imageUri: string | null;
+}
 
 export interface OnboardingProfile {
   // Eligibility
   eduEmail: string;
-  demographic: Demographic | null;
 
   // Identity
   name: string;
+  avatarId: string;
   photoUri: string | null;
 
   // Personality + capability
   vibeBlurb: string;
   skills: string[];
 
-  // Proximity
-  campusId: string | null;
+  // Proximity — opt-in to surfacing nearby matches (null = undecided)
+  openToNearby: boolean | null;
+
+  // Portfolio — uploaded as portfolio_items at submit time
+  highlights: OnboardingHighlight[];
 
   // Validation
   proofLinks: {
@@ -40,12 +51,13 @@ export interface OnboardingProfile {
 
 const INITIAL: OnboardingProfile = {
   eduEmail: '',
-  demographic: null,
   name: '',
+  avatarId: 'monster-01',
   photoUri: null,
   vibeBlurb: '',
   skills: [],
-  campusId: null,
+  openToNearby: null,
+  highlights: [],
   proofLinks: { github: '', linkedin: '', portfolio: '', resume: '' },
   role: 'seeker',
 };
@@ -68,44 +80,26 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<OnboardingProfile>(INITIAL);
 
   const update: Ctx['update'] = (key, value) =>
-    setProfile((p) => {
-      const next = { ...p, [key]: value };
-      // Professors are implicitly Owners (they recruit) and skip the role
-      // screen, so their role is never picked. Coerce it the moment the
-      // demographic is chosen so in-flow branching (shouldShow) and submit
-      // stay consistent — otherwise the persisted role stays 'seeker' and
-      // app/index routes professors into the seeker app.
-      if (key === 'demographic' && value === 'professor') {
-        return { ...next, role: 'owner' as Role };
-      }
-      // Reverting to student: the 'owner' role may have been coerced by the
-      // professor branch above, never picked by the user. Reset to the default
-      // so they land on the role screen with a clean 'seeker' rather than a
-      // silently sticky 'owner'.
-      if (key === 'demographic' && value === 'student' && p.role === 'owner') {
-        return { ...next, role: 'seeker' as Role };
-      }
-      return next;
-    });
+    setProfile((p) => ({ ...p, [key]: value }));
 
-  const reset = () => setProfile(INITIAL);
+  // Re-deal a fresh random avatar so a new flow doesn't reuse the last one.
+  const reset = () => setProfile({ ...INITIAL, avatarId: randomAvatarId() });
 
   const hydrate = async (userId: string): Promise<OnboardingProfile> => {
     const { data, error } = await supabase
       .from('profiles')
-      .select('edu_email, demographic, name, vibe_blurb, skills, role, campus_id, photo_url, github_url, linkedin_url, portfolio_url, resume_url')
+      .select('edu_email, name, avatar_id, vibe_blurb, skills, role, open_to_nearby, github_url, linkedin_url, portfolio_url, resume_url')
       .eq('id', userId)
       .maybeSingle();
     if (error || !data) return profile;
     const merged: OnboardingProfile = {
       ...profile,
       eduEmail: data.edu_email ?? profile.eduEmail,
-      demographic: (data.demographic as Demographic | null) ?? profile.demographic,
       name: data.name ?? profile.name,
-      photoUri: data.photo_url ?? profile.photoUri,
+      avatarId: data.avatar_id ?? profile.avatarId,
       vibeBlurb: data.vibe_blurb ?? profile.vibeBlurb,
       skills: data.skills ?? profile.skills,
-      campusId: data.campus_id ?? profile.campusId,
+      openToNearby: (data.open_to_nearby as boolean | null) ?? profile.openToNearby,
       role: (data.role as Role | null) ?? profile.role,
       proofLinks: {
         github: data.github_url ?? profile.proofLinks.github,
@@ -119,11 +113,11 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
   };
 
   const submit = async (userId: string, userEmail?: string) => {
-    // Safety net for fix #1: even if the profile was hydrated with a stale
-    // role, professors always persist as Owners.
-    const resolvedRole: Role | null =
-      profile.demographic === 'professor' ? 'owner' : profile.role;
-    let photoUrl: string | null = profile.photoUri;
+    // `undefined` when no local URI was picked (photo_url omitted from the
+    // payload, never nulled); the public URL on upload success; `null` on
+    // upload failure (drop the local-only file:// URI so other users' decks
+    // don't render a broken image).
+    let uploadedPhotoUrl: string | null | undefined;
 
     if (profile.photoUri?.startsWith('file://') || profile.photoUri?.startsWith('content://')) {
       // ArrayBuffer route — fetch().blob() silently 0-bytes on RN.
@@ -136,39 +130,60 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
         .upload(path, bytes, { upsert: true, contentType: `image/${ext}` });
       if (!uploadError) {
         const { data } = supabase.storage.from('avatars').getPublicUrl(path);
-        photoUrl = data.publicUrl;
+        uploadedPhotoUrl = data.publicUrl;
       } else {
-        // Upload failed — never persist the local file:// URI: it's only
-        // resolvable on this device, so other users' decks would render a
-        // broken image. Drop it; the user can re-add from their profile.
-        photoUrl = null;
+        uploadedPhotoUrl = null;
         toast.error("Photo didn't upload — you can add it later from your profile");
       }
     }
 
-    const { error: upsertError } = await supabase.from('profiles').upsert({
+    const payload: Record<string, unknown> = {
       id: userId,
       edu_email: profile.eduEmail || userEmail,
-      demographic: profile.demographic,
       name: profile.name,
+      avatar_id: profile.avatarId,
       vibe_blurb: profile.vibeBlurb,
       skills: profile.skills,
-      role: resolvedRole,
-      campus_id: profile.campusId,
-      photo_url: photoUrl,
+      role: profile.role,
+      open_to_nearby: profile.openToNearby,
       github_url: profile.proofLinks.github,
       linkedin_url: profile.proofLinks.linkedin,
       portfolio_url: profile.proofLinks.portfolio,
       resume_url: profile.proofLinks.resume,
       updated_at: new Date().toISOString(),
       last_meaningful_action_at: new Date().toISOString(),
-    });
+    };
+    if (uploadedPhotoUrl !== undefined) payload.photo_url = uploadedPhotoUrl;
+
+    const { error: upsertError } = await supabase.from('profiles').upsert(payload);
     if (upsertError) throw upsertError;
+
+    // Profile is saved — insert highlights as portfolio_items. Failures
+    // toast-and-continue: the profile is already persisted, and the user can
+    // re-add any dropped highlight from their profile.
+    for (const [i, h] of profile.highlights.entries()) {
+      if (!h.title.trim()) continue;
+      try {
+        let imageUrl: string | null = null;
+        if (h.imageUri) imageUrl = await uploadPortfolioImage(userId, h.id, h.imageUri, Date.now());
+        await upsertPortfolioItem({
+          userId,
+          id: h.id,
+          title: h.title.trim(),
+          // portfolio_items.description has a NOT NULL length ≥ 1 check.
+          description: h.description.trim() || h.title.trim(),
+          imageUrl,
+          position: i,
+        });
+      } catch {
+        toast.error(`"${h.title}" didn't save — you can re-add it from your profile`);
+      }
+    }
 
     // Write-through to the role cache so the app routes on the fresh role
     // immediately (the cache may hold a stale `null` from before the
     // profile row existed).
-    setProfileRoleCache(userId, resolvedRole);
+    setProfileRoleCache(userId, profile.role);
 
     // Fire-and-forget: generate vibe embedding via Edge Function.
     // Failures are non-fatal — the profile is already saved. Use invoke()
