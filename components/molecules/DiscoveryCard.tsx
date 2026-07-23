@@ -24,7 +24,7 @@ import {
   type IconProps,
 } from 'phosphor-react-native';
 import * as Haptics from 'expo-haptics';
-import { VibeQuote } from '../atoms';
+import { Avatar, VibeQuote } from '../atoms';
 import {
   Astra,
   Brand,
@@ -32,7 +32,6 @@ import {
   Radii,
 } from '../../constants/theme';
 import type { DiscoveryCardData, PortfolioItem, SeekerLinks } from '../../data/mock';
-import { CAMPUSES } from '../../data/mock';
 import { responseReward, type ResponseReward } from '../../lib/responseRate';
 import { useReducedMotion } from '../../hooks/useReducedMotion';
 
@@ -257,11 +256,21 @@ function PhotoPanel({
   uri,
   gradient,
   scrim,
+  surface,
+  center,
   children,
 }: {
   uri: string | null;
   gradient?: readonly [string, string];
   scrim?: boolean;
+  /// Solid seekerSurface backdrop instead of the gradient — used for the
+  /// monster-mark fallback so the mark reads on a soft lilac panel, not a
+  /// dark hero gradient.
+  surface?: boolean;
+  /// Centered element floated over the backdrop (the monster mark). Rendered
+  /// as a non-interactive absolute layer so the top/bottom overlay content
+  /// (`children`) keeps its space-between placement.
+  center?: React.ReactNode;
   children: React.ReactNode;
 }) {
   // Polaroid framing: the photo is inset with an even white margin on top/left/
@@ -269,16 +278,18 @@ function PhotoPanel({
   // thick bottom caption border. `photoFrame` = the margin; `photo` = the print.
   return (
     <View style={styles.photoFrame}>
-      <View style={styles.photo}>
-        <LinearGradient
-          colors={gradient ?? [Astra.royal, Astra.iris]}
-          locations={[0, 0.71]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={StyleSheet.absoluteFill}
-        />
+      <View style={[styles.photo, surface && styles.photoSurface]}>
+        {!surface && (
+          <LinearGradient
+            colors={gradient ?? [Astra.royal, Astra.iris]}
+            locations={[0, 0.71]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+        )}
         {uri && <Image source={{ uri }} style={StyleSheet.absoluteFill} contentFit="cover" cachePolicy="memory-disk" />}
-        {scrim && (
+        {scrim && !surface && (
           <LinearGradient
             colors={['rgba(12,0,34,0)', 'rgba(12,0,34,0.55)']}
             locations={[0.45, 1]}
@@ -288,16 +299,21 @@ function PhotoPanel({
             pointerEvents="none"
           />
         )}
+        {center && (
+          <View style={styles.photoCenter} pointerEvents="none">
+            {center}
+          </View>
+        )}
         {children}
       </View>
     </View>
   );
 }
 
-function StatusBadge({ label }: { label: string }) {
+function StatusBadge({ label, onSurface = false }: { label: string; onSurface?: boolean }) {
   return (
-    <View style={styles.statusBadge}>
-      <Text style={styles.statusBadgeText}>{label}</Text>
+    <View style={[styles.statusBadge, onSurface && styles.statusBadgeLight]}>
+      <Text style={[styles.statusBadgeText, onSurface && styles.statusBadgeTextDark]}>{label}</Text>
     </View>
   );
 }
@@ -320,12 +336,16 @@ function firstSentence(text: string): string {
   return (m ? m[0] : t).trim();
 }
 
+/// null `openToNearby` = unanswered → omit the location segment entirely.
+function nearbyLabel(openToNearby: boolean | null): string {
+  return openToNearby === false ? 'REMOTE' : openToNearby === true ? 'IN PERSON' : '';
+}
+
 function seekerEyebrow(card: Extract<DiscoveryCardData, { kind: 'seeker' }>): string {
-  const campus = CAMPUSES.find((c) => c.id === card.campusId);
   const yy = card.gradYear ? card.gradYear.replace(/^’/, '') : '';
   return [
     card.major && yy ? `${card.major} ’${yy}` : card.major || (yy ? `’${yy}` : ''),
-    campus?.name,
+    nearbyLabel(card.openToNearby),
   ].filter(Boolean).join(' · ');
 }
 
@@ -333,15 +353,25 @@ function seekerEyebrow(card: Extract<DiscoveryCardData, { kind: 'seeker' }>): st
 
 function SeekerFront({ card, matchedSet }: { card: Extract<DiscoveryCardData, { kind: 'seeker' }>; matchedSet: Set<string> }) {
   const subtitle = seekerEyebrow(card);
+  // Project-forward hero: the top portfolio highlight image leads. Absent that,
+  // the seeker's monster mark sits on a soft lilac panel (no photos here —
+  // discovery is pre-connection).
+  const highlightUri = card.portfolio.find((p) => p.imageUri)?.imageUri ?? null;
+  const onSurface = !highlightUri;
   return (
     <>
-      <PhotoPanel uri={card.photoUri} scrim>
+      <PhotoPanel
+        uri={highlightUri}
+        scrim={!onSurface}
+        surface={onSurface}
+        center={onSurface ? <Avatar avatarId={card.avatarId} size={132} /> : undefined}
+      >
         <View style={styles.photoTopRow}>
-          <StatusBadge label="OPEN TO TEAMS" />
+          <StatusBadge label="OPEN TO TEAMS" onSurface={onSurface} />
         </View>
         <View style={styles.identity}>
-          <Text style={styles.name} numberOfLines={1}>{card.name.trim() || 'Someone on Ambit'}</Text>
-          {subtitle !== '' && <Text style={styles.subtitle} numberOfLines={1}>{subtitle}</Text>}
+          <Text style={[styles.name, onSurface && styles.nameDark]} numberOfLines={1}>{card.name.trim() || 'Someone on Ambit'}</Text>
+          {subtitle !== '' && <Text style={[styles.subtitle, onSurface && styles.subtitleDark]} numberOfLines={1}>{subtitle}</Text>}
         </View>
       </PhotoPanel>
 
@@ -454,11 +484,14 @@ function LinkIcon({ Icon, url, label }: { Icon: React.ComponentType<IconProps>; 
 // ─── Project — page 1 (front) ───────────────────────────────────────────────
 
 function ProjectFront({ card }: { card: Extract<DiscoveryCardData, { kind: 'project' }> }) {
-  const ownerInitials =
-    card.ownerName.split(' ').slice(0, 2).map((w) => w[0]?.toUpperCase() ?? '').join('') || '?';
+  // Cover image leads; otherwise the owner's monster mark centers on the
+  // royal→iris gradient backdrop.
   return (
     <>
-      <PhotoPanel uri={card.imageUri ?? card.ownerPhotoUri ?? null} gradient={card.gradient}>
+      <PhotoPanel
+        uri={card.imageUri ?? null}
+        center={card.imageUri ? undefined : <Avatar avatarId={card.ownerAvatarId} size={96} />}
+      >
         <View style={styles.photoTopRowRight}>
           <StatusBadge label="LIVE" />
         </View>
@@ -468,9 +501,7 @@ function ProjectFront({ card }: { card: Extract<DiscoveryCardData, { kind: 'proj
         <Text style={styles.projectTitle} numberOfLines={1}>{card.title}</Text>
         {card.pitch.trim() !== '' && <VibeQuote text={card.pitch} lines={2} />}
         <View style={styles.metaRow}>
-          <LinearGradient colors={[Astra.royal, Astra.iris]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.ownerAvatar}>
-            <Text style={styles.ownerAvatarText}>{ownerInitials}</Text>
-          </LinearGradient>
+          <Avatar avatarId={card.ownerAvatarId} size={30} />
           <ResponsePill rate={card.responseRate} />
         </View>
       </View>
@@ -487,9 +518,9 @@ function formatNeededBy(iso: string): string {
 }
 
 function ProjectDetail({ card, matchedSet }: { card: Extract<DiscoveryCardData, { kind: 'project' }>; matchedSet: Set<string> }) {
-  const campus = CAMPUSES.find((c) => c.id === card.ownerCampusId);
-  const eyebrow = campus
-    ? `BY ${card.ownerName.toUpperCase()} · ${campus.name.toUpperCase()}`
+  const nearby = nearbyLabel(card.ownerOpenToNearby);
+  const eyebrow = nearby
+    ? `BY ${card.ownerName.toUpperCase()} · ${nearby}`
     : `BY ${card.ownerName.toUpperCase()}`;
   const by = card.neededBy ? formatNeededBy(card.neededBy) : '';
 
@@ -671,6 +702,11 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: 'rgba(28,27,27,0.10)',
   },
+  // Monster-mark fallback backdrop: soft lilac instead of the hero gradient.
+  photoSurface: { backgroundColor: Brand.seekerSurface },
+  // Centered mark layer — floats over the backdrop without disturbing the
+  // top/bottom overlay content's space-between placement.
+  photoCenter: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
   photoTopRow: { flexDirection: 'row', alignItems: 'center' },
   photoTopRowRight: { flexDirection: 'row', justifyContent: 'flex-end' },
 
@@ -689,10 +725,19 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     letterSpacing: 1,
   },
+  // On the light seekerSurface fallback, invert the badge to a purple-tinted
+  // chip with dark ink so it stays legible off the dark hero scrim.
+  statusBadgeLight: {
+    backgroundColor: 'rgba(147,98,200,0.10)',
+    borderColor: 'rgba(111,77,162,0.28)',
+  },
+  statusBadgeTextDark: { color: Brand.selected },
 
   identity: { gap: 3 },
   name: { fontFamily: AmbitFont.display, fontSize: 30, color: '#FFFFFF', letterSpacing: -0.4 },
+  nameDark: { color: Brand.inkPrimary },
   subtitle: { fontFamily: AmbitFont.medium, fontSize: 14, color: '#E9E2F4' },
+  subtitleDark: { color: Brand.inkMuted },
 
   // ── White info panel (Polaroid caption) ───────────────────────────────────
   // Modest bottom padding — just enough to clear the small corner arrow. (Was
@@ -732,16 +777,6 @@ const styles = StyleSheet.create({
 
   // ── Project meta row ──────────────────────────────────────────────────────
   metaRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  ownerAvatar: {
-    width: 30,
-    height: 30,
-    borderRadius: 7,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1.5,
-    borderColor: Brand.canvas,
-  },
-  ownerAvatarText: { fontFamily: AmbitFont.display, fontSize: 12, color: '#FFFFFF' },
 
   // ── Page 2 (portfolio / detail) ───────────────────────────────────────────
   page2: {
