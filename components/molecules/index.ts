@@ -28,3 +28,4 @@ export { ReachOutLimitSheet } from './ReachOutLimitSheet';
 export { ProjectCoverField } from './ProjectCoverField';
 export { ProjectDeadlineField } from './ProjectDeadlineField';
 export { ResumeImportSheet } from './ResumeImportSheet';
+export { AvatarPickerSheet } from './AvatarPickerSheet';
