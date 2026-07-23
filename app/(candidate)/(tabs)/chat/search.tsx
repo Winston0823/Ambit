@@ -61,7 +61,9 @@ export default function SearchScreen() {
     <View style={styles.root}>
       <BackChevron onPress={() => router.back()} />
 
-      <GlassSurface hairline intensity={20} style={[styles.searchBar, { marginTop: insets.top + 40 }]}>
+      {/* Clear the absolute-positioned BackChevron (insets.top+8, 44 tall)
+          with real breathing room below it. */}
+      <GlassSurface hairline intensity={20} style={[styles.searchBar, { marginTop: insets.top + 68 }]}>
         <MagnifyingGlass size={18} color={Brand.inkMuted} weight="regular" />
         <TextInput
           autoFocus
