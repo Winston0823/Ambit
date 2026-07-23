@@ -1,23 +1,24 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Camera } from 'phosphor-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { Image } from 'expo-image';
-import { BackChevron, KeyboardDismiss } from '../../atoms';
-import { OnboardingContinue } from '../../molecules';
+import { Avatar, BackChevron, KeyboardDismiss } from '../../atoms';
+import { AvatarPickerSheet, OnboardingContinue } from '../../molecules';
 import { useOnboarding } from '../../../context/OnboardingContext';
 import { Brand, AmbitFont, Radii, Space } from '../../../constants/theme';
 
 interface Props { onBack: () => void; onContinue: () => void; }
 
-/// S-011 Profile Photo + Name. Per Figma node 18:441:
-///   - 280×280 circular avatar at top
+/// S-011 Identity — monster mark + name (photo optional, revealed post-connect).
+///   - 200px monster avatar centered, tap to pick a different mark
 ///   - "First + Last Name" text input below
+///   - Optional photo row — only shown to others after they connect with you
 ///   - Anchored Continue at bottom
-/// Tapping the avatar opens an action sheet (Camera / Photo Library / Cancel).
-export function PhotoScreen({ onBack, onContinue }: Props) {
+export function IdentityScreen({ onBack, onContinue }: Props) {
   const { profile, update } = useOnboarding();
+  const [pickerVisible, setPickerVisible] = useState(false);
 
   const pickFromLibrary = async () => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -72,17 +73,11 @@ export function PhotoScreen({ onBack, onContinue }: Props) {
         <BackChevron onPress={onBack} />
 
         <View style={styles.content}>
-          <Text style={styles.headline}>Show your face</Text>
+          <Text style={styles.headline}>Meet your mark</Text>
 
-          <Pressable onPress={openPicker} style={styles.avatarBtn}>
-            {profile.photoUri ? (
-              <Image source={{ uri: profile.photoUri }} style={styles.avatarImg} cachePolicy="memory-disk" transition={180} />
-            ) : (
-              <View style={styles.avatarPlaceholder}>
-                <Camera size={36} color={Brand.actionDeep} weight="duotone" />
-                <Text style={styles.avatarLabel}>Tap to add a photo</Text>
-              </View>
-            )}
+          <Pressable onPress={() => setPickerVisible(true)} style={styles.avatarBtn}>
+            <Avatar avatarId={profile.avatarId} size={200} />
+            <Text style={styles.avatarLabel}>Tap to pick a different monster</Text>
           </Pressable>
 
           <TextInput
@@ -94,10 +89,35 @@ export function PhotoScreen({ onBack, onContinue }: Props) {
             style={styles.nameInput}
             returnKeyType="done"
           />
+
+          <Pressable onPress={openPicker} style={styles.photoRow}>
+            {profile.photoUri ? (
+              <Image
+                source={{ uri: profile.photoUri }}
+                style={styles.photoThumb}
+                cachePolicy="memory-disk"
+                transition={180}
+              />
+            ) : (
+              <Camera size={20} color={Brand.actionDeep} weight="duotone" />
+            )}
+            <Text style={styles.photoText}>
+              {profile.photoUri
+                ? 'Photo added — shown after you connect'
+                : 'Add a photo — only shown after someone connects with you'}
+            </Text>
+          </Pressable>
         </View>
 
         <OnboardingContinue onPress={onContinue} disabled={!isValid} />
       </SafeAreaView>
+
+      <AvatarPickerSheet
+        visible={pickerVisible}
+        selectedId={profile.avatarId}
+        onSelect={(id) => update('avatarId', id)}
+        onClose={() => setPickerVisible(false)}
+      />
     </KeyboardDismiss>
   );
 }
@@ -110,16 +130,9 @@ const styles = StyleSheet.create({
     marginBottom: 32, alignSelf: 'flex-start',
   },
   avatarBtn: {
-    width: 220, height: 220, borderRadius: Radii.xl,
-    overflow: 'hidden',
+    alignItems: 'center',
+    gap: 10,
     marginBottom: 32,
-  },
-  avatarImg: { width: '100%', height: '100%' },
-  avatarPlaceholder: {
-    width: '100%', height: '100%',
-    backgroundColor: Brand.seekerSurface,
-    alignItems: 'center', justifyContent: 'center',
-    gap: 12,
   },
   avatarLabel: {
     fontFamily: AmbitFont.body, fontSize: 13, color: Brand.actionDeep,
@@ -132,5 +145,25 @@ const styles = StyleSheet.create({
     borderWidth: 1.5, borderColor: Brand.borderDefault,
     fontFamily: AmbitFont.medium, fontSize: 16, color: Brand.inkBody,
     textAlign: 'center',
+  },
+  photoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    width: '100%',
+    marginTop: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: Radii.md,
+    borderWidth: 1.5,
+    borderColor: Brand.borderDefault,
+    backgroundColor: Brand.surface1,
+  },
+  photoThumb: {
+    width: 40, height: 40, borderRadius: Radii.sm,
+  },
+  photoText: {
+    flex: 1,
+    fontFamily: AmbitFont.body, fontSize: 13, color: Brand.inkMuted,
   },
 });
