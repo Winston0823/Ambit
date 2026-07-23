@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { HardShadow, Skeleton } from '../../../../components/atoms';
+import { Avatar, HardShadow, Skeleton } from '../../../../components/atoms';
 import {
   Alert,
   FlatList,
@@ -14,7 +14,6 @@ import { router, useFocusEffect, useSegments } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Archive, ArrowCounterClockwise, CaretRight, MagnifyingGlass, Plus } from 'phosphor-react-native';
 import * as Haptics from 'expo-haptics';
-import { Image } from 'expo-image';
 import {
   InboxRow,
   PassReasonSheet,
@@ -22,6 +21,7 @@ import {
 } from '../../../../components/molecules';
 import { useAuth } from '../../../../context/AuthContext';
 import { supabase } from '../../../../lib/supabase';
+import { fetchPeerPhotos } from '../../../../lib/photoReveal';
 import {
   getInbox,
   inboxState,
@@ -44,6 +44,9 @@ export default function ChatTab() {
   const insets = useSafeAreaInsets();
   const segments = useSegments();
   const [items, setItems] = useState<InboxItem[] | null>(null);
+  /// Revealed real photos keyed by partner id — mutual conversations only
+  /// (fetch_peer_photos gate). Rows with no entry render the monster mark.
+  const [revealed, setRevealed] = useState<Map<string, string>>(new Map());
   const [passTargetId, setPassTargetId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<InboxFilter>('all');
@@ -61,6 +64,11 @@ export default function ChatTab() {
     try {
       const data = await getInbox();
       setItems(data);
+      // One batched reveal fetch for every partner in the inbox. The RPC
+      // returns a photo only for mutual threads; everyone else stays a
+      // monster mark. Never throws.
+      const peerIds = data.map((d) => d.partner_id);
+      setRevealed(await fetchPeerPhotos(peerIds));
     } catch (e) {
       console.warn('inbox load failed:', e);
       // Don't clobber to [] — a failed load must not read as "no conversations
@@ -268,6 +276,7 @@ export default function ChatTab() {
             <InboxRow
               item={item}
               meId={user.id}
+              photoUrl={revealed.get(item.partner_id) ?? null}
               onPress={() => openConversation(item.conversation_id)}
               onPassRequest={(id) => setPassTargetId(id)}
               onPin={handleTogglePin}
@@ -281,6 +290,7 @@ export default function ChatTab() {
           <ListHeader
             user={user}
             pinned={pinned}
+            revealed={revealed}
             onOpen={openConversation}
             onUnpin={handleTogglePin}
             discoveryPath={discoveryPath}
@@ -314,6 +324,7 @@ export default function ChatTab() {
                   <ArchivedRow
                     key={item.conversation_id}
                     item={item}
+                    photoUrl={revealed.get(item.partner_id) ?? null}
                     onOpen={() => openConversation(item.conversation_id)}
                     onUnarchive={() => handleUnarchive(item)}
                   />
@@ -372,14 +383,15 @@ export default function ChatTab() {
 /// thread; the trailing "Unarchive" button restores it to the active list.
 function ArchivedRow({
   item,
+  photoUrl,
   onOpen,
   onUnarchive,
 }: {
   item: InboxItem;
+  photoUrl: string | null;
   onOpen: () => void;
   onUnarchive: () => void;
 }) {
-  const initial = (item.partner_name ?? '?').slice(0, 1).toUpperCase();
   const preview = item.last_message_deleted
     ? 'Message deleted'
     : item.last_message_body
@@ -390,13 +402,7 @@ function ArchivedRow({
   return (
     <View style={styles.archivedRow}>
       <Pressable style={styles.archivedRowMain} onPress={onOpen}>
-        <View style={styles.archivedAvatar}>
-          {item.partner_photo_url ? (
-            <Image source={{ uri: item.partner_photo_url }} style={styles.archivedAvatarImg} cachePolicy="memory-disk" transition={180} />
-          ) : (
-            <Text style={styles.archivedAvatarInitial}>{initial}</Text>
-          )}
-        </View>
+        <Avatar avatarId={item.partner_avatar_id} photoUrl={photoUrl} size={40} />
         <View style={styles.archivedMeta}>
           <Text style={styles.archivedName} numberOfLines={1}>
             {item.partner_name ?? 'Someone'}
@@ -432,6 +438,7 @@ const INBOX_TABS: { key: InboxFilter; label: string }[] = [
 function ListHeader({
   user,
   pinned,
+  revealed,
   onOpen,
   onUnpin,
   discoveryPath,
@@ -440,6 +447,7 @@ function ListHeader({
 }: {
   user:   { id: string } | null;
   pinned: InboxItem[];
+  revealed: Map<string, string>;
   onOpen: (conversationId: string) => void;
   onUnpin: (item: InboxItem) => void;
   discoveryPath: string;
@@ -504,6 +512,7 @@ function ListHeader({
         <PinnedStrip
           items={pinned}
           meId={user.id}
+          revealed={revealed}
           onPress={onOpen}
           onLongPress={onUnpin}
         />

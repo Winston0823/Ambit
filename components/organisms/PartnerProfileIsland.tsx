@@ -24,10 +24,9 @@ import {
   MapPin,
 } from 'phosphor-react-native';
 import * as Haptics from 'expo-haptics';
-import { Chip } from '../atoms';
+import { Avatar, Chip } from '../atoms';
 import { StageRail } from '../molecules';
 import { supabase } from '../../lib/supabase';
-import { CAMPUSES } from '../../data/mock';
 import {
   formatResponseRate,
   formatResponseTime,
@@ -52,6 +51,10 @@ const AVATAR_IN_PILL_SIZE = 44;
 interface Props {
   partnerId:        string | null;
   partnerName:      string;
+  /// Partner's monster mark — the default identity visual in the pill.
+  partnerAvatarId?: string | null;
+  /// Revealed real photo (mutual thread only), passed down from the thread's
+  /// reveal map. Absent/null = keep the monster mark.
   partnerPhotoUrl?: string | null;
   /// Partner's last-active timestamp (profiles.last_active_at). Drives the
   /// presence dot color (online vs muted) and the "Active …" subline.
@@ -97,7 +100,6 @@ interface SiblingChat {
 interface PartnerProfile {
   vibe_blurb:           string | null;
   skills:               string[] | null;
-  campus_id:            string | null;
   response_rate:        number | null;
   avg_response_minutes: number | null;
   github_url:           string | null;
@@ -120,6 +122,7 @@ interface PartnerProfile {
 export function PartnerProfileIsland({
   partnerId,
   partnerName,
+  partnerAvatarId,
   partnerPhotoUrl,
   partnerLastActiveAt,
   top,
@@ -149,7 +152,7 @@ export function PartnerProfileIsland({
       const { data } = await supabase
         .from('profiles')
         .select(
-          'vibe_blurb, skills, campus_id, response_rate, avg_response_minutes, github_url, linkedin_url, portfolio_url, resume_url',
+          'vibe_blurb, skills, response_rate, avg_response_minutes, github_url, linkedin_url, portfolio_url, resume_url',
         )
         .eq('id', partnerId)
         .maybeSingle();
@@ -263,11 +266,6 @@ export function PartnerProfileIsland({
     extrapolate: 'clamp',
   });
 
-  const campus = useMemo(
-    () => CAMPUSES.find((c) => c.id === profile?.campus_id) ?? null,
-    [profile?.campus_id],
-  );
-
   const handleToggle = () => {
     if (Platform.OS !== 'web') Haptics.selectionAsync().catch(() => {});
     setExpanded((open) => !open);
@@ -331,15 +329,7 @@ export function PartnerProfileIsland({
             accessibilityRole="button"
             accessibilityLabel={`${partnerName} profile`}
           >
-            {partnerPhotoUrl ? (
-              <Image source={{ uri: partnerPhotoUrl }} style={styles.pillAvatar} cachePolicy="memory-disk" transition={180} />
-            ) : (
-              <View style={[styles.pillAvatar, styles.pillAvatarFallback]}>
-                <Text style={styles.pillAvatarInitial}>
-                  {(partnerName ?? '?').slice(0, 1).toUpperCase()}
-                </Text>
-              </View>
-            )}
+            <Avatar avatarId={partnerAvatarId} photoUrl={partnerPhotoUrl} size={AVATAR_IN_PILL_SIZE} />
             <View style={styles.pillNameRow}>
               <Text style={[styles.pillStatusDot, !isOnline(partnerLastActiveAt) && styles.pillStatusDotOff]}>●</Text>
               <Text style={styles.pillName} numberOfLines={1}>

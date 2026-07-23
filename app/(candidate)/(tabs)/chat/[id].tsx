@@ -94,6 +94,7 @@ import {
   type ProjectRefRow,
   type ReactionRow,
 } from '../../../../lib/messaging';
+import { fetchPeerPhotos } from '../../../../lib/photoReveal';
 import { fetchPortfolioForUser, fetchPortfolioRefs } from '../../../../lib/portfolio';
 import { DiscoveryCard, PortfolioModal } from '../../../../components/molecules';
 import { DaySeparator, dayLabel, sameDay } from '../../../../components/molecules/DaySeparator';
@@ -118,7 +119,7 @@ interface ConvoMeta {
   seeker_id:         string;
   partner_id:        string;
   partner_name:      string;
-  partner_photo_url: string | null;
+  partner_avatar_id: string | null;
   partner_last_active_at: string | null;
   /// Closure-loop fields used by the thread header to render the banner
   /// state (hired-pending confirm prompt, hired celebration, passed
@@ -168,11 +169,14 @@ export default function ThreadScreen() {
     return () => { cancelled = true; };
   }, [conversationId]);
   const iAmReceiver = !!reacherId && !!user && reacherId !== user.id;
-  /// Signed-in user's avatar URL, fetched once on screen mount and
+  /// Signed-in user's monster mark, fetched once on screen mount and
   /// passed to MessageBubble so my own bubbles get an avatar too.
-  const [myPhotoUrl, setMyPhotoUrl] = useState<string | null>(null);
-  /// Display name of the signed-in user — used for the fallback initial
-  /// on my own avatars when myPhotoUrl is null.
+  const [myAvatarId, setMyAvatarId] = useState<string | null>(null);
+  /// Revealed real photos keyed by user id — self + the partner when the
+  /// thread is mutual. Refreshed when the peer's reply flips mutuality.
+  const [revealed, setRevealed] = useState<Map<string, string>>(new Map());
+  /// Display name of the signed-in user — used for my own bubble's
+  /// accessibility label.
   const [myName, setMyName] = useState<string>('You');
   const [messages, setMessages] = useState<MessageRow[]>([]);
   const [reactions, setReactions] = useState<ReactionRow[]>([]);
@@ -490,7 +494,7 @@ export default function ThreadScreen() {
 
       const { data: partnerProfile } = await supabase
         .from('profiles')
-        .select('name, photo_url, last_active_at')
+        .select('name, avatar_id, last_active_at')
         .eq('id', partnerId)
         .maybeSingle();
 
@@ -502,7 +506,7 @@ export default function ThreadScreen() {
         seeker_id:         convo.seeker_id,
         partner_id:        partnerId,
         partner_name:      partnerProfile?.name ?? (isOwner ? 'Seeker' : 'Owner'),
-        partner_photo_url: partnerProfile?.photo_url ?? null,
+        partner_avatar_id: (partnerProfile as any)?.avatar_id ?? null,
         partner_last_active_at: (partnerProfile as any)?.last_active_at ?? null,
         status:            ((convo as any).status as ConversationStatus) ?? 'active',
         pass_reason:       (convo as any).pass_reason ?? null,
@@ -526,7 +530,7 @@ export default function ThreadScreen() {
           .then(({ data }) => data?.last_read_at ?? null),
         supabase
           .from('profiles')
-          .select('name, photo_url')
+          .select('name, avatar_id')
           .eq('id', user.id)
           .maybeSingle()
           .then(({ data }) => data),
@@ -541,7 +545,7 @@ export default function ThreadScreen() {
       setSchedulingRequests(schedReqs);
       setPolls(availPolls);
       setPartnerLastReadAt(partnerRead);
-      setMyPhotoUrl((selfProfile as { photo_url: string | null } | null)?.photo_url ?? null);
+      setMyAvatarId((selfProfile as { avatar_id: string | null } | null)?.avatar_id ?? null);
       setMyName((selfProfile as { name: string | null } | null)?.name ?? 'You');
     } catch (e) {
       // A rejected fetch (network / server) must NOT hang on the skeleton
@@ -559,6 +563,30 @@ export default function ThreadScreen() {
     // late completion can't setState on a torn-down screen.
     return () => { loadSeqRef.current++; };
   }, [loadThread]);
+
+  // ── Photo reveal ─────────────────────────────────────────────
+  // Monster marks by default; a real photo appears only once the thread is
+  // mutual (both sides have sent) — the server decides via fetch_peer_photos.
+  // Self is always revealed (we pass our own id). We refetch whenever a new
+  // INCOMING message lands: the peer's first reply is what flips mutuality,
+  // and every incoming message flows through the realtime handler into
+  // `messages`, so keying on the incoming count hooks that stream.
+  const partnerId = meta?.partner_id ?? null;
+  const incomingCount = useMemo(
+    () =>
+      partnerId
+        ? messages.filter((m) => m.sender_id === partnerId && (!m.kind || m.kind === 'user')).length
+        : 0,
+    [messages, partnerId],
+  );
+  useEffect(() => {
+    if (!partnerId || !user) { setRevealed(new Map()); return; }
+    let cancelled = false;
+    fetchPeerPhotos([partnerId, user.id]).then((map) => {
+      if (!cancelled) setRevealed(map);
+    });
+    return () => { cancelled = true; };
+  }, [partnerId, user?.id, incomingCount]);
 
   // ── Realtime ─────────────────────────────────────────────────
   useEffect(() => {
@@ -1381,7 +1409,8 @@ export default function ThreadScreen() {
         <PartnerProfileIsland
           partnerId={meta.partner_id}
           partnerName={meta.partner_name}
-          partnerPhotoUrl={meta.partner_photo_url}
+          partnerAvatarId={meta.partner_avatar_id}
+          partnerPhotoUrl={revealed.get(meta.partner_id) ?? null}
           partnerLastActiveAt={meta.partner_last_active_at}
           top={insets.top + 6}
           currentConversationId={meta.id}
@@ -1507,7 +1536,8 @@ export default function ThreadScreen() {
               : failedIds.has(item.id) ? 'failed'
               : 'sent';
             const isMine = item.sender_id === user.id;
-            const avatarUrl = isMine ? myPhotoUrl : meta.partner_photo_url;
+            const avatarId = isMine ? myAvatarId : meta.partner_avatar_id;
+            const photoUrl = revealed.get(item.sender_id) ?? null;
             const senderName = isMine ? myName : meta.partner_name;
             const schedRequest = item.scheduling_request_id
               ? schedulingRequests.find((r) => r.id === item.scheduling_request_id) ?? null
@@ -1536,7 +1566,8 @@ export default function ThreadScreen() {
                 partnerLastReadAt={partnerLastReadAt}
                 meId={user.id}
                 status={status}
-                avatarUrl={avatarUrl}
+                avatarId={avatarId}
+                photoUrl={photoUrl}
                 senderName={senderName}
                 isLatestMine={isMine && item.id === lastMineId}
                 schedulingRequest={schedRequest}

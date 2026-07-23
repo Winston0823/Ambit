@@ -10,17 +10,17 @@ import {
   View,
 } from 'react-native';
 import { router } from 'expo-router';
-import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MagnifyingGlass, X, CaretRight } from 'phosphor-react-native';
-import { BackChevron, GlassSurface, Skeleton } from '../../../../components/atoms';
+import { Avatar, BackChevron, GlassSurface, Skeleton } from '../../../../components/atoms';
 import { DiscoveryCard, ReachOutComposer } from '../../../../components/molecules';
 import { supabase } from '../../../../lib/supabase';
 import { sendProjectAttachment, startConversationWithMessage } from '../../../../lib/messaging';
+import { fetchPeerPhotos } from '../../../../lib/photoReveal';
 import { canReachOut, recordReachOut } from '../../../../lib/reachOutLimit';
 import { fetchPortfoliosByUser } from '../../../../lib/portfolio';
 import { useAuth } from '../../../../context/AuthContext';
-import { CAMPUSES, type SeekerCardData } from '../../../../data/mock';
+import { type SeekerCardData } from '../../../../data/mock';
 import { AmbitFont, Brand, Radii, Space } from '../../../../constants/theme';
 import { toast } from '../../../../lib/toast';
 
@@ -34,12 +34,12 @@ import { toast } from '../../../../lib/toast';
 /// If multiple projects qualify the user picks; only when neither side has an
 /// active project is there nothing to anchor on (the DB has no project-less DM).
 interface Person {
-  id:         string;
-  name:       string;
-  photo_url:  string | null;
-  campus_id:  string | null;
-  skills:     string[] | null;
-  vibe_blurb: string | null;
+  id:             string;
+  name:           string;
+  avatar_id:      string | null;
+  open_to_nearby: boolean | null;
+  skills:         string[] | null;
+  vibe_blurb:     string | null;
 }
 
 interface ProjectRow {
@@ -50,18 +50,15 @@ interface ProjectRow {
 /// A concrete way to start the thread: which project anchors it and, derived
 /// from that project's owner, who is owner vs seeker on the new conversation.
 const cardFromPerson = (p: Person, portfolio: SeekerCardData['portfolio'] = []): SeekerCardData => ({
-  kind:      'seeker',
-  id:        p.id,
-  name:      p.name,
-  photoUri:  p.photo_url,
-  campusId:  p.campus_id ?? '',
-  skills:    p.skills ?? [],
-  vibeBlurb: p.vibe_blurb ?? '',
+  kind:         'seeker',
+  id:           p.id,
+  name:         p.name,
+  avatarId:     p.avatar_id ?? 'monster-01',
+  openToNearby: p.open_to_nearby ?? null,
+  skills:       p.skills ?? [],
+  vibeBlurb:    p.vibe_blurb ?? '',
   portfolio,
 });
-
-const campusName = (id: string | null): string | null =>
-  CAMPUSES.find((c) => c.id === id)?.name ?? null;
 
 export default function NewChatScreen() {
   const insets = useSafeAreaInsets();
@@ -69,6 +66,9 @@ export default function NewChatScreen() {
 
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<Person[] | null>(null);
+  /// Revealed real photos keyed by person id — mutual conversations only.
+  /// A search row with no entry renders the monster mark.
+  const [revealed, setRevealed] = useState<Map<string, string>>(new Map());
   const [searching, setSearching] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -93,12 +93,17 @@ export default function NewChatScreen() {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, name, photo_url, campus_id, skills, vibe_blurb')
+        .select('id, name, avatar_id, open_to_nearby, skills, vibe_blurb')
         .ilike('name', `%${term}%`)
         .neq('id', user?.id ?? '')
         .limit(30);
       if (error) throw error;
-      setResults((data as Person[] | null) ?? []);
+      const people = (data as Person[] | null) ?? [];
+      setResults(people);
+      // One batched reveal fetch for the search hits — a photo comes back
+      // only for someone you already share a mutual thread with; everyone
+      // else stays a monster mark. Never throws.
+      setRevealed(await fetchPeerPhotos(people.map((p) => p.id)));
     } catch {
       // A failed search must not read as "No one found." Keep prior results
       // (or the empty prompt) and surface a retryable error.
@@ -316,21 +321,11 @@ export default function NewChatScreen() {
               accessibilityRole="button"
               accessibilityLabel={`View ${item.name}'s profile`}
             >
-              {item.photo_url ? (
-                <Image source={{ uri: item.photo_url }} style={styles.rowAvatar} cachePolicy="memory-disk" transition={180} />
-              ) : (
-                <View style={[styles.rowAvatar, styles.rowAvatarFallback]}>
-                  <Text style={styles.rowAvatarInitial}>
-                    {(item.name ?? '?').slice(0, 1).toUpperCase()}
-                  </Text>
-                </View>
-              )}
+              <Avatar avatarId={item.avatar_id} photoUrl={revealed.get(item.id) ?? null} size={48} />
               <View style={styles.rowText}>
                 <Text style={styles.rowName} numberOfLines={1}>{item.name}</Text>
                 <Text style={styles.rowMeta} numberOfLines={1}>
-                  {[campusName(item.campus_id), (item.skills ?? []).slice(0, 2).join(' · ')]
-                    .filter(Boolean)
-                    .join('  ·  ') || 'On Ambit'}
+                  {(item.skills ?? []).slice(0, 2).join('  ·  ') || 'On Ambit'}
                 </Text>
               </View>
               <CaretRight size={16} color={Brand.inkLabel} weight="regular" />

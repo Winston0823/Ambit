@@ -6,14 +6,17 @@ import {
   Text,
   View,
 } from 'react-native';
-import { Image } from 'expo-image';
 import type { InboxItem } from '../../lib/messaging';
 import { isReachedOutToYou } from '../../lib/messaging';
+import { Avatar } from '../atoms';
 import { AmbitFont, Brand } from '../../constants/theme';
 
 interface Props {
   items:   InboxItem[];
   meId:    string;
+  /// Revealed real photos keyed by partner id (mutual conversations only).
+  /// A tile with no entry renders the monster mark.
+  revealed: Map<string, string>;
   onPress: (conversationId: string) => void;
   /// Long-press → unpin via parent. Same handler InboxRow uses for
   /// the toggle; parent routes pinned items to unpin().
@@ -24,7 +27,7 @@ interface Props {
 /// avatars with the partner's first name under each. Only renders when
 /// there's at least one pinned conversation. A small preview pip floats
 /// over a tile when that pinned chat has unread messages.
-export function PinnedStrip({ items, meId, onPress, onLongPress }: Props) {
+export function PinnedStrip({ items, meId, revealed, onPress, onLongPress }: Props) {
   if (items.length === 0) return null;
 
   return (
@@ -40,6 +43,7 @@ export function PinnedStrip({ items, meId, onPress, onLongPress }: Props) {
           <PinnedTile
             item={item}
             meId={meId}
+            photoUrl={revealed.get(item.partner_id) ?? null}
             onPress={() => onPress(item.conversation_id)}
             onLongPress={onLongPress ? () => onLongPress(item) : undefined}
           />
@@ -52,15 +56,16 @@ export function PinnedStrip({ items, meId, onPress, onLongPress }: Props) {
 function PinnedTile({
   item,
   meId,
+  photoUrl,
   onPress,
   onLongPress,
 }: {
   item:    InboxItem;
   meId:    string;
+  photoUrl: string | null;
   onPress: () => void;
   onLongPress?: () => void;
 }) {
-  const initial = (item.partner_name ?? '?').slice(0, 1).toUpperCase();
   const firstName = (item.partner_name ?? 'Chat').split(' ')[0];
   const hasUnread = item.unread_count > 0 || isReachedOutToYou(item, meId);
   const previewText = item.last_message_deleted
@@ -79,13 +84,7 @@ function PinnedTile({
       style={({ pressed }) => [styles.tile, pressed && { opacity: 0.7 }]}
     >
       <View style={styles.avatarWrap}>
-        {item.partner_photo_url ? (
-          <Image source={{ uri: item.partner_photo_url }} style={styles.avatar} cachePolicy="memory-disk" transition={180} />
-        ) : (
-          <View style={[styles.avatar, styles.avatarFallback]}>
-            <Text style={styles.avatarInitial}>{initial}</Text>
-          </View>
-        )}
+        <Avatar avatarId={item.partner_avatar_id} photoUrl={photoUrl} size={AVATAR_S} />
         {hasUnread && previewText && (
           <View style={styles.bubble}>
             <Text style={styles.bubbleText} numberOfLines={1}>
@@ -130,24 +129,6 @@ const styles = StyleSheet.create({
     width: AVATAR_S,
     height: AVATAR_S,
     position: 'relative',
-  },
-  avatar: {
-    width: AVATAR_S,
-    height: AVATAR_S,
-    borderRadius: AVATAR_S / 2,
-  },
-  avatarFallback: {
-    backgroundColor: Brand.surface2,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: Brand.borderSoft,
-  },
-  avatarInitial: {
-    fontFamily: AmbitFont.display,
-    fontSize: 20,
-    color: Brand.inkLabel,
-    letterSpacing: -0.2,
   },
   // Floating preview pip on the top-left of the tile — iMessage cue
   // that this pinned chat has an unread message.

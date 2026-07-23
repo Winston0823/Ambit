@@ -38,6 +38,7 @@ import type { PortfolioItem } from '../../data/mock';
 import { ProjectAttachmentBubble } from './ProjectAttachmentBubble';
 import { PortfolioAttachmentBubble } from './PortfolioAttachmentBubble';
 import { ContactCardBubble } from './ContactCardBubble';
+import { Avatar } from '../atoms';
 import { AmbitFont, Brand, Radii, Space } from '../../constants/theme';
 import { Motion } from '../../constants/motion';
 
@@ -69,11 +70,14 @@ interface Props {
   /// the iMessage-style "Delivered" / "Read" line directly under the bubble.
   /// Earlier mine bubbles stay clean (no inline meta).
   isLatestMine?: boolean;
-  /// Avatar URL of the message sender. Rounded-square thumbnail rendered
-  /// next to the bubble (left for partner, right for mine). Null falls
-  /// back to a colored initial.
-  avatarUrl?:    string | null;
-  /// Display name of the sender (used for the initial-fallback avatar).
+  /// Sender's monster mark (profiles.avatar_id) — the default identity
+  /// visual next to the bubble. Rendered via the shared Avatar atom.
+  avatarId?:     string | null;
+  /// Revealed real photo of the sender, when the conversation is mutual
+  /// (self is always revealed). Comes from the thread's fetchPeerPhotos
+  /// map; absent = keep the monster mark. expo-image crossfades the swap.
+  photoUrl?:     string | null;
+  /// Display name of the sender (used for the accessibility label).
   senderName?:   string;
   /// Tap reaction chip → toggle off / on (caller routes to toggleReaction).
   onToggleReaction: (emoji: string) => void;
@@ -147,38 +151,6 @@ function useAttachmentUrl(path: string | null): string | null {
   return url;
 }
 
-/// Rounded-square avatar rendered next to each bubble. 32pt with 8pt
-/// radius (App-Store-icon vibe). Falls back to the sender's first
-/// initial on a muted surface when no photo is available, and also
-/// when the remote image fails to load.
-function Avatar({
-  url,
-  name,
-}: {
-  url?: string | null;
-  name?: string;
-}) {
-  const [failed, setFailed] = useState(false);
-  const initial = (name ?? '?').trim().slice(0, 1).toUpperCase() || '?';
-  const showImage = !!url && !failed;
-  return (
-    <View style={styles.avatar}>
-      {showImage ? (
-        <Image
-          source={{ uri: url! }}
-          style={styles.avatarImg}
-          contentFit="cover"
-          cachePolicy="memory-disk"
-          transition={180}
-          onError={() => setFailed(true)}
-        />
-      ) : (
-        <Text style={styles.avatarInitial}>{initial}</Text>
-      )}
-    </View>
-  );
-}
-
 /// Splits a run of text on http(s):// and www.-prefixed tokens and
 /// renders the URL tokens as tappable, underlined spans. Kept simple on
 /// purpose (regex split, no full URL grammar) — the goal is "links you
@@ -230,7 +202,8 @@ export function MessageBubble({
   partnerLastReadAt,
   meId,
   status = 'sent',
-  avatarUrl,
+  avatarId,
+  photoUrl,
   senderName,
   isLatestMine = false,
   onToggleReaction,
@@ -425,7 +398,7 @@ export function MessageBubble({
           shows only on the LAST bubble of a run; earlier bubbles keep a
           spacer so the column stays aligned. */}
       <View style={styles.bubbleRow}>
-        {!isMine && (lastInGroup ? <Avatar url={avatarUrl} name={senderName} /> : <View style={styles.avatarSpacer} />)}
+        {!isMine && (lastInGroup ? <Avatar avatarId={avatarId} photoUrl={photoUrl} size={32} /> : <View style={styles.avatarSpacer} />)}
         <Pressable
           ref={bubbleRef}
           onLayout={measureBubble}
@@ -552,7 +525,7 @@ export function MessageBubble({
           />
         ) : null}
       </Pressable>
-        {isMine && (lastInGroup ? <Avatar url={avatarUrl} name={senderName} /> : <View style={styles.avatarSpacer} />)}
+        {isMine && (lastInGroup ? <Avatar avatarId={avatarId} photoUrl={photoUrl} size={32} /> : <View style={styles.avatarSpacer} />)}
       </View>
 
       {/* External status line — iMessage style. Only renders for the latest
@@ -671,27 +644,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-end',
     gap: 8,
-  },
-
-  // Rounded-square avatar. 32pt with 8pt radius — App-Store-icon shape,
-  // distinct from the circular hero avatars elsewhere in the app.
-  // On a white chat surface the avatar is a quiet neutral chip so it
-  // doesn't compete with the colored bubbles — the visual emphasis
-  // belongs on the conversation, not the affordance.
-  avatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    backgroundColor: Brand.surface1,
-    overflow: 'hidden',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarImg: { width: '100%', height: '100%' },
-  avatarInitial: {
-    fontFamily: AmbitFont.bold,
-    fontSize: 14,
-    color: Brand.inkLabel,
   },
 
   // System-message banner (closure-loop events). Centered, narrow, muted.

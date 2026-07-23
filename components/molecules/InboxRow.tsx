@@ -1,13 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Image } from 'expo-image';
 import { Archive, ArrowBendUpLeft, Bell, BellSlash, Clock, PushPin, X } from 'phosphor-react-native';
 import type { InboxItem } from '../../lib/messaging';
 import { inboxState, isReachedOutToYou } from '../../lib/messaging';
 import { getAutoCloseCountdown } from '../../lib/closureLoop';
-import { AmbitFont, Astra, Brand, Radii } from '../../constants/theme';
+import { Avatar } from '../atoms';
+import { AmbitFont, Brand, Radii } from '../../constants/theme';
 
 /// Soft iris tint for rows that need you (unread / reached-out-to-you).
 const SURFACE_NEEDS = 'rgba(153, 117, 206, 0.09)';
@@ -15,6 +14,10 @@ const SURFACE_NEEDS = 'rgba(153, 117, 206, 0.09)';
 interface Props {
   item:    InboxItem;
   meId:    string;
+  /// Revealed real photo of the partner, when the conversation is mutual.
+  /// Comes from the inbox screen's fetchPeerPhotos batch; absent/null =
+  /// render the monster mark (item.partner_avatar_id).
+  photoUrl?: string | null;
   onPress: () => void;
   /// Left-swipe → Pass. Parent owns the PassReasonSheet.
   onPassRequest?: (conversationId: string) => void;
@@ -34,8 +37,7 @@ interface Props {
 ///   • active — any conversation that doesn't fit the above and isn't
 ///     auto-closed. White card. Optional "Reply" / "Hired" chip.
 ///   • auto-closed — terminal. Same shape, 55% opacity.
-export function InboxRow({ item, meId, onPress, onPassRequest, onPin, onMute, onArchive }: Props) {
-  const initial = (item.partner_name ?? '?').slice(0, 1).toUpperCase();
+export function InboxRow({ item, meId, photoUrl, onPress, onPassRequest, onPin, onMute, onArchive }: Props) {
   const swipeRef = useRef<Swipeable>(null);
   const sentByMe  = item.last_message_sender_id === meId;
   const isPending = isReachedOutToYou(item, meId);
@@ -212,19 +214,9 @@ export function InboxRow({ item, meId, onPress, onPassRequest, onPin, onMute, on
           pressed && { opacity: 0.75 },
         ]}
       >
-        {/* Avatar — 46pt gradient monogram (or partner photo). */}
-        {item.partner_photo_url ? (
-          <Image source={{ uri: item.partner_photo_url }} style={styles.avatar} cachePolicy="memory-disk" transition={180} />
-        ) : (
-          <LinearGradient
-            colors={[Astra.royal, Astra.iris]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.avatar}
-          >
-            <Text style={styles.avatarInitial}>{initial}</Text>
-          </LinearGradient>
-        )}
+        {/* Avatar — monster mark by default; real photo only when the
+            conversation is mutual (photoUrl from the reveal batch). */}
+        <Avatar avatarId={item.partner_avatar_id} photoUrl={photoUrl ?? null} size={46} />
 
         <View style={styles.col}>
           <View style={styles.nameRow}>
@@ -352,22 +344,6 @@ const styles = StyleSheet.create({
     paddingLeft: 13,
     paddingRight: 14,
     paddingVertical: 13,
-  },
-
-  // Avatar — 46pt rounded-square gradient monogram (royal→iris), white serif
-  // initial; a partner photo fills the same frame.
-  avatar: {
-    width: 46,
-    height: 46,
-    borderRadius: 7,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  avatarInitial: {
-    fontFamily: AmbitFont.display,
-    fontSize: 17,
-    color: '#FFFFFF',
   },
 
   col: { flex: 1, minWidth: 0, gap: 3 },

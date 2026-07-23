@@ -71,6 +71,12 @@ export interface InboxItem {
   project_title:               string;
   partner_id:                  string;
   partner_name:                string;
+  /// Partner's picked monster mark (profiles.avatar_id) — the identity
+  /// visual chat surfaces render by default. Real photos are never in this
+  /// payload; they arrive only through fetchPeerPhotos' mutual-reveal gate.
+  partner_avatar_id:           string | null;
+  /// Legacy raw photo (still surfaced to the out-of-scope projects tab).
+  /// Chat surfaces MUST NOT render this — use avatar_id + the reveal map.
   partner_photo_url:           string | null;
   last_message_at:             string;
   last_message_body:           string | null;
@@ -385,15 +391,14 @@ export async function fetchProjectCard(projectId: string): Promise<ProjectCardDa
     roles_sought: string[] | null;
     image_url: string | null;
     needed_by: string | null;
-    campus_id: string | null;
     owner_id: string;
   };
   const { data: owner } = await supabase
     .from('profiles')
-    .select('name, photo_url')
+    .select('name, avatar_id, open_to_nearby')
     .eq('id', r.owner_id)
     .maybeSingle();
-  const o = owner as { name: string | null; photo_url: string | null } | null;
+  const o = owner as { name: string | null; avatar_id: string | null; open_to_nearby: boolean | null } | null;
   return {
     kind: 'project',
     id: r.id,
@@ -401,8 +406,8 @@ export async function fetchProjectCard(projectId: string): Promise<ProjectCardDa
     title: r.title,
     pitch: r.vibe_blurb || r.title,
     ownerName: o?.name ?? 'Unknown',
-    ownerPhotoUri: o?.photo_url ?? null,
-    ownerCampusId: r.campus_id ?? '',
+    ownerAvatarId: o?.avatar_id ?? 'monster-01',
+    ownerOpenToNearby: o?.open_to_nearby ?? null,
     whyMatched: '',
     skillsSought: (r.required_skills ?? []).slice(0, 5),
     rolesSought: r.roles_sought ?? [],
@@ -418,15 +423,15 @@ export async function fetchProjectCard(projectId: string): Promise<ProjectCardDa
 export async function fetchSeekerCard(userId: string): Promise<SeekerCardData | null> {
   const { data } = await supabase
     .from('profiles')
-    .select('id, name, photo_url, campus_id, skills, vibe_blurb, response_rate, github_url, portfolio_url')
+    .select('id, name, avatar_id, open_to_nearby, skills, vibe_blurb, response_rate, github_url, portfolio_url')
     .eq('id', userId)
     .maybeSingle();
   if (!data) return null;
   const s = data as {
     id: string;
     name: string | null;
-    photo_url: string | null;
-    campus_id: string | null;
+    avatar_id: string | null;
+    open_to_nearby: boolean | null;
     skills: string[] | null;
     vibe_blurb: string | null;
     response_rate: number | null;
@@ -438,8 +443,8 @@ export async function fetchSeekerCard(userId: string): Promise<SeekerCardData | 
     kind: 'seeker',
     id: s.id,
     name: (s.name ?? '').trim() || 'Someone on Ambit',
-    photoUri: s.photo_url,
-    campusId: s.campus_id ?? '',
+    avatarId: s.avatar_id ?? 'monster-01',
+    openToNearby: s.open_to_nearby ?? null,
     skills: s.skills ?? [],
     vibeBlurb: s.vibe_blurb ?? '',
     portfolio: portfolioMap.get(s.id) ?? [],
