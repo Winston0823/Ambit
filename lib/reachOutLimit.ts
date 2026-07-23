@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { supabase } from './supabase';
 
 /// How many reach-outs a user gets for free each calendar day.
 export const DAILY_FREE_LIMIT = 5;
@@ -8,6 +9,18 @@ export const DAILY_FREE_LIMIT = 5;
 export const MAX_AD_BONUS = 3;
 
 const STORAGE_KEY = '@ambit/reach_out_daily';
+
+/// Per-account storage key. The counter is device-local, so without the user
+/// id in the key, two accounts signed in on the same device share one daily
+/// quota. getSession() reads local storage (no network), so this stays cheap.
+async function storageKey(): Promise<string> {
+  try {
+    const { data } = await supabase.auth.getSession();
+    const uid = data.session?.user?.id;
+    if (uid) return `${STORAGE_KEY}/${uid}`;
+  } catch {}
+  return STORAGE_KEY;
+}
 
 interface DailyCounter {
   date: string;     // 'YYYY-MM-DD' — counter resets when this changes
@@ -28,7 +41,7 @@ function todayKey(): string {
 
 async function getCounter(): Promise<DailyCounter> {
   try {
-    const raw = await AsyncStorage.getItem(STORAGE_KEY);
+    const raw = await AsyncStorage.getItem(await storageKey());
     if (raw) {
       const c = JSON.parse(raw) as DailyCounter;
       // Still the same calendar day — use the stored counter.
@@ -40,7 +53,7 @@ async function getCounter(): Promise<DailyCounter> {
 }
 
 async function setCounter(c: DailyCounter): Promise<void> {
-  await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(c));
+  await AsyncStorage.setItem(await storageKey(), JSON.stringify(c));
 }
 
 /// True if the user has capacity for another reach-out right now.
