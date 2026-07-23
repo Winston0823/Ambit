@@ -8,7 +8,7 @@
 
 Four coordinated changes:
 
-1. **Profile photos are removed entirely** (feature + data) and replaced by a curated set of 12 playful monster avatars ("marks") in the ASTRA palette. Users pick one from a grid.
+1. **Profile photos become a post-connection reveal.** Pre-connection, everyone is represented by a curated set of 12 playful monster avatars ("marks") in the ASTRA palette, picked from a grid. The real photo (optional) is revealed only after a conversation becomes mutual — the other person responded.
 2. **Projects get more emphasis**: a new skippable onboarding step lets every user (seeker or owner) add past-work highlights to their profile, and the discovery card becomes project-forward now that photos are gone.
 3. **Campus selector is cut**, replaced by a single vicinity preference: open to working in person nearby, or remote only.
 4. **Professors are cut**: the "student or professor?" demographic step disappears; everyone is a student.
@@ -26,20 +26,29 @@ Four coordinated changes:
 ### Data model
 
 - `profiles.avatar_id text` — key like `"monster-03"`. New users get a random default at onboarding.
-- `profiles.photo_url` — **dropped** (column + all reads/writes). `avatars` storage bucket **dropped**.
-- Migration: add `avatar_id` (backfill existing rows with a deterministic pick, e.g. hash(id) mod 12), drop `photo_url`, drop bucket + its storage policies (004/006 successors).
+- `profiles.photo_url` and the `avatars` bucket are **kept** — the photo is now the post-connection reveal (see "Photo reveal" below).
+- Migration: add `avatar_id` (backfill existing rows with a deterministic pick, e.g. hash(id) mod 12).
+
+### Photo reveal mechanic
+
+The monster is the public mask; the real photo is private until trust is established.
+
+- **Reveal predicate:** user B's photo is visible to user A iff a `conversations` row exists between them where **both participants have sent ≥1 message** (the recipient chose to respond — same initiator derivation as migration 038) and `status` is not `passed`/`auto_declined`. No photo uploaded → monster everywhere, always.
+- **Enforcement is server-side:** a new `security definer` RPC `fetch_peer_photos(peer_ids uuid[]) → (user_id, photo_url)` returns photo URLs only for peers satisfying the predicate against `auth.uid()`. All client base queries (feed, saved, new-chat search, projects tab) stop selecting `photo_url`. Hardening: revoke column-level `select` on `profiles.photo_url` from `authenticated` so the RPC is the only read path (client code always selects explicit column lists, so this is safe).
+- **Where photos appear once revealed:** chat thread header + message avatars, partner profile island, inbox rows for mutual threads. Everywhere else (discovery, saved, search, pending/unanswered threads) stays monster.
+- **Reveal moment:** when a thread turns mutual, the avatar swap is a small delight beat — the monster crossfades to the photo in the thread header (respect reduced motion).
 
 ### Components
 
-- New `components/atoms/Avatar.tsx`: `{ avatarId, size, surface? }` → renders the mapped bundled PNG inside the standard circular/rounded tile (lilac `#F3EFF7` fill by default so the transparent PNG always has ground). Static `require` map for all 12.
+- New `components/atoms/Avatar.tsx`: `{ avatarId, photoUrl?, size, surface? }` → renders `photoUrl` when provided (i.e., the caller is a revealed context that fetched it via `fetch_peer_photos`), otherwise the mapped bundled monster PNG inside the standard circular/rounded tile (lilac `#F3EFF7` fill by default so the transparent PNG always has ground). Static `require` map for all 12.
 - New `components/molecules/AvatarPickerSheet.tsx`: a grid of the 12 monsters (3×4), current selection ringed in `Brand.selected`; tapping saves `avatar_id`.
 - **Replaces all 8+ inline photo/initial fallbacks**: `MessageBubble` local Avatar, `InboxRow`, `PinnedStrip`, `chat/new` rows, `DiscoveryCard`, `OwnerProfileCard`, `projects.tsx` collaborator faces, `saved`/`SavedCarousel`, `project-manage`.
 
 ### Surfaces
 
-- **Onboarding (name step, formerly PhotoScreen):** photo picker removed. The screen captures the name (unchanged gate: length > 1) and shows the user's randomly-dealt monster large, with a "change" affordance opening the picker grid. Screen renamed `IdentityScreen`.
-- **Profile tab:** the "Add photo / Change photo" row becomes **"Change icon"** → opens `AvatarPickerSheet`. The profile hero renders the monster at large size.
-- All photo upload code removed: `OnboardingContext` upload block, `profile.tsx` `pickPhoto`, `expo-image-picker` usage for avatars (picker stays for portfolio/project covers).
+- **Onboarding (name step, formerly PhotoScreen):** renamed `IdentityScreen`. Captures the name (unchanged gate: length > 1) and shows the user's randomly-dealt monster large with a "change" affordance opening the picker grid. Below it, an optional "Add a photo — only shown after someone connects with you" row keeps the existing picker; photo upload at submit is unchanged.
+- **Profile tab:** the hero renders the monster; the old "Add photo / Change photo" row becomes **"Change icon"** → opens `AvatarPickerSheet`, with a secondary **"Change photo"** row beneath it (copy: "revealed after you connect") keeping the existing `pickPhoto` upload.
+- Own photo is always visible to yourself on the profile tab (small, next to the reveal copy) so users know what connections will see.
 
 ## 2. Project emphasis + onboarding highlights
 
@@ -85,14 +94,16 @@ Progress-bar steps: `eduEmail, identity, role, skills, vicinity, highlights`. `(
 ## Error handling
 
 - Avatar map lookups fall back to `monster-01` for unknown/legacy `avatar_id` values.
-- Highlights inserted at submit: failures toast-and-continue (profile still created), matching the old photo-upload failure behavior.
-- Migration is destructive (drops `photo_url`, `demographic`, `campus_id`, avatars bucket) — acceptable per explicit "feature + data" decision; prototype has no production users to preserve.
+- Highlights inserted at submit: failures toast-and-continue (profile still created), matching the existing photo-upload failure behavior.
+- `fetch_peer_photos` failures degrade gracefully: revealed contexts simply keep showing the monster.
+- Migration drops `demographic` and `campus_id` (destructive, accepted — prototype has no production users). Photos (`photo_url`, avatars bucket) are **kept**.
 
 ## Testing / verification
 
 - `tsc --noEmit` clean.
 - Migration applies cleanly against local Supabase; RPCs return without `campus_id`.
-- Simulator run-through: full onboarding (both roles, with and without highlights), feed cards (seeker + project), chat surfaces, profile "Change icon" flow, saved deck.
+- Reveal predicate tested at the SQL level: `fetch_peer_photos` returns a photo only for mutual, non-passed conversations (one-sided reach-out → no photo; after recipient replies → photo).
+- Simulator run-through: full onboarding (both roles, with and without highlights/photo), feed cards (seeker + project — always monsters), chat thread before and after the recipient's first reply (monster → photo swap), profile "Change icon" + "Change photo" flows, saved deck.
 
 ## Out of scope
 
