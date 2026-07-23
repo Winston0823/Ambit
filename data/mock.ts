@@ -2,34 +2,6 @@
 
 import { Brand } from '../constants/theme';
 
-export interface Campus {
-  id: string;
-  name: string;
-  city: string;
-  /// Campus photo for the filter drawer row (bleeds in from the right, faded
-  /// into the canvas). Null → a warm gradient placeholder is used instead.
-  imageUrl?: string | null;
-}
-
-/// LA-area campuses. USC + UCLA are the v1 anchor campuses; the rest are
-/// nearby schools where students might commute or collaborate.
-export const CAMPUSES: Campus[] = [
-  { id: 'usc',        name: 'USC',        city: 'Los Angeles',
-    imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/5a/Doheny_Memorial_Library_of_USC.jpg/500px-Doheny_Memorial_Library_of_USC.jpg' },
-  { id: 'ucla',       name: 'UCLA',       city: 'Los Angeles',
-    imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/ad/Royce_Hall_post_rain.jpg/500px-Royce_Hall_post_rain.jpg' },
-  { id: 'caltech',    name: 'Caltech',    city: 'Pasadena',
-    imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/cc/Caltech_Entrance.jpg/500px-Caltech_Entrance.jpg' },
-  { id: 'lmu',        name: 'LMU',        city: 'Los Angeles',
-    imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/55/Loyola_Marymount_SunkenGardens_SacredHeartChapel.jpg/500px-Loyola_Marymount_SunkenGardens_SacredHeartChapel.jpg' },
-  { id: 'pepperdine', name: 'Pepperdine', city: 'Malibu',
-    imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/6b/Pepperdine_University_Malibu_Canyon_Entrance_Gate.JPG/500px-Pepperdine_University_Malibu_Canyon_Entrance_Gate.JPG' },
-  { id: 'csula',      name: 'Cal State LA', city: 'Los Angeles',
-    imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b0/Aerial_view_of_California_State_University%2C_Los_Angeles_campus_2.jpg/500px-Aerial_view_of_California_State_University%2C_Los_Angeles_campus_2.jpg' },
-  { id: 'oxy',        name: 'Occidental College', city: 'Los Angeles',
-    imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/95/Herrick_Memorial_Chapel_n_fountain.jpg/500px-Herrick_Memorial_Chapel_n_fountain.jpg' },
-];
-
 /// Skill tag categories. Spec § 8.1 has the full taxonomy; this is a v0 subset.
 export interface SkillCategory {
   label: string;
@@ -157,12 +129,17 @@ export interface SeekerCardData {
   kind: 'seeker';
   id: string;
   name: string;
-  photoUri: string | null;
-  campusId: string;
+  /// Picked monster mark, e.g. "monster-07". Keyed into the bundled avatar
+  /// map (see components/atoms/Avatar). Real photos are gated behind mutual
+  /// reveal and never ship on the discovery card.
+  avatarId: string;
+  /// Vicinity preference from `profiles.open_to_nearby`. true = open to
+  /// nearby collaborators, false = same-place only, null = unanswered.
+  openToNearby: boolean | null;
   skills: string[];
   vibeBlurb: string;
   /// Field of study, e.g. "Computer Science". Optional — the discovery card
-  /// eyebrow shows it when present and falls back to campus-only otherwise,
+  /// eyebrow shows it when present and falls back to name-only otherwise,
   /// so we never fabricate a major the user didn't give us.
   major?: string;
   /// Graduation year, e.g. "26" or "2026". Optional, same rationale.
@@ -188,8 +165,12 @@ export interface ProjectCardData {
   title: string;
   pitch: string;
   ownerName: string;
-  ownerPhotoUri: string | null;
-  ownerCampusId: string;
+  /// Owner's picked monster mark, e.g. "monster-03" — same avatar map as
+  /// SeekerCardData.avatarId. Photos are gated behind mutual reveal.
+  ownerAvatarId: string;
+  /// Owner's vicinity preference from `profiles.open_to_nearby`. true = open
+  /// to nearby, false = same-place only, null = unanswered.
+  ownerOpenToNearby: boolean | null;
   /// Single-string mock until the matching algorithm lands. Real shape:
   /// `{ reasons: string[]; score: number }` — only DiscoveryCard.tsx reads it.
   whyMatched: string;
@@ -230,8 +211,8 @@ export const MOCK_SEEKERS: SeekerCardData[] = [
     kind: 'seeker',
     id: 'seeker-1',
     name: 'Alex Chen',
-    photoUri: 'https://i.pravatar.cc/800?img=12',
-    campusId: 'usc',
+    avatarId: 'monster-03',
+    openToNearby: true,
     skills: ['React Native', 'TypeScript', 'iOS', 'Swift'],
     vibeBlurb: 'I like shipping things that feel calm and fast.',
     portfolio: [
@@ -267,8 +248,8 @@ export const MOCK_SEEKERS: SeekerCardData[] = [
     kind: 'seeker',
     id: 'seeker-2',
     name: 'Daria Park',
-    photoUri: null,
-    campusId: 'ucla',
+    avatarId: 'monster-07',
+    openToNearby: false,
     skills: ['Figma', 'UI/UX', 'Brand', 'Motion'],
     vibeBlurb: 'Designer who codes enough to be dangerous.',
     portfolio: [
@@ -296,8 +277,8 @@ export const MOCK_SEEKERS: SeekerCardData[] = [
     kind: 'seeker',
     id: 'seeker-3',
     name: 'Maya Patel',
-    photoUri: null,
-    campusId: 'caltech',
+    avatarId: 'monster-11',
+    openToNearby: true,
     skills: ['Python', 'User Research', 'Product Strategy'],
     vibeBlurb: 'Researcher first, builder second. Loves a good interview.',
     portfolio: [
@@ -317,8 +298,8 @@ export const MOCK_SEEKERS: SeekerCardData[] = [
     kind: 'seeker',
     id: 'seeker-4',
     name: 'Sam Liu',
-    photoUri: null,
-    campusId: 'usc',
+    avatarId: 'monster-05',
+    openToNearby: null,
     skills: ['Growth Strategy', 'Marketing', 'Operations'],
     vibeBlurb: 'I make the engine that pulls people in. Big spreadsheet energy.',
     portfolio: [
@@ -335,8 +316,8 @@ export const MOCK_SEEKERS: SeekerCardData[] = [
     kind: 'seeker',
     id: 'seeker-5',
     name: 'Iris Tan',
-    photoUri: null,
-    campusId: 'ucla',
+    avatarId: 'monster-09',
+    openToNearby: true,
     skills: ['Brand', 'Motion', 'Prototyping'],
     vibeBlurb: 'Brand systems and the tiny animations that make them sing.',
     portfolio: [
@@ -360,8 +341,8 @@ export const MOCK_SEEKERS: SeekerCardData[] = [
     kind: 'seeker',
     id: 'seeker-6',
     name: 'Jordan Reyes',
-    photoUri: null,
-    campusId: 'lmu',
+    avatarId: 'monster-02',
+    openToNearby: false,
     skills: ['Swift', 'iOS', 'Prototyping'],
     vibeBlurb: 'iOS native. Care a lot about polish, less about frameworks.',
     portfolio: [
@@ -378,8 +359,8 @@ export const MOCK_SEEKERS: SeekerCardData[] = [
     kind: 'seeker',
     id: 'seeker-7',
     name: 'Priya Shah',
-    photoUri: null,
-    campusId: 'usc',
+    avatarId: 'monster-12',
+    openToNearby: true,
     skills: ['Python', 'DevOps', 'Web'],
     vibeBlurb: 'Backend-y, infra-curious. I make things not break.',
     portfolio: [
@@ -402,9 +383,9 @@ export const MOCK_PROJECTS: ProjectCardData[] = [
     title: 'AI Study Tool',
     pitch: 'A study companion that learns the way you actually study — not the way textbooks assume you do.',
     ownerName: 'Noah Park',
-    ownerPhotoUri: null,
-    ownerCampusId: 'usc',
-    whyMatched: '3 shared skills · same campus',
+    ownerAvatarId: 'monster-04',
+    ownerOpenToNearby: true,
+    whyMatched: '3 shared skills · nearby',
     skillsSought: ['Designer', 'iOS', 'User Research'],
     rolesSought: ['Mobile', 'Product Design', 'UX Research'],
     gradient: [Brand.primary, Brand.accent],
@@ -416,9 +397,9 @@ export const MOCK_PROJECTS: ProjectCardData[] = [
     title: 'Hardware for student labs',
     pitch: 'Cheaper, open-source bench equipment so undergrad labs stop running on duct tape.',
     ownerName: 'Daria Kim',
-    ownerPhotoUri: null,
-    ownerCampusId: 'caltech',
-    whyMatched: 'Both into prototyping · 12 mi away',
+    ownerAvatarId: 'monster-08',
+    ownerOpenToNearby: true,
+    whyMatched: 'Both into prototyping · nearby',
     skillsSought: ['Mechanical', 'Firmware', 'Industrial Design'],
     rolesSought: ['Software Engineer', 'DevOps / Infra'],
     gradient: ['#C9A57A', Brand.seekerInk],
@@ -430,8 +411,8 @@ export const MOCK_PROJECTS: ProjectCardData[] = [
     title: 'Campus mental-health app',
     pitch: 'Anonymous, peer-led support that meets students where they actually are: their phones, at 2 a.m.',
     ownerName: 'Maya Patel',
-    ownerPhotoUri: null,
-    ownerCampusId: 'ucla',
+    ownerAvatarId: 'monster-11',
+    ownerOpenToNearby: false,
     whyMatched: 'Skills you listed match 4 of their needs',
     skillsSought: ['Design', 'iOS', 'Research', 'Brand'],
     rolesSought: ['Mobile', 'Product Design', 'Marketing'],
@@ -444,9 +425,9 @@ export const MOCK_PROJECTS: ProjectCardData[] = [
     title: 'Late-night food map',
     pitch: 'A map of every place still serving food past midnight near campus — built by students, for students.',
     ownerName: 'Sam Liu',
-    ownerPhotoUri: null,
-    ownerCampusId: 'usc',
-    whyMatched: 'Both at USC · same vibe (calm + fast)',
+    ownerAvatarId: 'monster-05',
+    ownerOpenToNearby: null,
+    whyMatched: 'Same vibe (calm + fast)',
     skillsSought: ['Web', 'Growth Strategy', 'Brand'],
     rolesSought: ['Full Stack', 'Marketing'],
     gradient: ['#E8C9A0', Brand.primary],
@@ -458,9 +439,9 @@ export const MOCK_PROJECTS: ProjectCardData[] = [
     title: 'Sustainable thrift marketplace',
     pitch: 'Peer-to-peer clothing exchange that doesn\'t feel like a flea market and isn\'t run by middlemen.',
     ownerName: 'Iris Tan',
-    ownerPhotoUri: null,
-    ownerCampusId: 'ucla',
-    whyMatched: '2 shared skills · same campus radius',
+    ownerAvatarId: 'monster-09',
+    ownerOpenToNearby: true,
+    whyMatched: '2 shared skills · nearby',
     skillsSought: ['React Native', 'Marketing', 'Operations'],
     rolesSought: ['Mobile', 'Marketing', 'Operations'],
     gradient: [Brand.accent, '#7A5A38'],
@@ -472,9 +453,9 @@ export const MOCK_PROJECTS: ProjectCardData[] = [
     title: 'Indie-game studio v0',
     pitch: 'Looking for a small, weird team to make one strange, small game and ship it before graduation.',
     ownerName: 'Jordan Reyes',
-    ownerPhotoUri: null,
-    ownerCampusId: 'lmu',
-    whyMatched: 'Both like motion · adjacent campus',
+    ownerAvatarId: 'monster-02',
+    ownerOpenToNearby: false,
+    whyMatched: 'Both like motion',
     skillsSought: ['Motion', 'Sound', 'Game Dev'],
     rolesSought: ['Software Engineer', 'Brand / Visual'],
     gradient: ['#D4B490', '#4D361D'],
@@ -486,9 +467,9 @@ export const MOCK_PROJECTS: ProjectCardData[] = [
     title: 'Lecture-recap bot',
     pitch: 'A bot that watches your lecture recording and gives you a 3-bullet summary before you finish your coffee.',
     ownerName: 'Priya Shah',
-    ownerPhotoUri: null,
-    ownerCampusId: 'usc',
-    whyMatched: '4 shared skills · same campus',
+    ownerAvatarId: 'monster-12',
+    ownerOpenToNearby: true,
+    whyMatched: '4 shared skills · nearby',
     skillsSought: ['Python', 'iOS', 'Growth Strategy'],
     rolesSought: ['ML / AI', 'Mobile', 'Marketing'],
     gradient: [Brand.seekerSurface, '#B48045'],

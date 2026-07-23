@@ -55,7 +55,6 @@ interface ProjectRow {
   vibe_blurb: string | null;
   required_skills: string[] | null;
   roles_sought: string[] | null;
-  campus_id: string | null;
   image_url: string | null;
   needed_by: string | null;
   owner_id: string;
@@ -68,7 +67,7 @@ async function hydrateSavedProjects(projectIds: string[]): Promise<ProjectCardDa
   if (projectIds.length === 0) return [];
   const { data: projects } = await supabase
     .from('projects')
-    .select('id, title, vibe_blurb, required_skills, roles_sought, campus_id, image_url, needed_by, owner_id')
+    .select('id, title, vibe_blurb, required_skills, roles_sought, image_url, needed_by, owner_id')
     .in('id', projectIds);
   const rows = (projects ?? []) as ProjectRow[];
   if (rows.length === 0) return [];
@@ -76,10 +75,10 @@ async function hydrateSavedProjects(projectIds: string[]): Promise<ProjectCardDa
   const ownerIds = [...new Set(rows.map((r) => r.owner_id))];
   const { data: owners } = await supabase
     .from('profiles')
-    .select('id, name, photo_url, campus_id, response_rate')
+    .select('id, name, avatar_id, open_to_nearby, response_rate')
     .in('id', ownerIds);
   const ownerMap = Object.fromEntries(
-    ((owners ?? []) as { id: string; name: string; photo_url: string | null; campus_id: string | null; response_rate: number | null }[]).map(
+    ((owners ?? []) as { id: string; name: string; avatar_id: string | null; open_to_nearby: boolean | null; response_rate: number | null }[]).map(
       (o) => [o.id, o],
     ),
   );
@@ -98,8 +97,8 @@ async function hydrateSavedProjects(projectIds: string[]): Promise<ProjectCardDa
         title: r.title,
         pitch: r.vibe_blurb || r.title,
         ownerName: owner?.name ?? 'Unknown',
-        ownerPhotoUri: owner?.photo_url ?? null,
-        ownerCampusId: r.campus_id ?? owner?.campus_id ?? '',
+        ownerAvatarId: owner?.avatar_id ?? 'monster-01',
+        ownerOpenToNearby: owner?.open_to_nearby ?? null,
         whyMatched: 'Saved',
         skillsSought: (r.required_skills ?? []).slice(0, 5),
         rolesSought: r.roles_sought ?? [],
@@ -117,13 +116,13 @@ async function hydrateSavedSeekers(seekerIds: string[]): Promise<SeekerCardData[
   if (seekerIds.length === 0) return [];
   const { data: seekers } = await supabase
     .from('profiles')
-    .select('id, name, photo_url, campus_id, skills, vibe_blurb, response_rate')
+    .select('id, name, avatar_id, open_to_nearby, skills, vibe_blurb, response_rate')
     .in('id', seekerIds);
   const rows = (seekers ?? []) as {
     id: string;
     name: string;
-    photo_url: string | null;
-    campus_id: string | null;
+    avatar_id: string | null;
+    open_to_nearby: boolean | null;
     skills: string[] | null;
     vibe_blurb: string | null;
     response_rate: number | null;
@@ -141,8 +140,8 @@ async function hydrateSavedSeekers(seekerIds: string[]): Promise<SeekerCardData[
       kind: 'seeker',
       id: s.id,
       name: s.name.trim(),
-      photoUri: s.photo_url,
-      campusId: s.campus_id ?? '',
+      avatarId: s.avatar_id ?? 'monster-01',
+      openToNearby: s.open_to_nearby ?? null,
       skills: s.skills ?? [],
       vibeBlurb: s.vibe_blurb ?? '',
       portfolio: portfolioMap.get(s.id) ?? [],

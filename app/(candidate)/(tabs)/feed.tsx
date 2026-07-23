@@ -9,11 +9,9 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ArrowsClockwise, BookmarkSimple, CaretDown, Check, GraduationCap, MagnifyingGlass, Sparkle, X } from 'phosphor-react-native';
+import { ArrowsClockwise, BookmarkSimple, CaretDown, Check, MagnifyingGlass, Sparkle, X } from 'phosphor-react-native';
 import type { IconProps } from 'phosphor-react-native';
 import * as Haptics from 'expo-haptics';
 import { DiscoveryOverview, SwipeDeck } from '../../../components/organisms';
@@ -21,7 +19,7 @@ import type { SwipeDeckHandle } from '../../../components/organisms';
 import { PortfolioModal, ReachOutComposer, BottomSheet, ReachOutLimitSheet, ReportReasonSheet } from '../../../components/molecules';
 import { blockUser, type ReportTarget } from '../../../lib/safety';
 import { Button, Skeleton as SkeletonBlock, Tactile, TopAppBar } from '../../../components/atoms';
-import { CAMPUSES, SKILL_CATEGORIES } from '../../../data/mock';
+import { SKILL_CATEGORIES } from '../../../data/mock';
 import {
   canReachOut,
   recordReachOut,
@@ -98,7 +96,6 @@ async function fetchProjectDeck(userId: string): Promise<ProjectCardData[]> {
     roles_sought: string[];
     image_url: string | null;
     needed_by: string | null;
-    campus_id: string | null;
     owner_id: string;
     score: number;
     skill_match_pct: number;
@@ -107,14 +104,14 @@ async function fetchProjectDeck(userId: string): Promise<ProjectCardData[]> {
   const ownerIds = [...new Set(rows.map((r) => r.owner_id))];
   const { data: owners } = await supabase
     .from('profiles')
-    .select('id, name, photo_url, response_rate')
+    .select('id, name, avatar_id, open_to_nearby, response_rate')
     .in('id', ownerIds);
 
   const ownerMap = Object.fromEntries(
     (owners ?? []).map(
-      (o: { id: string; name: string; photo_url: string | null; response_rate: number | null }) => [
+      (o: { id: string; name: string; avatar_id: string | null; open_to_nearby: boolean | null; response_rate: number | null }) => [
         o.id,
-        { name: o.name, photoUri: o.photo_url, responseRate: o.response_rate },
+        { name: o.name, avatarId: o.avatar_id, openToNearby: o.open_to_nearby, responseRate: o.response_rate },
       ]
     )
   );
@@ -133,8 +130,8 @@ async function fetchProjectDeck(userId: string): Promise<ProjectCardData[]> {
       title: r.title,
       pitch: r.vibe_blurb || r.title,
       ownerName: ownerMap[r.owner_id]?.name ?? 'Unknown',
-      ownerPhotoUri: ownerMap[r.owner_id]?.photoUri ?? null,
-      ownerCampusId: r.campus_id ?? '',
+      ownerAvatarId: ownerMap[r.owner_id]?.avatarId ?? 'monster-01',
+      ownerOpenToNearby: ownerMap[r.owner_id]?.openToNearby ?? null,
       whyMatched,
       skillsSought: r.required_skills.slice(0, 5),
       rolesSought: r.roles_sought ?? [],
@@ -173,7 +170,7 @@ async function fetchSeekerDeck(userId: string): Promise<SeekerCardData[]> {
 
   const { data: seekers } = await supabase
     .from('profiles')
-    .select('id, name, photo_url, campus_id, skills, vibe_blurb, response_rate')
+    .select('id, name, avatar_id, open_to_nearby, skills, vibe_blurb, response_rate')
     .in('id', seekerIds);
 
   if (!seekers || seekers.length === 0) return DEMO_FALLBACK ? MOCK_SEEKERS : [];
@@ -188,8 +185,8 @@ async function fetchSeekerDeck(userId: string): Promise<SeekerCardData[]> {
   return (seekers as {
     id: string;
     name: string;
-    photo_url: string | null;
-    campus_id: string | null;
+    avatar_id: string | null;
+    open_to_nearby: boolean | null;
     skills: string[];
     vibe_blurb: string;
     response_rate: number | null;
@@ -203,8 +200,8 @@ async function fetchSeekerDeck(userId: string): Promise<SeekerCardData[]> {
       kind: 'seeker',
       id: s.id,
       name: s.name.trim(),
-      photoUri: s.photo_url,
-      campusId: s.campus_id ?? '',
+      avatarId: s.avatar_id ?? 'monster-01',
+      openToNearby: s.open_to_nearby ?? null,
       skills: s.skills ?? [],
       vibeBlurb: s.vibe_blurb ?? '',
       portfolio: portfolioMap.get(s.id) ?? [],
@@ -435,33 +432,31 @@ export default function DiscoveryFeed() {
     [reinserted, deck],
   );
 
-  // ── Discovery filters (skills + campus) ──────────────────────
+  // ── Discovery filters (skills) ───────────────────────────────
+  // Campus filtering was removed with the campus concept (migration 039);
+  // vicinity is now a per-profile preference, not a discovery filter.
   const [filterSkills, setFilterSkills] = useState<string[]>([]);
-  const [filterCampus, setFilterCampus] = useState<string[]>([]);
-  const [filterSheet, setFilterSheet] = useState<null | 'skills' | 'campus'>(null);
+  const [filterSheet, setFilterSheet] = useState<null | 'skills'>(null);
   const [filterSearch, setFilterSearch] = useState('');
   // Skills edit in a DRAFT committed by Apply — atomic (no per-toggle deck
   // recompose) and dismissing the sheet discards changes.
   const [draftSkills, setDraftSkills] = useState<string[]>([]);
-  const openFilterSheet = (dim: 'skills' | 'campus') => {
+  const openFilterSheet = (dim: 'skills') => {
     setFilterSearch('');
     if (dim === 'skills') setDraftSkills(filterSkills);
     setFilterSheet(dim);
   };
-  const campusLabel = (id: string) => CAMPUSES.find((c) => c.id === id)?.name ?? id;
 
   const cardSkills = (c: DiscoveryCardData) => (c.kind === 'project' ? c.skillsSought : c.skills) ?? [];
-  const cardCampus = (c: DiscoveryCardData) => (c.kind === 'project' ? c.ownerCampusId : c.campusId) ?? '';
 
   const filteredDeck = useMemo(
     () =>
       activeDeck.filter((c) => {
         const sk = cardSkills(c).map((s) => s.toLowerCase());
         const skillOk = filterSkills.length === 0 || filterSkills.some((f) => sk.includes(f.toLowerCase()));
-        const campusOk = filterCampus.length === 0 || filterCampus.includes(cardCampus(c));
-        return skillOk && campusOk;
+        return skillOk;
       }),
-    [activeDeck, filterSkills, filterCampus],
+    [activeDeck, filterSkills],
   );
 
   // Filterable skills = the canonical taxonomy (so the search works even when
@@ -498,20 +493,7 @@ export default function DiscoveryFeed() {
       .map((c) => ({ ...c, tags: q ? c.tags.filter((t) => t.toLowerCase().includes(q)) : c.tags }))
       .filter((c) => c.tags.length > 0);
   }, [filterSearch, skillOptions]);
-  // Campus is single-select: pick one (radio), tap again to clear. Kept as an
-  // array (length ≤ 1) so the filteredDeck `filterCampus.includes` logic is
-  // unchanged.
-  const selectCampus = (id: string) =>
-    setFilterCampus((prev) => (prev.includes(id) ? [] : [id]));
-  const filterCount = filterSkills.length + filterCampus.length;
-
-  // Options for the open sheet, narrowed by the search box.
-  const sheetOptions = useMemo(() => {
-    const all = filterSheet === 'campus' ? CAMPUSES.map((c) => c.id) : skillOptions;
-    const q = filterSearch.trim().toLowerCase();
-    if (!q) return all;
-    return all.filter((opt) => (filterSheet === 'campus' ? campusLabel(opt) : opt).toLowerCase().includes(q));
-  }, [filterSheet, filterSearch, skillOptions]);
+  const filterCount = filterSkills.length;
 
   const overviewVisible = consecutiveSkips >= SKIP_OVERVIEW_THRESHOLD;
 
@@ -807,9 +789,8 @@ export default function DiscoveryFeed() {
       {!loading && !overviewVisible && (
         <View style={styles.filterRow}>
           <FilterButton Icon={Sparkle} label="Skills" count={filterSkills.length} onPress={() => openFilterSheet('skills')} />
-          <FilterButton Icon={GraduationCap} label="Campus" count={filterCampus.length} onPress={() => openFilterSheet('campus')} />
           {filterCount > 0 && (
-            <Tactile haptic="tap" onPress={() => { setFilterSkills([]); setFilterCampus([]); }} style={styles.filterClear} accessibilityLabel="Clear filters">
+            <Tactile haptic="tap" onPress={() => { setFilterSkills([]); }} style={styles.filterClear} accessibilityLabel="Clear filters">
               <Text style={styles.filterClearText}>Clear</Text>
             </Tactile>
           )}
@@ -859,7 +840,7 @@ export default function DiscoveryFeed() {
               // Filters hide every card, but the deck itself isn't empty — offer
               // a non-destructive Clear, never "Start over" (which deletes
               // skipped-match rows). Fix 4.
-              <FilteredEmpty onClear={() => { setFilterSkills([]); setFilterCampus([]); }} />
+              <FilteredEmpty onClear={() => { setFilterSkills([]); }} />
             ) : (
               <DeckExhausted onRefresh={handleRefresh} isOwner={role === 'owner'} neverHadCards={activeDeck.length === 0} />
             )
@@ -892,40 +873,29 @@ export default function DiscoveryFeed() {
 
       {/* Filter sheet — searchable + drag-to-expand (half → near-top). */}
       <BottomSheet visible={filterSheet !== null} onClose={() => setFilterSheet(null)} snapPoints={FILTER_SNAP_POINTS}>
-        {filterSheet === 'campus' ? (
-          <View style={styles.filterSheetHead}>
-            <Text style={styles.filterSheetTitle}>Campus</Text>
-            {filterCampus.length > 0 && (
-              <Tactile haptic="tap" onPress={() => setFilterCampus([])} style={styles.filterSheetClear} accessibilityLabel="Clear campus filter">
+        <View>
+          <Text style={styles.filterSheetTitle}>Skills</Text>
+          <Text style={styles.filterSheetSub}>Match on what they build with</Text>
+          <View style={styles.filterCountRow}>
+            <Text style={styles.filterCountText}>
+              {draftSkills.length > 0
+                ? `${draftSkills.length} skill${draftSkills.length === 1 ? '' : 's'} selected`
+                : 'Faded skills aren’t in your deck right now'}
+            </Text>
+            {draftSkills.length > 0 && (
+              <Tactile haptic="tap" onPress={() => setDraftSkills([])} style={styles.filterSheetClear} accessibilityLabel="Clear selected skills">
                 <Text style={styles.filterSheetClearText}>Clear all</Text>
               </Tactile>
             )}
           </View>
-        ) : (
-          <View>
-            <Text style={styles.filterSheetTitle}>Skills</Text>
-            <Text style={styles.filterSheetSub}>Match on what they build with</Text>
-            <View style={styles.filterCountRow}>
-              <Text style={styles.filterCountText}>
-                {draftSkills.length > 0
-                  ? `${draftSkills.length} skill${draftSkills.length === 1 ? '' : 's'} selected`
-                  : 'Faded skills aren’t in your deck right now'}
-              </Text>
-              {draftSkills.length > 0 && (
-                <Tactile haptic="tap" onPress={() => setDraftSkills([])} style={styles.filterSheetClear} accessibilityLabel="Clear selected skills">
-                  <Text style={styles.filterSheetClearText}>Clear all</Text>
-                </Tactile>
-              )}
-            </View>
-          </View>
-        )}
+        </View>
 
         <View style={styles.filterSearchBar}>
           <MagnifyingGlass size={16} color={Brand.inkMuted} weight="bold" />
           <TextInput
             value={filterSearch}
             onChangeText={setFilterSearch}
-            placeholder={filterSheet === 'campus' ? 'Search campuses' : 'Search skills'}
+            placeholder="Search skills"
             placeholderTextColor={Brand.inkPlaceholder}
             style={styles.filterSearchInput}
             autoCapitalize="none"
@@ -941,89 +911,40 @@ export default function DiscoveryFeed() {
 
         <ScrollView
           style={styles.filterScroll}
-          contentContainerStyle={filterSheet === 'campus' ? styles.filterSheetRows : styles.filterSheetSections}
+          contentContainerStyle={styles.filterSheetSections}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* Campus → single-select radio list. Skills → multi-select chips. */}
-          {filterSheet === 'campus'
-            ? sheetOptions.map((opt, i) => {
-                const selected = filterCampus.includes(opt);
-                const c = CAMPUSES.find((x) => x.id === opt);
-                return (
-                  <Tactile
-                    key={opt}
-                    haptic="selection"
-                    onPress={() => selectCampus(opt)}
-                    style={styles.campusRow}
-                    accessibilityLabel={c?.name ?? opt}
-                  >
-                    {/* Campus photo bleeding in from the right, faded into the
-                        canvas on the left so the name/location stay readable. */}
-                    <View style={styles.campusImgWrap} pointerEvents="none">
-                      {c?.imageUrl ? (
-                        <Image source={{ uri: c.imageUrl }} style={StyleSheet.absoluteFill} contentFit="cover" cachePolicy="memory-disk" transition={180} />
-                      ) : (
-                        <LinearGradient
-                          colors={CARD_GRADIENTS[i % CARD_GRADIENTS.length]}
-                          start={{ x: 0, y: 0 }}
-                          end={{ x: 1, y: 1 }}
-                          style={StyleSheet.absoluteFill}
-                        />
-                      )}
-                      <LinearGradient
-                        colors={[Brand.canvas, 'rgba(252,249,248,0)']}
-                        start={{ x: 0, y: 0.5 }}
-                        end={{ x: 1, y: 0.5 }}
-                        style={StyleSheet.absoluteFill}
-                      />
-                    </View>
-
-                    <View style={styles.campusText}>
-                      <Text style={styles.campusName} numberOfLines={1}>{c?.name ?? opt}</Text>
-                      <Text style={styles.campusLoc} numberOfLines={1}>{c ? `${c.city}, CA` : ''}</Text>
-                    </View>
-
-                    {selected ? (
-                      <View style={styles.campusCheck}>
-                        <Check size={14} color={Brand.inkOnBrand} weight="bold" />
-                      </View>
-                    ) : (
-                      <View style={styles.campusRadio} />
-                    )}
-                  </Tactile>
-                );
-              })
-            : skillSections.map((section) => (
-                <View key={section.label} style={styles.filterSection}>
-                  <Text style={styles.filterSectionLabel}>{section.label}</Text>
-                  <View style={styles.filterSectionChips}>
-                    {section.tags.map((opt) => {
-                      const selected = draftSkills.includes(opt);
-                      // Selected chips stay interactive even if supply moved on,
-                      // so a stale selection can always be un-picked.
-                      const unavailable = !selected && !availableSkills.has(opt.toLowerCase());
-                      return (
-                        <Tactile
-                          key={opt}
-                          haptic="selection"
-                          onPress={unavailable ? undefined : () => toggleDraftSkill(opt)}
-                          style={[
-                            styles.filterSheetChip,
-                            selected && styles.filterSheetChipSel,
-                            unavailable && styles.filterSheetChipOff,
-                          ]}
-                          accessibilityLabel={unavailable ? `${opt}, none nearby` : opt}
-                        >
-                          {selected && <Check size={13} color={Brand.inkOnBrand} weight="bold" />}
-                          <Text style={[styles.filterSheetChipText, selected && styles.filterSheetChipTextSel]}>{opt}</Text>
-                        </Tactile>
-                      );
-                    })}
-                  </View>
-                </View>
-              ))}
-          {(filterSheet === 'campus' ? sheetOptions.length === 0 : skillSections.length === 0) && (
+          {skillSections.map((section) => (
+            <View key={section.label} style={styles.filterSection}>
+              <Text style={styles.filterSectionLabel}>{section.label}</Text>
+              <View style={styles.filterSectionChips}>
+                {section.tags.map((opt) => {
+                  const selected = draftSkills.includes(opt);
+                  // Selected chips stay interactive even if supply moved on,
+                  // so a stale selection can always be un-picked.
+                  const unavailable = !selected && !availableSkills.has(opt.toLowerCase());
+                  return (
+                    <Tactile
+                      key={opt}
+                      haptic="selection"
+                      onPress={unavailable ? undefined : () => toggleDraftSkill(opt)}
+                      style={[
+                        styles.filterSheetChip,
+                        selected && styles.filterSheetChipSel,
+                        unavailable && styles.filterSheetChipOff,
+                      ]}
+                      accessibilityLabel={unavailable ? `${opt}, none nearby` : opt}
+                    >
+                      {selected && <Check size={13} color={Brand.inkOnBrand} weight="bold" />}
+                      <Text style={[styles.filterSheetChipText, selected && styles.filterSheetChipTextSel]}>{opt}</Text>
+                    </Tactile>
+                  );
+                })}
+              </View>
+            </View>
+          ))}
+          {skillSections.length === 0 && (
             <Text style={styles.filterSheetEmpty}>{filterSearch ? 'No matches.' : 'Nothing to filter on yet.'}</Text>
           )}
         </ScrollView>
@@ -1339,46 +1260,6 @@ const styles = StyleSheet.create({
   filterSheetChipText: { fontFamily: AmbitFont.semibold, fontSize: 14, color: Brand.inkBody },
   filterSheetChipTextSel: { color: Brand.inkOnBrand },
 
-  // ── Campus drawer rows (photo bleed + name + location + check) ─────────
-  filterSheetRows: { paddingBottom: 16, gap: 0 },
-  campusRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    height: 64,
-    paddingHorizontal: 16,
-    marginBottom: 8,
-    borderRadius: 10,
-    overflow: 'hidden',
-    backgroundColor: Brand.canvas,
-  },
-  // Photo occupies the right portion; the canvas→transparent fade over it
-  // blends its left edge into the row so the text stays legible.
-  campusImgWrap: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    right: 0,
-    width: '60%',
-  },
-  campusText: { flex: 1, minWidth: 0, gap: 2 },
-  campusName: { fontFamily: AmbitFont.medium, fontSize: 16, color: Brand.selected },
-  campusLoc: { fontFamily: AmbitFont.medium, fontSize: 13, color: Brand.inkLabel },
-  campusCheck: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: Brand.selected,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  campusRadio: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: Brand.inkPlaceholder,
-    backgroundColor: 'rgba(255,255,255,0.55)',
-  },
   filterSheetEmpty: { fontFamily: AmbitFont.body, fontSize: 14, color: Brand.inkMuted, paddingVertical: 12 },
   savedBadge: {
     position: 'absolute',
