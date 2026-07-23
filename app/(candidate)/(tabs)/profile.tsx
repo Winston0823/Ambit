@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -18,18 +18,17 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
-  Camera,
   Check,
   FileArrowUp,
-  MapPin,
   PencilSimpleLine,
   Plus,
   SignOut,
   X,
 } from 'phosphor-react-native';
-import { Chip, GlassSurface, HardShadow, Skeleton, TextField } from '../../../components/atoms';
+import { Avatar, Chip, GlassSurface, HardShadow, Skeleton, TextField } from '../../../components/atoms';
 import { router, useFocusEffect } from 'expo-router';
 import {
+  AvatarPickerSheet,
   DiscoveryCard,
   LegalModal,
   OwnerProfileCard,
@@ -41,6 +40,7 @@ import { useAuth } from '../../../context/AuthContext';
 import { setProfileRoleCache } from '../../../hooks/useProfileRole';
 import { supabase } from '../../../lib/supabase';
 import { readLocalFileAsArrayBuffer } from '../../../lib/messaging';
+import { fetchPeerPhotos } from '../../../lib/photoReveal';
 import {
   deletePortfolioItem,
   fetchPortfolioForUser,
@@ -52,7 +52,7 @@ import { toast } from '../../../lib/toast';
 import { optimistic } from '../../../lib/mutation';
 import { formatResponseRate, formatResponseTime } from '../../../lib/closureLoop';
 import { canonicalizeSkill } from '../../../lib/resume';
-import { CAMPUSES, SKILL_CATEGORIES } from '../../../data/mock';
+import { SKILL_CATEGORIES } from '../../../data/mock';
 import type { PortfolioItem, SeekerCardData } from '../../../data/mock';
 import {
   AmbitFont,
@@ -70,7 +70,12 @@ interface ProfileRow {
   skills: string[] | null;
   role: 'owner' | 'seeker' | null;
   campus_id: string | null;
-  photo_url: string | null;
+  /// Picked monster mark ("monster-07"). The public identity — photos are
+  /// gated behind mutual reveal and never selected here.
+  avatar_id: string | null;
+  /// Vicinity preference. true = open to in-person nearby, false = remote only,
+  /// null = unanswered.
+  open_to_nearby: boolean | null;
   /// Optional phone — only ever shared via the chat contact card, never on
   /// discovery. Null until the user adds one.
   phone: string | null;
@@ -147,8 +152,13 @@ export default function ProfileTab() {
 
   // Edit modal state
   const [skillsOpen, setSkillsOpen] = useState(false);
-  const [campusOpen, setCampusOpen] = useState(false);
+  const [avatarPickerOpen, setAvatarPickerOpen] = useState(false);
   const [roleOpen, setRoleOpen] = useState(false);
+
+  // The user's own photo thumbnail. Self is always revealed by the
+  // fetch_peer_photos RPC, so this is the reveal-aware source of truth for the
+  // "Change photo" row — never the (revoked-from-select) profiles.photo_url.
+  const [ownPhoto, setOwnPhoto] = useState<string | null>(null);
   const [activePortfolio, setActivePortfolio] = useState<PortfolioItem | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [legalDoc, setLegalDoc] = useState<LegalDoc | null>(null);
@@ -208,7 +218,7 @@ export default function ProfileTab() {
     setLoadError(false);
     const full = await supabase
       .from('profiles')
-      .select('id, name, vibe_blurb, skills, role, campus_id, photo_url, phone, response_rate, avg_response_minutes')
+      .select('id, name, vibe_blurb, skills, role, campus_id, avatar_id, open_to_nearby, phone, response_rate, avg_response_minutes')
       .eq('id', user.id)
       .maybeSingle();
     if (!full.error) {
@@ -221,7 +231,7 @@ export default function ProfileTab() {
     console.warn('profile fetch (full) failed, retrying baseline:', full.error.message);
     const base = await supabase
       .from('profiles')
-      .select('id, name, vibe_blurb, skills, role, campus_id, photo_url')
+      .select('id, name, vibe_blurb, skills, role, campus_id, avatar_id, open_to_nearby')
       .eq('id', user.id)
       .maybeSingle();
     if (base.error) {
@@ -239,11 +249,6 @@ export default function ProfileTab() {
     }
     setLoading(false);
   }, [user?.id]);
-
-  const campus = useMemo(
-    () => CAMPUSES.find((c) => c.id === profile?.campus_id) ?? null,
-    [profile?.campus_id],
-  );
 
   /// Update a single Supabase column and mirror the change locally for
   /// immediate UI feedback. Optimistic via the shared helper: the UI moves
@@ -295,9 +300,9 @@ export default function ProfileTab() {
 
     // Remember the current photo so a failed upload can snap back instead of
     // leaving a local file:// URI on display forever.
-    const prevPhoto = profile?.photo_url ?? null;
-    // Show the local URI immediately so the UI updates without waiting.
-    setProfile((p) => (p ? { ...p, photo_url: asset.uri } : p));
+    const prevPhoto = ownPhoto;
+    // Show the local URI immediately so the thumbnail updates without waiting.
+    setOwnPhoto(asset.uri);
 
     // Upload + persist real URL in the background. Use the ArrayBuffer
     // route from readLocalFileAsArrayBuffer — fetch().blob() silently
@@ -312,12 +317,12 @@ export default function ProfileTab() {
         .upload(path, bytes, { upsert: true, contentType: `image/${ext}` });
       const { data } = supabase.storage.from('avatars').getPublicUrl(path);
       await supabase.from('profiles').update({ photo_url: data.publicUrl }).eq('id', user.id);
-      setProfile((p) => (p ? { ...p, photo_url: data.publicUrl } : p));
+      setOwnPhoto(data.publicUrl);
     } catch (e: any) {
       console.warn('Avatar upload failed:', e?.message ?? e);
       // Revert the optimistic local URI — the upload never landed, so keep
-      // showing the previous (real) avatar rather than a dead file:// path.
-      setProfile((p) => (p ? { ...p, photo_url: prevPhoto } : p));
+      // showing the previous (real) photo rather than a dead file:// path.
+      setOwnPhoto(prevPhoto);
       toast.error("Couldn't upload your photo. Tap to try again.", {
         actionLabel: 'Retry',
         onAction: () => { void pickPhoto(); },
@@ -331,6 +336,19 @@ export default function ProfileTab() {
     if (!user) return;
     const items = await fetchPortfolioForUser(user.id);
     setPortfolio(items);
+  }, [user?.id]);
+
+  // Load the user's own photo thumbnail for the "Change photo" row. Self is
+  // always revealed by fetch_peer_photos, so this is the correct reveal-aware
+  // read — nothing shows when the user hasn't uploaded a photo.
+  useEffect(() => {
+    if (!user) { setOwnPhoto(null); return; }
+    let cancelled = false;
+    (async () => {
+      const photos = await fetchPeerPhotos([user.id]);
+      if (!cancelled) setOwnPhoto(photos.get(user.id) ?? null);
+    })();
+    return () => { cancelled = true; };
   }, [user?.id]);
 
   // Reload profile + portfolio every time the tab regains focus — so edits
@@ -513,7 +531,6 @@ export default function ProfileTab() {
     );
   }
 
-  const initial = (profile?.name ?? '?')[0]?.toUpperCase() ?? '?';
   const skills = profile?.skills ?? [];
 
   // The user's own card, shaped exactly like a discovery seeker card so the
@@ -522,8 +539,8 @@ export default function ProfileTab() {
     kind: 'seeker',
     id: user?.id ?? 'me',
     name: profile?.name ?? '',
-    photoUri: profile?.photo_url ?? null,
-    campusId: profile?.campus_id ?? '',
+    avatarId: profile?.avatar_id ?? 'monster-01',
+    openToNearby: profile?.open_to_nearby ?? null,
     skills,
     vibeBlurb: profile?.vibe_blurb ?? '',
     portfolio,
@@ -566,27 +583,46 @@ export default function ProfileTab() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Photo — centered squared avatar (royal→iris) + Change photo */}
+        {/* Identity — the monster mark is the public face. Below it two rows:
+            change the mark, or attach a real photo that only unlocks after a
+            mutual connection. */}
         <View style={styles.avatarBlock}>
-          <Pressable onPress={pickPhoto} style={styles.avatarSquare} accessibilityLabel="Change photo">
-            {profile?.photo_url ? (
-              <Image source={{ uri: profile.photo_url }} style={styles.avatarSquareImg} cachePolicy="memory-disk" transition={180} />
-            ) : (
-              <LinearGradient
-                colors={[Astra.royal, Astra.iris]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.avatarSquareImg}
-              >
-                <Text style={styles.avatarSquareInitial}>{initial}</Text>
-              </LinearGradient>
-            )}
-            <View style={styles.cameraChip}>
-              <Camera size={14} color={Brand.inkOnBrand} weight="fill" />
+          <Avatar avatarId={profile?.avatar_id} size={96} />
+        </View>
+
+        <View style={styles.identityRows}>
+          <Pressable
+            onPress={() => { if (Platform.OS !== 'web') Haptics.selectionAsync().catch(() => {}); setAvatarPickerOpen(true); }}
+            style={styles.identityRow}
+            accessibilityRole="button"
+            accessibilityLabel="Change icon"
+          >
+            <View style={styles.identityRowText}>
+              <Text style={styles.identityRowTitle}>Change icon</Text>
+              <Text style={styles.identityRowSub}>Your public mark</Text>
+            </View>
+            <View style={styles.identityRowRight}>
+              <Avatar avatarId={profile?.avatar_id} size={40} />
+              <PencilSimpleLine size={15} color={Brand.inkMuted} weight="regular" />
             </View>
           </Pressable>
-          <Pressable onPress={pickPhoto} hitSlop={8}>
-            <Text style={styles.changePhoto}>{profile?.photo_url ? 'Change photo' : 'Add photo'}</Text>
+
+          <Pressable
+            onPress={pickPhoto}
+            style={styles.identityRow}
+            accessibilityRole="button"
+            accessibilityLabel="Change photo"
+          >
+            <View style={styles.identityRowText}>
+              <Text style={styles.identityRowTitle}>Change photo</Text>
+              <Text style={styles.identityRowSub}>Revealed after you connect</Text>
+            </View>
+            <View style={styles.identityRowRight}>
+              {ownPhoto ? (
+                <Image source={{ uri: ownPhoto }} style={styles.photoThumb} cachePolicy="memory-disk" transition={180} />
+              ) : null}
+              <PencilSimpleLine size={15} color={Brand.inkMuted} weight="regular" />
+            </View>
           </Pressable>
         </View>
 
@@ -653,12 +689,37 @@ export default function ProfileTab() {
             maxLength={20}
             returnKeyType="done"
           />
-          <PickerField
-            label="Campus"
-            value={campus?.name ?? ''}
-            placeholder="Set your campus"
-            onPress={() => setCampusOpen(true)}
-          />
+          {/* Vicinity — a two-option segment (same field-row language as the
+              pickers). Writes open_to_nearby true/false with an optimistic
+              update. */}
+          <View style={styles.pickerWrap}>
+            <Text style={styles.pickerLabel}>Collaboration</Text>
+            <View style={styles.vicinitySegment}>
+              {([
+                { val: true,  label: 'In person nearby' },
+                { val: false, label: 'Remote only' },
+              ] as const).map((opt) => {
+                const active = profile?.open_to_nearby === opt.val;
+                return (
+                  <Pressable
+                    key={opt.label}
+                    onPress={() => {
+                      if (Platform.OS !== 'web') Haptics.selectionAsync().catch(() => {});
+                      updateField('open_to_nearby', opt.val);
+                    }}
+                    style={[styles.vicinityOpt, active && styles.vicinityOptActive]}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: active }}
+                    accessibilityLabel={opt.label}
+                  >
+                    <Text style={[styles.vicinityText, active && styles.vicinityTextActive]}>
+                      {opt.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
           <PickerField
             label="Looking to"
             value={profile?.role ? ROLE_LABEL[profile.role] : ''}
@@ -829,8 +890,7 @@ export default function ProfileTab() {
         <View style={styles.previewWrap}>
             <OwnerProfileCard
               name={profile?.name ?? ''}
-              photoUri={profile?.photo_url ?? null}
-              campusName={campus?.name ?? null}
+              avatarId={profile?.avatar_id ?? null}
               vibe={profile?.vibe_blurb ?? ''}
               skills={skills}
               projects={ownerProjects}
@@ -866,14 +926,11 @@ export default function ProfileTab() {
         }}
       />
 
-      <CampusEditModal
-        visible={campusOpen}
-        selected={profile?.campus_id ?? null}
-        onCancel={() => setCampusOpen(false)}
-        onSave={(id) => {
-          updateField('campus_id', id);
-          setCampusOpen(false);
-        }}
+      <AvatarPickerSheet
+        visible={avatarPickerOpen}
+        selectedId={profile?.avatar_id ?? null}
+        onSelect={(id) => updateField('avatar_id', id)}
+        onClose={() => setAvatarPickerOpen(false)}
       />
 
       <RoleEditModal
@@ -1057,70 +1114,6 @@ function SkillsEditModal({
               </Pressable>
             </HardShadow>
           </View>
-        </View>
-      </View>
-    </Modal>
-  );
-}
-
-// ─── CampusEditModal — single-select list ────────────────────────────────
-
-function CampusEditModal({
-  visible,
-  selected,
-  onCancel,
-  onSave,
-}: {
-  visible: boolean;
-  selected: string | null;
-  onCancel: () => void;
-  onSave: (id: string) => void;
-}) {
-  return (
-    <Modal transparent animationType="fade" visible={visible} onRequestClose={onCancel}>
-      <View style={modalStyles.root}>
-        <Pressable style={modalStyles.scrim} onPress={onCancel} />
-        <View style={modalStyles.sheet}>
-          <View style={modalStyles.sheetHeader}>
-            <Text style={modalStyles.sheetTitle}>Where do you go?</Text>
-            <Pressable onPress={onCancel} hitSlop={10}>
-              <X size={20} color={Brand.inkMuted} weight="bold" />
-            </Pressable>
-          </View>
-
-          <ScrollView contentContainerStyle={{ gap: 8 }}>
-            {CAMPUSES.map((c) => {
-              const isSelected = c.id === selected;
-              return (
-                <Pressable
-                  key={c.id}
-                  onPress={() => onSave(c.id)}
-                  style={[
-                    modalStyles.campusRow,
-                    isSelected && modalStyles.campusRowSelected,
-                  ]}
-                >
-                  <MapPin
-                    size={16}
-                    color={isSelected ? Brand.seekerInk : Brand.inkMuted}
-                    weight={isSelected ? 'fill' : 'regular'}
-                  />
-                  <View style={{ flex: 1 }}>
-                    <Text
-                      style={[
-                        modalStyles.campusName,
-                        isSelected && { color: Brand.seekerInk },
-                      ]}
-                    >
-                      {c.name}
-                    </Text>
-                    <Text style={modalStyles.campusCity}>{c.city}</Text>
-                  </View>
-                  {isSelected && <Check size={18} color={Brand.seekerInk} weight="bold" />}
-                </Pressable>
-              );
-            })}
-          </ScrollView>
         </View>
       </View>
     </Modal>
@@ -1324,25 +1317,46 @@ const styles = StyleSheet.create({
   segmentText: { fontFamily: AmbitFont.semibold, fontSize: 13.5, lineHeight: 18, textAlign: 'center', includeFontPadding: false, color: Brand.inkLabel },
   segmentTextActive: { fontFamily: AmbitFont.semibold, color: Brand.inkOnBrand },
 
-  // Centered squared avatar (royal→iris) + Change photo affordance.
-  avatarBlock: { alignItems: 'center', gap: 12, paddingTop: Space.md, paddingBottom: Space.sm },
-  avatarSquare: { width: 104, height: 104, borderRadius: 24, overflow: 'hidden' },
-  avatarSquareImg: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' },
-  avatarSquareInitial: { fontFamily: AmbitFont.display, fontSize: 44, color: Brand.inkOnBrand },
-  cameraChip: {
-    position: 'absolute',
-    right: 6,
-    bottom: 6,
-    width: 26,
-    height: 26,
-    borderRadius: 8,
-    backgroundColor: Brand.selected,
+  // Monster hero — the public identity mark, centered above the identity rows.
+  avatarBlock: { alignItems: 'center', paddingTop: Space.md, paddingBottom: Space.md },
+
+  // "Change icon" / "Change photo" rows — same bordered field-box language as
+  // the pickers, with a title + sub-copy on the left and the current
+  // mark/photo thumbnail on the right.
+  identityRows: { gap: 10 },
+  identityRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: Radii.sm,
+    backgroundColor: Brand.cardCream,
+    borderWidth: 1,
+    borderColor: Astra.hairlinePurple,
+  },
+  identityRowText: { flex: 1, minWidth: 0, gap: 2 },
+  identityRowTitle: { fontFamily: AmbitFont.semibold, fontSize: 14.5, color: Brand.inkPrimary },
+  identityRowSub: { fontFamily: AmbitFont.body, fontSize: 12.5, color: Brand.inkMuted },
+  identityRowRight: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  photoThumb: { width: 40, height: 40, borderRadius: 20 },
+
+  // Vicinity two-option segment — writes open_to_nearby true/false.
+  vicinitySegment: { flexDirection: 'row', gap: 8 },
+  vicinityOpt: {
+    flex: 1,
+    height: 46,
+    borderRadius: Radii.sm,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1.5,
-    borderColor: Brand.cardCream,
+    backgroundColor: Brand.cardCream,
+    borderWidth: 1,
+    borderColor: Astra.hairlinePurple,
   },
-  changePhoto: { fontFamily: AmbitFont.semibold, fontSize: 13.5, color: Brand.selected },
+  vicinityOptActive: { backgroundColor: Brand.selected, borderColor: Brand.selected },
+  vicinityText: { fontFamily: AmbitFont.semibold, fontSize: 13.5, color: Brand.inkBody },
+  vicinityTextActive: { color: Brand.inkOnBrand },
 
   // Inline TextField + picker stack.
   fieldStack: { gap: Space.md, marginTop: Space.md },

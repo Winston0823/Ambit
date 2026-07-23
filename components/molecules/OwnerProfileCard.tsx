@@ -3,7 +3,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Image } from 'expo-image';
 import { CaretRight } from 'phosphor-react-native';
-import { Chip, HardShadow, VibeQuote } from '../atoms';
+import { Avatar, Chip, HardShadow, VibeQuote } from '../atoms';
 import { AmbitFont, Astra, Brand, Radii } from '../../constants/theme';
 
 export interface OwnerProject {
@@ -17,8 +17,9 @@ export interface OwnerProject {
 
 interface Props {
   name: string;
-  photoUri: string | null;
-  campusName: string | null;
+  /// Owner's picked monster mark. The preview shows what strangers see, so the
+  /// identity is always the monster — never a real photo.
+  avatarId: string | null;
   vibe: string;
   skills: string[];
   projects: OwnerProject[];
@@ -38,10 +39,8 @@ const THUMBS: [string, string][] = [
 /// projects lead. Reused as the owner's own profile Preview AND as what a
 /// seeker sees when they tap an owner. Seekers sell themselves (DiscoveryCard);
 /// owners sell the opportunity (this).
-export function OwnerProfileCard({ name, photoUri, campusName, vibe, skills, projects, onProjectPress }: Props) {
-  const initial = (name?.trim()?.[0] ?? '?').toUpperCase();
-  const subtitle = ['Founder', campusName, `${projects.length} live project${projects.length === 1 ? '' : 's'}`]
-    .filter(Boolean)
+export function OwnerProfileCard({ name, avatarId, vibe, skills, projects, onProjectPress }: Props) {
+  const subtitle = ['Founder', `${projects.length} live project${projects.length === 1 ? '' : 's'}`]
     .join('  ·  ');
 
   return (
@@ -49,15 +48,7 @@ export function OwnerProfileCard({ name, photoUri, campusName, vibe, skills, pro
     <View style={styles.card}>
       <View style={styles.idz}>
         <View style={styles.idRow}>
-          <View style={styles.avatar}>
-            {photoUri ? (
-              <Image source={{ uri: photoUri }} style={styles.avatarImg} cachePolicy="memory-disk" transition={180} />
-            ) : (
-              <LinearGradient colors={[Astra.royal, Astra.iris]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.avatarImg}>
-                <Text style={styles.avatarInitial}>{initial}</Text>
-              </LinearGradient>
-            )}
-          </View>
+          <Avatar avatarId={avatarId} size={64} />
           <View style={styles.idText}>
             <Text style={styles.name} numberOfLines={1}>{name || 'Your name'}</Text>
             <Text style={styles.subtitle} numberOfLines={1}>{subtitle}</Text>
@@ -125,9 +116,6 @@ const styles = StyleSheet.create({
   },
   idz: { padding: 24 },
   idRow: { flexDirection: 'row', gap: 16, alignItems: 'center' },
-  avatar: { width: 64, height: 64, borderRadius: Radii.md, overflow: 'hidden' },
-  avatarImg: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' },
-  avatarInitial: { fontFamily: AmbitFont.display, fontSize: 26, color: Brand.inkOnBrand },
   idText: { flex: 1, minWidth: 0 },
   name: { fontFamily: AmbitFont.display, fontSize: 25, color: Brand.inkPrimary, lineHeight: 28 },
   subtitle: { fontFamily: AmbitFont.body, fontSize: 13, color: Brand.inkMuted, marginTop: 4 },
