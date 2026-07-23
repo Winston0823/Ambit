@@ -13,3 +13,4 @@ export { Skeleton } from './Skeleton';
 export { GlassSurface } from './GlassSurface';
 export { TopAppBar } from './TopAppBar';
 export { VibeQuote } from './VibeQuote';
+export { Avatar, AVATAR_IDS, avatarSource, randomAvatarId } from './Avatar';
