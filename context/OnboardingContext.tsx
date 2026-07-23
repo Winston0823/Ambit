@@ -77,7 +77,7 @@ interface Ctx {
 const OnboardingContext = createContext<Ctx | undefined>(undefined);
 
 export function OnboardingProvider({ children }: { children: ReactNode }) {
-  const [profile, setProfile] = useState<OnboardingProfile>(INITIAL);
+  const [profile, setProfile] = useState<OnboardingProfile>(() => ({ ...INITIAL, avatarId: randomAvatarId() }));
 
   const update: Ctx['update'] = (key, value) =>
     setProfile((p) => ({ ...p, [key]: value }));
