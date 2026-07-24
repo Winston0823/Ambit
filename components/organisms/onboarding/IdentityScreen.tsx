@@ -87,6 +87,19 @@ export function IdentityScreen({ onBack, onContinue }: Props) {
             placeholderTextColor={Brand.inkPlaceholder}
             autoCapitalize="words"
             style={styles.nameInput}
+            returnKeyType="next"
+          />
+
+          {/* Discovery v2: the card header is "name + what you do". Optional —
+              the card falls back gracefully when it's left blank. */}
+          <TextInput
+            value={profile.headline}
+            onChangeText={(v) => update('headline', v)}
+            placeholder="What you do — e.g. Full-stack & ML Engineer"
+            placeholderTextColor={Brand.inkPlaceholder}
+            autoCapitalize="sentences"
+            maxLength={60}
+            style={[styles.nameInput, styles.headlineInput]}
             returnKeyType="done"
           />
 
@@ -145,6 +158,9 @@ const styles = StyleSheet.create({
     borderWidth: 1.5, borderColor: Brand.borderDefault,
     fontFamily: AmbitFont.medium, fontSize: 16, color: Brand.inkBody,
     textAlign: 'center',
+  },
+  headlineInput: {
+    marginTop: 12,
   },
   photoRow: {
     flexDirection: 'row',

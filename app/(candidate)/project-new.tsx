@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { BackChevron, Button, OnboardingProgress, TextField } from '../../components/atoms';
+import { Button, OnboardingProgress, TextField } from '../../components/atoms';
 import { ProjectCoverField, ProjectDeadlineField } from '../../components/molecules';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
@@ -20,7 +20,10 @@ import { checkMinLength } from '../../lib/validation';
 import { toast } from '../../lib/toast';
 import { AmbitFont, Astra, Brand, Radii } from '../../constants/theme';
 
-const BLURB_MIN = 10;
+/// The pitch is the card: discovery v2 leads with a ~3-sentence elevator
+/// pitch, so nudge past one-liners without walling anyone off.
+const PITCH_MIN = 40;
+const PITCH_MAX = 320;
 
 /// Airy chip — brand-tan when selected (the "Vocabulary steer" — monochrome selection, no tan).
 function SteerChip({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) {
@@ -41,6 +44,7 @@ export default function ProjectNewScreen() {
 
   const [step, setStep] = useState(0);
   const [title, setTitle] = useState('');
+  const [industry, setIndustry] = useState('');
   const [vibe, setVibe] = useState('');
   const [roles, setRoles] = useState<string[]>([]);
   const [coverUri, setCoverUri] = useState<string | null>(null);
@@ -55,8 +59,8 @@ export default function ProjectNewScreen() {
   // Semantic validation → visible "why" copy under the offending field, so the
   // dimmed CTA is never a silent wall (audit theme 3). BLURB_MIN is now
   // communicated live ("N more characters to go").
-  const blurbCheck = checkMinLength(vibe, BLURB_MIN);
-  const detailsValid = title.trim().length > 0 && blurbCheck.valid;
+  const blurbCheck = checkMinLength(vibe, PITCH_MIN);
+  const detailsValid = title.trim().length > 0 && industry.trim().length > 0 && blurbCheck.valid;
   const whoValid = roles.length >= 1;
   const canAdvance = step === 0 ? detailsValid : whoValid;
 
@@ -69,6 +73,7 @@ export default function ProjectNewScreen() {
         .insert({
           owner_id: user.id,
           title: title.trim(),
+          industry: industry.trim(),
           vibe_blurb: vibe.trim(),
           required_skills: skillsForRoles(roles),
           roles_sought: roles,
@@ -115,6 +120,7 @@ export default function ProjectNewScreen() {
   // tap that would discard typed edits prompts a confirm first.
   const isDirty =
     title.trim().length > 0 ||
+    industry.trim().length > 0 ||
     vibe.trim().length > 0 ||
     roles.length > 0 ||
     coverUri !== null ||
@@ -127,18 +133,27 @@ export default function ProjectNewScreen() {
 
   return (
     <View style={styles.root}>
-      <View style={[styles.topRow, { marginTop: insets.top + 6 }]}>
-        <BackChevron onPress={onBack} />
-        {/* Circular ring progress, docked top-right. */}
-        <OnboardingProgress current={step + 1} total={2} />
-      </View>
-
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 6 }]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
+        {/* Header scrolls WITH the content (not sticky): inline back chevron
+            on the left, circular ring progress on the right. */}
+        <View style={styles.headerRow}>
+          <Pressable
+            onPress={onBack}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Back"
+            style={styles.backBtn}
+          >
+            <Text style={styles.backGlyph}>‹</Text>
+          </Pressable>
+          <OnboardingProgress current={step + 1} total={2} />
+        </View>
+
         <Text style={styles.kicker}>NEW PROJECT · {step + 1} OF 2</Text>
 
         {step === 0 ? (
@@ -156,13 +171,23 @@ export default function ProjectNewScreen() {
             </View>
             <View style={styles.field}>
               <TextField
-                label="One line that captures it"
+                label="Industry / topic"
+                value={industry}
+                onChangeText={setIndustry}
+                placeholder="Campus networking, fintech, health…"
+                maxLength={40}
+                returnKeyType="next"
+              />
+            </View>
+            <View style={styles.field}>
+              <TextField
+                label="Your elevator pitch"
                 value={vibe}
                 onChangeText={setVibe}
-                placeholder="A warmer way to find your team on campus…"
+                placeholder="Three sentences: what you're building, who it's for, and why it matters right now."
                 textarea
-                maxLength={140}
-                helper={blurbCheck.reason ?? undefined}
+                maxLength={PITCH_MAX}
+                helper={blurbCheck.reason ?? 'This is the first thing seekers read on your card — aim for about three sentences.'}
               />
             </View>
             <ProjectCoverField uri={coverUri} onChange={setCoverUri} />
@@ -198,14 +223,27 @@ export default function ProjectNewScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Brand.canvas },
-  topRow: {
+  headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'flex-end',
-    paddingHorizontal: 20,
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  backBtn: {
+    width: 44,
+    height: 44,
+    justifyContent: 'center',
+    marginLeft: -8,
+    paddingLeft: 8,
+  },
+  backGlyph: {
+    fontFamily: AmbitFont.body,
+    fontSize: 28,
+    color: Brand.inkMuted,
+    lineHeight: 32,
   },
   scroll: { flex: 1 },
-  scrollContent: { paddingHorizontal: 28, paddingTop: 8 },
+  scrollContent: { paddingHorizontal: 28 },
   kicker: {
     fontFamily: AmbitFont.body,
     fontSize: 11,

@@ -92,6 +92,7 @@ async function fetchProjectDeck(userId: string): Promise<ProjectCardData[]> {
     project_id: string;
     title: string;
     vibe_blurb: string;
+    industry?: string | null;
     required_skills: string[];
     roles_sought: string[];
     image_url: string | null;
@@ -129,6 +130,7 @@ async function fetchProjectDeck(userId: string): Promise<ProjectCardData[]> {
       ownerId: r.owner_id,
       title: r.title,
       pitch: r.vibe_blurb || r.title,
+      industry: r.industry ?? '',
       ownerName: ownerMap[r.owner_id]?.name ?? 'Unknown',
       ownerAvatarId: ownerMap[r.owner_id]?.avatarId ?? 'monster-01',
       ownerOpenToNearby: ownerMap[r.owner_id]?.openToNearby ?? null,
@@ -170,7 +172,7 @@ async function fetchSeekerDeck(userId: string): Promise<SeekerCardData[]> {
 
   const { data: seekers } = await supabase
     .from('profiles')
-    .select('id, name, avatar_id, open_to_nearby, skills, vibe_blurb, response_rate')
+    .select('id, name, headline, avatar_id, open_to_nearby, skills, vibe_blurb, response_rate')
     .in('id', seekerIds);
 
   if (!seekers || seekers.length === 0) return DEMO_FALLBACK ? MOCK_SEEKERS : [];
@@ -185,6 +187,7 @@ async function fetchSeekerDeck(userId: string): Promise<SeekerCardData[]> {
   return (seekers as {
     id: string;
     name: string;
+    headline: string | null;
     avatar_id: string | null;
     open_to_nearby: boolean | null;
     skills: string[];
@@ -200,6 +203,7 @@ async function fetchSeekerDeck(userId: string): Promise<SeekerCardData[]> {
       kind: 'seeker',
       id: s.id,
       name: s.name.trim(),
+      headline: s.headline ?? '',
       avatarId: s.avatar_id ?? 'monster-01',
       openToNearby: s.open_to_nearby ?? null,
       skills: s.skills ?? [],
@@ -753,6 +757,19 @@ export default function DiscoveryFeed() {
         <TopAppBar
           right={
             <View style={styles.headerActions}>
+              {/* Skills filter lives in the top bar now — with campus gone
+                  (039) a lone filter didn't deserve its own row. Sits left of
+                  refresh; Clear appears beside it only when a filter is on. */}
+              {!loading && !overviewVisible && (
+                <>
+                  {filterCount > 0 && (
+                    <Tactile haptic="tap" onPress={() => { setFilterSkills([]); }} style={styles.filterClear} accessibilityLabel="Clear filters">
+                      <Text style={styles.filterClearText}>Clear</Text>
+                    </Tactile>
+                  )}
+                  <FilterButton Icon={Sparkle} label="Skills" count={filterSkills.length} onPress={() => openFilterSheet('skills')} />
+                </>
+              )}
               <Pressable
                 onPress={handleRefresh}
                 hitSlop={10}
@@ -784,18 +801,6 @@ export default function DiscoveryFeed() {
           }
         />
       </View>
-
-      {/* Filter row — short rectangle buttons above the card. */}
-      {!loading && !overviewVisible && (
-        <View style={styles.filterRow}>
-          <FilterButton Icon={Sparkle} label="Skills" count={filterSkills.length} onPress={() => openFilterSheet('skills')} />
-          {filterCount > 0 && (
-            <Tactile haptic="tap" onPress={() => { setFilterSkills([]); }} style={styles.filterClear} accessibilityLabel="Clear filters">
-              <Text style={styles.filterClearText}>Clear</Text>
-            </Tactile>
-          )}
-        </View>
-      )}
 
       {/* Demo banner — only when the dev-only mock fallback is showing, so the
           placeholder cards (which dead-end "Reach out") read as demo data, not
@@ -1175,8 +1180,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
-  // ── Filter row (above the card) — borderless icon+label triggers.
-  filterRow: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: Space.lg - 4, paddingBottom: 4 },
+  // ── Skills filter trigger (lives in the top bar, left of refresh).
   filterBtn: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -108,6 +108,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: Space.md,
+    // Fixed-size cells never fill the sheet width exactly, so without this
+    // the whole grid hugs the left edge and the leftover width pools on the
+    // right. Centering splits the slack evenly.
+    justifyContent: 'center',
   },
   cell: {
     width: 88,

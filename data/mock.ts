@@ -129,6 +129,9 @@ export interface SeekerCardData {
   kind: 'seeker';
   id: string;
   name: string;
+  /// Short professional line under the name — "Full-stack & ML Engineer".
+  /// From `profiles.headline`. '' / undefined = fall back to major · year.
+  headline?: string;
   /// Picked monster mark, e.g. "monster-07". Keyed into the bundled avatar
   /// map (see components/atoms/Avatar). Real photos are gated behind mutual
   /// reveal and never ship on the discovery card.
@@ -164,6 +167,9 @@ export interface ProjectCardData {
   ownerId: string;
   title: string;
   pitch: string;
+  /// Industry / topic line under the title — "Campus networking", "Fintech".
+  /// From `projects.industry`. '' / undefined = line hidden.
+  industry?: string;
   ownerName: string;
   /// Owner's picked monster mark, e.g. "monster-03" — same avatar map as
   /// SeekerCardData.avatarId. Photos are gated behind mutual reveal.

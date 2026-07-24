@@ -36,7 +36,10 @@ const gradFor = (s: string): [string, string] => {
   return CARD_GRADS[h % CARD_GRADS.length];
 };
 
+/// Edit keeps a loose minimum (create enforces the full ~3-sentence pitch)
+/// so owners of legacy short-blurb projects aren't locked out of saving.
 const BLURB_MIN = 10;
+const PITCH_MAX = 320;
 
 /// Parse a `YYYY-MM-DD` date-only string into a local Date (avoids the UTC
 /// day-shift of `new Date('2026-04-30')`). Null/empty → null.
@@ -66,6 +69,7 @@ export default function ProjectEditScreen() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [editing, setEditing] = useState(true); // Edit first; Preview is a tap away
   const [title, setTitle] = useState('');
+  const [industry, setIndustry] = useState('');
   const [vibe, setVibe] = useState('');
   const [roles, setRoles] = useState<string[]>([]);
   const [active, setActive] = useState(true);
@@ -78,6 +82,7 @@ export default function ProjectEditScreen() {
   // its date-only string form so a re-parsed Date object doesn't read dirty.
   const [orig, setOrig] = useState<{
     title: string;
+    industry: string;
     vibe: string;
     roles: string[];
     coverUrl: string | null;
@@ -101,7 +106,7 @@ export default function ProjectEditScreen() {
     (async () => {
       const { data, error } = await supabase
         .from('projects')
-        .select('owner_id, title, vibe_blurb, roles_sought, image_url, needed_by, active')
+        .select('owner_id, title, industry, vibe_blurb, roles_sought, image_url, needed_by, active')
         .eq('id', id)
         .maybeSingle();
       if (cancelled) return;
@@ -121,6 +126,7 @@ export default function ProjectEditScreen() {
       const loadedActive: boolean = d.active;
       const loadedCover: string | null = d.image_url ?? null;
       setTitle(d.title ?? '');
+      setIndustry(d.industry ?? '');
       setVibe(d.vibe_blurb ?? '');
       setRoles(loadedRoles);
       setCoverUrl(loadedCover);
@@ -128,6 +134,7 @@ export default function ProjectEditScreen() {
       setActive(loadedActive);
       setOrig({
         title: d.title ?? '',
+        industry: d.industry ?? '',
         vibe: d.vibe_blurb ?? '',
         roles: loadedRoles,
         coverUrl: loadedCover,
@@ -166,6 +173,7 @@ export default function ProjectEditScreen() {
   const isDirty =
     !!orig &&
     (title.trim() !== orig.title.trim() ||
+      industry.trim() !== orig.industry.trim() ||
       vibe.trim() !== orig.vibe.trim() ||
       !sameRoles(roles, orig.roles) ||
       (neededBy ? toDateOnly(neededBy) : null) !== orig.neededBy ||
@@ -186,6 +194,7 @@ export default function ProjectEditScreen() {
         .from('projects')
         .update({
           title: title.trim(),
+          industry: industry.trim(),
           vibe_blurb: vibe.trim(),
           required_skills: skillsForRoles(roles),
           roles_sought: roles,
@@ -233,6 +242,7 @@ export default function ProjectEditScreen() {
     ownerId: user?.id ?? '',
     title: title.trim() || 'Untitled project',
     pitch: vibe.trim(),
+    industry: industry.trim(),
     ownerName: owner.name,
     ownerAvatarId: owner.avatarId,
     ownerOpenToNearby: owner.openToNearby,
@@ -242,7 +252,7 @@ export default function ProjectEditScreen() {
     gradient: gradFor(id ?? 'preview'),
     imageUri: pickedUri ?? coverUrl,
     neededBy: neededBy ? toDateOnly(neededBy) : null,
-  }), [id, user?.id, title, vibe, owner, roles, pickedUri, coverUrl, neededBy]);
+  }), [id, user?.id, title, industry, vibe, owner, roles, pickedUri, coverUrl, neededBy]);
 
   if (loading) {
     return (
@@ -302,12 +312,21 @@ export default function ProjectEditScreen() {
         </View>
         <View style={styles.field}>
           <TextField
-            label="One line that captures it"
+            label="Industry / topic"
+            value={industry}
+            onChangeText={setIndustry}
+            placeholder="Campus networking, fintech, health…"
+            maxLength={40}
+          />
+        </View>
+        <View style={styles.field}>
+          <TextField
+            label="Your elevator pitch"
             value={vibe}
             onChangeText={setVibe}
             textarea
-            maxLength={140}
-            helper={blurbCheck.reason ?? undefined}
+            maxLength={PITCH_MAX}
+            helper={blurbCheck.reason ?? 'Shown on your discovery card — aim for about three sentences.'}
           />
         </View>
 

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Avatar } from '../atoms';
 import {
   Brand,
   AmbitFont,
@@ -32,9 +33,9 @@ export function DiscoveryRowSummary({ card, onPress, trailing }: Props) {
       accessibilityRole="button"
     >
       {card.kind === 'seeker' ? (
-        <View style={[styles.swatch, { backgroundColor: Brand.seekerSurface }]}>
-          <Text style={styles.swatchSeekerInitial}>{card.name[0]?.toUpperCase() ?? '?'}</Text>
-        </View>
+        // The seeker's picked monster mark — same identity visual as the
+        // discovery card, not a letter monogram.
+        <Avatar avatarId={card.avatarId} size={48} />
       ) : (
         <LinearGradient
           colors={card.gradient}
@@ -91,11 +92,6 @@ const styles = StyleSheet.create({
     borderRadius: Radii.lg, // squared avatar (~25% of size), not a circle
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  swatchSeekerInitial: {
-    fontFamily: AmbitFont.display,
-    fontSize: 22,
-    color: Brand.seekerInk,
   },
   swatchProjectInitial: {
     fontFamily: AmbitFont.display,

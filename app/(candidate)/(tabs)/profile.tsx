@@ -18,6 +18,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
+  Camera,
   Check,
   FileArrowUp,
   PencilSimpleLine,
@@ -66,6 +67,9 @@ import {
 interface ProfileRow {
   id: string;
   name: string | null;
+  /// Short professional line under the name on the discovery card —
+  /// "Full-stack & ML Engineer". Null/'' = unset (card falls back).
+  headline: string | null;
   vibe_blurb: string | null;
   skills: string[] | null;
   role: 'owner' | 'seeker' | null;
@@ -143,9 +147,11 @@ export default function ProfileTab() {
   // pickers use, on blur. Seeded from the profile and re-synced whenever the
   // canonical row changes (focus refetch, résumé import, etc.).
   const [nameDraft, setNameDraft] = useState('');
+  const [headlineDraft, setHeadlineDraft] = useState('');
   const [aboutDraft, setAboutDraft] = useState('');
   const [phoneDraft, setPhoneDraft] = useState('');
   useEffect(() => { setNameDraft(profile?.name ?? ''); }, [profile?.name]);
+  useEffect(() => { setHeadlineDraft(profile?.headline ?? ''); }, [profile?.headline]);
   useEffect(() => { setAboutDraft(profile?.vibe_blurb ?? ''); }, [profile?.vibe_blurb]);
   useEffect(() => { setPhoneDraft(profile?.phone ?? ''); }, [profile?.phone]);
 
@@ -217,7 +223,7 @@ export default function ProfileTab() {
     setLoadError(false);
     const full = await supabase
       .from('profiles')
-      .select('id, name, vibe_blurb, skills, role, avatar_id, open_to_nearby, phone, response_rate, avg_response_minutes')
+      .select('id, name, headline, vibe_blurb, skills, role, avatar_id, open_to_nearby, phone, response_rate, avg_response_minutes')
       .eq('id', user.id)
       .maybeSingle();
     if (!full.error) {
@@ -230,7 +236,7 @@ export default function ProfileTab() {
     console.warn('profile fetch (full) failed, retrying baseline:', full.error.message);
     const base = await supabase
       .from('profiles')
-      .select('id, name, vibe_blurb, skills, role, avatar_id, open_to_nearby')
+      .select('id, name, headline, vibe_blurb, skills, role, avatar_id, open_to_nearby')
       .eq('id', user.id)
       .maybeSingle();
     if (base.error) {
@@ -274,7 +280,7 @@ export default function ProfileTab() {
   /// Commit an inline text field on blur — only writes when the trimmed draft
   /// actually diverges from the saved value, so a focus/blur with no change is
   /// a no-op (no needless network write or embed refresh).
-  const commitText = (field: 'name' | 'vibe_blurb' | 'phone', draft: string) => {
+  const commitText = (field: 'name' | 'headline' | 'vibe_blurb' | 'phone', draft: string) => {
     const next = draft.trim();
     if (next === (profile?.[field] ?? '')) return;
     updateField(field, next);
@@ -538,6 +544,7 @@ export default function ProfileTab() {
     kind: 'seeker',
     id: user?.id ?? 'me',
     name: profile?.name ?? '',
+    headline: profile?.headline ?? '',
     avatarId: profile?.avatar_id ?? 'monster-01',
     openToNearby: profile?.open_to_nearby ?? null,
     skills,
@@ -564,7 +571,19 @@ export default function ProfileTab() {
             <Text style={[styles.segmentText, editing && styles.segmentTextActive]}>Edit</Text>
           </Pressable>
           <Pressable
-            onPress={() => { if (Platform.OS !== 'web') Haptics.selectionAsync().catch(() => {}); setEditing(false); }}
+            onPress={() => {
+              if (Platform.OS !== 'web') Haptics.selectionAsync().catch(() => {});
+              // Flush pending drafts BEFORE leaving edit mode: fields commit
+              // on blur, but switching segments unmounts the inputs and RN
+              // doesn't reliably fire onBlur/onEndEditing on unmount — a
+              // still-focused field's text would silently never save.
+              // commitText no-ops when a draft matches the saved value.
+              commitText('name', nameDraft);
+              commitText('headline', headlineDraft);
+              commitText('vibe_blurb', aboutDraft);
+              commitText('phone', phoneDraft);
+              setEditing(false);
+            }}
             style={[styles.segmentBtn, !editing && styles.segmentBtnActive]}
             accessibilityLabel="Preview profile"
           >
@@ -582,46 +601,47 @@ export default function ProfileTab() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Identity — the monster mark is the public face. Below it two rows:
-            change the mark, or attach a real photo that only unlocks after a
-            mutual connection. */}
-        <View style={styles.avatarBlock}>
-          <Avatar avatarId={profile?.avatar_id} size={96} />
-        </View>
-
-        <View style={styles.identityRows}>
+        {/* Identity — the monster mark and the real photo side by side, each
+            a tappable circle with an edit badge pinned to its top-right. The
+            mark is the public face; the photo only unlocks after a mutual
+            connection. */}
+        <View style={styles.identityCircles}>
           <Pressable
             onPress={() => { if (Platform.OS !== 'web') Haptics.selectionAsync().catch(() => {}); setAvatarPickerOpen(true); }}
-            style={styles.identityRow}
+            style={styles.identityCircleItem}
             accessibilityRole="button"
             accessibilityLabel="Change icon"
           >
-            <View style={styles.identityRowText}>
-              <Text style={styles.identityRowTitle}>Change icon</Text>
-              <Text style={styles.identityRowSub}>Your public mark</Text>
+            <View style={styles.identityCircleWrap}>
+              <Avatar avatarId={profile?.avatar_id} size={96} />
+              <View style={styles.editBadge}>
+                <PencilSimpleLine size={14} color={Brand.inkBody} weight="regular" />
+              </View>
             </View>
-            <View style={styles.identityRowRight}>
-              <Avatar avatarId={profile?.avatar_id} size={40} />
-              <PencilSimpleLine size={15} color={Brand.inkMuted} weight="regular" />
-            </View>
+            <Text style={styles.identityCircleTitle}>Icon</Text>
+            <Text style={styles.identityCircleSub}>Your public mark</Text>
           </Pressable>
 
           <Pressable
             onPress={pickPhoto}
-            style={styles.identityRow}
+            style={styles.identityCircleItem}
             accessibilityRole="button"
             accessibilityLabel="Change photo"
           >
-            <View style={styles.identityRowText}>
-              <Text style={styles.identityRowTitle}>Change photo</Text>
-              <Text style={styles.identityRowSub}>Revealed after you connect</Text>
-            </View>
-            <View style={styles.identityRowRight}>
+            <View style={styles.identityCircleWrap}>
               {ownPhoto ? (
-                <Image source={{ uri: ownPhoto }} style={styles.photoThumb} cachePolicy="memory-disk" transition={180} />
-              ) : null}
-              <PencilSimpleLine size={15} color={Brand.inkMuted} weight="regular" />
+                <Image source={{ uri: ownPhoto }} style={styles.photoCircle} cachePolicy="memory-disk" transition={180} />
+              ) : (
+                <View style={[styles.photoCircle, styles.photoCircleEmpty]}>
+                  <Camera size={30} color={Brand.inkMuted} weight="duotone" />
+                </View>
+              )}
+              <View style={styles.editBadge}>
+                <PencilSimpleLine size={14} color={Brand.inkBody} weight="regular" />
+              </View>
             </View>
+            <Text style={styles.identityCircleTitle}>Photo</Text>
+            <Text style={styles.identityCircleSub}>Revealed after you connect</Text>
           </Pressable>
         </View>
 
@@ -664,6 +684,16 @@ export default function ProfileTab() {
             onEndEditing={() => commitText('name', nameDraft)}
             onBlur={() => commitText('name', nameDraft)}
             placeholder="Add your name"
+            maxLength={60}
+            returnKeyType="done"
+          />
+          <TextField
+            label="What you do"
+            value={headlineDraft}
+            onChangeText={setHeadlineDraft}
+            onEndEditing={() => commitText('headline', headlineDraft)}
+            onBlur={() => commitText('headline', headlineDraft)}
+            placeholder="e.g. Full-stack & ML Engineer"
             maxLength={60}
             returnKeyType="done"
           />
@@ -1316,30 +1346,46 @@ const styles = StyleSheet.create({
   segmentText: { fontFamily: AmbitFont.semibold, fontSize: 13.5, lineHeight: 18, textAlign: 'center', includeFontPadding: false, color: Brand.inkLabel },
   segmentTextActive: { fontFamily: AmbitFont.semibold, color: Brand.inkOnBrand },
 
-  // Monster hero — the public identity mark, centered above the identity rows.
-  avatarBlock: { alignItems: 'center', paddingTop: Space.md, paddingBottom: Space.md },
-
-  // "Change icon" / "Change photo" rows — same bordered field-box language as
-  // the pickers, with a title + sub-copy on the left and the current
-  // mark/photo thumbnail on the right.
-  identityRows: { gap: 10 },
-  identityRow: {
+  // Identity circles — monster mark + real photo side by side, each with an
+  // edit badge (base circle + pencil) pinned top-right, captioned beneath.
+  identityCircles: {
     flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'flex-start',
+    gap: 36,
+    paddingTop: Space.md,
+    paddingBottom: Space.sm,
+  },
+  identityCircleItem: { alignItems: 'center', maxWidth: 140 },
+  identityCircleWrap: { position: 'relative' },
+  editBadge: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: Radii.sm,
+    justifyContent: 'center',
     backgroundColor: Brand.cardCream,
     borderWidth: 1,
     borderColor: Astra.hairlinePurple,
+    shadowColor: Astra.royal,
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 3,
   },
-  identityRowText: { flex: 1, minWidth: 0, gap: 2 },
-  identityRowTitle: { fontFamily: AmbitFont.semibold, fontSize: 14.5, color: Brand.inkPrimary },
-  identityRowSub: { fontFamily: AmbitFont.body, fontSize: 12.5, color: Brand.inkMuted },
-  identityRowRight: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  photoThumb: { width: 40, height: 40, borderRadius: 20 },
+  photoCircle: { width: 96, height: 96, borderRadius: 48 },
+  photoCircleEmpty: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Brand.seekerSurface,
+    borderWidth: 1,
+    borderColor: Astra.hairlinePurple,
+  },
+  identityCircleTitle: { fontFamily: AmbitFont.semibold, fontSize: 13.5, color: Brand.inkPrimary, marginTop: 10 },
+  identityCircleSub: { fontFamily: AmbitFont.body, fontSize: 11.5, color: Brand.inkMuted, marginTop: 2, textAlign: 'center' },
 
   // Vicinity two-option segment — writes open_to_nearby true/false.
   vicinitySegment: { flexDirection: 'row', gap: 8 },

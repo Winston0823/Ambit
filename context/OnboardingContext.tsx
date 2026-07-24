@@ -24,6 +24,9 @@ export interface OnboardingProfile {
 
   // Identity
   name: string;
+  /// Short professional line shown under the name on the discovery card —
+  /// "Full-stack & ML Engineer". Optional; '' = unset.
+  headline: string;
   avatarId: string;
   photoUri: string | null;
 
@@ -52,6 +55,7 @@ export interface OnboardingProfile {
 const INITIAL: OnboardingProfile = {
   eduEmail: '',
   name: '',
+  headline: '',
   avatarId: 'monster-01',
   photoUri: null,
   vibeBlurb: '',
@@ -88,7 +92,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
   const hydrate = async (userId: string): Promise<OnboardingProfile> => {
     const { data, error } = await supabase
       .from('profiles')
-      .select('edu_email, name, avatar_id, vibe_blurb, skills, role, open_to_nearby, github_url, linkedin_url, portfolio_url, resume_url')
+      .select('edu_email, name, headline, avatar_id, vibe_blurb, skills, role, open_to_nearby, github_url, linkedin_url, portfolio_url, resume_url')
       .eq('id', userId)
       .maybeSingle();
     if (error || !data) return profile;
@@ -96,6 +100,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
       ...profile,
       eduEmail: data.edu_email ?? profile.eduEmail,
       name: data.name ?? profile.name,
+      headline: data.headline ?? profile.headline,
       avatarId: data.avatar_id ?? profile.avatarId,
       vibeBlurb: data.vibe_blurb ?? profile.vibeBlurb,
       skills: data.skills ?? profile.skills,
@@ -141,6 +146,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
       id: userId,
       edu_email: profile.eduEmail || userEmail,
       name: profile.name,
+      headline: profile.headline.trim(),
       avatar_id: profile.avatarId,
       vibe_blurb: profile.vibeBlurb,
       skills: profile.skills,
