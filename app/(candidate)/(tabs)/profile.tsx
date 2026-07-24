@@ -69,7 +69,6 @@ interface ProfileRow {
   vibe_blurb: string | null;
   skills: string[] | null;
   role: 'owner' | 'seeker' | null;
-  campus_id: string | null;
   /// Picked monster mark ("monster-07"). The public identity — photos are
   /// gated behind mutual reveal and never selected here.
   avatar_id: string | null;
@@ -218,7 +217,7 @@ export default function ProfileTab() {
     setLoadError(false);
     const full = await supabase
       .from('profiles')
-      .select('id, name, vibe_blurb, skills, role, campus_id, avatar_id, open_to_nearby, phone, response_rate, avg_response_minutes')
+      .select('id, name, vibe_blurb, skills, role, avatar_id, open_to_nearby, phone, response_rate, avg_response_minutes')
       .eq('id', user.id)
       .maybeSingle();
     if (!full.error) {
@@ -231,7 +230,7 @@ export default function ProfileTab() {
     console.warn('profile fetch (full) failed, retrying baseline:', full.error.message);
     const base = await supabase
       .from('profiles')
-      .select('id, name, vibe_blurb, skills, role, campus_id, avatar_id, open_to_nearby')
+      .select('id, name, vibe_blurb, skills, role, avatar_id, open_to_nearby')
       .eq('id', user.id)
       .maybeSingle();
     if (base.error) {
