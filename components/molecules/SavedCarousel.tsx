@@ -2,7 +2,7 @@ import React, { useRef } from 'react';
 import { Animated, Dimensions, Pressable, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import type { DiscoveryCardData } from '../../data/mock';
-import { HardShadow } from '../atoms';
+import { Avatar, HardShadow } from '../atoms';
 import { AmbitFont, Astra, Brand, Radii, Space, TypeScale } from '../../constants/theme';
 
 const { width: SCREEN_W } = Dimensions.get('window');
@@ -59,18 +59,18 @@ export function SavedCarousel({ cards, onPress }: Props) {
             >
               <HardShadow radius={Radii.card} offset={4} style={styles.shadowFill}>
               <Pressable onPress={() => onPress(card)} style={styles.card} accessibilityLabel={`Open ${title}`}>
-                {isSeeker && card.photoUri ? (
-                  <Animated.Image
-                    source={{ uri: card.photoUri }}
-                    style={[styles.photo, { transform: [{ translateX: photoShift }, { scale: 1.12 }] }]}
-                  />
-                ) : (
-                  <LinearGradient
-                    colors={[Astra.royal, Astra.iris]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={StyleSheet.absoluteFill}
-                  />
+                <LinearGradient
+                  colors={[Astra.royal, Astra.iris]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={StyleSheet.absoluteFill}
+                />
+                {isSeeker && (
+                  /// Monster mark drifts subtly for depth as the rail scrolls —
+                  /// real photos stay gated behind mutual reveal.
+                  <Animated.View style={[styles.avatarWrap, { transform: [{ translateX: photoShift }] }]}>
+                    <Avatar avatarId={card.avatarId} size={76} />
+                  </Animated.View>
                 )}
                 <LinearGradient colors={['transparent', 'rgba(12,0,34,0.88)']} style={styles.scrim} />
                 <View style={styles.meta}>
@@ -103,7 +103,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     backgroundColor: Astra.royal,
   },
-  photo: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },
+  avatarWrap: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', paddingBottom: 44 },
   scrim: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '62%' },
   meta: { position: 'absolute', left: 12, right: 12, bottom: 12 },
   eyebrow: {

@@ -68,9 +68,8 @@ export default function ProjectEditScreen() {
   const [title, setTitle] = useState('');
   const [vibe, setVibe] = useState('');
   const [roles, setRoles] = useState<string[]>([]);
-  const [campusId, setCampusId] = useState<string | null>(null);
   const [active, setActive] = useState(true);
-  const [owner, setOwner] = useState<{ name: string; photo: string | null }>({ name: '', photo: null });
+  const [owner, setOwner] = useState<{ name: string; avatarId: string; openToNearby: boolean | null }>({ name: '', avatarId: 'monster-01', openToNearby: null });
   const [coverUrl, setCoverUrl] = useState<string | null>(null); // saved cover (remote)
   const [pickedUri, setPickedUri] = useState<string | null>(null); // new local pick, uploaded on save
   const [neededBy, setNeededBy] = useState<Date | null>(null);
@@ -102,7 +101,7 @@ export default function ProjectEditScreen() {
     (async () => {
       const { data, error } = await supabase
         .from('projects')
-        .select('owner_id, title, vibe_blurb, roles_sought, image_url, needed_by, campus_id, active')
+        .select('owner_id, title, vibe_blurb, roles_sought, image_url, needed_by, active')
         .eq('id', id)
         .maybeSingle();
       if (cancelled) return;
@@ -124,7 +123,6 @@ export default function ProjectEditScreen() {
       setTitle(d.title ?? '');
       setVibe(d.vibe_blurb ?? '');
       setRoles(loadedRoles);
-      setCampusId(d.campus_id ?? null);
       setCoverUrl(loadedCover);
       setNeededBy(parseDateOnly(loadedNeededBy));
       setActive(loadedActive);
@@ -140,10 +138,14 @@ export default function ProjectEditScreen() {
       // Owner identity for the Preview card (how seekers see the project).
       const { data: prof } = await supabase
         .from('profiles')
-        .select('name, photo_url')
+        .select('name, avatar_id, open_to_nearby')
         .eq('id', user.id)
         .maybeSingle();
-      if (!cancelled && prof) setOwner({ name: (prof as any).name ?? '', photo: (prof as any).photo_url ?? null });
+      if (!cancelled && prof) setOwner({
+        name: (prof as any).name ?? '',
+        avatarId: (prof as any).avatar_id ?? 'monster-01',
+        openToNearby: (prof as any).open_to_nearby ?? null,
+      });
     })();
     return () => { cancelled = true; };
   }, [id, user?.id]);
@@ -187,7 +189,6 @@ export default function ProjectEditScreen() {
           vibe_blurb: vibe.trim(),
           required_skills: skillsForRoles(roles),
           roles_sought: roles,
-          campus_id: campusId,
           active,
           needed_by: neededBy ? toDateOnly(neededBy) : null,
           ...(nextImageUrl ? { image_url: nextImageUrl } : {}),
@@ -233,15 +234,15 @@ export default function ProjectEditScreen() {
     title: title.trim() || 'Untitled project',
     pitch: vibe.trim(),
     ownerName: owner.name,
-    ownerPhotoUri: owner.photo,
-    ownerCampusId: campusId ?? '',
+    ownerAvatarId: owner.avatarId,
+    ownerOpenToNearby: owner.openToNearby,
     whyMatched: '',
     skillsSought: skillsForRoles(roles),
     rolesSought: roles,
     gradient: gradFor(id ?? 'preview'),
     imageUri: pickedUri ?? coverUrl,
     neededBy: neededBy ? toDateOnly(neededBy) : null,
-  }), [id, user?.id, title, vibe, owner, campusId, roles, pickedUri, coverUrl, neededBy]);
+  }), [id, user?.id, title, vibe, owner, roles, pickedUri, coverUrl, neededBy]);
 
   if (loading) {
     return (

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Alert,
   Pressable,
@@ -43,20 +43,9 @@ export default function ProjectNewScreen() {
   const [title, setTitle] = useState('');
   const [vibe, setVibe] = useState('');
   const [roles, setRoles] = useState<string[]>([]);
-  const [campusId, setCampusId] = useState<string | null>(null);
   const [coverUri, setCoverUri] = useState<string | null>(null);
   const [neededBy, setNeededBy] = useState<Date | null>(null);
   const [submitting, setSubmitting] = useState(false);
-
-  useEffect(() => {
-    if (!user) return;
-    let cancelled = false;
-    (async () => {
-      const { data } = await supabase.from('profiles').select('campus_id').eq('id', user.id).maybeSingle();
-      if (!cancelled && data?.campus_id) setCampusId(data.campus_id);
-    })();
-    return () => { cancelled = true; };
-  }, [user?.id]);
 
   const allRoles = useMemo(() => ROLE_CATEGORIES.flatMap((c) => c.roles), []);
 
@@ -83,7 +72,6 @@ export default function ProjectNewScreen() {
           vibe_blurb: vibe.trim(),
           required_skills: skillsForRoles(roles),
           roles_sought: roles,
-          campus_id: campusId,
           needed_by: neededBy ? toDateOnly(neededBy) : null,
         })
         .select('id')

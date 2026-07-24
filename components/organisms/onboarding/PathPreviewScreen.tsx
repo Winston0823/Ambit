@@ -22,7 +22,7 @@ type PhosphorIcon = React.ComponentType<IconProps>;
 /// Previews the short gate as a vertical path so the user sees the finish
 /// line up front — "just a few quick steps" is one of the strongest
 /// anti-drop-off cues. Generic order (seeker max); the actual flow branches
-/// later for owners/professors.
+/// later for owners.
 const PATH: { icon: PhosphorIcon; label: string }[] = [
   { icon: ShieldCheck,   label: 'Verify your school email' },
   { icon: GraduationCap, label: 'Tell us who you are' },

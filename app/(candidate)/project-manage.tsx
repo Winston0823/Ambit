@@ -369,13 +369,6 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   stripe: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 3 },
-  avatar: { width: 44, height: 44, borderRadius: Radii.md },
-  avatarFallback: {
-    backgroundColor: Brand.surface2,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarInitial: { fontFamily: AmbitFont.display, fontSize: 18, color: Brand.inkLabel },
   candidateText: { flex: 1 },
   candidateName: {
     fontFamily: AmbitFont.body,

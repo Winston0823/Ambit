@@ -16,9 +16,8 @@ import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Swipeable } from 'react-native-gesture-handler';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Image } from 'expo-image';
 import { CaretLeft, NotePencil, PaperPlaneTilt, Rocket, Trash, X } from 'phosphor-react-native';
-import { GlassSurface, HardShadow, Tactile } from '../../components/atoms';
+import { Avatar, GlassSurface, HardShadow, Tactile } from '../../components/atoms';
 import { DiscoveryCard, ReachOutComposer, ReachOutLimitSheet, SavedCarousel } from '../../components/molecules';
 import { Motion } from '../../constants/motion';
 import { haptics } from '../../lib/haptics';
@@ -250,7 +249,6 @@ export default function SavedScreen() {
           const isSeeker = card.kind === 'seeker';
           const title = isSeeker ? card.name : card.title;
           const sub = isSeeker ? (card.major ?? card.vibeBlurb) : card.ownerName;
-          const initial = title.charAt(0).toUpperCase() || '?';
           const hasNote = !!notes[card.id];
 
           return (
@@ -286,10 +284,11 @@ export default function SavedScreen() {
                   }}
                 >
                   <Pressable style={styles.rowMain} onPress={() => handleRowPress(card)} accessibilityRole="button">
-                    {/* Squared avatar/thumb — royal→iris gradient with Playfair
-                        initials (seeker) or a project icon. Seeker photos win. */}
-                    {isSeeker && card.photoUri ? (
-                      <Image source={{ uri: card.photoUri }} style={styles.avatar} cachePolicy="memory-disk" transition={180} />
+                    {/* Pre-connection identity — seekers get their monster mark
+                        (photos are gated behind mutual reveal); projects get a
+                        royal→iris gradient thumb with a rocket. */}
+                    {isSeeker ? (
+                      <Avatar avatarId={card.avatarId} size={52} />
                     ) : (
                       <LinearGradient
                         colors={[Astra.royal, Astra.iris]}
@@ -297,11 +296,7 @@ export default function SavedScreen() {
                         end={{ x: 1, y: 1 }}
                         style={styles.avatar}
                       >
-                        {isSeeker ? (
-                          <Text style={styles.avatarInitial}>{initial}</Text>
-                        ) : (
-                          <Rocket size={22} color={Brand.inkOnBrand} weight="fill" />
-                        )}
+                        <Rocket size={22} color={Brand.inkOnBrand} weight="fill" />
                       </LinearGradient>
                     )}
 
@@ -574,11 +569,6 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  avatarInitial: {
-    fontFamily: AmbitFont.display,
-    fontSize: 22,
-    color: Brand.inkOnBrand,
   },
   meta: {
     flex: 1,
