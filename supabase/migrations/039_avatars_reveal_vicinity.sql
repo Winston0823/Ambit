@@ -50,11 +50,59 @@ $$;
 revoke all on function fetch_peer_photos(uuid[]) from public;
 grant execute on function fetch_peer_photos(uuid[]) to authenticated;
 
--- Hardening: the RPC is the ONLY read path for photo_url. Column-level
--- revoke narrows any existing table-level SELECT so authenticated can no
--- longer read profiles.photo_url directly (Postgres supports column-level
--- revoke on top of a table-level grant).
-revoke select (photo_url) on profiles from authenticated;
+-- Hardening: fetch_peer_photos is the ONLY read path for photo_url.
+--
+-- WHY a bare `revoke select (photo_url)` is a NO-OP: Postgres UNIONs
+-- table-level and column-level privileges. Supabase's default grants hand
+-- `authenticated` (and `anon`) table-level SELECT on every public table, so
+-- a column-level revoke leaves the table-level SELECT intact and photo_url
+-- stays readable via a direct PostgREST select. The only way to withhold a
+-- single column is to drop the table-level SELECT entirely and re-grant it
+-- column-by-column for every column EXCEPT photo_url.
+--
+-- COLUMN LIST is the authoritative post-039 set. profiles' base table DDL is
+-- provisioned outside these migrations (Supabase-managed), so the list is
+-- derived from: seed inserts (supabase/seed.sql + supabase/seeds/*), every
+-- `alter table profiles add column` migration (001 vibe_embedding /
+-- reliability_score / last_meaningful_action_at, 005 response_rate /
+-- avg_response_minutes, 015 last_active_at, 025 github_url / linkedin_url /
+-- portfolio_url / resume_url, 026 is_seed, 034 phone, this file's avatar_id /
+-- open_to_nearby), and cross-checked against every client `.from('profiles')
+-- .select(...)` in the app — every selected column is present below.
+-- demographic + campus_id are dropped in section 4, so they are absent.
+--
+-- SECURITY DEFINER functions (fetch_peer_photos above, get_inbox, the compat_*
+-- RPCs) execute with owner privileges and BYPASS these column grants — they
+-- still read photo_url and every other column freely. service_role likewise
+-- has bypassrls + full grants and is unaffected. No trigger reads photo_url
+-- through the authenticated/anon roles, so nothing else regresses.
+revoke select on profiles from authenticated;
+grant select (
+  id, edu_email, name, role,
+  vibe_blurb, skills, vibe_embedding,
+  avatar_id, open_to_nearby,
+  reliability_score, response_rate, avg_response_minutes,
+  last_meaningful_action_at, last_active_at,
+  github_url, linkedin_url, portfolio_url, resume_url,
+  phone, is_seed, updated_at
+) on profiles to authenticated;
+
+-- anon: Supabase's default grants also give `anon` table-level SELECT on
+-- profiles. anon is already denied every profiles row by RLS (012 created the
+-- sole permissive SELECT policy `to authenticated`; there is NO `to anon`
+-- policy), so anon reads nothing today regardless. We apply the same
+-- revoke + column re-grant anyway as defense-in-depth: it guarantees the
+-- photo_url lockdown holds even if an anon-scoped RLS policy is ever added.
+revoke select on profiles from anon;
+grant select (
+  id, edu_email, name, role,
+  vibe_blurb, skills, vibe_embedding,
+  avatar_id, open_to_nearby,
+  reliability_score, response_rate, avg_response_minutes,
+  last_meaningful_action_at, last_active_at,
+  github_url, linkedin_url, portfolio_url, resume_url,
+  phone, is_seed, updated_at
+) on profiles to anon;
 
 -- ── 4. professors + campus removal ──────────────────────────
 -- ORDERING: compat_projects_for_seeker's body selects projects.campus_id
